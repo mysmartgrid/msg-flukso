@@ -1,0 +1,4 @@
+### network configuration
+config 'internal' 'network'
+	option 'interface' 'eth0'
+
