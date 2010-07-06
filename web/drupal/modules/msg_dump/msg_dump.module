@@ -110,13 +110,13 @@ function msg_dump_setup_form_validate($form, &$form_state) {
 }
 
 function msg_dump_setup_form_submit($form, &$form_state) {
+  global $user;
   $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
   $to = strtotime(implode('-',$form_state['values']['to']) . '00:00');
   $file = md5(uniqid(rand(), TRUE));
 
   $meter = db_result(db_query("SELECT meter FROM {logger_meters} LEFT JOIN (logger_devices) ON logger_meters.device=logger_devices.device WHERE serial=%d AND type='electricity'", $form_state['values']['flukso']));
   $result = db_result(db_query("INSERT INTO {msg_dump} (meter, uid, startdate, stopdate, file) VALUES ('%s', %d, %d, %d, '%s')", $meter, $user->uid, $from, $to, $file));
-  drupal_set_message($meter);
 }
 
 function theme_msg_dump_setup($form) {
@@ -125,17 +125,20 @@ function theme_msg_dump_setup($form) {
   $now = $now->format("U");
   $rows = array();
 
-  $result = db_query("SELECT meter, startdate, stopdate, file
-                      FROM {msg_dump}
-                      WHERE uid = %d
-		      ORDER BY startdate", $user->uid);
+  $result = db_query("SELECT serial, startdate, stopdate, file
+                      FROM `logger_meters` LEFT JOIN (
+                      `logger_devices` , `msg_dump`
+                      ) ON ( msg_dump.meter = logger_meters.meter
+                      AND logger_meters.device = logger_devices.device )
+                      WHERE msg_dump.uid = %d
+		                  ORDER BY stopdate", $user->uid);
 
   while ($device = db_fetch_object($result)) {
     $startdate = new DateTime('@' . $device->startdate);
     $stopdate = new DateTime('@' . $device->stopdate);
 
     $row = array();
-    $row[] = $device->meter;
+    $row[] = $device->serial;
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
     $row[] = file_exists('/sites/all/modules/msg_dump/dumps/' . $device->file) && $stopdate<$now?'<a href="' . $device->file . '.sqlite">' . $device->file . '</a>':$device->file;
