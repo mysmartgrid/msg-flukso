@@ -1,0 +1,4 @@
+; $Id$
+name = High resolution dump
+description = Dump data from Flukso in high resolution
+core = 6.x

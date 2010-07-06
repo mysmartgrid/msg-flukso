@@ -1,0 +1,159 @@
+<?php
+// $Id$
+
+/**
+* Display help and module information
+* @param path which path of the site we're displaying help
+* @param arg array that holds the current path as would be returned from arg() function
+* @return help text for the path
+*/
+function msg_dump_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#msg_dump":
+      $output = '<p>'.t("This module dumps values given by a Flukso in high resolution to a sqlite database and provides the possibility to download this data.").'</p>';
+      break;
+  }
+  return $output;
+} //msg_dump_help
+
+/**
+* Valid permissions for this module
+* @return array An array of valid permissions for the onthisdate module
+*/
+function msg_dump_perm() {
+  return array('msg_dump');
+} // function msg_dump_perm()
+
+/**
+*/
+function msg_dump_menu() {
+  $items = array();
+  $items['setup'] = array(
+    'title' => t("Dump values"),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('msg_dump_setup'),
+    'access arguments' => array('msg_dump'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+} // function msg_dump_menu()
+
+function msg_dump_cron() {
+  //run dump here
+}
+
+function msg_dump_theme() {
+  return array(
+    'msg_dump_setup' => array(
+      'arguments' => array('form' => NULL)
+    ),
+    'msg_dump_setup_list' => array(
+      'arguments' => array('items' => NULL)
+    ),
+  );
+}
+
+function msg_dump_setup() {
+  global $user;
+  $date = new DateTime('now');
+  $date->modify('+1 day');
+  $newdate = new DateTime('now');
+  $newdate->modify('+1 week');
+  $result = db_query('SELECT serial FROM {logger_devices} WHERE uid=%d', $user->uid);
+  $fluksos = array();
+  while($serial = db_fetch_object($result)) {
+    $fluksos[$serial->serial] = 'WA' . $serial->serial;
+  }
+  $form['flukso'] = array(
+    '#type' => 'select',
+    '#options' => $fluksos,
+    '#title' => t('Flukso'),
+    '#description' => t('Flukso to use for recording'),
+    );
+  $form['from'] = array(
+    '#type' => 'date',
+    '#title' => t("From"),
+    '#default_value' => array('year' => $date->format("Y"), 'month' => $date->format("n"), 'day' => $date->format("d")),
+    '#description' => t('The date dumping should start on'),
+    );
+  $form['to'] = array(
+    '#type' => 'date',
+    '#title' => t("Until"),
+    '#default_value' => array('year' => $newdate->format("Y"), 'month' => $newdate->format("n"), 'day' => $newdate->format("d")),
+    '#description' => t('The date dumping should stop on'),
+    );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Submit"),
+    );
+  $form['#validate'][] = 'msg_dump_setup_form_validate';
+  $form['#submit'][] = 'msg_dump_setup_form_submit';
+  $form['#theme'] = 'msg_dump_setup';
+  return $form;
+}
+
+function msg_dump_setup_form_validate($form, &$form_state) {
+  global $user;
+  $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
+  $to = strtotime(implode('-',$form_state['values']['to']) . '00:00');
+  $now = new DateTime("now");
+  $now = $now->format("U");
+  if ($now > $from)
+    form_set_error('from',t('Can\'t record values in the past.'));
+  if ($from > $to)
+    form_set_error('to',t('Time to stop has to be after time to start.'));
+  if (!$from)
+    form_set_error('from',t('Invalid date.'));
+  if (!$to)
+    form_set_error('to',t('Invalid date.'));
+}
+
+function msg_dump_setup_form_submit($form, &$form_state) {
+  $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
+  $to = strtotime(implode('-',$form_state['values']['to']) . '00:00');
+  $file = md5(uniqid(rand(), TRUE));
+
+  $meter = db_result(db_query("SELECT meter FROM {logger_meters} LEFT JOIN (logger_devices) ON logger_meters.device=logger_devices.device WHERE serial=%d AND type='electricity'", $form_state['values']['flukso']));
+  $result = db_result(db_query("INSERT INTO {msg_dump} (meter, uid, startdate, stopdate, file) VALUES ('%s', %d, %d, %d, '%s')", $meter, $user->uid, $from, $to, $file));
+  drupal_set_message($meter);
+}
+
+function theme_msg_dump_setup($form) {
+  global $user;
+  $now = new DateTime("now");
+  $now = $now->format("U");
+  $rows = array();
+
+  $result = db_query("SELECT meter, startdate, stopdate, file
+                      FROM {msg_dump}
+                      WHERE uid = %d
+		      ORDER BY startdate", $user->uid);
+
+  while ($device = db_fetch_object($result)) {
+    $startdate = new DateTime('@' . $device->startdate);
+    $stopdate = new DateTime('@' . $device->stopdate);
+
+    $row = array();
+    $row[] = $device->meter;
+    $row[] = $startdate->format("Y-m-d");
+    $row[] = $stopdate->format("Y-m-d");
+    $row[] = file_exists('/sites/all/modules/msg_dump/dumps/' . $device->file) && $stopdate<$now?'<a href="' . $device->file . '.sqlite">' . $device->file . '</a>':$device->file;
+
+    $rows[] = $row;
+  }
+
+#  $rows[] = array(drupal_render($form['meter']), drupal_render($form['from']), drupal_render($form['to']), drupal_render($form['submit']));
+
+  $output = drupal_render($form);
+  $output .= theme('msg_dump_setup_list', $rows);
+
+  return $output;
+}
+
+function theme_msg_dump_setup_list($items) {
+  $headers = array(t('Meter'), t('Startdate'), t('Stopdate'), t('File'));
+  $output  = theme('table', $headers, $items);
+
+  return $output;
+}
