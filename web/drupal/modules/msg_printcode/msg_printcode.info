@@ -1,0 +1,4 @@
+; $Id$
+name = Print Codes
+description = Print activation codes for MySmartGrid
+core = 6.x
