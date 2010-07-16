@@ -71,6 +71,10 @@ function msg_dump_setup() {
     '#title' => t('Flukso'),
     '#description' => t('Flukso to use for recording'),
     );
+  $form['type'] = array(
+    '#type' => 'hidden',
+    '#value' => 'electricity',
+    );
   $form['from'] = array(
     '#type' => 'date',
     '#title' => t("From"),
@@ -96,7 +100,7 @@ function msg_dump_setup() {
 function msg_dump_setup_form_validate($form, &$form_state) {
   global $user;
   $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
-  $to = strtotime(implode('-',$form_state['values']['to']) . '00:00');
+  $to = strtotime(implode('-',$form_state['values']['to']) . ' 23:59');
   $now = new DateTime("now");
   $now = $now->format("U");
   if ($now > $from)
@@ -115,8 +119,9 @@ function msg_dump_setup_form_submit($form, &$form_state) {
   $to = strtotime(implode('-',$form_state['values']['to']) . '00:00');
   $file = md5(uniqid(rand(), TRUE));
 
-  $meter = db_result(db_query("SELECT meter FROM {logger_meters} LEFT JOIN (logger_devices) ON logger_meters.device=logger_devices.device WHERE serial=%d AND type='electricity'", $form_state['values']['flukso']));
-  $result = db_result(db_query("INSERT INTO {msg_dump} (meter, uid, startdate, stopdate, file) VALUES ('%s', %d, %d, %d, '%s')", $meter, $user->uid, $from, $to, $file));
+  $result = db_query("INSERT INTO {msg_dump} (serial, uid, start, stop, file) VALUES ('%s', %d, %d, %d, '%s')", $form_state['values']['flukso'], $user->uid, $from, $to, $file);
+
+  msg_dump_register($file, $form_state['values']['flukso'], $form_state['values']['type']);
 }
 
 function theme_msg_dump_setup($form) {
@@ -125,28 +130,23 @@ function theme_msg_dump_setup($form) {
   $now = $now->format("U");
   $rows = array();
 
-  $result = db_query("SELECT serial, startdate, stopdate, file
-                      FROM `logger_meters` LEFT JOIN (
-                      `logger_devices` , `msg_dump`
-                      ) ON ( msg_dump.meter = logger_meters.meter
-                      AND logger_meters.device = logger_devices.device )
-                      WHERE msg_dump.uid = %d
-		                  ORDER BY stopdate", $user->uid);
+  $result = db_query("SELECT * FROM msg_dump WHERE uid=%d", $user->uid);
 
   while ($device = db_fetch_object($result)) {
-    $startdate = new DateTime('@' . $device->startdate);
-    $stopdate = new DateTime('@' . $device->stopdate);
+    $startdate = new DateTime('@' . $device->start);
+    $stopdate = new DateTime('@' . $device->stop);
 
     $row = array();
     $row[] = $device->serial;
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
-    $row[] = file_exists('/sites/all/modules/msg_dump/dumps/' . $device->file) && $stopdate<$now?'<a href="' . $device->file . '.sqlite">' . $device->file . '</a>':$device->file;
+    # not needed yet as only available type ist electricity
+    #$row[] = $device->type;
+    if ( file_exists('/sites/all/modules/msg_dump/dumps/' . $device->file) && $stopdate<$now )
+	   $row[] = '<a href="' . $device->file . '.sqlite">' . 'Download' . '</a>';
 
     $rows[] = $row;
   }
-
-#  $rows[] = array(drupal_render($form['meter']), drupal_render($form['from']), drupal_render($form['to']), drupal_render($form['submit']));
 
   $output = drupal_render($form);
   $output .= theme('msg_dump_setup_list', $rows);
@@ -160,3 +160,23 @@ function theme_msg_dump_setup_list($items) {
 
   return $output;
 }
+
+function msg_dump_register($file, $serial, $type) {
+  $root_prefix = '/home/flukso/www/public';
+  $values = db_query("SELECT logger_tokens.token AS token, logger_meters.meter AS meter from `logger_tokens` LEFT JOIN logger_meters ON logger_tokens.meter = logger_meters.meter LEFT JOIN logger_devices ON logger_meters.device = logger_devices.device WHERE logger_devices.serial = '%s' AND logger_meters.type = '%s'", $serial, $type);
+
+  while ($value = db_fetch_object($values)) {
+    $config = 'DB_FILE:  "' . $root_prefix . '/sites/all/modules/msg_dump/db/' . $file . '.sqlite"
+DB_TABLE_NAME: "UTCReadings"
+ACCESS_TOKEN: "' . $value->token . '"
+SENSOR_ID: "' . $value->meter . '"
+BASE_URL: "https://api.mysmartgrid.de/sensor"';
+  }
+
+  $out = fopen($root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc", 'w');
+  fwrite($out, $config);
+  fclose($out);
+
+  exec("flukso_create_db -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
+  exec("flukso_archive_watts -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
+};
