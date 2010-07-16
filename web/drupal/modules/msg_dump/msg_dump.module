@@ -41,6 +41,12 @@ function msg_dump_menu() {
 
 function msg_dump_cron() {
   //run dump here
+  $now = new DateTime('now');
+  $result = db_query("SELECT file FROM msg_dump WHERE start<=%d AND stop>=%d", $now, $now);
+
+  while($file = db_fetch_object($result)) {
+    exec("flukso_archive_watts -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
+  }
 }
 
 function msg_dump_theme() {
