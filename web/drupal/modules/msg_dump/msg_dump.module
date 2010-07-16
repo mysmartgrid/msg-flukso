@@ -186,3 +186,16 @@ BASE_URL: "https://api.mysmartgrid.de/sensor"';
   exec("flukso_create_db -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
   exec("flukso_archive_watts -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
 };
+
+function msg_dump_install() {
+  db_query("CREATE TABLE IF NOT EXISTS `msg_dump` (
+              `id` int(11) NOT NULL auto_increment,
+              `serial` int(10) unsigned NOT NULL,
+              `uid` int(10) unsigned NOT NULL,
+              `start` int(10) unsigned NOT NULL,
+              `stop` int(10) unsigned NOT NULL,
+              `file` varchar(32) character set utf8 NOT NULL,
+              `type` varchar(32) character set utf8 default NULL,
+              UNIQUE KEY `id` (`id`)
+              ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1");
+}
