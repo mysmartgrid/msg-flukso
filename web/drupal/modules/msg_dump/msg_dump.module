@@ -40,12 +40,17 @@ function msg_dump_menu() {
 } // function msg_dump_menu()
 
 function msg_dump_cron() {
-  //run dump here
   $now = new DateTime('now');
-  $result = db_query("SELECT file FROM msg_dump WHERE start<=%d AND stop>=%d", $now, $now);
+  $now = $now->format('U');
+  //get requested dumps from database
+  $result = db_query("SELECT stop, file FROM msg_dump WHERE start<=%d AND stop>=%d", $now, $now);
 
-  while($file = db_fetch_object($result)) {
-    exec("flukso_archive_watts -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
+  while($data = db_fetch_object($result)) {
+    if ( $data->stop + 2629743 < $now ) { //delete dumps older then 3 months
+      exec("rm " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $date->file . ".*");
+      db_query("DELETE FROM msg_dump WHERE file='%s'", $date->file);
+    } else
+      exec("flukso_archive_watts -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $data->file . ".flukso4rrc"); //otherwise execute dump
   }
 }
 
@@ -148,11 +153,13 @@ function theme_msg_dump_setup($form) {
     $row[] = $stopdate->format("Y-m-d");
     # not needed yet as only available type ist electricity
     #$row[] = $device->type;
-    if ( file_exists('/sites/all/modules/msg_dump/dumps/' . $device->file) && $stopdate<$now )
-	   $row[] = '<a href="' . $device->file . '.sqlite">' . 'Download' . '</a>';
+    if ( file_exists('/home/flukso/www/public/sites/all/modules/msg_dump/db/' . $device->file . '.sqlite') )
+      $row[] = '<a href="/sites/all/modules/msg_dump/db/' . $device->file . '.sqlite">' . 'Download' . '</a>';
 
     $rows[] = $row;
   }
+
+#  $rows[] = array(drupal_render($form['meter']), drupal_render($form['from']), drupal_render($form['to']), drupal_render($form['submit']));
 
   $output = drupal_render($form);
   $output .= theme('msg_dump_setup_list', $rows);
