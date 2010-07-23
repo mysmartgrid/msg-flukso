@@ -1,0 +1,4 @@
+; $Id$
+name = Deployment Overview
+description = Shows the Statuses of Deployment Procedures
+core = 6.x

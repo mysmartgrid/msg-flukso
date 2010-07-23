@@ -1,0 +1,4 @@
+; $Id$
+name = Device Check Up
+description = Checks a Device Status Up
+core = 6.x

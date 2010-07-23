@@ -1,0 +1,99 @@
+<?php
+// $Id$
+
+/**
+ * Display help and module information
+ * @param path which path of the site we're displaying help
+ * @param arg array that holds the current path as would be returned from arg() function
+ * @return help text for the path
+ */
+function deployment_overview_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#deployment_overview":
+      $output = '<p>'.t("Shows Deployment Overview").'</p>';
+      break;
+  }
+  return $output;
+}
+
+/**
+ * Valid permissions for this module
+ * @return array An array of valid permissions for the onthisdate module
+ */
+function deployment_overview_perm() {
+  return array('deployment_overview','print deployment_overview');
+}
+
+/**
+ * Menu item.
+ */
+function deployment_overview_menu() {
+  $items = array();
+  $items['deploymentoverview'] = array(
+    'title' => t("Deployment Overview"),
+    'page callback' => 'deployment_overview_list',
+    'access arguments' => array('print deployment_overview'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function deployment_overview_settings_access($permission, $account) {
+  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
+}
+
+function deployment_overview_list() {
+
+  $output = '';
+  $limit = 15;
+
+  $sql = "
+    SELECT
+      d.serial AS serial,
+      u.name AS name,
+      IF(d.access = 0, FROM_UNIXTIME(d.created), FROM_UNIXTIME(d.access)) AS latest,
+
+      IF(u.uid = 0,
+        'Uninstalled', 
+        IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR),
+          'Faulty',
+          'Working'
+      )) AS state
+
+    FROM 
+      {users} u 
+        INNER JOIN {logger_devices} d ON d.uid = u.uid";
+
+  $sql_count = "
+    SELECT
+      count(*)
+    FROM
+      {logger_devices}";
+
+  $headers = array(
+    array('data' => t('Device'),        'field' => 'serial',    'sort'=> 'asc'),
+    array('data' => t('User'),          'field' => 'name',      'sort'=> 'desc'),
+    array('data' => t('Latest Update'), 'field' => 'latest',    'sort'=> 'desc'),
+    array('data' => t('State'),         'field' => 'state',     'sort'=> 'desc')
+  );
+
+  $sql .= tablesort_sql($headers);
+  $sql_count = db_rewrite_sql($sql_count);
+
+  $result = pager_query($sql, $limit, 0, $sql_count);
+
+  if($result){
+   
+    $data = '';
+    while($entry = db_fetch_array($result)){
+      $data[] = $entry;
+    }
+
+    $output = theme('table', $headers, $data);
+    $output .= theme('pager', NULL, $limit, 0);
+  }
+
+  return $output;
+}
+
