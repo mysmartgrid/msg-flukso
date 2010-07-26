@@ -13,11 +13,11 @@ You may obtain a copy of the License at
 $Id: network.lua 3674 2008-10-31 09:35:53Z Cyrus $
 ]]--
 
-module("luci.controller.mini.lan", package.seeall)
+module("luci.controller.mini.wlan", package.seeall)
 
 function index()
 	luci.i18n.loadc("admin-core")
 	local i18n = luci.i18n.translate
 
-	entry({"lan"}, cbi("mini/lan", {on_success_to="tryit"}), i18n("wizard"), 1)
+	entry({"wlan"}, cbi("mini/wlan", {on_success_to="tryit"}), i18n("wizard"), 1)
 end

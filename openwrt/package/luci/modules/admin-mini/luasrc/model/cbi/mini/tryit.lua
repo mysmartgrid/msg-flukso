@@ -15,19 +15,37 @@ $Id: network.lua 4171 2009-01-27 20:50:28Z Cyrus $
 
 f = SimpleForm("tryit", "Test Connection", "Trying to connect to the server of the MySmartgrid project")
 
-local path = "../../../../../flukso/"
+uci = luci.model.uci.cursor()
+
+-- Get wireless interface
+wifidevs={}
+uci:foreach("wireless", "wifi-device",
+	function(section)
+		table.insert(wifidevs, section[".name"])
+	end)
+
+if uci:get("network", "wan", "proto") == "none" then
+	uci:set("wireless", wifidevs[1], "disabled", 1) -- Disable wireless interface
+else
+	uci:delete("wireless", wifidevs[1], "disabled") -- Activate wireless interface
+end
+uci:save("wireless")
+uci:commit("wireless")
+uci:save("network")
+uci:commit("network")
+uci:apply({"wireless", "network"}) -- Apply changes
 
 function heartbeat()
   require 'posix'
   require 'xmlrpc.http'
   require 'luci.sys'
 
-  auth = require(path..'flukso.auth')
-  dbg  = require(path..'flukso.dbg')
+  auth = require('flukso.auth')
+  dbg  = require('flukso.dbg')
 
   -- config parameters
-  local param = {server        = 'logger.flukso.net',
-                 xmlrpcaddress = 'http://logger.flukso.net/xmlrpc',
+  local param = {server        = 'dev2-logger.mysmartgrid.de',
+                 xmlrpcaddress = 'http://dev2-logger.mysmartgrid.de/xmlrpc',
                  xmlrpcversion = '1',
                  xmlrpcmethod  = 'logger.heartbeat'}
 
@@ -57,16 +75,19 @@ function heartbeat()
     auth,
     monitor)
 
-	return pcall_ok
+	return pcall_ok, return_or_err, pong
 end
 
-res = heartbeat()
+res, err, pong = heartbeat()
 
-function result.write(self, section, value)
+result = f:field(DummyValue, "", "")
+function result.cfgvalue(self, section)
 	if res then
-		luci.http.redirect("msg_wizard_end")
+		return "Verbindungsaufbau erfolgreich"
+	elseif err:find("host not found") then
+		return "Konnte keine Verbindung zum mySmartGrid Server herstellen. "
 	else
-		luci.http.redirect("msg_wizard")
+		return "Fehler aufgetreten: " .. err
 	end
 end
 

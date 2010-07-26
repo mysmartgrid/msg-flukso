@@ -15,18 +15,10 @@ $Id: network.lua 4171 2009-01-27 20:50:28Z Cyrus $
 
 f = SimpleForm("msg_wizard", translate("wizard"), translate("m_n_wizard"))
 
-local uci = luci.model.uci.cursor()
-
-interface = f:field(ListValue, "interface", "interface")
+interface = f:field(ListValue, "interface", "Interface")
 interface.widget = "select"
-interface:value("lan")
-interface:value("wlan")
-if uci:get("network", "lan") then
-	interface.default = "lan"
-end
-if uci:get("network", "wan") then
-	interface.default = "wlan"
-end
+interface:value("wlan", "WLAN")
+interface:value("lan", "LAN")
 
 function interface.write(self, section, value)
 	luci.http.redirect(value)

@@ -13,50 +13,45 @@ You may obtain a copy of the License at
 $Id: network.lua 4171 2009-01-27 20:50:28Z Cyrus $
 ]]--
 
-f = SimpleForm("lan", "Local Area Network", "Configure the Flukso to use wired lan to connect to the internet")
+local uci = require "luci.model.uci".cursor()
 
-dhcp = f:field(Flag, "DHCP", "DHCP", "Automaticaly set network settings")
-dhcp.default = 1
+m = Map("network", translate("network"), translate("m_n_network"))
 
-ipaddr = f:field(Value, "ipaddr", "IP-Address")
-ipaddr:depends("DHCP", "")
-ipaddr.defaults = "..."
-function ipaddr:validate(value)
-	if dhcp.enabled then
-    return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
-	else
-		return false
+s = m:section(NamedSection, "lan", "interface", translate("m_n_local"))
+s.addremove = false
+
+dhcp = s:option(Flag, "proto", "DHCP", "Automatically set network settings")
+dhcp.enabled = "dhcp"
+dhcp.disabled = "static"
+dhcp.rmempty = false
+
+ip = s:option(Value, "ipaddr", translate("ipaddress"))
+ip:depends("proto", "")
+
+function ip:validate(value)
+	if uci:get("network", "wan", "ipaddr") == value then
+		return nil
 	end
-end
-
-netmask = f:field(Value, "netmask", "Netmask")
-netmask:depends("DHCP", "")
-netmask.defaults = "255.255.255.0"
-function netmask:validate(value)
     return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
 end
 
-gateway = f:field(Value, "gw", "Standard-Gateway")
-gateway:depends("DHCP", "")
-function gateway:validate(value)
-    return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
-end
+nm = s:option(Value, "netmask", translate("netmask"))
+nm:depends("proto", "")
+nm:value("255.255.255.0")
+nm:value("255.255.0.0")
+nm:value("255.0.0.0")
 
-dns1 = f:field(Value, "dns1", "Primary DNS-Server")
-dns1:depends("DHCP", "")
-function dns1:validate(value)
-    return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
-end
+gw = s:option(Value, "gateway", translate("gateway") .. translate("cbi_optional"))
+gw:depends("proto", "")
+gw.rmempty = true
 
-dns2 = f:field(Value, "dns2", "Secondary DNS-Server")
-dns2:depends("DHCP", "")
-dns2.optional = true
-function dns2:validate(value)
-    return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
-end
+dns = s:option(Value, "dns", translate("dnsserver") .. translate("cbi_optional"))
+dns:depends("proto", "")
+dns.rmempty = true
 
-function dhcp.write(self, section, value)
-	luci.http.redirect("tryit")
-end
+-- Tell tryit.lua that the wireless interface isn't used
+uci:set("network", "wan", "proto", "none")
+uci:save("network")
+uci:commit("network")
 
-return f
+return m
