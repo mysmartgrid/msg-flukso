@@ -22,7 +22,7 @@ function deployment_overview_help($path, $arg) {
  * @return array An array of valid permissions for the onthisdate module
  */
 function deployment_overview_perm() {
-  return array('deployment_overview','print deployment_overview');
+  return array('Deployment Overview');
 }
 
 /**
@@ -31,7 +31,7 @@ function deployment_overview_perm() {
 function deployment_overview_menu() {
   $items = array();
   $items['deploymentoverview'] = array(
-    'title' => t("Deployment Overview"),
+    'title' => 'Deployment Overview',
     'page callback' => 'deployment_overview_list',
     'access arguments' => array('print deployment_overview'),
     'type' => MENU_NORMAL_ITEM,
@@ -48,22 +48,31 @@ function deployment_overview_list() {
   $output = '';
   $limit = 15;
 
+  $states = array('Uninstalled', 'No Heartbeat', 'Corrupted Heartbeat', 'Working');
+
   $sql = "
     SELECT
       d.serial AS serial,
       u.name AS name,
+
       IF(d.access = 0, FROM_UNIXTIME(d.created), FROM_UNIXTIME(d.access)) AS latest,
 
       IF(u.uid = 0,
-        'Uninstalled', 
-        IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR),
-          'Faulty',
-          'Working'
-      )) AS state
+        0,
+	IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR),
+          1,
+	  IF(SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR),
+	    2, 3
+      ))) AS state
 
-    FROM 
-      {users} u 
-        INNER JOIN {logger_devices} d ON d.uid = u.uid";
+    FROM
+      {logger_meters} m,
+      {logger_devices} d
+      LEFT OUTER JOIN {users} u ON d.uid = u.uid
+      
+    WHERE
+      d.device = m.device AND
+      m.type = 'electricity'";
 
   $sql_count = "
     SELECT
@@ -72,10 +81,10 @@ function deployment_overview_list() {
       {logger_devices}";
 
   $headers = array(
-    array('data' => t('Device'),        'field' => 'serial',    'sort'=> 'asc'),
-    array('data' => t('User'),          'field' => 'name',      'sort'=> 'desc'),
-    array('data' => t('Latest Update'), 'field' => 'latest',    'sort'=> 'desc'),
-    array('data' => t('State'),         'field' => 'state',     'sort'=> 'desc')
+    array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'desc'),
+    array('data' => t('User'),          'field' => 'name',   'sort'=> 'desc'),
+    array('data' => t('Latest Update'), 'field' => 'latest', 'sort'=> 'desc'),
+    array('data' => t('State'),         'field' => 'state',  'sort'=> 'desc')
   );
 
   $sql .= tablesort_sql($headers);
@@ -86,8 +95,11 @@ function deployment_overview_list() {
   if($result){
    
     $data = '';
-    while($entry = db_fetch_array($result)){
-      $data[] = $entry;
+    while($entry = db_fetch_array($result)) {
+
+	$state = t($states[$entry["state"]]);
+
+	$data[] = array($entry["serial"], $entry["name"], $entry["latest"], $state);
     }
 
     $output = theme('table', $headers, $data);
