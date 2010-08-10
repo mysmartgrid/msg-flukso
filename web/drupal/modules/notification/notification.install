@@ -1,0 +1,40 @@
+<?php
+// $Id$
+
+function notification_install() {
+  drupal_install_schema('notification');
+}
+
+function notification_uninstall() {
+  drupal_uninstall_schema('notification');
+}
+
+function notification_schema() {
+  $schema['notification'] = array(
+    'description' => t('Stores event notifications'),
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'email' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => TRUE,
+      ),
+      'delay' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'device'
+    ),
+  );
+
+  return $schema;
+}

@@ -1,0 +1,286 @@
+<?php
+// $Id$
+
+function notification_node_info() {
+  return array(
+    'notification' => array(
+      'name' => t('Notification'),
+      'module' => 'notification',
+      'description' => t('Event Notification'),
+      'has_title' => FALSE,
+      'has_body' => FALSE,
+      'locked' => TRUE
+    )
+  );
+}
+
+function notification_perm() {
+  return array('manage notifications');
+}
+
+function notification_menu() {
+
+  $items = array();
+
+  $items['notification_list'] = array(
+    'title' => 'Event Notifications',
+    'page callback' => 'notification_list_page',
+    'access arguments' => array('notification'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['notification_delete'] = array(
+    'title' => $items['notification_list']['title'],
+    'page callback' => 'notification_delete',
+    'page arguments' => array(1),
+    'access arguments' => array('notification'),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['notification_register'] = array(
+    'title' => 'Event Notification Registration',
+    'page callback' => 'notification_register_page',
+    'access arguments' => array('notification'),
+    'type' => MENU_CALLBACK
+  );
+
+  return $items;
+}
+
+function notification_settings_access($permission, $account) {
+  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
+}
+
+function notification_register_page() {
+  $output .= drupal_get_form('notification_register_form');
+  return $output;
+}
+
+function notification_list_page() {
+
+  $sql = "
+      SELECT
+      d.serial AS serial,
+      'No Heartbeat' AS event,
+      n.delay AS delay,
+      n.email AS email,
+      d.device AS device
+    FROM
+      {logger_devices} d,
+      {notification} n
+    WHERE
+      d.uid = %d AND
+      d.device = n.device";
+
+  $header = array(
+    array('data' => t('Device'), 'field' => 'serial', 'sort' => 'ASC'),
+    array('data' => t('Event'), 'field' => 'event', 'sort' => 'ASC'),
+    array('data' => t('Delay (min)'),  'field' => 'delay'),
+    array('data' => t('e-mail'), 'field' => 'email')
+  );
+
+  global $user;
+  $result = db_query($sql, $user->uid, tablesort_sql($header));
+
+  $rows = array();
+  while ($object = db_fetch_array($result)) {
+
+    $row = array();
+    $row['serial'] = $object['serial'];
+    $row['event'] = t($object['event']);
+    $row['delay'] = $object['delay'];
+    $row['email'] = $object['email'];
+    $row[] = l('Remove', 'notification_delete/' . $object['device']);
+
+    $rows[] = $row;
+  }
+
+  $caption = '<p>' . l('Register Notification', 'notification_register') . '</p>';
+
+  $output .= theme('table', $header, $rows, array(), $caption);
+  return $output;
+}
+
+function notification_get_devices_options() {
+  
+  $sql = "
+    SELECT
+      serial,
+      device
+    FROM
+      {logger_devices}
+    WHERE
+      uid = %d
+    ORDER BY
+      serial";
+
+  global $user;
+  $result = db_query($sql, $user->uid);
+
+  $devices = array();
+  while ($row = db_fetch_array($result)) {
+    $devices[$row['device']] = $row['serial'];
+  }
+
+  return $devices;    
+}	
+
+function notification_get_events_options() {
+      
+  $events = array();
+  $events[] = t('No Heartbeat');
+
+  return $events;
+}
+
+function notification_register_form() {
+
+  global $user;
+
+  $form['device'] = array(
+    '#type' => 'select',
+    '#description' => t('Select the serial number of the monitored device.'),
+    '#options' => notification_get_devices_options()
+  );
+
+  $form['event'] = array(
+    '#type' => 'select',
+    '#description' => t('Select the event to be detected and notified.'),
+    '#options' => notification_get_events_options()
+  );
+
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter the e-mail to which the notification will be sent.'),
+    '#maxlength' => 64,
+    '#size' => 20,
+    '#default_value' => $user->mail
+  );
+
+  $form['delay'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter the event detection delay.'),
+    '#maxlength' => 6,
+    '#size' => 6,
+    '#default_value' => 120,
+    '#field_suffix' => t('minutes')
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save')
+  );
+  
+  return $form;
+}
+
+function notification_register_form_submit($form, &$form_state) {
+
+  $device = $form_state['values']['device'];
+  $email = $form_state['values']['email'];
+  $delay = $form_state['values']['delay'];
+
+  _notification_delete($device);
+  _notification_insert($device, $email, $delay);
+
+  $form_state['redirect'] = 'notification_list';
+}
+
+function notification_register_form_validate($form, &$form_state) {
+
+  $email = $form_state['values']['email'];
+  $delay = $form_state['values']['delay'];
+
+  if (!valid_email_address($email)) {
+    form_set_error('email', t('Invalid e-mail.'));
+  }
+
+  if($delay < 1) {
+    form_set_error('delay', t('Delay time must be greater than 0.'));
+  }
+}
+
+function notification_delete($device) {
+
+  _notification_delete($device);
+  return notification_list_page();
+}
+
+function _notification_delete($device) {
+
+  $sql = "DELETE FROM {notification} WHERE device = '%s'";
+  db_query($sql, $device);
+}
+
+function _notification_insert($device, $email, $delay) {
+      
+  $sql = "INSERT INTO {notification} (device, email, delay) VALUES('%s', '%s', %d)";
+  db_query($sql, $device, $email, $delay);
+}
+
+function notification_cron() {
+
+  $sql = "
+    SELECT
+      n.email AS email,       
+      d.serial AS serial,
+      u.name AS name,
+      FROM_UNIXTIME(m.access) AS latest
+
+    FROM
+      {logger_meters} m,
+      {logger_devices} d,
+      {users} u,
+      {notification} n
+
+    WHERE
+      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.delay MINUTE) AND
+      n.device = d.device AND
+      d.uid = u.uid AND
+      d.device = m.device AND
+      m.type = 'electricity'";
+
+  $result = db_query($sql);
+
+  while ($object = db_fetch_array($result)) {
+
+    $email = $object['email'];
+
+    $variables = array(
+      '%user' => $object['name'],
+      '%serial' => $object['serial'],
+      '%latest' => $object['latest']
+    );
+
+    $body = t("<p>Dear user %user</p>
+	    <p>Your Flukso device <b>%serial</b> has not been sending a heartbeat since <b>%latest</b>.
+	    Please, check your WLAN and Flukso installations.</p>
+            <p>Best Regards,</p>
+            <p>mySmartGrid System</p>",
+            $variables);
+
+    $params = array(
+      'subject' => 'Event Notification',
+      'body' => $body
+    );
+
+    drupal_mail('notification', 'notice', $email, language_default(), $params);
+  }
+}
+
+function notification_mail($key, &$message, $params) {
+
+  $headers = array(
+    'MIME-Version' => '1.0',
+    'Content-Type' => 'text/html; charset=UTF-8; format=flowed',
+    'Content-Transfer-Encoding' => '8Bit',
+    'X-Mailer' => 'Drupal'
+  );
+
+  foreach ($headers as $key => $value) {
+    $message['headers'][$key] = $value;
+  }
+
+  $message['subject'] = $params['subject'];
+  $message['body'][] = $params['body'];
+}

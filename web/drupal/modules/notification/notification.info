@@ -1,0 +1,4 @@
+; $Id$
+name = Event Notification
+description = Manages Event Notifications
+core = 6.x
