@@ -75,8 +75,8 @@ function notification_list_page() {
   $header = array(
     array('data' => t('Device'), 'field' => 'serial', 'sort' => 'ASC'),
     array('data' => t('Event'), 'field' => 'event', 'sort' => 'ASC'),
-    array('data' => t('Delay (min)'),  'field' => 'delay'),
-    array('data' => t('e-mail'), 'field' => 'email')
+    array('data' => t('Detection Delay (min)'),  'field' => 'delay'),
+    array('data' => t('Target e-mail'), 'field' => 'email')
   );
 
   global $user;
@@ -195,8 +195,8 @@ function notification_register_form_validate($form, &$form_state) {
     form_set_error('email', t('Invalid e-mail.'));
   }
 
-  if($delay < 1) {
-    form_set_error('delay', t('Delay time must be greater than 0.'));
+  if($delay < 30) {
+    form_set_error('delay', t('Delay time can not be less than 30 minutes.'));
   }
 }
 
@@ -253,7 +253,7 @@ function notification_cron() {
     );
 
     $body = t("<p>Dear user %user</p>
-	    <p>Your Flukso device <b>%serial</b> has not been sending a heartbeat since <b>%latest</b>.
+	    <p>Your Flukso device <b>%serial</b> has not been sending heartbeats since <b>%latest</b>.
 	    Please, check your WLAN and Flukso installations.</p>
             <p>Best Regards,</p>
             <p>mySmartGrid System</p>",
