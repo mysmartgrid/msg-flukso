@@ -62,7 +62,7 @@ function notification_list_page() {
       SELECT
       d.serial AS serial,
       'No Heartbeat' AS event,
-      n.delay AS delay,
+      n.limit_up AS limit_up,
       n.email AS email,
       d.device AS device
     FROM
@@ -75,7 +75,7 @@ function notification_list_page() {
   $header = array(
     array('data' => t('Device'), 'field' => 'serial', 'sort' => 'ASC'),
     array('data' => t('Event'), 'field' => 'event', 'sort' => 'ASC'),
-    array('data' => t('Detection Delay (min)'),  'field' => 'delay'),
+    array('data' => t('Maximum Delay'),  'field' => 'limit_up'),
     array('data' => t('Target e-mail'), 'field' => 'email')
   );
 
@@ -88,7 +88,7 @@ function notification_list_page() {
     $row = array();
     $row['serial'] = $object['serial'];
     $row['event'] = t($object['event']);
-    $row['delay'] = $object['delay'];
+    $row['limit_up'] = $object['limit_up'] . t(' min');
     $row['email'] = $object['email'];
     $row[] = l('Remove', 'notification_delete/' . $object['device']);
 
@@ -157,9 +157,9 @@ function notification_register_form() {
     '#default_value' => $user->mail
   );
 
-  $form['delay'] = array(
+  $form['limit_up'] = array(
     '#type' => 'textfield',
-    '#description' => t('Enter the event detection delay.'),
+    '#description' => t('Enter the maximum heartbeat delay, beyond which the device is considered faulty.'),
     '#maxlength' => 6,
     '#size' => 6,
     '#default_value' => 120,
@@ -178,10 +178,10 @@ function notification_register_form_submit($form, &$form_state) {
 
   $device = $form_state['values']['device'];
   $email = $form_state['values']['email'];
-  $delay = $form_state['values']['delay'];
+  $limit_up = $form_state['values']['limit_up'];
 
   _notification_delete($device);
-  _notification_insert($device, $email, $delay);
+  _notification_insert($device, $email, $limit_up);
 
   $form_state['redirect'] = 'notification_list';
 }
@@ -189,14 +189,14 @@ function notification_register_form_submit($form, &$form_state) {
 function notification_register_form_validate($form, &$form_state) {
 
   $email = $form_state['values']['email'];
-  $delay = $form_state['values']['delay'];
+  $limit_up = $form_state['values']['limit_up'];
 
   if (!valid_email_address($email)) {
     form_set_error('email', t('Invalid e-mail.'));
   }
 
-  if($delay < 30) {
-    form_set_error('delay', t('Delay time can not be less than 30 minutes.'));
+  if($limit_up < 30) {
+    form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
   }
 }
 
@@ -212,10 +212,10 @@ function _notification_delete($device) {
   db_query($sql, $device);
 }
 
-function _notification_insert($device, $email, $delay) {
+function _notification_insert($device, $email, $limit_up) {
       
-  $sql = "INSERT INTO {notification} (device, email, delay) VALUES('%s', '%s', %d)";
-  db_query($sql, $device, $email, $delay);
+  $sql = "INSERT INTO {notification} (device, email, limit_up) VALUES('%s', '%s', %d)";
+  db_query($sql, $device, $email, $limit_up);
 }
 
 function notification_cron() {
@@ -234,7 +234,7 @@ function notification_cron() {
       {notification} n
 
     WHERE
-      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.delay MINUTE) AND
+      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
       d.uid = u.uid AND
       d.device = m.device AND

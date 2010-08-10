@@ -23,7 +23,7 @@ function notification_schema() {
         'length' => '64',
         'not null' => TRUE,
       ),
-      'delay' => array(
+      'limit_up' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
