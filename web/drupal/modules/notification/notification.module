@@ -249,9 +249,9 @@ function notification_cron() {
   _notification_send_peak_consumption_emails();
 }
 
-function _notification_send_emails($message, $sql, $event_id, $uid) {
+function _notification_send_emails($message, $sql) {
 
-  $result = db_query($sql, $event_id, $uid);
+  $result = db_query($sql);
 
   while ($object = db_fetch_array($result)) {
 
@@ -259,8 +259,7 @@ function _notification_send_emails($message, $sql, $event_id, $uid) {
 
     $variables = array();
     foreach ($object as $key => $value) {
-      $key = '%' . $key;    
-      $variables[$key] = $value;
+      $variables["%$key"] = $value;
     }
 
     $body = t($message, $variables);
@@ -275,7 +274,10 @@ function _notification_send_emails($message, $sql, $event_id, $uid) {
 }
 
 function _notification_send_no_heartbeat_emails($event_id = 1) {
-      
+
+  global $user;
+  $uid = $user->uid;
+
   $sql = "
     SELECT
       n.email AS email,       
@@ -290,9 +292,9 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
     WHERE
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = %d AND
-      d.uid = u.uidi AND
-      u.uid = %d";
+      n.event_id = $event_id AND
+      d.uid = u.uid AND
+      u.uid = $uid";
 
   $message = "
     <p>Dear user %user_name</p>
@@ -301,12 +303,14 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
     <p>Best Regards,</p>
     <p>mySmartGrid System</p>";
 
-  global $user;
-  _notification_send_emails($message, $sql, $event_id, $user->uid);
+  _notification_send_emails($message, $sql);
 }
 
 function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
 
+  global $user;
+  $uid = $user->uid;
+  
   $sql = "
     SELECT
       n.email AS email,
@@ -322,9 +326,9 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
       SYSDATE() <= (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = %d AND
+      n.event_id = $event_id AND
       d.uid = u.uid AND
-      u.uid = %d AND
+      u.uid = $uid AND
       d.device = m.device AND
       m.type = 'electricity'";
 
@@ -335,8 +339,7 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
     <p>Best Regards,</p>
     <p>mySmartGrid System</p>";
 
-  global $user;
-  _notification_send_emails($message, $sql, $event_id, $user->uid);
+  _notification_send_emails($message, $sql);
 }
 
 function _notification_send_any_heartbeat_failure_emails() {
@@ -346,7 +349,10 @@ function _notification_send_any_heartbeat_failure_emails() {
 }
 
 function _notification_send_peak_consumption_emails() {
-      
+
+  global $user;
+  $uid = $user->uid;
+
   $sql = "
     SELECT
       n.email AS email,
@@ -361,9 +367,9 @@ function _notification_send_peak_consumption_emails() {
     WHERE
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = %d AND
+      n.event_id = 4 AND
       d.uid = u.uid AND
-      u.uid = %d";
+      u.uid = $uid";
 
   $message = "
     <p>Dear user %user_name</p>
@@ -371,8 +377,7 @@ function _notification_send_peak_consumption_emails() {
     <p>Best Regards,</p>
     <p>mySmartGrid System</p>";
 
-  global $user;
-  _notification_send_emails($message, $sql, 4, $user->uid);
+  _notification_send_emails($message, $sql);
 }
 
 function notification_mail($key, &$message, $params) {
