@@ -255,8 +255,6 @@ function _notification_send_emails($message, $sql) {
 
   while ($object = db_fetch_array($result)) {
 
-    $email = $object['email'];
-
     $variables = array();
     foreach ($object as $key => $value) {
       $variables["%$key"] = $value;
@@ -269,7 +267,7 @@ function _notification_send_emails($message, $sql) {
       'body' => $body
     );
 
-    drupal_mail('notification', 'notice', $email, language_default(), $params);
+    drupal_mail('notification', 'notice', $object['email'], language_default(), $params);
   }
 }
 
