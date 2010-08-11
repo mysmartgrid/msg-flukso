@@ -89,7 +89,7 @@ function notification_list_page() {
 
     $row = array();
     $row['serial'] = $object['serial'];
-    $row['event_name'] = t("%event_name  (in %limit_up min)", array('%event_name' => t($object['event_name']), '%limit_up' => $object['limit_up']));
+    $row['event_name'] = _notification_format_event_name($object['event_id'], $object['event_name'], $object['limit_up']);
     $row['email'] = $object['email'];
     $row[] = l('Remove', 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
 
@@ -102,18 +102,24 @@ function notification_list_page() {
   return $output;
 }
 
-function notification_get_devices_options() {
+function _notification_format_event_name($event_id, $event_name, $limit_up) {
+
+  $name;	
+  if ($event_id == 1 || $event_id == 3) {
+    $name = "%event_name (in %limit_up min)";
+
+  } else if ($event_id == 4) {
+    $name = "%event_name (%limit_up watts)";
+
+  } else {
+    $name = "%event_name";
+  }
+  return t($name, array('%event_name' => $event_name, '%limit_up' => $limit_up));
+}
+
+function _notification_get_devices_options() {
   
-  $sql = "
-    SELECT
-      serial,
-      device
-    FROM
-      {logger_devices}
-    WHERE
-      uid = %d
-    ORDER BY
-      serial";
+  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
 
   global $user;
   $result = db_query($sql, $user->uid);
@@ -126,17 +132,9 @@ function notification_get_devices_options() {
   return $devices;    
 }	
 
-function notification_get_events_options() {
+function _notification_get_events_options() {
 
-  $sql = "
-    SELECT
-      id,
-      name
-    FROM
-      {event}
-    ORDER BY
-      id";
-
+  $sql = "SELECT id, name FROM {event} ORDER BY id";
   $result = db_query($sql);
 
   $events = array();
@@ -151,33 +149,39 @@ function notification_register_form() {
 
   global $user;
 
-  $form['device'] = array(
-    '#type' => 'select',
-    '#description' => t('Select the serial number of the monitored device.'),
-    '#options' => notification_get_devices_options()
-  );
-
-  $form['event_id'] = array(
-    '#type' => 'select',
-    '#description' => t('Select the event to be detected and notified.'),
-    '#options' => notification_get_events_options()
-  );
-
-  $form['limit_up'] = array(
-    '#type' => 'textfield',
-    '#description' => t('Enter the maximum heartbeat delay, beyond which the device is considered faulty.'),
-    '#maxlength' => 6,
-    '#size' => 6,
-    '#default_value' => 120,
-    '#field_suffix' => t('minutes')
-  );
-
   $form['email'] = array(
     '#type' => 'textfield',
     '#description' => t('Enter the e-mail to which the notification will be sent.'),
     '#maxlength' => 64,
     '#size' => 20,
     '#default_value' => $user->mail
+  );
+
+  $form['device'] = array(
+    '#type' => 'select',
+    '#description' => t('Select the serial number of the monitored device.'),
+    '#options' => _notification_get_devices_options()
+  );
+
+  $form['event_id'] = array(
+    '#type' => 'select',
+    '#description' => t('Select the event to be detected and notified.'),
+    '#options' => _notification_get_events_options(),
+    '#default_value' => 1,
+    '#attributes' => array(
+      'onchange' => '
+      wrapper = document.getElementById("edit-limit-up-wrapper");
+      wrapper.style.visibility = (this.value == 2? "hidden" : "visible");'
+    )
+  );
+
+  $form['limit_up'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter the limit value related to the event. For "Peak Consumption", enter the maximum eletricity consumption in watts.
+    Otherwise, enter the maximum heartbeat delay in minutes, beyond which the device is considered faulty.'),
+    '#maxlength' => 6,
+    '#size' => 6,
+    '#default_value' => 120
   );
 
   $form['submit'] = array(
@@ -211,8 +215,11 @@ function notification_register_form_validate($form, &$form_state) {
     form_set_error('email', t('Invalid e-mail.'));
   }
 
-  if($event_id == 1 && $limit_up < 30) {
+  if(($event_id == 1 || $event_id == 3) && $limit_up < 30) {
     form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
+
+  } else if ($event_id == 4 && $limit_up < 1) {
+    form_set_error('limit_up', t('Peak consumption can not be less than 1 watt.'));
   }
 }
 
@@ -242,9 +249,9 @@ function notification_cron() {
   _notification_send_peak_consumption_emails();
 }
 
-function _notification_send_emails($sql, $message) {
+function _notification_send_emails($message, $sql, $event_id, $uid) {
 
-  $result = db_query($sql);
+  $result = db_query($sql, $event_id, $uid);
 
   while ($object = db_fetch_array($result)) {
 
@@ -252,6 +259,7 @@ function _notification_send_emails($sql, $message) {
 
     $variables = array();
     foreach ($object as $key => $value) {
+      $key = '%' . $key;    
       $variables[$key] = $value;
     }
 
@@ -267,7 +275,7 @@ function _notification_send_emails($sql, $message) {
 }
 
 function _notification_send_no_heartbeat_emails($event_id = 1) {
-
+      
   $sql = "
     SELECT
       n.email AS email,       
@@ -275,49 +283,48 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
       u.name AS user_name,
       FROM_UNIXTIME(d.access) AS when,
       n.up_limit AS up_limit
-
     FROM
       {logger_devices} d,
       {users} u,
       {notification} n
-
     WHERE
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = " . $event_id . " AND
-      d.uid = u.uid";
+      n.event_id = %d AND
+      d.uid = u.uidi AND
+      u.uid = %d";
 
   $message = "
     <p>Dear user %user_name</p>
     <p>Your Flukso device <b>%serial</b> has not been sending heartbeats for %up_limit minutes, since <b>%when</b>.
     Please, check your WLAN and Flukso installations.</p>
     <p>Best Regards,</p>
-    <p>mySmartGrid System</p>"
+    <p>mySmartGrid System</p>";
 
-  _notification_send_emails($sql, $message);
+  global $user;
+  _notification_send_emails($message, $sql, $event_id, $user->uid);
 }
 
 function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
-      
+
   $sql = "
     SELECT
       n.email AS email,
       d.serial AS serial,
       u.name AS user_name,
       FROM_UNIXTIME(d.access) AS when
-
     FROM
       {logger_meters} m,
       {logger_devices} d,
       {users} u,
       {notification} n
-
     WHERE
       SYSDATE() <= (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = " . $event_id . " AND
+      n.event_id = %d AND
       d.uid = u.uid AND
+      u.uid = %d AND
       d.device = m.device AND
       m.type = 'electricity'";
 
@@ -326,19 +333,20 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
     <p>Your Flukso device <b>%serial</b> has sent a heartbeat with corrupted data at <b>%when</b>.
     Please, check your WLAN and Flukso installations.</p>
     <p>Best Regards,</p>
-    <p>mySmartGrid System</p>"
+    <p>mySmartGrid System</p>";
 
-  _notification_send_emails($sql, $message);
+  global $user;
+  _notification_send_emails($message, $sql, $event_id, $user->uid);
 }
 
 function _notification_send_any_heartbeat_failure_emails() {
 
-  _notification_send_event1_emails(3);
-  _notification_send_event2_emails(3);
+  _notification_send_no_heartbeat_emails(3);
+  _notification_send_corrupted_heartbeat_emails(3);
 }
 
 function _notification_send_peak_consumption_emails() {
-
+      
   $sql = "
     SELECT
       n.email AS email,
@@ -346,25 +354,25 @@ function _notification_send_peak_consumption_emails() {
       u.name AS user_name,
       FROM_UNIXTIME(d.access) AS when,
       n.up_limit AS up_limit
-  
     FROM
       {logger_devices} d,
       {users} u,
       {notification} n
-  
     WHERE
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
       n.device = d.device AND
-      n.event_id = " . $event_id . " AND
-      d.uid = u.uid";
+      n.event_id = %d AND
+      d.uid = u.uid AND
+      u.uid = %d";
 
   $message = "
     <p>Dear user %user_name</p>
     <p>Your Flukso device <b>%serial</b> has registered a peak consumption of %up_limit watts, at <b>%when</b>.
     <p>Best Regards,</p>
-    <p>mySmartGrid System</p>"
+    <p>mySmartGrid System</p>";
 
-  _notification_send_emails($sql, $message);
+  global $user;
+  _notification_send_emails($message, $sql, 4, $user->uid);
 }
 
 function notification_mail($key, &$message, $params) {
