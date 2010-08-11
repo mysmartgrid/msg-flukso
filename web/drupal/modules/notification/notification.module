@@ -32,7 +32,7 @@ function notification_menu() {
   $items['notification_delete'] = array(
     'title' => $items['notification_list']['title'],
     'page callback' => 'notification_delete',
-    'page arguments' => array(1),
+    'page arguments' => array(1, 2),
     'access arguments' => array('notification'),
     'type' => MENU_CALLBACK
   );
@@ -59,23 +59,25 @@ function notification_register_page() {
 function notification_list_page() {
 
   $sql = "
-      SELECT
+    SELECT
       d.serial AS serial,
-      'No Heartbeat' AS event,
-      n.limit_up AS limit_up,
+      e.name AS event_name,
       n.email AS email,
-      d.device AS device
+      n.limit_up AS limit_up,
+      d.device AS device,
+      e.id AS event_id
     FROM
       {logger_devices} d,
-      {notification} n
+      {notification} n,
+      {event} e
     WHERE
       d.uid = %d AND
-      d.device = n.device";
+      d.device = n.device AND
+      n.event_id = e.id";
 
   $header = array(
     array('data' => t('Device'), 'field' => 'serial', 'sort' => 'ASC'),
-    array('data' => t('Event'), 'field' => 'event', 'sort' => 'ASC'),
-    array('data' => t('Maximum Delay'),  'field' => 'limit_up'),
+    array('data' => t('Event'), 'field' => 'event_name', 'sort' => 'ASC'),
     array('data' => t('Target e-mail'), 'field' => 'email')
   );
 
@@ -87,10 +89,9 @@ function notification_list_page() {
 
     $row = array();
     $row['serial'] = $object['serial'];
-    $row['event'] = t($object['event']);
-    $row['limit_up'] = $object['limit_up'] . t(' min');
+    $row['event_name'] = t("%event_name  (in %limit_up min)", array('%event_name' => t($object['event_name']), '%limit_up' => $object['limit_up']));
     $row['email'] = $object['email'];
-    $row[] = l('Remove', 'notification_delete/' . $object['device']);
+    $row[] = l('Remove', 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
 
     $rows[] = $row;
   }
@@ -126,9 +127,22 @@ function notification_get_devices_options() {
 }	
 
 function notification_get_events_options() {
-      
+
+  $sql = "
+    SELECT
+      id,
+      name
+    FROM
+      {event}
+    ORDER BY
+      id";
+
+  $result = db_query($sql);
+
   $events = array();
-  $events[] = t('No Heartbeat');
+  while ($row = db_fetch_array($result)) {
+    $events[$row['id']] = t($row['name']);
+  }  
 
   return $events;
 }
@@ -143,18 +157,10 @@ function notification_register_form() {
     '#options' => notification_get_devices_options()
   );
 
-  $form['event'] = array(
+  $form['event_id'] = array(
     '#type' => 'select',
     '#description' => t('Select the event to be detected and notified.'),
     '#options' => notification_get_events_options()
-  );
-
-  $form['email'] = array(
-    '#type' => 'textfield',
-    '#description' => t('Enter the e-mail to which the notification will be sent.'),
-    '#maxlength' => 64,
-    '#size' => 20,
-    '#default_value' => $user->mail
   );
 
   $form['limit_up'] = array(
@@ -164,6 +170,14 @@ function notification_register_form() {
     '#size' => 6,
     '#default_value' => 120,
     '#field_suffix' => t('minutes')
+  );
+
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter the e-mail to which the notification will be sent.'),
+    '#maxlength' => 64,
+    '#size' => 20,
+    '#default_value' => $user->mail
   );
 
   $form['submit'] = array(
@@ -177,11 +191,12 @@ function notification_register_form() {
 function notification_register_form_submit($form, &$form_state) {
 
   $device = $form_state['values']['device'];
+  $event_id = $form_state['values']['event_id'];
   $email = $form_state['values']['email'];
   $limit_up = $form_state['values']['limit_up'];
 
-  _notification_delete($device);
-  _notification_insert($device, $email, $limit_up);
+  _notification_delete($device, $event_id);
+  _notification_insert($device, $event_id, $email, $limit_up);
 
   $form_state['redirect'] = 'notification_list';
 }
@@ -189,56 +204,45 @@ function notification_register_form_submit($form, &$form_state) {
 function notification_register_form_validate($form, &$form_state) {
 
   $email = $form_state['values']['email'];
+  $event_id = $form_state['values']['event_id'];
   $limit_up = $form_state['values']['limit_up'];
 
   if (!valid_email_address($email)) {
     form_set_error('email', t('Invalid e-mail.'));
   }
 
-  if($limit_up < 30) {
+  if($event_id == 1 && $limit_up < 30) {
     form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
   }
 }
 
-function notification_delete($device) {
+function notification_delete($device, $event_id) {
 
-  _notification_delete($device);
+  _notification_delete($device, $event_id);
   return notification_list_page();
 }
 
-function _notification_delete($device) {
+function _notification_delete($device, $event_id) {
 
-  $sql = "DELETE FROM {notification} WHERE device = '%s'";
-  db_query($sql, $device);
+  $sql = "DELETE FROM {notification} WHERE device = '%s' AND event_id = %d";
+  db_query($sql, $device, $event_id);
 }
 
-function _notification_insert($device, $email, $limit_up) {
+function _notification_insert($device, $event_id, $email, $limit_up) {
       
-  $sql = "INSERT INTO {notification} (device, email, limit_up) VALUES('%s', '%s', %d)";
-  db_query($sql, $device, $email, $limit_up);
+  $sql = "INSERT INTO {notification} (device, event_id, email, limit_up) VALUES('%s', %d, '%s', %d)";
+  db_query($sql, $device, $event_id, $email, $limit_up);
 }
 
 function notification_cron() {
 
-  $sql = "
-    SELECT
-      n.email AS email,       
-      d.serial AS serial,
-      u.name AS name,
-      FROM_UNIXTIME(m.access) AS latest
+  _notification_send_no_heartbeat_emails();
+  _notification_send_corrupted_heartbeat_emails();
+  _notification_send_any_heartbeat_failure_emails();
+  _notification_send_peak_consumption_emails();
+}
 
-    FROM
-      {logger_meters} m,
-      {logger_devices} d,
-      {users} u,
-      {notification} n
-
-    WHERE
-      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.limit_up MINUTE) AND
-      n.device = d.device AND
-      d.uid = u.uid AND
-      d.device = m.device AND
-      m.type = 'electricity'";
+function _notification_send_emails($sql, $message) {
 
   $result = db_query($sql);
 
@@ -246,18 +250,12 @@ function notification_cron() {
 
     $email = $object['email'];
 
-    $variables = array(
-      '%user' => $object['name'],
-      '%serial' => $object['serial'],
-      '%latest' => $object['latest']
-    );
+    $variables = array();
+    foreach ($object as $key => $value) {
+      $variables[$key] = $value;
+    }
 
-    $body = t("<p>Dear user %user</p>
-	    <p>Your Flukso device <b>%serial</b> has not been sending heartbeats since <b>%latest</b>.
-	    Please, check your WLAN and Flukso installations.</p>
-            <p>Best Regards,</p>
-            <p>mySmartGrid System</p>",
-            $variables);
+    $body = t($message, $variables);
 
     $params = array(
       'subject' => 'Event Notification',
@@ -266,6 +264,107 @@ function notification_cron() {
 
     drupal_mail('notification', 'notice', $email, language_default(), $params);
   }
+}
+
+function _notification_send_no_heartbeat_emails($event_id = 1) {
+
+  $sql = "
+    SELECT
+      n.email AS email,       
+      d.serial AS serial,
+      u.name AS user_name,
+      FROM_UNIXTIME(d.access) AS when,
+      n.up_limit AS up_limit
+
+    FROM
+      {logger_devices} d,
+      {users} u,
+      {notification} n
+
+    WHERE
+      SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
+      n.device = d.device AND
+      n.event_id = " . $event_id . " AND
+      d.uid = u.uid";
+
+  $message = "
+    <p>Dear user %user_name</p>
+    <p>Your Flukso device <b>%serial</b> has not been sending heartbeats for %up_limit minutes, since <b>%when</b>.
+    Please, check your WLAN and Flukso installations.</p>
+    <p>Best Regards,</p>
+    <p>mySmartGrid System</p>"
+
+  _notification_send_emails($sql, $message);
+}
+
+function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
+      
+  $sql = "
+    SELECT
+      n.email AS email,
+      d.serial AS serial,
+      u.name AS user_name,
+      FROM_UNIXTIME(d.access) AS when
+
+    FROM
+      {logger_meters} m,
+      {logger_devices} d,
+      {users} u,
+      {notification} n
+
+    WHERE
+      SYSDATE() <= (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
+      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL n.limit_up MINUTE) AND
+      n.device = d.device AND
+      n.event_id = " . $event_id . " AND
+      d.uid = u.uid AND
+      d.device = m.device AND
+      m.type = 'electricity'";
+
+  $message = "
+    <p>Dear user %user</p>
+    <p>Your Flukso device <b>%serial</b> has sent a heartbeat with corrupted data at <b>%when</b>.
+    Please, check your WLAN and Flukso installations.</p>
+    <p>Best Regards,</p>
+    <p>mySmartGrid System</p>"
+
+  _notification_send_emails($sql, $message);
+}
+
+function _notification_send_any_heartbeat_failure_emails() {
+
+  _notification_send_event1_emails(3);
+  _notification_send_event2_emails(3);
+}
+
+function _notification_send_peak_consumption_emails() {
+
+  $sql = "
+    SELECT
+      n.email AS email,
+      d.serial AS serial,
+      u.name AS user_name,
+      FROM_UNIXTIME(d.access) AS when,
+      n.up_limit AS up_limit
+  
+    FROM
+      {logger_devices} d,
+      {users} u,
+      {notification} n
+  
+    WHERE
+      SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
+      n.device = d.device AND
+      n.event_id = " . $event_id . " AND
+      d.uid = u.uid";
+
+  $message = "
+    <p>Dear user %user_name</p>
+    <p>Your Flukso device <b>%serial</b> has registered a peak consumption of %up_limit watts, at <b>%when</b>.
+    <p>Best Regards,</p>
+    <p>mySmartGrid System</p>"
+
+  _notification_send_emails($sql, $message);
 }
 
 function notification_mail($key, &$message, $params) {

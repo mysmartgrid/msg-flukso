@@ -10,6 +10,26 @@ function notification_uninstall() {
 }
 
 function notification_schema() {
+      
+  $schema['event'] = array(
+    'description' => t('Stores Flukso events'),
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '50',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'id'
+    ),
+  );
+
   $schema['notification'] = array(
     'description' => t('Stores event notifications'),
     'fields' => array(
@@ -17,6 +37,11 @@ function notification_schema() {
         'type' => 'varchar',
         'length' => '32',
         'not null' => TRUE,
+      ),
+      'event_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
       ),
       'email' => array(
         'type' => 'varchar',
@@ -32,7 +57,7 @@ function notification_schema() {
       ),
     ),
     'primary key' => array(
-      'device'
+      'device', 'event_id'
     ),
   );
 
