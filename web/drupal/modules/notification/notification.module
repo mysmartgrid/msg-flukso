@@ -96,7 +96,7 @@ function notification_list_page() {
     $rows[] = $row;
   }
 
-  $caption = '<p>' . l('Register Notification', 'notification_register') . '</p>';
+  $caption = '<p>' . l(t('Register Notification'), 'notification_register') . '</p>';
 
   $output .= theme('table', $header, $rows, array(), $caption);
   return $output;
