@@ -1,0 +1,9 @@
+#!/usr/bin/expect -f
+set command [lindex $argv 0]
+set timeout -1
+spawn -noecho sh -c "$command"
+set pass "root"
+expect {
+        password: {send "$pass\r" ; exp_continue}
+        eof exit
+}
