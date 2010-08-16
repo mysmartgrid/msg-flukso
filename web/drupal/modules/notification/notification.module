@@ -1,19 +1,6 @@
 <?php
 // $Id$
 
-function notification_node_info() {
-  return array(
-    'notification' => array(
-      'name' => t('Notification'),
-      'module' => 'notification',
-      'description' => t('Event Notification'),
-      'has_title' => FALSE,
-      'has_body' => FALSE,
-      'locked' => TRUE
-    )
-  );
-}
-
 function notification_perm() {
   return array('manage notifications');
 }
