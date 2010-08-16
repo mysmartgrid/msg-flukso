@@ -177,7 +177,8 @@ function notification_register_form() {
 
   $form['limit_up'] = array(
     '#type' => 'textfield',
-    '#description' => t('For "Peak Consumption", enter the maximum eletricity consumption in watts. Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
+    '#description' => t('For "Peak Consumption", enter the maximum eletricity consumption in watts.
+    Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
     '#maxlength' => 6,
     '#size' => 6,
     '#default_value' => 120
@@ -248,28 +249,6 @@ function notification_cron() {
   _notification_send_peak_consumption_emails();
 }
 
-function _notification_send_emails($message, $sql) {
-
-  $result = db_query($sql);
-
-  while ($object = db_fetch_array($result)) {
-
-    $variables = array();
-    foreach ($object as $key => $value) {
-      $variables["%$key"] = $value;
-    }
-
-    $body = t($message, $variables);
-
-    $params = array(
-      'subject' => t('Event Notification'),
-      'body' => $body
-    );
-
-    drupal_mail('notification', 'notice', $object['email'], language_default(), $params);
-  }
-}
-
 function _notification_send_no_heartbeat_emails($event_id = 1) {
 
   $sql = "
@@ -280,23 +259,23 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
       FROM_UNIXTIME(d.access) AS event_time,
       n.limit_up AS limit_up
     FROM
-      {logger_devices} d,
       {users} u,
+      {logger_devices} d,
       {notification} n
     WHERE
+      u.uid = d.uid AND
+      d.device = n.device AND
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
-      n.device = d.device AND
-      n.event_id = $event_id AND
-      d.uid = u.uid";
+      n.event_id = $event_id";
 
-  $message = "
-    <p>Dear user %user_name</p>
-    <p>Your Flukso device <b>%serial</b> has not been sending heartbeats for %limit_up minutes, since <b>%event_time</b>.
-    Please, check your WLAN and Flukso installations.</p>
-    <p>Best Regards,</p>
-    <p>mySmartGrid System</p>";
+  $message = _notification_compose_error_email("
+    Your Flukso device (serial number: %serial) has not been sending heartbeats for more
+    than %limit_up minutes, since %event_time.",
 
-  _notification_send_emails($message, $sql);
+    "Check your WLAN configuration and make sure that it remains active for at least 1 hour per day.
+    The device might be working fine, but it is failing to send the heartbeats over the internet.");
+
+  _notification_send_emails($sql, $message);
 }
 
 function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
@@ -308,26 +287,22 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
       d.serial AS serial,
       FROM_UNIXTIME(d.access) AS event_time
     FROM
-      {logger_meters} m,
-      {logger_devices} d,
       {users} u,
+      {logger_devices} d,
+      {logger_meters} m,
       {notification} n
     WHERE
-      TIMEDIFF(FROM_UNIXTIME(d.access), FROM_UNIXTIME(m.access)) > TIME('00:10:00') AND
-      n.device = d.device AND
-      n.event_id = $event_id AND
-      d.uid = u.uid AND
+      u.uid = d.uid AND
       d.device = m.device AND
-      m.type = 'electricity'";
+      m.type = 'electricity' AND
+      TIMEDIFF(FROM_UNIXTIME(d.access), FROM_UNIXTIME(m.access)) > TIME('00:10:00') AND
+      d.device = n.device AND
+      n.event_id = $event_id";
 
-  $message = "
-    <p>Dear user %user</p>
-    <p>Your Flukso device <b>%serial</b> has sent a heartbeat with corrupted data at <b>%event_time</b>.
-    Please, check your WLAN and Flukso installations.</p>
-    <p>Best Regards,</p>
-    <p>mySmartGrid System</p>";
+  $message = _notification_compose_error_email("
+    Your Flukso device (serial number: %serial) has sent a heartbeat with corrupted data at %event_time.");
 
-  _notification_send_emails($message, $sql);
+  _notification_send_emails($sql, $message);
 }
 
 function _notification_send_any_heartbeat_failure_emails() {
@@ -346,41 +321,103 @@ function _notification_send_peak_consumption_emails() {
       FROM_UNIXTIME(d.access) AS event_time,
       n.limit_up AS limit_up
     FROM
-      {logger_meters} m,
-      {logger_devices} d,
       {users} u,
+      {logger_devices} d,
+      {logger_meters} m,
       {notification} n
     WHERE
-      m.value > n.limit_up AND
-      m.type = 'electricity' AND
-      m.unit = 'watt' AND
-      n.device = d.device AND
-      d.device = m.device AND
+      u.uid = d.uid AND
+      d.device = n.device AND
       n.event_id = 4 AND
-      d.uid = u.uid";
+      d.device = m.device AND
+      m.type = 'electricity' AND
+      m.unit = 'watt'
+    GROUP BY
+      u.name,
+      n.email,
+      d.access,
+      n.limit_up
+    HAVING
+      sum(m.value) > n.limit_up";
 
-  $message = "
-    <p>Dear user %user_name</p>
-    <p>Your Flukso device <b>%serial</b> has registered an electricity consumption beyond %limit_up watts, at <b>%event_time</b>.
-    <p>Best Regards,</p>
-    <p>mySmartGrid System</p>";
+  $message = _notification_compose_email("
+    Your Flukso device (serial number: %serial) has registered an electricity consumption
+    beyond %limit_up watts, at %event_time.");
 
-  _notification_send_emails($message, $sql);
+  _notification_send_emails($sql, $message);
+}
+
+function _notification_compose_email($description, $complement = "") {
+      
+  global $base_url;    
+
+  return "
+    <html>
+      <body>
+        <p>Dear user %user_name
+        <br> &nbsp;<br></p>
+
+	<p>$description</p>
+	<p>$complement</p>
+
+        <p>If you want to stop receiving this notification, please remove it from your
+        <a href='$base_url/notification_list'>event notifications list</a>.</p>
+
+	<p>&nbsp;<br>
+	Best Regards,</p>
+	<p>mySmartGrid Administrator</p>
+        <p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>
+      </body>
+    </html>";
+}
+
+function _notification_compose_error_email($description, $recommendation = NULL) {
+
+  $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
+
+  global $base_url;
+
+  return _notification_compose_email($description, "
+      
+    In order to identify and solve the problem, please take the following actions.
+    <ul>
+      $recommendation
+
+      <li>Check if the device complies with the
+      <a href='$base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>.
+      It might be improperly installed or misconfigured.<br><br>
+
+      <li>Visit our <a href='$base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, and
+      read the answers to questions made by other users in similar situations.<br><br>
+
+      <li>In case the problem persists, please answer to this email, informing your situation.
+    </ul>");
+}
+
+function _notification_send_emails($sql, $message) {
+
+  $language = user_preferred_language();
+  $result = db_query($sql);
+
+  while ($object = db_fetch_array($result)) {
+      
+    $variables = array();
+    foreach ($object as $key => $value) {
+      $variables["%$key"] = $value;
+    }
+
+    $params = array(
+      'subject' => t('Event Notification'),
+      'body' => t($message, $variables, $language->language) 
+    );
+
+    drupal_mail('notification', 'notice', $object['email'], $language, $params);
+  }
 }
 
 function notification_mail($key, &$message, $params) {
 
-  $headers = array(
-    'MIME-Version' => '1.0',
-    'Content-Type' => 'text/html; charset=UTF-8; format=flowed',
-    'Content-Transfer-Encoding' => '8Bit',
-    'X-Mailer' => 'Drupal'
-  );
-
-  foreach ($headers as $key => $value) {
-    $message['headers'][$key] = $value;
-  }
-
+  $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];
 }
