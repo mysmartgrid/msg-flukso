@@ -307,6 +307,18 @@ function forum_node_info() {
   );
 }
 
+function forum_view($node, $teaser = FALSE, $page = FALSE) {
+
+  $node = node_prepare($node, $teaser);
+  $created = date('d M Y H:i:s', $node->created);
+
+  $node->content['created'] = array(
+    '#value' => "$created <br><br>",
+    '#weight' => -1
+  );
+  return $node;
+}
+
 /**
  * Implementation of hook_access().
  */

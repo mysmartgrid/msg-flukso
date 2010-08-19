@@ -2705,6 +2705,14 @@ ol#footnotes li { list-style-type: decimal; margin-left: 1.9em; }
   margin-right: 4px;
 }
 
+/* Added by Ely de Oliveira (19/08/2010) */
+#main #edit-preview {
+  margin: 1em 0;
+  float: right;
+  margin-right: 4px;
+}
+/* End Added */
+
 #section {
   height: 34px;
 }
