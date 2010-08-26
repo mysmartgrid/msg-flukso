@@ -383,7 +383,8 @@ function _notification_compose_error_email($description, $recommendation = NULL)
 
 function _notification_send_emails($sql, $message) {
 
-  $language = user_preferred_language();
+  global $user;
+  $language = user_preferred_language($user);
   $result = db_query($sql);
 
   while ($object = db_fetch_array($result)) {
