@@ -25,32 +25,20 @@
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
 
-  <?php if ($page == 0): ?>
-    <div class="node-headline clear-block">
-      <h3><a href="<?php print $node_url; ?>" rel="bookmark" title="<?php print $mysmartgrid_perma_title; ?>"><?php print $title; ?></a></h3>
-      <?php if (isset($mysmartgrid_node_timestamp)): ?>
-          <span class="timestamp"><?php print $mysmartgrid_node_timestamp; ?></span>
-      <?php endif; ?>
-      <?php if (isset($mysmartgrid_node_author)): ?>
-        <span class="node-author"> – <?php print $mysmartgrid_node_author; ?></span>
-      <?php else: ?>
-        <span class="node-author">'</span>
-      <?php endif; ?>
-    </div>
-  <?php endif; ?>
+  <div class="node-headline clear-block">
+    <span class="timestamp"><?php print $mysmartgrid_node_timestamp; ?></span>
+    <span class="node-author"> – <?php print $mysmartgrid_node_author; ?></span>
+    <br><br>
+  </div>
 
   <div class="content clear-block">
     <?php print $picture; ?>
     <?php print $content; ?>
   </div>
 
-  <?php if (!empty($taxonomy) || !empty($links)): ?>
+  <?php if (!stripos(request_uri(), 'reply')): ?>
     <div class="meta">
-      <?php
-      if ($taxonomy) { print '<div class="tags">'.$mysmartgrid_term_links.'</div>'; }
-      if (!empty($links)): ?>
-          <div class="more"><?php print $mysmartgrid_node_links; ?></div>
-      <?php endif; ?>
+        <div class="more"><?php print $mysmartgrid_node_links; ?></div>
     </div>
   <?php endif; ?>
 
