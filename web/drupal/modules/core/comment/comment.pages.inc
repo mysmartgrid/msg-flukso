@@ -99,7 +99,7 @@ function comment_reply($node, $pid = NULL) {
         drupal_goto("node/$node->nid");
       }
       else if (user_access('post comments')) {
-        $output .= comment_form_box(array('pid' => $pid, 'nid' => $node->nid), t('Reply'));
+        $output .= comment_form_box(array('pid' => $pid, 'nid' => $node->nid), NULL);
       }
       else {
         drupal_set_message(t('You are not authorized to post comments.'), 'error');

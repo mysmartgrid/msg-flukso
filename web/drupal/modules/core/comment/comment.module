@@ -1474,8 +1474,8 @@ function comment_form_add_preview($form, &$form_state) {
     $output .= theme('comment_view', $comment, $node);
   }
   else {
-    $suffix = empty($form['#suffix']) ? '' : $form['#suffix'];
-    $form['#suffix'] = $suffix . node_view($node);
+    $prefix = empty($form['#prefix']) ? '' : $form['#prefix'];
+    $form['#prefix'] = $prefix . node_view($node);
     $edit['pid'] = 0;
   }
 
