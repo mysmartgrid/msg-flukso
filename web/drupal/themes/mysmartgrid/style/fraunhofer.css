@@ -1715,10 +1715,9 @@ form.context {
 	margin-bottom: 0.923em;
 }
 form.context fieldset {
-	margin-bottom: 1px;
-	padding: 0.923em 0.923em 0;
+  margin-bottom: 1px;
+  padding: 0.923em 0.923em 0;
 }
-
 
 #main form fieldset.submit {
 	background-color: transparent;
@@ -1770,10 +1769,10 @@ ul.cat li.last label {
 #main ul.cat li input.radio,
 #main ul.cat li input[type=checkbox],
 #main ul.cat li input[type=radio] {
-	border: none;
-	display: block;
-	float: left;
-	margin-top: 0.1em;
+  border: none;
+  display: block;
+  float: left;
+  margin-top: 0.1em;
 }
 ul.cat input {
 	display: block;
@@ -2857,14 +2856,6 @@ div.comment-author {
   border-right: 1px solid #aaa;
   text-align: left;
   padding: 10px;
-}
-
-div.box {
-  margin-top: 10px;
-}
-
-div.box h2 {
-  font-weight: bold;	
 }
 
 /* End Added */
