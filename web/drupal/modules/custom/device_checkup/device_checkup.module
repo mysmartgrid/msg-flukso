@@ -22,7 +22,7 @@ function device_checkup_help($path, $arg) {
  * @return array An array of valid permissions for the onthisdate module
  */
 function device_checkup_perm() {
-  return array('Device Check Up');
+  return array('show device_checkup');
 }
 
 function device_checkup_menu() {
@@ -30,7 +30,7 @@ function device_checkup_menu() {
   $items['devicecheckup'] = array(
     'title' => 'Device Check Up',
     'page callback' => 'device_checkup_print',
-    'access arguments' => array('device_checkup'),
+    'access arguments' => array('show device_checkup'),
     'type' => MENU_NORMAL_ITEM,
   );
   return $items;
@@ -58,23 +58,30 @@ function device_checkup_print_form() {
   return $form;
 }
 
+function get_device($serial) {
+     
+  $sql = "SELECT
+            d.access AS latest_heartbeat,
+            m.access AS integrity
+          FROM
+            {logger_devices} d,
+            {logger_meters} m
+          WHERE
+            m.device = d.device AND
+            m.type = 'electricity' AND
+            d.serial = %d";
+
+  $result = db_query($sql, $serial);
+  $device = db_fetch_object($result);
+
+  return $device;
+}
+
 function device_checkup_print_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
 
-  $sql = "SELECT
-             d.access AS latest_heartbeat,
-             m.access AS integrity
-           FROM
-             {logger_devices} d,
-             {logger_meters} m
-           WHERE
-             m.device = d.device AND
-             m.type = 'electricity' AND
-             d.serial = %d";
-
-  $result = db_query($sql, $serial);
-  $device = db_fetch_object($result);
+  $device = get_device($serial);
 
   if($device) {
 

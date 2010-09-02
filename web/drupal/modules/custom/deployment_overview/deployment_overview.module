@@ -11,7 +11,7 @@ function deployment_overview_help($path, $arg) {
   $output = '';
   switch ($path) {
     case "admin/help#deployment_overview":
-      $output = '<p>'.t("Shows Deployment Overview").'</p>';
+      $output = '<p>'.t("show deployment_overview").'</p>';
       break;
   }
   return $output;
@@ -33,7 +33,7 @@ function deployment_overview_menu() {
   $items['deploymentoverview'] = array(
     'title' => 'Deployment Overview',
     'page callback' => 'deployment_overview_list',
-    'access arguments' => array('print deployment_overview'),
+    'access arguments' => array('show deployment_overview'),
     'type' => MENU_NORMAL_ITEM,
   );
   return $items;
