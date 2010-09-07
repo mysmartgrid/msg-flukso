@@ -300,8 +300,9 @@ function _logger_dashboard($type, $function, $interval) {
           break;
       }
   }
-
-  $color = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE);
+  
+  /*                                                       BROWN     PINK      CYAN      SKYBLUE */
+  $color = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, '808000', 'FF0080', '00ffff', '0080FF');
 
   $i = 0;
 
