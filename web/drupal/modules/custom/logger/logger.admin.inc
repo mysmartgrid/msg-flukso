@@ -151,24 +151,40 @@ function theme_logger_account_devices_list($items) {
  * @param $type
  *   String defining the sensor type
  */
-function _logger_account_sensors($type = 'electricity') {
+function _logger_account_sensors() {
       
   global $user;
   $rows = array();
 
-  $result = db_query("SELECT lm.meter, lm.function, lt.token, lt.permissions 
+  $result = db_query("SELECT lm.meter, lm.function, lm.type, lt.token, lt.permissions 
                       FROM {logger_meters} lm
                       INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
-                      WHERE lm.uid = %d AND lm.type = '%s'
-                      ORDER BY lm.function", $user->uid, $type);
+                      WHERE lm.uid = %d
+                      ORDER BY lm.function DESC", $user->uid);
 
   while ($sensor = db_fetch_object($result)) {
+      
     $row = array();
     $row[] = substr($sensor->meter, 0, 15) . '<br>' . substr($sensor->meter, 15);
     $row[] = substr($sensor->token, 0, 15) . '<br>' . substr($sensor->token, 15);
-    $row[] = $type;
-    $row[] = $sensor->function;
-    $row[] = l(t('Edit'), 'sensor/edit/' . $sensor->meter);
+
+    $operations = '';
+
+    if ($sensor->function == NULL) {
+      $row[] = t('Inactive');
+      $row[] = '';
+      $row[] = '';
+      $operations = l(t('Activate'), 'sensor/activate/' . $sensor->meter);
+
+    } else {
+      $row[] = t('Active');
+      $row[] = $sensor->type;
+      $row[] = $sensor->function;
+      $operations .=  l(t('Edit'), 'sensor/edit/' . $sensor->meter) .
+              '<br>' . l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
+    }
+
+    $row[] = $operations;
 
     $rows[] = $row;
   }
@@ -184,7 +200,7 @@ function _logger_account_sensors($type = 'electricity') {
  */
 function theme_logger_account_sensors_list($items) {
   if (count($items) > 0) {
-    $headers = array(t('Sensor'), t('Token'), t('Type'), t('Function'));
+    $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
     $output  = theme('table', $headers, $items);
   }
   else {
