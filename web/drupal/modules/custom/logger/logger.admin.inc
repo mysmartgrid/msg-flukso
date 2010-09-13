@@ -152,6 +152,7 @@ function theme_logger_account_devices_list($items) {
  *   String defining the sensor type
  */
 function _logger_account_sensors($type = 'electricity') {
+      
   global $user;
   $rows = array();
 
@@ -163,10 +164,11 @@ function _logger_account_sensors($type = 'electricity') {
 
   while ($sensor = db_fetch_object($result)) {
     $row = array();
-    $row[] = $sensor->meter;
-    $row[] = $sensor->token;
+    $row[] = substr($sensor->meter, 0, 15) . '<br>' . substr($sensor->meter, 15);
+    $row[] = substr($sensor->token, 0, 15) . '<br>' . substr($sensor->token, 15);
     $row[] = $type;
     $row[] = $sensor->function;
+    $row[] = l(t('Edit'), 'sensor/edit/' . $sensor->meter);
 
     $rows[] = $row;
   }
