@@ -180,8 +180,9 @@ function _logger_account_sensors() {
       $row[] = t('Active');
       $row[] = $sensor->type;
       $row[] = $sensor->function;
-      $operations .=  l(t('Edit'), 'sensor/edit/' . $sensor->meter) .
-              '<br>' . l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
+      $operations .=
+	      l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
+	      l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
 
     $row[] = $operations;
@@ -202,12 +203,135 @@ function theme_logger_account_sensors_list($items) {
   if (count($items) > 0) {
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
     $output  = theme('table', $headers, $items);
-  }
-  else {
+
+  } else {
     $output = t('No sensors available.');
   }
 
   return $output;
+}
+
+function _logger_sensor_deactivate($meter) {
+
+  db_query("UPDATE logger_meters SET function = NULL, type = NULL WHERE meter = '%s'", $meter);
+
+  global $user;
+  $uid = $user->uid;
+
+  drupal_goto("user/$uid/sensors");
+}
+
+function _logger_sensor_edit($meter) {
+
+  $sensor = _get_sensor($meter);
+
+  $output .= drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
+  return $output;
+}
+
+function _logger_sensor_activate($meter) {
+
+  $output .= drupal_get_form('logger_sensor_form', $meter, 'electricity', 'main');
+  return $output;
+}
+
+function logger_sensor_form(&$form_state, $meter, $type, $function) {
+
+  $form['meter'] = array(
+    '#type' => 'textfield',
+    '#description' => t('The sensor id.'),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE,
+    '#default_value' => $meter,
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['type'] = array(
+    '#type' => 'textfield',
+    '#description' => t('The sensor type.'),
+    '#maxlength' => 16,
+    '#size' => 16,
+    '#required' => TRUE,
+    '#default_value' => $type,
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['function'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter the sensor function name.'),
+    '#maxlength' => 16,
+    '#size' => 16,
+    '#required' => TRUE,
+    '#default_value' => $function
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Save")
+  );
+
+  return $form;
+}
+
+function logger_sensor_form_validate($form, &$form_state) {
+
+  $function = $form_state['values']['function'];
+  $meter = $form_state['values']['meter'];
+
+  if (!_logger_function_name_validate($function, $meter)) {
+    form_set_error('function', t('Another sensor was found with the function name: %function_name.
+      Please inform another name which has not yet been used.', array('%function_name' => $function)));
+  }
+}
+
+function logger_sensor_form_submit($form, &$form_state) {
+
+  $function = $form_state['values']['function'];
+  $type = $form_state['values']['type'];
+  $meter = $form_state['values']['meter'];
+
+  db_query("UPDATE logger_meters SET function = '%s', type = '%s' WHERE meter = '%s'", $function, $type, $meter);
+
+  global $user;
+  $uid = $user->uid;
+  $form_state['redirect'] = "user/$uid/sensors";
+}
+
+function _get_sensor($id) {
+
+  $sql = "
+    SELECT
+      m.meter AS meter,
+      m.type AS type,
+      m.function AS function
+    FROM
+      logger_meters m
+    WHERE
+      m.meter = '$id'";
+
+  $result = db_query($sql);
+  return db_fetch_object($result);
+}
+
+function _logger_function_name_validate($function, $sensor_id) {
+
+  global $user;
+  $uid = $user->uid;
+
+  $sql = "
+    SELECT
+      1
+    FROM
+      logger_meters m
+    WHERE
+      m.function = '$function' AND
+      m.uid = $uid AND
+      m.meter <> '$sensor_id'";
+
+  $result = db_fetch_object(db_query($sql));
+
+  return $result == NULL;
 }
 
 /**
@@ -263,6 +387,6 @@ function _logger_account_privacy_form_submit($form, &$form_state) {
  * Define the administration settings form for the logger module
  */
 function _logger_admin_settings() {
-//TODO
+  //TODO
 }
 

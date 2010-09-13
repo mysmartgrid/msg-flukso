@@ -3,7 +3,6 @@
 //
 // logger.module : support module for charting data stored in RRD's
 // Copyright (c) 2008-2009 jokamajo.org
-//               2010 flukso.net
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,7 +18,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
-// $Id: logger.module 109 2010-03-12 17:18:32Z icarus75 $
+// $Id: logger.module 90 2010-02-19 10:29:03Z icarus75 $
 //
 
 /**
@@ -37,25 +36,12 @@ define('GREEN',  '7AAB5A');
 define('ORANGE', 'F37E2B');
 define('YELLOW', 'FBEB0D');
 define('PURPLE', 'A052A0');
-define('BROWN', '808000');
-define('PINK', 'FF0080');
-define('CYAN', '00ffff');
-define('SKYBLUE', '0080FF');
-
-/**
- * Implementation of hook_init().
- */
-function logger_init() {
-  global $user;
-  // Workaround for collapse.js not being loaded within  _logger_fluksonians_form  when block caching is on.
-  if ($user->uid > 0) drupal_add_js('misc/collapse.js');
-}
 
 /**
  * Implementation of hook_perm().
  */
 function logger_perm() {
-  return array('logger', 'register devices');
+  return array('logger');
 }
 
 /**
@@ -72,7 +58,6 @@ function logger_menu() {
     'page arguments'      => array('_logger_admin_settings'),
     'access arguments'    => array('administer site configuration'),
   );
-
   $items['logger'] = array(
     'title'               => 'your dashboard', // isn't printed as title on the page, therefore resort to drupal_set_title (t('your ecological dashboard')) in ecology_dashboard;
     'description'         => 'Configure settings for logging metering values.',
@@ -81,28 +66,24 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_CALLBACK,
   );
-
   $items['logger/add'] = array(
     'title'               => 'add this user to the chart',
     'page callback'       => '_logger_add',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
-
   $items['logger/remove'] = array(
     'title'               => 'remove this user from the chart',
     'page callback'       => '_logger_remove',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
-
   $items['logger/unit'] = array(
     'title'               => 'change the unit',
     'page callback'       => '_logger_unit',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
-
   $items['logger/electricity'] = array(
     'title'               => 'electricity',
 //    'page callback'       => '_logger_dashboard',
@@ -119,7 +100,6 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
   );
-
   $items['logger/gas'] = array(
     'title'               => 'gas',
     'page callback'       => '_logger_dashboard',
@@ -130,50 +110,45 @@ function logger_menu() {
 **/
 
   $items['logger/electricity/hour'] = array(
-    'title'               => t('hour'),
+    'title'               => 'hour',
     'page callback'       => '_logger_dashboard',
     'page arguments'      => array('electricity', 'main', 'hour'),
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 0,
   );
-
   $items['logger/electricity/day'] = array(
-    'title'               => t('day'),
+    'title'               => 'day',
     'page callback'       => '_logger_dashboard',
     'page arguments'      => array('electricity', 'main', 'day'),
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 1,
   );
-
   $items['logger/electricity/month'] = array(
-    'title'               => t('month'),
+    'title'               => 'month',
     'page callback'       => '_logger_dashboard',
     'page arguments'      => array('electricity', 'main', 'month'),
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 2,
   );
-
   $items['logger/electricity/year'] = array(
-    'title'               => t('year'),
+    'title'               => 'year',
     'page callback'       => '_logger_dashboard',
     'page arguments'      => array('electricity', 'main', 'year'),
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 3,
   );
-
   $items['logger/electricity/night'] = array(
-    'title'               => t('night'),
+    'title'               => 'night',
     'page callback'       => '_logger_dashboard',
     'page arguments'      => array('electricity', 'main', 'night'),
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 4,
   );
-
   $items['installation'] = array(
     'title'               => '',
     'description'         => 'Howto install a Fluksometer',
@@ -181,72 +156,19 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_CALLBACK,
   );
-
   $items['user/%user_uid_optional/privacy'] = array(
-    'title'               => t('Privacy'),
-    'page callback'       => '_logger_account_privacy',
-    'access callback'     => '_logger_account_access',
+    'title'               => 'Privacy',
+    'page callback'       => '_logger_privacy',
+    'access callback'     => '_logger_privacy_access',
     'access arguments'    => array('logger', 1),
     'type'                => MENU_LOCAL_TASK,
-    'file'                => 'logger.admin.inc',
-    'weight'              => 2,
-  );
-
-  $items['user/%user_uid_optional/devices'] = array(
-    'title'               => t('Devices'),
-    'page callback'       => 'drupal_get_form',
-    'page arguments'      => array('_logger_account_devices'),
-    'access callback'     => '_logger_account_access',
-    'access arguments'    => array('register devices', 1),
-    'type'                => MENU_LOCAL_TASK,
-    'file'                => 'logger.admin.inc',
-    'weight'              => 3,
-  );
-
-  $items['user/%user_uid_optional/sensors'] = array(
-    'title'               => t('Sensors'),
-    'page callback'       => '_logger_account_sensors',
-    'access callback'     => '_logger_account_access',
-    'access arguments'    => array('logger', 1),
-    'type'                => MENU_LOCAL_TASK,
-    'file'                => 'logger.admin.inc',
-    'weight'              => 3,
-  );
-
-  $items['sensor/edit'] = array(
-    'title'            => t('Sensor Edition'),
-    'page callback'    => '_logger_sensor_edit',
-    'page arguments'   => array(2),
-    'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
-    'type'             => MENU_CALLBACK,
-    'file'             => 'logger.admin.inc'
-  );
-
-  $items['sensor/deactivate'] = array(
-    'title'            => $items['user/%user_uid_optional/sensors']['title'],
-    'page callback'    => '_logger_sensor_deactivate',
-    'page arguments'   => array(2),
-    'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
-    'type'             => MENU_CALLBACK,
-    'file'             => 'logger.admin.inc'
-  );	      
-
-  $items['sensor/activate'] = array(
-    'title'            => $items['sensor/edit']['title'],
-    'page callback'    => '_logger_sensor_activate',
-    'page arguments'   => array(2),
-    'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
-    'type'             => MENU_CALLBACK,
-    'file'             => 'logger.admin.inc'
   );
 
   return $items;
 }
 
-function _logger_installation() {
+
+function _logger_installation(){
   $output = '<div class="install">';
   $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step1.png' height='120' width='150' alt='step 1'/></a>";
   $output .= "<p><b>STEP 1: CONFIGURING WIFI</b><br/>Power up the Fluksometer. Connect your computer to the Fluksometer's ethernet port. Surf to <a href = 'http://192.168.255.1'>http://192.168.255.1</a>. Configure the wireless interface with the proper name and security key.</p>";
@@ -255,7 +177,7 @@ function _logger_installation() {
   $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step3.png' height='120' width='150' alt='step 3'/></a>";
   $output .= "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>For safety reasons, switch off the main electricity supply. For a single phase supply, attach the current clamp to one of the two cables running from the electricity meter to the fuse box. Close the clamp firmly.</p>";
   $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step4.png' height='120' width='150' alt='step 4'/></a>";
-  $output .= "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>Connect the cable from the current clamp to the Fluksometer's input port. Take care of connecting the black and red cable as shown in the drawing on the left. Only apply gentle force when fastening the two screws.</p>";
+  $output .= "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>Connect the cable from the current clamp to the Fluksometer's input port. Take care of connecting the black and red cable as shown in the drawing on the right. Only apply gentle force when fastening the two screws.</p>";
   $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step5.png' height='120' width='150' alt='step 4'/></a>";
   $output .= "<p><b>STEP 5: POWERING UP</b><br/>Switch the main electricity supply back on. Activate the Fluksometer by connecting the power plug.</p>";
   $output .= "</div>";
@@ -267,19 +189,17 @@ function _logger_installation() {
  * Callback functions registered in the logger_menu section
  */
 function _logger_dashboard($type, $function, $interval) {
-  // watchdog('dashboard', 'arguments: %type, %function, %interval', array('%type' => $type, '%function' => $function, '%interval' => $interval), WATCHDOG_DEBUG);
+  watchdog('dashboard', '_logger_dashboard arguments: %type, %function, %interval', array('%type' => $type, '%function' => $function, '%interval' => $interval), WATCHDOG_DEBUG);
 
   if (user_access('logger')) {
-    // MD patch
-    drupal_set_title(t('Ihr Stromverbrauch'));
+    drupal_set_title(t('your dashboard'));
     global $user;
   }
   else {  //show users who don't have 'logger' permissions icrarus'es chart
-    // MD patch
-    drupal_set_title(t("Stromverbrauch des CC HPC"));
+    drupal_set_title(t("CC-HPC's dashboard"));
     $user = new stdClass();
     $user->uid = 1;
-    $user->name = 'CC-HPC';
+    $user->name = 'cc-hpc';
     $user->timezone = '3600';
   }
 
@@ -348,23 +268,21 @@ function _logger_dashboard($type, $function, $interval) {
       }
   }
 
-  $color = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
+  $color = array(RED, BLUE, GREEN, YELLOW, PURPLE);
 
   $i = 0;
 
   $string->line = ' COMMENT:"\s"';
   if (user_access('logger') && ((!$meter_sub = db_fetch_object($result_sub)) || $meter_me->private)) {
-      
     do {
       $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-      $string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_me->function);
+      $string->line .= _logger_chart_line($i, $color[$i], $meter_me->function);
       $i++;
     } while ($meter_me = db_fetch_object($result_me));
   }
   elseif (user_access('logger')) {
-
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-    $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
+    $string->line .= _logger_chart_line($i, $color[$i], $user->name);
 
     do {
       $i++;   
@@ -376,7 +294,7 @@ function _logger_dashboard($type, $function, $interval) {
                          ' SHIFT:meter'. $i .':-31556926'; 
 
         // substitute the actual min/max/avg/last values by 'prv'
-        $string->line .= ' LINE1:meter'. $i .'#'. $color[$i % count($color)] .':'.'"'. substr($meter_sub->name.'               ', 0, 15) .'"'.
+        $string->line .= ' LINE1:meter'. $i .'#'. $color[$i] .':'.'"'. substr($meter_sub->name.'               ', 0, 15) .'"'.
                          ' COMMENT:"min\:  prv"'.
                          ' COMMENT:"\tmax\:  prv"'.
                          ' COMMENT:"\tavg\:  prv"'.
@@ -386,35 +304,28 @@ function _logger_dashboard($type, $function, $interval) {
       // the peer has not set his datastream to private so print it!
       else {
         $string->def  .= _logger_chart_def($i, $data_path, $meter_sub->meter, $factor); 
-	$string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_sub->name);
+	$string->line .= _logger_chart_line($i, $color[$i], $meter_sub->name);
       }
     } while($meter_sub = db_fetch_object($result_sub));
   }
   else {
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-    $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
+    $string->line .= _logger_chart_line($i, $color[$i], $user->name);
   }
 
   //construct the TZ=GMT-02:00 format from the $user->timezone object updated by the autotimezone module
-  
-  if ($user->timezone > 0) {
+  if ($user->timezone >= 0)
     $TZ = 'TZ="GMT-';
-    $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
-  }
-  elseif ($user->timezone < 0) {
-    $TZ = 'TZ="GMT+';
-    $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
-  }
   else
-    $TZ = 'TZ="GMT" ';
-
+    $TZ = 'TZ="GMT+';
+  $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
   $command = $TZ . $root_path .'/rrdtool graph '. $graph_path . $pngid .'.png -s '. $start .
              ' --vertical-label '. $unit .' --lower-limit 0 -w 500 -h 350 -E -X 0 --font LEGEND:8:';
   $command .= $string->def;
   $command .= $string->line;
   exec($command, $output, $return_var);
-  //watchdog('dashboard', 'arguments: %command ++ %output ++ %return_var', array('%command' => $command, '%output' => serialize($output), '%return_var' => $return_var), WATCHDOG_DEBUG);
+  watchdog('dashboard', 'arguments: %command ++ %output ++ %return_var', array('%command' => $command, '%output' => serialize($output), '%return_var' => $return_var), WATCHDOG_DEBUG);
   return theme('chart', $graph_path . $pngid .'.png');
 }
 
@@ -446,28 +357,26 @@ function _logger_add($uid) {
                                      WHERE requester_id = %d AND rtid = %d
                                      GROUP BY rtid", $user->uid, $rtid));
 
-  // don't allow users to add themselves
-  if ($uid != $user->uid) { 
-    // max subscriptions = 4
-    if ($result['COUNT(rid)'] < 4) {
+  // max subscriptions = 4
+  if ($result['COUNT(rid)'] < 4) {
+    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
+  }
+  else {
+    //check whether the requested relationship doesn't already exist
+    if (!db_result(db_query("SELECT rid
+                             FROM {user_relationships}
+                             WHERE requester_id = %d AND requestee_id = %d AND rtid = %d", $user->uid, $uid, $rtid))) {
+
+      // if not, delete the most recently added relationship and replace it with the newly selected one
+      db_query("DELETE
+                FROM {user_relationships}
+                WHERE rid = %d", $result['MAX(rid)']);
+
       user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
     }
-    else {
-      //check whether the requested relationship doesn't already exist
-      if (!db_result(db_query("SELECT rid
-                               FROM {user_relationships}
-                               WHERE requester_id = %d AND requestee_id = %d AND rtid = %d", $user->uid, $uid, $rtid))) {
-
-        // if not, delete the most recently added relationship and replace it with the newly selected one
-        db_query("DELETE
-                  FROM {user_relationships}
-                  WHERE rid = %d", $result['MAX(rid)']);
-
-        user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-      }
-    }
-    _logger_cache_clear('fluksonians');
   }
+
+  _logger_cache_clear('subscriptions');
   $destination = drupal_get_destination();
   drupal_goto($destination);
 }
@@ -486,7 +395,7 @@ function _logger_remove($rid) {
     watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
   }
 
-  _logger_cache_clear('fluksonians');
+  _logger_cache_clear('subscriptions');
   $destination = drupal_get_destination();
   drupal_goto($destination);
 }
@@ -518,7 +427,7 @@ function _logger_cache_clear($delta) {
   $cid = _block_get_cache_id($block);
   // prevent the whole chache_block being cleared when _block_get_cache_id returns an empty string (e.g. uid = 1)
   if ($cid != '') cache_clear_all($cid, 'cache_block');
-  //watchdog('block_cache', '%cid | %cache', array('%cid' => $cid, '%cache' => variable_get('block_cache', 100)), WATCHDOG_DEBUG);
+  watchdog('block_cache', '%cid | %cache', array('%cid' => $cid, '%cache' => variable_get('block_cache', 100)), WATCHDOG_DEBUG);
 }
 
 /**
@@ -546,18 +455,6 @@ function logger_theme() {
     'logger_item_list' => array(
       'arguments' => array('items' => NULL, 'title' => NULL),
     ),
-    'logger_account_devices' => array(
-      'arguments' => array('form' => NULL),
-      'file' => 'logger.admin.inc',
-    ),
-    'logger_account_devices_list' => array(
-      'arguments' => array('items' => NULL),
-      'file' => 'logger.admin.inc',
-    ),
-    'logger_account_sensors_list' => array(
-      'arguments' => array('items' => NULL),
-      'file' => 'logger.admin.inc',
-    ),
   );
 }
 
@@ -579,26 +476,26 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
   switch ($op) {
     case 'list':
+      $blocks['subscriptions']['info'] = t('Subscriptions');
+      $blocks['subscriptions']['status'] = TRUE;
+      $blocks['subscriptions']['region'] = 'right';
+      $blocks['subscriptions']['weight'] = 0;
+      $blocks['subscriptions']['pages'] = 'logger<br />logger/*';
+      $blocks['subscriptions']['cache'] = BLOCK_CACHE_PER_USER;
+
       $blocks['fluksonians']['info'] = t('Fluksonians');
       $blocks['fluksonians']['status'] = TRUE;
-      $blocks['fluksonians']['region'] = 'content';
+      $blocks['fluksonians']['region'] = 'right';
       $blocks['fluksonians']['weight'] = 1;
-      $blocks['fluksonians']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['fluksonians']['pages'] = 'logger<br />logger/*';
       $blocks['fluksonians']['cache'] = BLOCK_CACHE_PER_USER;
 
       $blocks['unit']['info'] = t('Unit');
       $blocks['unit']['status'] = TRUE;
       $blocks['unit']['region'] = 'right';
       $blocks['unit']['weight'] = 2;
-      $blocks['unit']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['unit']['pages'] = 'logger<br />logger/*';
       $blocks['unit']['cache'] = BLOCK_CACHE_PER_USER;
-
-      $blocks['posts']['info'] = t('Recent blog posts');
-      $blocks['posts']['status'] = TRUE;
-      $blocks['posts']['region'] = 'right';
-      $blocks['posts']['weight'] = 3;
-      $blocks['posts']['pages'] = '<front>\nlogger/\nlogger/*';
-      $blocks['posts']['cache'] = BLOCK_CACHE_GLOBAL;
 
       return $blocks;
 
@@ -606,8 +503,37 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
       $destination = drupal_get_destination();
 
-      if ($delta == 'fluksonians' && user_access('logger')) {
-        $block['content'] = drupal_get_form('_logger_fluksonians_form');
+      if ($delta == 'subscriptions' && user_access('logger')) {
+        $result = db_query("SELECT u.uid, u.name, ur.rid
+                            FROM ({users} u
+                            INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
+                            INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid
+                            WHERE ur.requester_id = %d AND urt.name = '%s'
+                            ORDER BY ur.rid", $user->uid, 'subscription');
+
+        $items = array();
+        while ($subscription = db_fetch_object($result)) {
+          $items[] = l('[x]', 'logger/remove/'. $subscription->rid, array('attributes' => array('title' => "unsubscribe from ". $subscription->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($subscription->name, 'user/'. $subscription->uid, array('alias' => FALSE));
+        }
+        $block['subject'] = t('Subscriptions');
+        $block['content'] = theme('logger_item_list', $items);
+      }
+
+      elseif ($delta == 'fluksonians' && user_access('logger')) {
+        // list all users having the fluksionian role for now
+        // to be replaced by a real buddylist later on
+        $result = db_query("SELECT u.uid, u.name
+                            FROM ({users} u
+                            INNER JOIN {users_roles} ur ON u.uid = ur.uid)
+                            INNER JOIN {role} r ON ur.rid = r.rid
+                            WHERE r.name = '%s' AND NOT u.uid = %d
+                            ORDER BY u.name", 'fluksonian', $user->uid);
+        $items = array();
+        while ($fluksonian = db_fetch_object($result)) {
+          $items[] = l('[+]', 'logger/add/'. $fluksonian->uid, array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
+        }
+        $block['subject'] = t('Fluksonians');
+        $block['content'] = theme('logger_item_list', $items);
       }
 
       elseif ($delta == 'unit' && user_access('logger')) {
@@ -641,15 +567,6 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
         $block['content'] = theme('logger_item_list', $items);
       }
 
-      elseif ($delta == 'posts' && user_access('access content')) {
-        $result = db_query_range(db_rewrite_sql("SELECT n.nid, n.title, n.created FROM {node} n WHERE n.type = 'blogpost' AND n.status = 1 ORDER BY n.created DESC"), 0, 5);
-        if ($node_title_list = node_title_list($result)) {
-          $block['subject'] = t('Recent blog posts');
-          $block['content'] = $node_title_list;
-          $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
-        }
-      }
-
       return $block;
   }
 }
@@ -666,78 +583,56 @@ function theme_logger_item_list($items, $title = NULL) {
 }
 
 /**
- * Generates the fluksonians block form.
+ * Callback function for the user/x/privacy page
  */
-function _logger_fluksonians_form() {
+function _logger_privacy() {
+  $output .= drupal_get_form('_logger_privacy_form');
+  return $output;
+}
+
+/**
+ * Generates the privacy form.
+ */
+function _logger_privacy_form() {
   global $user;
-  $destination = drupal_get_destination();
 
-  $fluksonians = db_query("SELECT u.uid, u.name
-                           FROM ({users} u
-                           INNER JOIN {users_roles} ur ON u.uid = ur.uid)
-                           INNER JOIN {role} r ON ur.rid = r.rid
-                           WHERE r.name = '%s' AND NOT u.uid = %d
-                           ORDER BY u.name", 'fluksonian', $user->uid);
-
-  $subscriptions = db_query("SELECT u.uid, u.name, ur.rid
-                             FROM ({users} u
-                             INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-                             INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid
-                             WHERE ur.requester_id = %d AND urt.name = '%s'
-                             ORDER BY u.name", $user->uid, 'subscription');
-
-  $i = 0;
-  $rows = array();
-  $row = array();
-  $subscription = db_fetch_object($subscriptions);
-
-  while ($fluksonian = db_fetch_object($fluksonians)) {
-    if ($i > 3) {
-      $rows[] = $row;
-      $row = array();
-      $i = 0;
-    }
-    if ($fluksonian->uid == $subscription->uid) {
-      $row[] = l('[x]', 'logger/remove/'. $subscription->rid, array('attributes' => array('title' => "unsubscribe from ". $subscription->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($subscription->name, 'user/'. $subscription->uid, array('alias' => FALSE));
-      $subscription = db_fetch_object($subscriptions);
-    }
-    else {
-      $row[] = l('[+]', 'logger/add/'. $fluksonian->uid, array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"), 'query' => $destination, 'ali
-as' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
-    }
-    $i++;
-  }
-  $rows[] = $row;
-
-  $form['fluksonians'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Fluksonians'),
-    '#description' => t('Select the Fluksonians you wish to add to [+] or clear from [x] the chart.'),
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
+  $form['privacy'] = array(
+    '#title' => t('Set your preferred privacy mode'),
+    '#type' => 'radios',
+    '#options' => array(
+      t('Shared within Flukso'),
+      t('Private'),
+    ),
+    '#description' => t("When selecting Private mode, your data stream will not be drawn on other people's graph and all statistics will be marked as 'prv'. Conversely, nobody else's data stream will be drawn on your chart."),
+    '#default_value' => db_result(db_query("SELECT private
+                                            FROM {logger_users}
+                                            WHERE uid = %d", $user->uid)),
   );
-  $form['fluksonians']['list'] = array(
-    '#type' => 'item',
-    //'#title' => t('Title'),
-    '#value' => theme('table', array(), $rows),
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
   );
-
   return $form;
 }
 
 /**
- * Implementation of hook_form_alter().
+ * Process settings form submissions.
  */
-function logger_form_alter(&$form, &$form_state, $form_id) {
-  if ($form_id == 'user_login') {
-    $form['#redirect'] = 'logger';
-    $form['name']['#size'] = 20;
-    $form['pass']['#size'] = 20;
-  }
+function _logger_privacy_form_submit($form, &$form_state) {
+  global $user;
+
+  // the built-in validation function already checks elements with options
+  $private = $form_state['values']['privacy'];
+  db_query("UPDATE {logger_users}
+            SET private = %d
+            WHERE uid = %d", $private, $user->uid);
+
+  // page redirection to the dashboard after form submission
+  $form_state['redirect'] = 'logger';
 }
 
 /**
- * Access callback ensuring the user account tabs are visible only to the
+ * Access callback ensuring the user profile tabs are visible only to their
  * owner.
  *
  * @param $permission
@@ -745,27 +640,15 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
  * @param $account
  *   A user object.
  */
-function _logger_account_access($permission, $account) {
+function _logger_privacy_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
 /**
- * Access callback ensuring the sensor are accessible only to the owner.
+ * Define the administration settings form for the logger module
  */
-function _logger_sensor_access($permission, $meter) {
-
-  $sql = "
-    SELECT
-      m.uid
-    FROM
-      logger_meters m
-    WHERE
-      m.meter = '$meter'";
-
-  $result = db_query($sql);
-  $sensor = db_fetch_object($result);
-
-  return ($sensor->uid == $GLOBALS['user']->uid && user_access($permission));
+function _logger_admin_settings() {
+//TODO
 }
 
 /**
