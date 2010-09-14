@@ -760,10 +760,9 @@ function _logger_sensor_access($permission, $meter) {
     FROM
       logger_meters m
     WHERE
-      m.meter = '$meter'";
+      m.meter = '%s'";
 
-  $result = db_query($sql);
-  $sensor = db_fetch_object($result);
+  $sensor = db_fetch_object(db_query($sql, $meter));
 
   return ($sensor->uid == $GLOBALS['user']->uid && user_access($permission));
 }

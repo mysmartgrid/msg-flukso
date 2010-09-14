@@ -171,9 +171,21 @@ function _logger_assign_node($serial, $country, $uid) {
 }
 
 function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
-  $result = db_query("UPDATE {logger_meters} SET type = '%s', function = '%s', phase = %d, constant = %d, unit = '%s' WHERE meter = '%s'", $type, $function, $phase, $constant, $unit, $meter);
-  drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');  
-  drush_print_pipe('ok');
+      
+  module_load_include('inc', 'logger', 'logger.admin');
+
+  if (_logger_function_name_validate($function, $meter)) {
+
+    $result = db_query("UPDATE {logger_meters} SET type = '%s', function = '%s', phase = %d, constant = %d, unit = '%s' WHERE meter = '%s'",
+      $type, $function, $phase, $constant, $unit, $meter);
+
+    drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');  
+    drush_print_pipe('ok');
+
+  } else {
+    drush_set_error('LOGGER_NON_UNIQUE_METER_FUNCTION', dt('The function name: @function is already been used by another sensor.',
+      array('@function' => $function)));
+  }
 }
 
 function _logger_tokens($meter = "", $permissions = 62) {

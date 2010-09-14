@@ -134,6 +134,7 @@ function theme_logger_account_devices($form) {
  *   An array of table rows.
  */
 function theme_logger_account_devices_list($items) {
+      
   if (count($items) > 0) {
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'));
     $output  = theme('table', $headers, $items);
@@ -298,7 +299,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   $form_state['redirect'] = "user/$uid/sensors";
 }
 
-function _get_sensor($id) {
+function _get_sensor($meter) {
 
   $sql = "
     SELECT
@@ -308,30 +309,28 @@ function _get_sensor($id) {
     FROM
       logger_meters m
     WHERE
-      m.meter = '$id'";
+      m.meter = '%s'";
 
-  $result = db_query($sql);
-  return db_fetch_object($result);
+  return db_fetch_object(db_query($sql, $meter));
 }
 
-function _logger_function_name_validate($function, $sensor_id) {
+function _logger_function_name_validate($function, $meter) {
 
   global $user;
-  $uid = $user->uid;
 
   $sql = "
     SELECT
-      1
+      count(*)
     FROM
       logger_meters m
     WHERE
-      m.function = '$function' AND
-      m.uid = $uid AND
-      m.meter <> '$sensor_id'";
+      m.function = '%s' AND
+      m.uid = %d AND
+      m.meter <> '%s'";
 
-  $result = db_fetch_object(db_query($sql));
+  $count = db_result(db_query($sql, $function, $user->uid, $meter));
 
-  return $result == NULL;
+  return $count == 0;
 }
 
 /**
