@@ -267,7 +267,11 @@ function _logger_installation() {
  * Callback functions registered in the logger_menu section
  */
 function _logger_dashboard($type, $function, $interval) {
-  // watchdog('dashboard', 'arguments: %type, %function, %interval', array('%type' => $type, '%function' => $function, '%interval' => $interval), WATCHDOG_DEBUG);
+
+  /*
+  watchdog('dashboard', 'arguments: %type, %function, %interval',
+  array('%type' => $type, '%function' => $function, '%interval' => $interval), WATCHDOG_DEBUG);
+  */
 
   if (user_access('logger')) {
     // MD patch
@@ -311,45 +315,62 @@ function _logger_dashboard($type, $function, $interval) {
 
   $result_me = db_query("
     SELECT
+      lm.uid,
+      '%s' AS username,
       lm.meter,
       lm.function,
       lm.unit,
       lu.private
     FROM
       {logger_meters} lm
-      INNER JOIN {logger_users} lu on lm.uid = lu.uid
+      INNER JOIN {logger_users} lu ON lm.uid = lu.uid
     WHERE
-      lm.uid = %d AND lm.type = '%s'
+      lm.uid = %d AND
+      lm.type = '%s'
     ORDER BY
-      lm.function", $user->uid, $type);
+      lm.function", $user->name, $user->uid, $type);
 
-  $meter_me = db_fetch_object($result_me);
+  $sensors = array();
 
-  $result_sub = db_query("
-    SELECT
-      u.name,
-      lm.meter,
-      lu.private
-    FROM
-      ((({users} u
-      INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-      INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid)
-      INNER JOIN {logger_meters} lm ON u.uid = lm.uid)
-      INNER JOIN {logger_users} lu ON u.uid = lu.uid
-    WHERE
-      ur.requester_id = %d AND urt.name = '%s' AND
-      type = '%s' AND
-      function = '%s'
-    ORDER BY
-      ur.rid", $user->uid, 'subscription', $type, $function);
+  while ($meter_me = db_fetch_object($result_me)) {
+    $sensors[] = $meter_me;
+  }
+
+  if (user_access('logger')) {
+
+    $result_sub = db_query("
+      SELECT
+        u.uid,
+        u.name AS username,
+        lm.meter,
+        lm.function,
+        lm.unit,
+        lu.private
+      FROM
+        ((({users} u
+        INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
+        INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid)
+        INNER JOIN {logger_meters} lm ON u.uid = lm.uid)
+        INNER JOIN {logger_users} lu ON u.uid = lu.uid
+      WHERE
+        ur.requester_id = %d AND urt.name = '%s' AND
+        lm.type = '%s' AND
+        lm.function = '%s'
+      ORDER BY
+        ur.rid", $user->uid, 'subscription', $type, $function);
+
+    while($meter_sub = db_fetch_object($result_sub)) {
+      $sensors[] = $meter_sub;
+    }
+  }
+
+  //Default unit and factor
+  $unit = 'watt';
+  $factor = 3600; // 1Wh/s = 3600 W
 
   switch ($type) {
     case 'electricity':
       switch ($meter_me->unit) {
-        case 'watt':
-          $unit = 'watt';
-          $factor = 3600; // 1Wh/s = 3600 W
-          break;
         case 'kwh':
           $unit = 'kWh/year';
           $factor = 31536;
@@ -365,50 +386,35 @@ function _logger_dashboard($type, $function, $interval) {
       }
   }
 
+  $string->line = ' COMMENT:"\s"';
   $color = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
-
   $i = 0;
 
-  $string->line = ' COMMENT:"\s"';
-  if (user_access('logger') && ((!$meter_sub = db_fetch_object($result_sub)) || $meter_me->private)) {
+  foreach ($sensors as &$sensor) {
 
-    do {
-      $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-      $string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_me->function);
-      $i++;
-    } while ($meter_me = db_fetch_object($result_me));
-
-  } elseif (user_access('logger')) {
-
-    $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-    $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
-
-    do {
-      $i++;   
-      // check whether the person who's datastream you'd like to superimpose on the graph is in private mode
-      if ($meter_sub->private) {
+     // check whether the person who's datastream you'd like to superimpose on the graph is in private mode
+    if ($sensor->private && $sensor->uid != $user->uid) {
+      
         // shift the data left by 1 year = 31556926 seconds to prevent the datastream from being displayed
-        $string->def  .= ' DEF:data'. $i .'='. $data_path . $meter_sub->meter .'.rrd:meter:AVERAGE'.
+        $string->def  .= ' DEF:data'. $i .'='. $data_path . $sensor->meter .'.rrd:meter:AVERAGE'.
                          ' CDEF:meter'. $i .'=data'. $i .','. $factor .',*'.
-                         ' SHIFT:meter'. $i .':-31556926'; 
+                         ' SHIFT:meter'. $i .':-31556926';
 
         // substitute the actual min/max/avg/last values by 'prv'
-        $string->line .= ' LINE1:meter'. $i .'#'. $color[$i % count($color)] .':'.'"'. substr($meter_sub->name.'               ', 0, 15) .'"'.
+        $string->line .= ' LINE1:meter'. $i .'#'. $color[$i % count($color)] .':'.'"'. substr($sensor->username.'               ', 0, 15) .'"'.
                          ' COMMENT:"min\:  prv"'.
                          ' COMMENT:"\tmax\:  prv"'.
                          ' COMMENT:"\tavg\:  prv"'.
-                         ' COMMENT:"\tlast\:  prv\l"';
+                         ' COMMENT:"\tlast\:  prv\l"';	  
 
-      // the peer has not set his datastream to private so print it!
-      } else {
-        $string->def  .= _logger_chart_def($i, $data_path, $meter_sub->meter, $factor); 
-	$string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_sub->name);
-      }
-    } while($meter_sub = db_fetch_object($result_sub));
+    } else {
+      $line_name = $sensor->uid == $user->uid && user_access('logger') ? $sensor->function : $sensor->username;
 
-  } else {
-    $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
-    $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
+      $string->def  .= _logger_chart_def($i, $data_path, $sensor->meter, $factor);
+      $string->line .= _logger_chart_line($i, $color[$i % count($color)], $line_name);
+    }
+
+    $i++;
   }
 
   //construct the TZ=GMT-02:00 format from the $user->timezone object updated by the autotimezone module
@@ -421,16 +427,23 @@ function _logger_dashboard($type, $function, $interval) {
     $TZ = 'TZ="GMT+';
     $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
 
-  } else
+  } else {
     $TZ = 'TZ="GMT" ';
+  }
 
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
   $command = $TZ . $root_path .'/rrdtool graph '. $graph_path . $pngid .'.png -s '. $start .
              ' --vertical-label '. $unit .' --lower-limit 0 -w 500 -h 350 -E -X 0 --font LEGEND:8:';
   $command .= $string->def;
   $command .= $string->line;
+
   exec($command, $output, $return_var);
-  //watchdog('dashboard', 'arguments: %command ++ %output ++ %return_var', array('%command' => $command, '%output' => serialize($output), '%return_var' => $return_var), WATCHDOG_DEBUG);
+
+  /*
+  watchdog('dashboard', 'arguments: %command ++ %output ++ %return_var',
+  array('%command' => $command, '%output' => serialize($output), '%return_var' => $return_var), WATCHDOG_DEBUG);
+  */
+
   return theme('chart', $graph_path . $pngid .'.png');
 }
 
