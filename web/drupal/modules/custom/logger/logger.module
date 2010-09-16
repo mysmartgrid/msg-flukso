@@ -273,8 +273,8 @@ function _logger_dashboard($type, $function, $interval) {
     // MD patch
     drupal_set_title(t('Ihr Stromverbrauch'));
     global $user;
-  }
-  else {  //show users who don't have 'logger' permissions icrarus'es chart
+
+  } else {  //show users who don't have 'logger' permissions icrarus'es chart
     // MD patch
     drupal_set_title(t("Stromverbrauch des CC HPC"));
     $user = new stdClass();
@@ -309,22 +309,39 @@ function _logger_dashboard($type, $function, $interval) {
       break;
   }
 
-  $result_me = db_query("SELECT lm.meter, lm.function, lm.unit, lu.private
-	                FROM {logger_meters} lm
-	                INNER JOIN {logger_users} lu on lm.uid = lu.uid
-	                WHERE lm.uid = %d AND lm.type = '%s'
-	                ORDER BY lm.function", $user->uid, $type);
+  $result_me = db_query("
+    SELECT
+      lm.meter,
+      lm.function,
+      lm.unit,
+      lu.private
+    FROM
+      {logger_meters} lm
+      INNER JOIN {logger_users} lu on lm.uid = lu.uid
+    WHERE
+      lm.uid = %d AND lm.type = '%s'
+    ORDER BY
+      lm.function", $user->uid, $type);
 
   $meter_me = db_fetch_object($result_me);
 
-  $result_sub = db_query("SELECT u.name, lm.meter, lu.private
-                          FROM ((({users} u
-                          INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-                          INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid)
-                          INNER JOIN {logger_meters} lm ON u.uid = lm.uid)
-                          INNER JOIN {logger_users} lu ON u.uid = lu.uid
-                          WHERE ur.requester_id = %d AND urt.name = '%s' AND type = '%s' AND function = '%s'
-                          ORDER BY ur.rid", $user->uid, 'subscription', $type, $function);
+  $result_sub = db_query("
+    SELECT
+      u.name,
+      lm.meter,
+      lu.private
+    FROM
+      ((({users} u
+      INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
+      INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid)
+      INNER JOIN {logger_meters} lm ON u.uid = lm.uid)
+      INNER JOIN {logger_users} lu ON u.uid = lu.uid
+    WHERE
+      ur.requester_id = %d AND urt.name = '%s' AND
+      type = '%s' AND
+      function = '%s'
+    ORDER BY
+      ur.rid", $user->uid, 'subscription', $type, $function);
 
   switch ($type) {
     case 'electricity':
@@ -354,14 +371,14 @@ function _logger_dashboard($type, $function, $interval) {
 
   $string->line = ' COMMENT:"\s"';
   if (user_access('logger') && ((!$meter_sub = db_fetch_object($result_sub)) || $meter_me->private)) {
-      
+
     do {
       $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
       $string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_me->function);
       $i++;
     } while ($meter_me = db_fetch_object($result_me));
-  }
-  elseif (user_access('logger')) {
+
+  } elseif (user_access('logger')) {
 
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
     $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
@@ -381,16 +398,15 @@ function _logger_dashboard($type, $function, $interval) {
                          ' COMMENT:"\tmax\:  prv"'.
                          ' COMMENT:"\tavg\:  prv"'.
                          ' COMMENT:"\tlast\:  prv\l"';
-      }
 
       // the peer has not set his datastream to private so print it!
-      else {
+      } else {
         $string->def  .= _logger_chart_def($i, $data_path, $meter_sub->meter, $factor); 
 	$string->line .= _logger_chart_line($i, $color[$i % count($color)], $meter_sub->name);
       }
     } while($meter_sub = db_fetch_object($result_sub));
-  }
-  else {
+
+  } else {
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
     $string->line .= _logger_chart_line($i, $color[$i % count($color)], $user->name);
   }
@@ -400,12 +416,12 @@ function _logger_dashboard($type, $function, $interval) {
   if ($user->timezone > 0) {
     $TZ = 'TZ="GMT-';
     $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
-  }
-  elseif ($user->timezone < 0) {
+
+  } elseif ($user->timezone < 0) {
     $TZ = 'TZ="GMT+';
     $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
-  }
-  else
+
+  } else
     $TZ = 'TZ="GMT" ';
 
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
