@@ -240,7 +240,7 @@ function logger_sensor_form(&$form_state, $meter, $type, $function) {
 
   $form['meter'] = array(
     '#type' => 'textfield',
-    '#description' => t('The sensor id.'),
+    '#description' => t("The sensor meter id."),
     '#maxlength' => 32,
     '#size' => 32,
     '#required' => TRUE,
@@ -260,7 +260,7 @@ function logger_sensor_form(&$form_state, $meter, $type, $function) {
 
   $form['function'] = array(
     '#type' => 'textfield',
-    '#description' => t('Enter the sensor function name.'),
+    '#description' => t("Enter the sensor's function name."),
     '#maxlength' => 16,
     '#size' => 16,
     '#required' => TRUE,
