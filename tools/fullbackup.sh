@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Please, inform the database user password"
+exit 70
 
 ####################
 # Configuration
@@ -8,7 +10,7 @@
 dbname="flukso"
 dbhost="localhost"
 dbuser="flukso"
-dbpw="jcRJ8aPxdeeN7JMm"
+dbpw="**************"
 
 # Date/Time
 datestamp=`date +'%m-%d-%Y'`
