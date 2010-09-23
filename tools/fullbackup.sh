@@ -77,8 +77,8 @@ gzip $tarfile
 ####################
 # Cleanup
 
-echo "Removing backup files older than 90 days" >> $logfile
-find $basedir/*.tar.gz -mtime +90 -exec rm {} \;
+echo "Removing backup files older than 3 days" >> $logfile
+find $basedir/*.tar.gz -mtime +3 -exec rm {} \;
 
 echo "Removing temp dir $tempdir ..." >> $logfile
 rm -rf $tempdir
