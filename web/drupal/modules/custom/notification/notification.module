@@ -352,7 +352,7 @@ function _notification_compose_email($description, $complement = "") {
 
 	<p>&nbsp;<br>
 	Best Regards,</p>
-	<p>mySmartGrid Administrator</p>
+	<p>mySmartGrid Team</p>
         <p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>
       </body>
     </html>";
@@ -399,7 +399,7 @@ function _notification_send_emails($sql, $message) {
       'body' => t($message, $variables, $language->language) 
     );
 
-    drupal_mail('notification', 'notice', $object['email'], $language, $params);
+    drupal_mail('notification', 'notice', $object['email'], $language, $params, 'msg-support@itwm.fhg.de');
   }
 }
 
