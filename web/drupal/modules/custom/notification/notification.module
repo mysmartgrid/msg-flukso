@@ -12,7 +12,7 @@ function notification_menu() {
   $items['notification_list'] = array(
     'title' => 'Event Notifications',
     'page callback' => 'notification_list_page',
-    'access arguments' => array('notification'),
+    'access arguments' => array('manage notifications'),
     'type' => MENU_NORMAL_ITEM
   );
 
@@ -20,14 +20,14 @@ function notification_menu() {
     'title' => $items['notification_list']['title'],
     'page callback' => 'notification_delete',
     'page arguments' => array(1, 2),
-    'access arguments' => array('notification'),
+    'access arguments' => array('manage notifications'),
     'type' => MENU_CALLBACK
   );
 
   $items['notification_register'] = array(
     'title' => 'Event Notification Registration',
     'page callback' => 'notification_register_page',
-    'access arguments' => array('notification'),
+    'access arguments' => array('manage notifications'),
     'type' => MENU_CALLBACK
   );
 
@@ -161,7 +161,7 @@ function notification_register_form() {
 
   $form['limit_up'] = array(
     '#type' => 'textfield',
-    '#description' => t('For "Peak Consumption", enter the maximum eletricity consumption in watts.
+    '#description' => t('For "Peak Consumption", enter the maximum electricity consumption in watts.
     Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
     '#maxlength' => 6,
     '#size' => 6,
