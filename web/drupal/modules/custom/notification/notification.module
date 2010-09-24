@@ -91,17 +91,14 @@ function notification_list_page() {
 
 function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
-  $name;	
+  $name = t($event_name);
   if ($event_id == 1 || $event_id == 3) {
-    $name = "%event_name (in %limit_up min)";
+    $name .= " (in $limit_up min)";
 
   } else if ($event_id == 4) {
-    $name = "%event_name (%limit_up watts)";
-
-  } else {
-    $name = "%event_name";
+    $name .= " ($limit_up watts)";
   }
-  return t($name, array('%event_name' => $event_name, '%limit_up' => $limit_up));
+  return $name;
 }
 
 function _notification_get_devices_options() {
@@ -339,23 +336,18 @@ function _notification_compose_email($description, $complement = "") {
   global $base_url;    
 
   return "
-    <html>
-      <body>
-        <p>Dear user %user_name
-        <br> &nbsp;<br></p>
+    <p>Dear user %user_name
+    <br> &nbsp;<br></p>
 
-	<p>$description</p>
-	<p>$complement</p>
+    <p>$description</p>
+    <p>$complement</p>
 
-        <p>If you want to stop receiving this notification, please remove it from your
-        <a href='$base_url/notification_list'>event notifications list</a>.</p>
+    <p>If you want to stop receiving this notification, please remove it from your
+    <a href='$base_url/notification_list'>event notifications list</a>.</p>
 
-	<p>&nbsp;<br>
-	Best Regards,</p>
-	<p>mySmartGrid Team</p>
-        <p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>
-      </body>
-    </html>";
+    <p>&nbsp;<br>
+    Best Regards,</p>
+    <p>mySmartGrid Team</p>";
 }
 
 function _notification_compose_error_email($description, $recommendation = NULL) {
@@ -377,15 +369,17 @@ function _notification_compose_error_email($description, $recommendation = NULL)
       <li>Visit our <a href='$base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, and
       read the answers to questions made by other users in similar situations.<br><br>
 
-      <li>In case the problem persists, please answer to this email, informing your situation.
+      <li>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de.
     </ul>");
 }
 
 function _notification_send_emails($sql, $message) {
 
   global $user;
+  global $base_url;
   $language = user_preferred_language($user);
   $result = db_query($sql);
+  $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
 
   while ($object = db_fetch_array($result)) {
       
@@ -394,12 +388,15 @@ function _notification_send_emails($sql, $message) {
       $variables["%$key"] = $value;
     }
 
+    $subject = t('Event Notification');
+    $body = t($message, $variables, $language->language) . $logo;
+
     $params = array(
-      'subject' => t('Event Notification'),
-      'body' => t($message, $variables, $language->language) 
+      'subject' => $subject,
+      'body' => $body
     );
 
-    drupal_mail('notification', 'notice', $object['email'], $language, $params, 'msg-support@itwm.fhg.de');
+    drupal_mail('notification', 'notice', $object['email'], $language, $params);
   }
 }
 
