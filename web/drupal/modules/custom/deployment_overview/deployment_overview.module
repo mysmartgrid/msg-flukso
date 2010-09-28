@@ -90,28 +90,28 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
       d.serial AS serial,
       u.name AS name,
       IF(d.access = 0, FROM_UNIXTIME(d.created), FROM_UNIXTIME(d.access)) AS latest,
-      IF(u.uid = 0,
-        0,
-        IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR),
-          1,
-          IF(SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR),
-            2, 3
+      IF(u.uid = 0, 0,
+        IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR), 1,
+          IF(EXISTS(
+            SELECT 
+              1
+            FROM
+              logger_meters m
+            WHERE
+              d.device = m.device AND
+              m.type = 'electricity' AND
+              SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR)), 2, 3
       ))) AS state
 
     FROM
-      {logger_meters} m,
-      {logger_devices} d
-      LEFT OUTER JOIN {users} u ON d.uid = u.uid
-  
-    WHERE
-      d.device = m.device AND
-      m.type = 'electricity'";
+      logger_devices d
+      LEFT OUTER JOIN users u ON d.uid = u.uid";
 
   $sql_count = NULL;
   $args = array();
   
   if($serial) {
-    $sql .= " AND d.serial = %d";
+    $sql .= " WHERE d.serial = %d";
     $args[] = $serial;
 
     $sql_count = "
@@ -171,31 +171,31 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
   $result = _get_devices(NULL, 1, $serial);
-  $msg = '';
 
   if (empty($result)) {
-    $msg = t('No device was found with such serial number.');
+    drupal_set_message(t('No device was found with such serial number.'));
 
   } else {
     $device = $result[0];
     $state = $device['state'];
 
+    drupal_set_message(t('Status: ') . $state);
+
     if ($state == UNINSTALLED) {
-      $msg = t('This device has not yet been installed.');
+      drupal_set_message(t('This device has not yet been installed.'));
 
     } else {
       $latest = array('%latest' => date('D, d M Y H:i:s', $device['latest']));
 
       if ($state == NO_HEARTBEAT) {
-        $msg = t('No heartbeat has been received from this device since %latest.', $latest);
+        drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
 
       } else if ($state == CORRUPTED) {
-        $msg = t('This device has sent an invalid measurement at %latest.', $latest);
+        drupal_set_message(t('This device has sent an invalid measurement at %latest.', $latest));
 
       } else if ($state == WORKING) {
-        $msg = t('This device is working fine. Latest heartbeat received at %latest.', $latest);
+        drupal_set_message(t('This device is working fine. Latest heartbeat received at %latest.', $latest));
       }
     }
   }
-  drupal_set_message($msg);
 }
