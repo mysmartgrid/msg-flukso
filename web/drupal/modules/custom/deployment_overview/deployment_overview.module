@@ -83,7 +83,11 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
   $output = '';
 
-  $states = array(UNINSTALLED, NO_HEARTBEAT, CORRUPTED, WORKING);
+  $states = array(
+	 0 => UNINSTALLED,
+	 1 => NO_HEARTBEAT,
+	 2 => CORRUPTED,
+	 3 => WORKING);
 
   $sql = "
     SELECT
@@ -185,7 +189,7 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
       drupal_set_message(t('This device has not yet been installed.'));
 
     } else {
-      $latest = array('%latest' => date('D, d M Y H:i:s', $device['latest']));
+      $latest = array('%latest' => $device['latest']);
 
       if ($state == NO_HEARTBEAT) {
         drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
