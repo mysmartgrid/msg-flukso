@@ -235,12 +235,16 @@ function notification_cron() {
 
 function _notification_send_no_heartbeat_emails($event_id = 1) {
 
+  global $user;
+  $tzdif = $user->timezone / (60 * 60);
+  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+
   $sql = "
     SELECT
       u.name AS user_name,
       n.email AS email,       
       d.serial AS serial,
-      FROM_UNIXTIME(d.access) AS event_time,
+      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
       n.limit_up AS limit_up
     FROM
       {users} u,
@@ -264,12 +268,16 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
 
 function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
 
+  global $user;
+  $tzdif = $user->timezone / (60 * 60);
+  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+
   $sql = "
     SELECT
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      FROM_UNIXTIME(d.access) AS event_time
+      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time
     FROM
       {users} u,
       {logger_devices} d,
@@ -279,7 +287,7 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
       u.uid = d.uid AND
       d.device = m.device AND
       m.type = 'electricity' AND
-      TIMEDIFF(FROM_UNIXTIME(d.access), FROM_UNIXTIME(m.access)) > TIME('00:10:00') AND
+      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR) AND
       d.device = n.device AND
       n.event_id = $event_id";
 
@@ -297,12 +305,16 @@ function _notification_send_any_heartbeat_failure_emails() {
 
 function _notification_send_peak_consumption_emails() {
 
+  global $user;
+  $tzdif = $user->timezone / (60 * 60);
+  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+
   $sql = "
     SELECT
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      FROM_UNIXTIME(d.access) AS event_time,
+      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
       n.limit_up AS limit_up
     FROM
       {users} u,

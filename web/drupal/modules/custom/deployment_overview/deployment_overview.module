@@ -81,6 +81,10 @@ function deployment_overview_list() {
 
 function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
+  global $user;
+  $tzdif = $user->timezone / (60 * 60);
+  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+
   $output = '';
 
   $states = array(
@@ -93,23 +97,22 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
     SELECT
       d.serial AS serial,
       u.name AS name,
-      IF(d.access = 0, FROM_UNIXTIME(d.created), FROM_UNIXTIME(d.access)) AS latest,
+      CONVERT_TZ(IF(d.access = 0, FROM_UNIXTIME(d.created), FROM_UNIXTIME(d.access)),'+00:00',$tz) AS latest,
       IF(u.uid = 0, 0,
         IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR), 1,
           IF(EXISTS(
             SELECT 
               1
             FROM
-              logger_meters m
+	      {logger_meters} m
             WHERE
               d.device = m.device AND
               m.type = 'electricity' AND
               SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR)), 2, 3
       ))) AS state
-
     FROM
-      logger_devices d
-      LEFT OUTER JOIN users u ON d.uid = u.uid";
+      {logger_devices} d
+      LEFT OUTER JOIN {users} u ON d.uid = u.uid";
 
   $sql_count = NULL;
   $args = array();
