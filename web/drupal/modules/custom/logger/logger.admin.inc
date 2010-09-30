@@ -34,9 +34,7 @@ function _logger_account_devices() {
   $form['code'] = array(
     '#title' => t('Activation Code'),
     '#type' => 'textfield',
-    '#description' => t('In order to add a device, please inform its activation
-      code and click the button bellow. This code is found in the device
-      installation instructions.'),
+    '#description' => t('Please, inform the activation code of the device to be added. This code is found in the device installation guide.'),
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => TRUE,
