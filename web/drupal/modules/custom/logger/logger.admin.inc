@@ -30,16 +30,23 @@
  * @see theme_logger_account_devices
  */
 function _logger_account_devices() {
-  $form['serial'] = array(
+
+  $form['code'] = array(
+    '#title' => t('Activation Code'),
     '#type' => 'textfield',
+    '#description' => t('In order to add a device, please inform its activation
+      code and click the button bellow. This code is found in the device
+      installation instructions.'),
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => TRUE,
   );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Add device'),
   );
+
   $form['#validate'][] = '_logger_account_devices_validate';
   $form['#submit'][] = '_logger_account_devices_submit';
   $form['#theme'] = 'logger_account_devices';
@@ -48,24 +55,28 @@ function _logger_account_devices() {
 }
 
 function _logger_account_devices_validate($form, &$form_state) {
-  $serial = $form_state['values']['serial'];
-  if (strlen($serial) == 10 && is_numeric(substr($serial, 2, 9))) {
-    if (db_result(db_query("SELECT COUNT(*) FROM {logger_devices} WHERE serial = %d AND uid = %d", substr($serial, 2, 9), 0)) == 0) {
-      form_set_error('serial', t('Please specify a valid serial number.'));
+
+  $code = $form_state['values']['code'];
+  if (strlen($code) == 10) {
+
+    $count = db_result(db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE '%s%' AND uid = %d", $code, 0));
+    
+    if ($count != 1) {
+      form_set_error('code', t('Please specify a valid activation code.'));
     }
-  }
-  else {
-    form_set_error('serial', t('Please specify a proper 10-character serial number.'));
+
+  } else {
+    form_set_error('code', t('Please specify a proper 10-character activation code.'));
   }
 }
 
 function _logger_account_devices_submit($form, &$form_state) {
-  global $user;
-  $serial = substr($form_state['values']['serial'], 2, 9);
-  $device = db_result(db_query("SELECT device FROM {logger_devices} WHERE serial = %d", $serial));
 
-  db_query("UPDATE {logger_devices} SET uid = %d WHERE serial = %d", $user->uid, $serial); 
-  db_query("UPDATE {logger_meters} SET uid = %d WHERE device = '%s'", $user->uid, $device);
+  global $user;
+  $code = $form_state['values']['code'];
+
+  db_query("UPDATE {logger_devices} SET uid = %d WHERE device LIKE '%s%'", $user->uid, $code);
+  db_query("UPDATE {logger_meters} SET uid = %d WHERE device LIKE '%s%'", $user->uid, $code);
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
@@ -78,6 +89,29 @@ function _logger_account_devices_submit($form, &$form_state) {
   drupal_set_message(t("The device is now associated with your account."));
 }
 
+function _logger_device_deactivate($serial) {
+
+  global $user;
+  $uid = $user->uid;
+
+  $device = db_result(db_query("SELECT device FROM {logger_devices} WHERE serial = %d", $serial));
+
+  db_query("UPDATE {logger_devices} SET uid = 0 WHERE serial = %d", $serial);
+  db_query("UPDATE {logger_meters} SET uid = 0 WHERE device = '%s'", $device);
+
+  $count = db_result(db_query("SELECT count(*) FROM {logger_devices} WHERE uid = %d", $uid));
+
+  // check whether the user is still a fluksonian
+  // if not, remove entries in {users_roles} and {logger_users}
+  if ($count == 0) {
+    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = 'fluksonian'"));
+    db_query("DELETE FROM {users_roles} WHERE uid = %d AND rid = %d", $uid, $rid);
+    db_query("DELETE FROM {logger_users} WHERE uid = %d AND private = 0", $uid);
+  }
+
+  drupal_goto("user/$uid/devices");
+}
+
 /**
  * Theme function for displaying the devices form
  *
@@ -87,6 +121,7 @@ function _logger_account_devices_submit($form, &$form_state) {
  *   The device form array.
  */
 function theme_logger_account_devices($form) {
+
   global $user;
   $rows = array();
 
@@ -113,13 +148,13 @@ function theme_logger_account_devices($form) {
     $row[] = $device->resets;
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
+    $row[] = l('Remove', 'device/deactivate/' . $device->serial);
 
     $rows[] = $row;
   }
 
-  $rows[] = array(drupal_render($form['serial']), array('data' => drupal_render($form['submit']), 'colspan' => 3));
+  $output .= drupal_render($form);
 
-  $output = drupal_render($form);
   $output .= theme('logger_account_devices_list', $rows);
 
   return $output;
@@ -136,7 +171,7 @@ function theme_logger_account_devices($form) {
 function theme_logger_account_devices_list($items) {
       
   if (count($items) > 0) {
-    $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'));
+    $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
     $output  = theme('table', $headers, $items);
   }
   else {
@@ -359,6 +394,7 @@ function _logger_account_privacy_form() {
                                             FROM {logger_users}
                                             WHERE uid = %d", $user->uid)),
   );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Submit'),
@@ -388,4 +424,3 @@ function _logger_account_privacy_form_submit($form, &$form_state) {
 function _logger_admin_settings() {
   //TODO
 }
-

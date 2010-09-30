@@ -231,13 +231,23 @@ function logger_menu() {
     'access arguments' => array('logger', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
-  );	      
+  );
 
   $items['sensor/activate'] = array(
     'title'            => $items['sensor/edit']['title'],
     'page callback'    => '_logger_sensor_activate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
+    'access arguments' => array('logger', 2),
+    'type'             => MENU_CALLBACK,
+    'file'             => 'logger.admin.inc'
+  );
+
+  $items['device/deactivate'] = array(
+    'title'            => $items['user/%user_uid_optional/devices']['title'],
+    'page callback'    => '_logger_device_deactivate',
+    'page arguments'   => array(2),
+    'access callback'  => '_logger_device_access',
     'access arguments' => array('logger', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
@@ -779,7 +789,7 @@ function _logger_account_access($permission, $account) {
 }
 
 /**
- * Access callback ensuring the sensor are accessible only to the owner.
+ * Access callback ensuring the sensor is accessible only to the owner.
  */
 function _logger_sensor_access($permission, $meter) {
 
@@ -794,6 +804,24 @@ function _logger_sensor_access($permission, $meter) {
   $sensor = db_fetch_object(db_query($sql, $meter));
 
   return ($sensor->uid == $GLOBALS['user']->uid && user_access($permission));
+}
+
+/**
+ * Access callback ensuring the device is accessible only to the owner.
+ */
+function _logger_device_access($permission, $serial) {
+
+  $sql = "
+    SELECT
+      d.uid
+    FROM
+      {logger_devices} d
+    WHERE
+      d.serial = %d";
+
+  $device = db_fetch_object(db_query($sql, $serial));
+
+  return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
 /**
