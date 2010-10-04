@@ -1,128 +1,160 @@
 <?php
-// $Id$
 
 /**
-* Display help and module information
-* @param path which path of the site we're displaying help
-* @param arg array that holds the current path as would be returned from arg() function
-* @return help text for the path
-*/
+ * This module prints activation codes for Flukso devices.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('BASE_DIR',             $_SERVER['DOCUMENT_ROOT'] . base_path());
+define('MODULE_RELATIVE_PATH', "sites/all/modules/msg_printcode");
+define('MODULE_ABS_PATH',      BASE_DIR . '/' . MODULE_RELATIVE_PATH);
+
 function msg_printcode_help($path, $arg) {
+
   $output = '';
   switch ($path) {
+
     case "admin/help#msg_printcode":
-      $output = '<p>'.t("Assign a User to a Flukso by getting a predefined hash value, looking it up in a database and running a little helper script").'</p>';
-      $output = '<p>'.t("Also gives the possibility to print the codes for the roll-out").'</p>';
+      $output = '<p>' . t("
+        Assign a User to a Flukso by getting a predefined hash value, looking
+        it up in a database and running a little helper script") . '</p>';
+
+      $output = '<p>' . t("
+        Also gives the possibility to print the codes for the roll-out") . '</p>';
       break;
   }
   return $output;
 }
 
-/**
-* Valid permissions for this module
-* @return array An array of valid permissions for the onthisdate module
-*/
 function msg_printcode_perm() {
   return array('print msg_printcode');
-} // function msg_printcode_perm()
-
-/**
-*/
-function msg_printcode_menu() {
-  $items = array();
-  $items['print'] = array(
-    'title' => t("Print Code"),
-    'page callback' => 'msg_printcode_print',
-    'access arguments' => array('print msg_printcode'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-  return $items;
-} // function msg_printcode_menu()
-
-function msg_printcode_cron() {
-  exec('rm /home/flukso/www/public/sites/all/modules/msg_printcode/pdf/*');
 }
 
-function msg_printcode_print() {
+function msg_printcode_menu() {
+  
+  $items = array();
+
+  $items['print'] = array(
+    'title'            => "Print Code",
+    'page callback'    => 'msg_printcode_print_page',
+    'access arguments' => array('print msg_printcode'),
+    'type'             => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+function msg_printcode_cron() {
+  exec('rm ' . MODULE_ABS_PATH . '/pdf/*');
+}
+
+function msg_printcode_print_page() {
   $output .= drupal_get_form('msg_printcode_print_form');
   return $output;
 }
 
 function msg_printcode_print_form() {
+
   $form['serial'] = array(
-    '#type' => 'textfield',
-    '#title' => t("Serial"),
-    '#size' => 32,
-    '#maxlength' => 40,
+    '#type'        => 'textfield',
+    '#title'       => t("Serial"),
+    '#size'        => 32,
+    '#maxlength'   => 40,
     '#description' => t('Enter the serial you want to generate the PDF file for'),
   );
+
   $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t("Generate")
+    '#type'   => 'submit',
+    '#value'  => t("Generate")
   );
+
   return $form;
 }
 
 function msg_printcode_print_form_submit($form, &$form_state) {
-	$name=substr(md5(uniqid(rand(), TRUE)),0,10);
-	// FPDF einfügen
-	require_once('fpdf/fpdf.php');
+  
+  $filename = substr(md5(uniqid(rand(), TRUE)),0,10);
+  $output_file_path = MODULE_RELATIVE_PATH . "/pdf/$filename.pdf";
 
-	// FPDI einfügen
-	require_once('fpdi/fpdi.php');
+  require_once('fpdf/fpdf.php');
+  require_once('fpdi/fpdi.php');
 
-	// Konstanten definieren
-	define('FPDF_FONTPATH','/home/flukso/www/public/sites/all/modules/msg_printcode/fpdf/font/');
-	//define('PDF_SOURCE_FILE','/home/flukso/www/public/sites/all/modules/msg_printcode/flukso.pdf');
-	define('PDF_SOURCE_FILE','/home/flukso/www/public/sites/all/modules/msg_printcode/Beipackzettel.pdf');
-	define('PDF_OUTPUT_FILE','/home/flukso/www/public/sites/all/modules/msg_printcode/pdf/'.$name.'.pdf');
+  define('FPDF_FONTPATH',   MODULE_ABS_PATH . '/fpdf/font/');
+  define('PDF_SOURCE_FILE', MODULE_ABS_PATH . '/Beipackzettel.pdf');
+  define('PDF_OUTPUT_FILE', BASE_DIR . "/$output_file_path");
 
-	$pdf = new FPDI();
+  $pdf = new FPDI();
 
-	$pagecount = $pdf->setSourceFile(PDF_SOURCE_FILE);
+  $pagecount = $pdf->setSourceFile(PDF_SOURCE_FILE);
 
-	//Importiere Seite 1
-	$tplidx = $pdf->importPage(1);
+  $tplidx = $pdf->importPage(1);
 
-	preg_match_all('/[\d]*[-[\d]*]?/', $form_state['values']['serial'], $values);
-	foreach($values[0] as $serial)
-	{
-		if ($serial != '') {
-			if (stripos($serial,'-') < 1) {
-				$result = db_query("SELECT *
-					FROM {logger_devices}
-				WHERE serial = %d", $serial
-			);
-			} else {
-				preg_match_all('/([\d]*)-([\d]*)/',$serial,$match);
-				$result = db_query("SELECT *
-					FROM {logger_devices}
-				WHERE serial >= %d AND serial <= %d", $match[1][0], $match[2][0]
-			);
-			}
-			if ($result)
-				while ($device = db_fetch_object($result)) {
-					//$file = exec('/home/flukso/www/public/sites/all/modules/msg_printcode/genpdf.php '.$device->serial.' '.substr($device->device,0,10));
-				
-					//Füge neue Seite hinzu
-					$pdf->AddPage();
+  preg_match_all('/[\d]*[-[\d]*]?/', $form_state['values']['serial'], $values);
 
-					$pdf->useTemplate($tplidx, 10, 10, 190);
+  foreach($values[0] as $serial) {
 
-					$pdf->SetFont('Arial', '', 12);
-					$pdf->SetTextColor(0,0,0);
-					$pdf->SetXY(43, 165);
+    if ($serial != '') {
 
-					$pdf->Write(0, 'Seriennummer: WA'.$device->serial);
-					$pdf->setXY(43,175);
-					$pdf->Write(0, 'Aktivierungscode: '.substr($device->device,0,10));
+      if (stripos($serial,'-') < 1) {
 
-				}
-			else
-				form_set_error('serial',t('Error while looking up activation code!'));
-		}
-	}
+        $result = db_query("
+          SELECT
+            *
+          FROM
+            {logger_devices}
+          WHERE
+            serial = %d", $serial);
 
-	$pdf->Output(PDF_OUTPUT_FILE, 'F');
-	drupal_set_message('<a href=/sites/all/modules/msg_printcode/pdf/'.$name.'.pdf>Download</a>');
+      } else {
+        preg_match_all('/([\d]*)-([\d]*)/', $serial, $match);
+
+        $result = db_query("
+          SELECT
+            *
+          FROM
+            {logger_devices}
+          WHERE
+            serial >= %d AND
+            serial <= %d", $match[1][0], $match[2][0]);
+      }
+
+      if ($result) {
+
+        while ($device = db_fetch_object($result)) {
+
+          $pdf->AddPage();
+
+          $pdf->useTemplate($tplidx, 10, 10, 190);
+
+          $pdf->SetFont('Arial', '', 12);
+          $pdf->SetTextColor(0,0,0);
+          $pdf->SetXY(43, 165);
+
+          $pdf->Write(0, 'Seriennummer: WA' . $device->serial);
+          $pdf->setXY(43,175);
+          $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device,0,10));
+
+        }
+      } else {
+        form_set_error('serial', t('Error while looking up activation code!'));
+      }
+    }
+  }
+
+  $pdf->Output(PDF_OUTPUT_FILE, 'F');
+  drupal_set_message(l(t('Download'), $output_file_path));
 }

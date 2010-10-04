@@ -1,5 +1,25 @@
 <?php
-// $Id: cache.inc,v 1.17.2.2 2009/05/26 08:10:33 goba Exp $
+
+/**
+ * cache_no_filter.module : Cache functions.
+ *
+ * Copyright (c) 2008-2009 jokamajo.org
+ *               2010 flukso.net
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
 
 /**
  * Return data from the persistent cache. Data may be stored as either plain text or as serialized data.
@@ -12,6 +32,7 @@
  *   'cache_menu', 'cache_page', or 'cache' for the default cache.
  */
 function cache_get($cid, $table = 'cache') {
+
   //BVDM: disable filter caching for image_annotate to work on img_assist inserted images
   if ($table == 'cache_filter') {
    return 0;
@@ -25,30 +46,33 @@ function cache_get($cid, $table = 'cache') {
     // Reset the variable immediately to prevent a meltdown in heavy load situations.
     variable_set('cache_flush_'. $table, 0);
     // Time to flush old cache data
-    db_query("DELETE FROM {". $table ."} WHERE expire != %d AND expire <= %d", CACHE_PERMANENT, $cache_flush);
+    db_query("DELETE FROM {$table} WHERE expire != %d AND expire <= %d", CACHE_PERMANENT, $cache_flush);
   }
 
   $cache = db_fetch_object(db_query("SELECT data, created, headers, expire, serialized FROM {". $table ."} WHERE cid = '%s'", $cid));
   if (isset($cache->data)) {
+
     // If the data is permanent or we're not enforcing a minimum cache lifetime
     // always return the cached data.
     if ($cache->expire == CACHE_PERMANENT || !variable_get('cache_lifetime', 0)) {
+
       $cache->data = db_decode_blob($cache->data);
       if ($cache->serialized) {
         $cache->data = unserialize($cache->data);
       }
-    }
+
     // If enforcing a minimum cache lifetime, validate that the data is
     // currently valid for this user before we return it by making sure the
     // cache entry was created before the timestamp in the current session's
     // cache timer. The cache variable is loaded into the $user object by
     // sess_read() in session.inc.
-    else {
+    } else {
+
       if ($user->cache > $cache->created) {
         // This cache data is too old and thus not valid for us, ignore it.
         return 0;
-      }
-      else {
+
+      } else {
         $cache->data = db_decode_blob($cache->data);
         if ($cache->serialized) {
           $cache->data = unserialize($cache->data);
@@ -105,6 +129,7 @@ function cache_get($cid, $table = 'cache') {
  *   A string containing HTTP header information for cached pages.
  */
 function cache_set($cid, $data, $table = 'cache', $expire = CACHE_PERMANENT, $headers = NULL) {
+
   //BVDM: disable filter caching for image_annotate to work on img_assist inserted images
   if ($table == 'cache_filter') {
    return 0;
@@ -115,10 +140,11 @@ function cache_set($cid, $data, $table = 'cache', $expire = CACHE_PERMANENT, $he
     $data = serialize($data);
     $serialized = 1;
   }
+
   $created = time();
-  db_query("UPDATE {". $table ."} SET data = %b, created = %d, expire = %d, headers = '%s', serialized = %d WHERE cid = '%s'", $data, $created, $expire, $headers, $serialized, $cid);
+  db_query("UPDATE {$table} SET data = %b, created = %d, expire = %d, headers = '%s', serialized = %d WHERE cid = '%s'", $data, $created, $expire, $headers, $serialized, $cid);
   if (!db_affected_rows()) {
-    @db_query("INSERT INTO {". $table ."} (cid, data, created, expire, headers, serialized) VALUES ('%s', %b, %d, %d, '%s', %d)", $cid, $data, $created, $expire, $headers, $serialized);
+    @db_query("INSERT INTO {$table} (cid, data, created, expire, headers, serialized) VALUES ('%s', %b, %d, %d, '%s', %d)", $cid, $data, $created, $expire, $headers, $serialized);
   }
 }
 
@@ -141,6 +167,7 @@ function cache_set($cid, $data, $table = 'cache', $expire = CACHE_PERMANENT, $he
  *   match. If '*' is given as $cid, the table $table will be emptied.
  */
 function cache_clear_all($cid = NULL, $table = NULL, $wildcard = FALSE) {
+
   global $user;
 
   if (!isset($cid) && !isset($table)) {
@@ -152,7 +179,9 @@ function cache_clear_all($cid = NULL, $table = NULL, $wildcard = FALSE) {
   }
 
   if (empty($cid)) {
+
     if (variable_get('cache_lifetime', 0)) {
+
       // We store the time in the current user's $user->cache variable which
       // will be saved into the sessions table by sess_write(). We then
       // simulate that the cache was flushed for this user by not returning
@@ -163,31 +192,29 @@ function cache_clear_all($cid = NULL, $table = NULL, $wildcard = FALSE) {
       if ($cache_flush == 0) {
         // This is the first request to clear the cache, start a timer.
         variable_set('cache_flush_'. $table, time());
-      }
-      else if (time() > ($cache_flush + variable_get('cache_lifetime', 0))) {
+
+      } else if (time() > ($cache_flush + variable_get('cache_lifetime', 0))) {
         // Clear the cache for everyone, cache_lifetime seconds have
         // passed since the first request to clear the cache.
-        db_query("DELETE FROM {". $table ."} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
+        db_query("DELETE FROM {$table} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
         variable_set('cache_flush_'. $table, 0);
       }
-    }
-    else {
+
+    } else {
       // No minimum cache lifetime, flush all temporary cache entries now.
-      db_query("DELETE FROM {". $table ."} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
+      db_query("DELETE FROM {$table} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
     }
-  }
-  else {
-    if ($wildcard) {
-      if ($cid == '*') {
-        db_query("DELETE FROM {". $table ."}");
-      }
-      else {
-        db_query("DELETE FROM {". $table ."} WHERE cid LIKE '%s%%'", $cid);
-      }
+
+  } else if ($wildcard) {
+
+    if ($cid == '*') {
+      db_query("DELETE FROM {$table}");
+
+    } else {
+      db_query("DELETE FROM {$table} WHERE cid LIKE '%s%%'", $cid);
     }
-    else {
-      db_query("DELETE FROM {". $table ."} WHERE cid = '%s'", $cid);
-    }
+
+  } else {
+    db_query("DELETE FROM {$table} WHERE cid = '%s'", $cid);
   }
 }
-

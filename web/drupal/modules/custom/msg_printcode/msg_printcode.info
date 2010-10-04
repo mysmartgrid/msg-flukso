@@ -1,4 +1,4 @@
 ; $Id$
 name = Print Codes
-description = Print activation codes for MySmartGrid
+description = Prints activation codes for Flukso devices.
 core = 6.x

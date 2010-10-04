@@ -1,35 +1,27 @@
 <?php
 
-//
-// logger.module : support module for charting data stored in RRD's
-// Copyright (c) 2008-2009 jokamajo.org
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-//
-// $Id: logger.module 90 2010-02-19 10:29:03Z icarus75 $
-//
-
 /**
- * @file
- * Support module for charting data stored in RRD's
+ * Support module for charting data stored in RRD's.
+ *
+ * Copyright (c) 2008-2009 jokamajo.org
+ *               2010 flukso.net
+ *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-
-/**
- * Constants
- */
 define('RED',    'F1572F');
 define('BLUE',   '44C3D3');
 define('GREEN',  '7AAB5A');
@@ -37,19 +29,14 @@ define('ORANGE', 'F37E2B');
 define('YELLOW', 'FBEB0D');
 define('PURPLE', 'A052A0');
 
-/**
- * Implementation of hook_perm().
- */
 function logger_perm() {
   return array('logger');
 }
 
-/**
- * Implementation of hook_menu() for logger
- * Don't forget to create a primary menu item in the Drupal administration section with the title 'ecology' linking to the '/logger' path
- */
 function logger_menu() {
+
   $items = array();
+  //TODO: Don't forget to create a primary menu item in the Drupal administration section with the title 'ecology' linking to the '/logger' path
 
   $items['admin/settings/logger'] = array(
     'title'               => 'Logger settings',
@@ -58,6 +45,7 @@ function logger_menu() {
     'page arguments'      => array('_logger_admin_settings'),
     'access arguments'    => array('administer site configuration'),
   );
+
   $items['logger'] = array(
     'title'               => 'your dashboard', // isn't printed as title on the page, therefore resort to drupal_set_title (t('your ecological dashboard')) in ecology_dashboard;
     'description'         => 'Configure settings for logging metering values.',
@@ -66,33 +54,37 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_CALLBACK,
   );
+
   $items['logger/add'] = array(
     'title'               => 'add this user to the chart',
     'page callback'       => '_logger_add',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
+
   $items['logger/remove'] = array(
     'title'               => 'remove this user from the chart',
     'page callback'       => '_logger_remove',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
+
   $items['logger/unit'] = array(
     'title'               => 'change the unit',
     'page callback'       => '_logger_unit',
     'access arguments'    => array('logger'),
     'type'                => MENU_CALLBACK,
   );
+
   $items['logger/electricity'] = array(
     'title'               => 'electricity',
-//    'page callback'       => '_logger_dashboard',
-//    'page arguments'      => array('electricity', 'main', 'hour'),
+    //'page callback'     => '_logger_dashboard',
+    //'page arguments'    => array('electricity', 'main', 'hour'),
     'access callback'     => TRUE,
     'type'                => MENU_DEFAULT_LOCAL_TASK,
   );
 
-/**
+  /*
   $items['logger/water'] = array(
     'title'               => 'water',
     'page callback'       => '_logger_dashboard',
@@ -100,6 +92,7 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
   );
+
   $items['logger/gas'] = array(
     'title'               => 'gas',
     'page callback'       => '_logger_dashboard',
@@ -107,7 +100,7 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
   );
-**/
+  */
 
   $items['logger/electricity/hour'] = array(
     'title'               => 'hour',
@@ -117,6 +110,7 @@ function logger_menu() {
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 0,
   );
+
   $items['logger/electricity/day'] = array(
     'title'               => 'day',
     'page callback'       => '_logger_dashboard',
@@ -125,6 +119,7 @@ function logger_menu() {
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 1,
   );
+
   $items['logger/electricity/month'] = array(
     'title'               => 'month',
     'page callback'       => '_logger_dashboard',
@@ -133,6 +128,7 @@ function logger_menu() {
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 2,
   );
+
   $items['logger/electricity/year'] = array(
     'title'               => 'year',
     'page callback'       => '_logger_dashboard',
@@ -141,6 +137,7 @@ function logger_menu() {
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 3,
   );
+
   $items['logger/electricity/night'] = array(
     'title'               => 'night',
     'page callback'       => '_logger_dashboard',
@@ -149,6 +146,7 @@ function logger_menu() {
     'type'                => MENU_LOCAL_TASK,
     'weight'              => 4,
   );
+
   $items['installation'] = array(
     'title'               => '',
     'description'         => 'Howto install a Fluksometer',
@@ -156,6 +154,7 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_CALLBACK,
   );
+
   $items['user/%user_uid_optional/privacy'] = array(
     'title'               => 'Privacy',
     'page callback'       => '_logger_privacy',
@@ -167,8 +166,8 @@ function logger_menu() {
   return $items;
 }
 
+function _logger_installation() {
 
-function _logger_installation(){
   $output = '<div class="install">';
   $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step1.png' height='120' width='150' alt='step 1'/></a>";
   $output .= "<p><b>STEP 1: CONFIGURING WIFI</b><br/>Power up the Fluksometer. Connect your computer to the Fluksometer's ethernet port. Surf to <a href = 'http://192.168.255.1'>http://192.168.255.1</a>. Configure the wireless interface with the proper name and security key.</p>";
@@ -189,13 +188,14 @@ function _logger_installation(){
  * Callback functions registered in the logger_menu section
  */
 function _logger_dashboard($type, $function, $interval) {
+
   watchdog('dashboard', '_logger_dashboard arguments: %type, %function, %interval', array('%type' => $type, '%function' => $function, '%interval' => $interval), WATCHDOG_DEBUG);
 
   if (user_access('logger')) {
     drupal_set_title(t('your dashboard'));
     global $user;
-  }
-  else {  //show users who don't have 'logger' permissions icrarus'es chart
+
+  } else {  //show users who don't have 'logger' permissions icrarus'es chart
     drupal_set_title(t("CC-HPC's dashboard"));
     $user = new stdClass();
     $user->uid = 1;
@@ -204,27 +204,34 @@ function _logger_dashboard($type, $function, $interval) {
   }
 
   $root_path = drupal_get_path('module', 'logger');
-  $graph_path = $root_path .'/graphs/'. $interval .'/';
+  $graph_path = "$root_path/graphs/$interval/";
+  $data_base_path = "$root_path/data/base/";
+
   $pngid = md5(uniqid()); //generate random numbers for the png chart so that the browser doesn't use the cached one, use cron to clean up the dir hourly
+
   switch ($interval) {
     case 'hour':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1h';
       break;
+
     case 'day':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1d';
       break;
+
     case 'month':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-60d';
       break;
+
     case 'year':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1y';
       break;
+
     case 'night':
-      $data_path = $root_path .'/data/night/';
+      $data_path = "$root_path/data/night/";
       $start = 'end-60d';
       break;
   }
@@ -253,14 +260,17 @@ function _logger_dashboard($type, $function, $interval) {
           $unit = 'watt';
           $factor = 3600; // 1Wh/s = 3600 W
           break;
+
         case 'kwh':
           $unit = 'kWh/year';
           $factor = 31536;
           break;
+
         case 'eur':
           $unit = 'euro/year';
           $factor = 5676; // 18 EURcent/kWh
           break;
+
         case 'aud':
           $unit = 'aud/year';
           $factor = 5991; // 19 AUDcent/kWh
@@ -279,8 +289,8 @@ function _logger_dashboard($type, $function, $interval) {
       $string->line .= _logger_chart_line($i, $color[$i], $meter_me->function);
       $i++;
     } while ($meter_me = db_fetch_object($result_me));
-  }
-  elseif (user_access('logger')) {
+
+  } elseif (user_access('logger')) {
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
     $string->line .= _logger_chart_line($i, $color[$i], $user->name);
 
@@ -299,25 +309,25 @@ function _logger_dashboard($type, $function, $interval) {
                          ' COMMENT:"\tmax\:  prv"'.
                          ' COMMENT:"\tavg\:  prv"'.
                          ' COMMENT:"\tlast\:  prv\l"';
-      }
 
-      // the peer has not set his datastream to private so print it!
-      else {
+      } else { // the peer has not set his datastream to private so print it!
         $string->def  .= _logger_chart_def($i, $data_path, $meter_sub->meter, $factor); 
-	$string->line .= _logger_chart_line($i, $color[$i], $meter_sub->name);
+      	$string->line .= _logger_chart_line($i, $color[$i], $meter_sub->name);
       }
     } while($meter_sub = db_fetch_object($result_sub));
-  }
-  else {
+
+  } else {
     $string->def  .= _logger_chart_def($i, $data_path, $meter_me->meter, $factor);
     $string->line .= _logger_chart_line($i, $color[$i], $user->name);
   }
 
   //construct the TZ=GMT-02:00 format from the $user->timezone object updated by the autotimezone module
-  if ($user->timezone >= 0)
+  if ($user->timezone >= 0) {
     $TZ = 'TZ="GMT-';
-  else
+  } else {
     $TZ = 'TZ="GMT+';
+  }
+
   $TZ .= gmdate('h:i', abs($user->timezone)) .'" ';
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
   $command = $TZ . $root_path .'/rrdtool graph '. $graph_path . $pngid .'.png -s '. $start .
@@ -326,6 +336,7 @@ function _logger_dashboard($type, $function, $interval) {
   $command .= $string->line;
   exec($command, $output, $return_var);
   watchdog('dashboard', 'arguments: %command ++ %output ++ %return_var', array('%command' => $command, '%output' => serialize($output), '%return_var' => $return_var), WATCHDOG_DEBUG);
+
   return theme('chart', $graph_path . $pngid .'.png');
 }
 
@@ -347,6 +358,7 @@ function _logger_chart_line($i, $color, $caption) {
 }
 
 function _logger_add($uid) {
+
   global $user;
   $rtid = db_result(db_query("SELECT rtid
                               FROM {user_relationship_types}
@@ -360,8 +372,8 @@ function _logger_add($uid) {
   // max subscriptions = 4
   if ($result['COUNT(rid)'] < 4) {
     user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-  }
-  else {
+
+  } else {
     //check whether the requested relationship doesn't already exist
     if (!db_result(db_query("SELECT rid
                              FROM {user_relationships}
@@ -382,7 +394,9 @@ function _logger_add($uid) {
 }
 
 function _logger_remove($rid) {
+
   global $user;
+
   // check whether the to-be-deleted relationship was created by the same user
   if ($user->uid == db_result(db_query("SELECT requester_id
                                         FROM {user_relationships}
@@ -390,8 +404,7 @@ function _logger_remove($rid) {
     db_query("DELETE
               FROM {user_relationships}
               WHERE rid = %d", $rid);
-  }
-  else {
+  } else {
     watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
   }
 
@@ -401,6 +414,7 @@ function _logger_remove($rid) {
 }
 
 function _logger_unit($unit) {
+
   global $user;
   // hardcoded type and function
   db_query("UPDATE {logger_meters}
@@ -416,6 +430,7 @@ function _logger_unit($unit) {
  * Clear the specific (per user) cache entry in the {cache_block} table
  */
 function _logger_cache_clear($delta) {
+
   global $theme;
   //the theme variable isn't set on these callbacks so force it
   $theme = 'flukso';
@@ -426,7 +441,9 @@ function _logger_cache_clear($delta) {
 
   $cid = _block_get_cache_id($block);
   // prevent the whole chache_block being cleared when _block_get_cache_id returns an empty string (e.g. uid = 1)
-  if ($cid != '') cache_clear_all($cid, 'cache_block');
+  if ($cid != '') {
+    cache_clear_all($cid, 'cache_block');
+  }
   watchdog('block_cache', '%cid | %cache', array('%cid' => $cid, '%cache' => variable_get('block_cache', 100)), WATCHDOG_DEBUG);
 }
 
@@ -444,9 +461,6 @@ function logger_user($op) {
   }
 }
 
-/**
- * Implementation of hook_theme() for logger
- */
 function logger_theme() {
   return array(
     'chart' => array(
@@ -472,6 +486,7 @@ function theme_chart($chart) {
  * another one for selecting the desired unit
  */
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
+
   global $user;
 
   switch ($op) {
@@ -512,14 +527,15 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
                             ORDER BY ur.rid", $user->uid, 'subscription');
 
         $items = array();
+
         while ($subscription = db_fetch_object($result)) {
           $items[] = l('[x]', 'logger/remove/'. $subscription->rid, array('attributes' => array('title' => "unsubscribe from ". $subscription->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($subscription->name, 'user/'. $subscription->uid, array('alias' => FALSE));
         }
+
         $block['subject'] = t('Subscriptions');
         $block['content'] = theme('logger_item_list', $items);
-      }
 
-      elseif ($delta == 'fluksonians' && user_access('logger')) {
+      } elseif ($delta == 'fluksonians' && user_access('logger')) {
         // list all users having the fluksionian role for now
         // to be replaced by a real buddylist later on
         $result = db_query("SELECT u.uid, u.name
@@ -532,11 +548,11 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
         while ($fluksonian = db_fetch_object($result)) {
           $items[] = l('[+]', 'logger/add/'. $fluksonian->uid, array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
         }
+
         $block['subject'] = t('Fluksonians');
         $block['content'] = theme('logger_item_list', $items);
-      }
 
-      elseif ($delta == 'unit' && user_access('logger')) {
+      } elseif ($delta == 'unit' && user_access('logger')) {
         //hardcoded the type and function parameters for now
         $unit = db_result(db_query("SELECT unit
                                     FROM {logger_meters}
@@ -553,16 +569,20 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
           case 'watt':
             $items[0] = 'watt';
             break;
+
           case 'kwh':
             $items[1] = 'kWh/year';
             break;
+
           case 'eur':
             $items[2] = 'euro/year [@ 0.18eur/kWh]';
             break;
+
           case 'aud':
             $items[3] = 'aud/year [@ 0.19aud/kWh]';
             break;
         }
+
         $block['subject'] = t('Unit');
         $block['content'] = theme('logger_item_list', $items);
       }
@@ -656,9 +676,13 @@ function _logger_admin_settings() {
  * Cron will call this hook periodically [e.g. 1 hour interval] to perform housekeeping on the png's.
  */
 function logger_cron() {
-  exec('rm sites/all/modules/logger/graphs/hour/*');
-  exec('rm sites/all/modules/logger/graphs/day/*');
-  exec('rm sites/all/modules/logger/graphs/month/*');
-  exec('rm sites/all/modules/logger/graphs/year/*');
-  exec('rm sites/all/modules/logger/graphs/night/*');
+
+  $root_path = drupal_get_path('module', 'logger');
+  $graph_path = "$root_path/graphs";
+
+  exec("rm $graph_path/hour/*");
+  exec("rm $graph_path/day/*");
+  exec("rm $graph_path/month/*");
+  exec("rm $graph_path/year/*");
+  exec("rm $graph_path/night/*");
 }

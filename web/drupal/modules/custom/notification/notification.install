@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 function notification_install() {
   drupal_install_schema('notification');

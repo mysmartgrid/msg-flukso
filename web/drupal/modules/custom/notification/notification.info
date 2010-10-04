@@ -1,4 +1,4 @@
 ; $Id$
 name = Event Notification
-description = Manages Event Notifications
+description = Manages Flukso devices' event notifications
 core = 6.x

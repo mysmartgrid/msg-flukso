@@ -1,58 +1,79 @@
 <?php
-// $Id$
 
 /**
-* Display help and module information
-* @param path which path of the site we're displaying help
-* @param arg array that holds the current path as would be returned from arg() function
-* @return help text for the path
-*/
+ * This module dumps data from Flukso devices in high resolution.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('DB_RELATIVE_PATH', 'sites/all/modules/msg_dump/db');
+define('DB_ABS_PATH',      $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DB_RELATIVE_PATH);
+
 function msg_dump_help($path, $arg) {
   $output = '';
   switch ($path) {
     case "admin/help#msg_dump":
-      $output = '<p>'.t("This module dumps values given by a Flukso in high resolution to a sqlite database and provides the possibility to download this data.").'</p>';
+      $output = '<p>' . t("
+        This module dumps values given by a Flukso in high
+        resolution to a sqlite database and provides the
+        possibility to download this data.") . '</p>';
       break;
   }
   return $output;
-} //msg_dump_help
+}
 
-/**
-* Valid permissions for this module
-* @return array An array of valid permissions for the onthisdate module
-*/
 function msg_dump_perm() {
   return array('msg_dump');
-} // function msg_dump_perm()
+}
 
-/**
-*/
 function msg_dump_menu() {
+
   $items = array();
+
   $items['user/%user_uid_optional/setup'] = array(
-    'title' => "Dump values",
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('msg_dump_setup'),
+    'title'            => "Dump values",
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('msg_dump_setup'),
     'access arguments' => array('msg_dump'),
-    'type' => MENU_NORMAL_ITEM,
+    'type'             => MENU_NORMAL_ITEM,
   );
+
   return $items;
-} // function msg_dump_menu()
+}
 
 function msg_dump_cron() {
+
   $now = new DateTime('now');
   $now = $now->format('U');
+
   //get requested dumps from database
-  $result = db_query("SELECT stop, file FROM msg_dump WHERE start<=%d", $now);
+  $result = db_query("SELECT stop, file FROM {msg_dump} WHERE start <= %d", $now);
   //watchdog("cron", "[msg_dump_cron] Running: " . mysqli_num_rows($result));
 
   while($data = db_fetch_object($result)) {
-    if ( $data->stop + 2629743 < $now ) { //delete dumps older then 3 months
-      exec("rm " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $date->file . ".*");
-      db_query("DELETE FROM msg_dump WHERE file='%s'", $date->file);
+
+    if ( $data->stop + 2629743 < $now ) {
+      //delete dumps older then 3 months
+      exec("rm " . DB_ABS_PATH . "/" . $date->file . ".*");
+      db_query("DELETE FROM {msg_dump} WHERE file = '%s'", $date->file);
+
     } elseif ( $data->stop > $now ) {
-      $res = exec("flukso_archive_watts -c /home/flukso/www/public" . $root_prefix . "/sites/all/modules/msg_dump/db/" . $data->file . ".flukso4rrc"); //otherwise execute dump
+      $res = exec("flukso_archive_watts -c " . DB_ABS_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
       watchdog("cron", "[msg_dump_cron] " . $data->file . ": " . $res);
+
     } else {
       watchdog("cron", "[msg_dump_cron] Nothing to do for " . $data->file);
     }
@@ -71,107 +92,142 @@ function msg_dump_theme() {
 }
 
 function msg_dump_setup() {
+
   global $user;
   $newdate = new DateTime('now');
-  $newdate->setTime(0,0);
+  $newdate->setTime(0, 0);
   $newdate->modify('+1 week');
-  $result = db_query('SELECT serial FROM {logger_devices} WHERE uid=%d', $user->uid);
+
+  $result = db_query('SELECT serial FROM {logger_devices} WHERE uid = %d', $user->uid);
+
   $fluksos = array();
+
   while($serial = db_fetch_object($result)) {
     $fluksos[$serial->serial] = $serial->serial;
   }
-  $result = db_query('SELECT file FROM {msg_dump} WHERE uid=%d', $user->uid);
+
+  $result = db_query('SELECT file FROM {msg_dump} WHERE uid = %d', $user->uid);
+
   while($file = db_fetch_object($result)) {
+
     $form[$file->file] = array(
-      '#type' => 'submit',
-      '#value' => 'X',
-      '#name' => $file->file,
+      '#type'       => 'submit',
+      '#value'      => 'X',
+      '#name'       => $file->file,
       '#attributes' => array(
-	'style' => 'background-color: transparent; color:#ff0000;'
-        )
-      );
+        'style' => 'background-color: transparent; color:#ff0000;'
+      )
+    );
   }
+
   $form['flukso'] = array(
-    '#type' => 'select',
-    '#options' => $fluksos,
-    '#title' => t('Flukso'),
-    '#description' => t('Flukso to use for recording'),
-    );
+    '#type'         => 'select',
+    '#options'      => $fluksos,
+    '#title'        => t('Flukso'),
+    '#description'  => t('Flukso to use for recording'),
+  );
+
   $form['type'] = array(
-    '#type' => 'hidden',
-    '#value' => 'electricity',
-    );
+    '#type'   => 'hidden',
+    '#value'  => 'electricity',
+  );
+
   $form['from'] = array(
-    '#type' => 'date',
-    '#title' => t("From"),
-    '#after_build' => array('_limit_year'),
-    '#description' => t('The date dumping should start on'),
-    );
+    '#type'         => 'date',
+    '#title'        => t("From"),
+    '#after_build'  => array('_limit_year'),
+    '#description'  => t('The date dumping should start on'),
+  );
+
   $form['to'] = array(
-    '#type' => 'date',
-    '#title' => t("Until"),
-    '#default_value' => array('year' => $newdate->format("Y"), 'month' => $newdate->format("n"), 'day' => $newdate->format("d")),
+    '#type'           => 'date',
+    '#title'          => t("Until"),
     '#after_build' => array('_limit_year'),
     '#description' => t('The date dumping should stop on'),
-    );
+    '#default_value'  => array(
+      'year'  => $newdate->format("Y"),
+      'month' => $newdate->format("n"),
+      'day'   => $newdate->format("d")),
+  );
+
   $form['submit'] = array(
-    '#type' => 'submit',
+    '#type'  => 'submit',
     '#value' => t("Submit"),
-    );
+  );
+
   $form['#validate'][] = 'msg_dump_setup_form_validate';
   $form['#submit'][] = 'msg_dump_setup_form_submit';
   $form['#theme'] = 'msg_dump_setup';
+
   return $form;
 }
 
 function msg_dump_setup_form_validate($form, &$form_state) {
-  if (strcmp($form_state['clicked_button']['#value'],t('Submit')) == 0)
-  {
+  
+  if (strcmp($form_state['clicked_button']['#value'], t('Submit')) == 0) {
+
     global $user;
-    $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
-    $to = strtotime(implode('-',$form_state['values']['to']) . ' 23:59');
+    $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+    $to = strtotime(implode('-', $form_state['values']['to']) . ' 23:59');
+
     $now = new DateTime("now");
     $now->setTime(0,0);
     $now = $now->format("U");
-    if ($now > $from)
-      form_set_error('from',t('Can\'t record values in the past.'));
-    if ($from > $to)
-      form_set_error('to',t('Time to stop has to be after time to start.'));
-    if (!$from)
-      form_set_error('from',t('Invalid date.'));
-    if (!$to)
-      form_set_error('to',t('Invalid date.'));
+
+    if ($now > $from) {
+      form_set_error('from', t('Can\'t record values in the past.'));
+    }
+    
+    if ($from > $to) {
+      form_set_error('to', t('Time to stop has to be after time to start.'));
+    }
+    
+    if (!$from) {
+      form_set_error('from', t('Invalid date.'));
+    }
+    
+    if (!$to) {
+      form_set_error('to', t('Invalid date.'));
+    }
   }
 }
 
 function msg_dump_setup_form_submit($form, &$form_state) {
-  if (strcmp($form_state['clicked_button']['#value'],t('Submit')) == 0)
-  {
+
+  if (strcmp($form_state['clicked_button']['#value'], t('Submit')) == 0) {
+
     global $user;
-    $from = strtotime(implode('-',$form_state['values']['from']) . ' 00:00');
-    $to = strtotime(implode('-',$form_state['values']['to']) . '23:59');
+    $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+    $to = strtotime(implode('-', $form_state['values']['to']) . '23:59');
     $file = md5(uniqid(rand(), TRUE));
+    $serial = $form_state['values']['flukso'];
+    $type = $form_state['values']['type'];
 
-    $result = db_query("INSERT INTO {msg_dump} (serial, uid, start, stop, file) VALUES ('%s', %d, %d, %d, '%s')", $form_state['values']['flukso'], $user->uid, $from, $to, $file);
+    $result = db_query("
+      INSERT
+        INTO {msg_dump} (serial, uid, start, stop, file)
+        VALUES ('%s', %d, %d, %d, '%s')", $serial, $user->uid, $from, $to, $file);
 
-    msg_dump_register($file, $form_state['values']['flukso'], $form_state['values']['type']);
+    msg_dump_register($file, $serial, $type);
+
   } else {
+
     $file = $form_state['clicked_button']['#name'];
-    $root_prefix = '/home/flukso/www/public';
-    db_query("DELETE FROM {msg_dump} WHERE file='%s'", $file);
-    exec('rm ' . $root_prefix . '/sites/all/modules/msg_dump/db/' . $file . '.*');
+
+    db_query("DELETE FROM {msg_dump} WHERE file = '%s'", $file);
+    exec('rm ' . DB_ABS_PATH . '/' . $file . '.*');
   }
 }
 
 function theme_msg_dump_setup($form) {
+
   global $user;
-  //$now = new DateTime("now");
-  //$now = $now->format("U");
   $rows = array();
 
-  $result = db_query("SELECT * FROM msg_dump WHERE uid=%d", $user->uid);
+  $result = db_query("SELECT * FROM {msg_dump} WHERE uid = %d", $user->uid);
 
   while ($device = db_fetch_object($result)) {
+
     $startdate = new DateTime('@' . $device->start);
     $stopdate = new DateTime('@' . $device->stop);
 
@@ -182,8 +238,7 @@ function theme_msg_dump_setup($form) {
     $row[] = $stopdate->format("Y-m-d");
     # not needed yet as only available type ist electricity
     #$row[] = $device->type;
-    #$row[] = '<a href="/sites/all/modules/msg_dump/db/' . $device->file . '.sqlite">' . 'Download' . '</a>' . drupal_render($form[$device->file]);
-    $row[] = '<a href="/sites/all/modules/msg_dump/db/' . $device->file . '.sqlite">' . 'Download' . '</a>';
+    $row[] = l(t('Download'), DB_RELATIVE_PATH . '/' . $device->file . '.sqlite');
 
     $rows[] = $row;
   }
@@ -195,42 +250,56 @@ function theme_msg_dump_setup($form) {
 }
 
 function theme_msg_dump_setup_list($items) {
-  $headers = array('',t('Flukso'), t('Startdate'), t('Stopdate'), t('File'));
-  $output  = theme('table', $headers, $items);
 
-  return $output;
+  $headers = array('',t('Flukso'), t('Startdate'), t('Stopdate'), t('File'));
+  return theme('table', $headers, $items);
 }
 
 function msg_dump_register($file, $serial, $type) {
-  $root_prefix = '/home/flukso/www/public';
-  $values = db_query("SELECT logger_tokens.token AS token, logger_meters.meter AS meter from `logger_tokens` LEFT JOIN logger_meters ON logger_tokens.meter = logger_meters.meter LEFT JOIN logger_devices ON logger_meters.device = logger_devices.device WHERE logger_devices.serial = '%s' AND logger_meters.type = '%s'", $serial, $type);
+
+  $values = db_query("
+    SELECT
+      logger_tokens.token AS token,
+      logger_meters.meter AS meter
+    FROM
+      `logger_tokens`
+        LEFT JOIN logger_meters ON logger_tokens.meter = logger_meters.meter
+        LEFT JOIN logger_devices ON logger_meters.device = logger_devices.device
+    WHERE
+      logger_devices.serial = '%s' AND
+      logger_meters.type = '%s'", $serial, $type);
+
+  global $base_url;
 
   while ($value = db_fetch_object($values)) {
-    $config = 'DB_FILE:  "' . $root_prefix . '/sites/all/modules/msg_dump/db/' . $file . '.sqlite"
-DB_TABLE_NAME: "UTCReadings"
-ACCESS_TOKEN: "' . $value->token . '"
-SENSOR_ID: "' . $value->meter . '"
-BASE_URL: "https://api.mysmartgrid.de/sensor"';
+
+    $config = 
+      'DB_FILE: "'       . DB_ABS_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
+      'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
+      'ACCESS_TOKEN: "'  . $value->token . '"' . PHP_EOL .
+      'SENSOR_ID: "'     . $value->meter . '"' . PHP_EOL .
+      'BASE_URL: "'      . $base_url . '/sensor' . '"' . PHP_EOL;
   }
 
-  $out = fopen($root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc", 'w');
+  $out = fopen(DB_ABS_PATH . "/$file.flukso4rrc", 'w');
   fwrite($out, $config);
   fclose($out);
 
-  exec("flukso_create_db -c " . $root_prefix . "/sites/all/modules/msg_dump/db/" . $file . ".flukso4rrc");
-};
+  exec("flukso_create_db -c " . DB_ABS_PATH . "/$file.flukso4rrc");
+}
 
 function msg_dump_install() {
-  db_query("CREATE TABLE IF NOT EXISTS `msg_dump` (
-              `id` int(11) NOT NULL auto_increment,
-              `serial` int(10) unsigned NOT NULL,
-              `uid` int(10) unsigned NOT NULL,
-              `start` int(10) unsigned NOT NULL,
-              `stop` int(10) unsigned NOT NULL,
-              `file` varchar(32) character set utf8 NOT NULL,
-              `type` varchar(32) character set utf8 default NULL,
-              UNIQUE KEY `id` (`id`)
-              ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1");
+  db_query("
+    CREATE TABLE IF NOT EXISTS `msg_dump` (
+      `id` int(11) NOT NULL auto_increment,
+      `serial` int(10) unsigned NOT NULL,
+      `uid` int(10) unsigned NOT NULL,
+      `start` int(10) unsigned NOT NULL,
+      `stop` int(10) unsigned NOT NULL,
+      `file` varchar(32) character set utf8 NOT NULL,
+      `type` varchar(32) character set utf8 default NULL,
+       UNIQUE KEY `id` (`id`)
+    ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1");
 }
 
 function _limit_year($form_element, $form_values) {

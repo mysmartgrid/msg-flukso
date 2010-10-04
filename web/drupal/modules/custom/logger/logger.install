@@ -1,6 +1,4 @@
 <?php
-// Copyright (c) 2009 jokamajo.org
-// $Id$
 
 function logger_schema() {
   $schema['logger_devices'] = array(

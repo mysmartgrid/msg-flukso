@@ -1,25 +1,26 @@
 <?php
 
-//
-// logger.admin.inc : callbacks for logger account and admin pages
-// Copyright (c) 2010 flukso.net
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-//
-// $Id$
-//
+/**
+ * Callbacks for logger account and admin pages.
+ *
+ * Copyright (c) 2008-2009 jokamajo.org
+ *               2010 flukso.net
+ *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
 
 /**
  * Callback function for the user/x/devices page's drupal_get_form
@@ -32,17 +33,17 @@
 function _logger_account_devices() {
 
   $form['code'] = array(
-    '#title' => t('Activation Code'),
-    '#type' => 'textfield',
-    '#description' => t('Please, inform the activation code of the device to be added. This code is found in the device installation guide.'),
-    '#size' => 10,
-    '#maxlength' => 10,
-    '#required' => TRUE,
+    '#title'        => t('Activation Code'),
+    '#type'         => 'textfield',
+    '#description'  => t('Please, inform the activation code of the device to be added. This code is found in the device installation guide.'),
+    '#size'         => 10,
+    '#maxlength'    => 10,
+    '#required'     => TRUE,
   );
 
   $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Add device'),
+    '#type'   => 'submit',
+    '#value'  => t('Add device'),
   );
 
   $form['#validate'][] = '_logger_account_devices_validate';
@@ -146,7 +147,7 @@ function theme_logger_account_devices($form) {
     $row[] = $device->resets;
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
-    $row[] = l('Remove', 'device/deactivate/' . $device->serial);
+    $row[] = l(t('Remove'), 'device/deactivate/' . $device->serial);
 
     $rows[] = $row;
   }
@@ -171,8 +172,8 @@ function theme_logger_account_devices_list($items) {
   if (count($items) > 0) {
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
     $output  = theme('table', $headers, $items);
-  }
-  else {
+
+  } else {
     $output = t('No devices available.');
   }
 
@@ -234,6 +235,7 @@ function _logger_account_sensors() {
  *   An array of table rows.
  */
 function theme_logger_account_sensors_list($items) {
+
   if (count($items) > 0) {
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
     $output  = theme('table', $headers, $items);
@@ -272,36 +274,36 @@ function _logger_sensor_activate($meter) {
 function logger_sensor_form(&$form_state, $meter, $type, $function) {
 
   $form['meter'] = array(
-    '#type' => 'textfield',
-    '#description' => t("The sensor meter id."),
-    '#maxlength' => 32,
-    '#size' => 32,
-    '#required' => TRUE,
+    '#type'          => 'textfield',
+    '#description'   => t("The sensor meter id."),
+    '#maxlength'     => 32,
+    '#size'          => 32,
+    '#required'      => TRUE,
     '#default_value' => $meter,
-    '#attributes' => array('readonly' => 'readonly')
+    '#attributes'    => array('readonly' => 'readonly')
   );
 
   $form['type'] = array(
-    '#type' => 'textfield',
-    '#description' => t('The sensor type.'),
-    '#maxlength' => 16,
-    '#size' => 16,
-    '#required' => TRUE,
+    '#type'          => 'textfield',
+    '#description'   => t('The sensor type.'),
+    '#maxlength'     => 16,
+    '#size'          => 16,
+    '#required'      => TRUE,
     '#default_value' => $type,
-    '#attributes' => array('readonly' => 'readonly')
+    '#attributes'    => array('readonly' => 'readonly')
   );
 
   $form['function'] = array(
-    '#type' => 'textfield',
-    '#description' => t("Enter the sensor's function name."),
-    '#maxlength' => 16,
-    '#size' => 16,
-    '#required' => TRUE,
+    '#type'          => 'textfield',
+    '#description'   => t("Enter the sensor's function name."),
+    '#maxlength'     => 16,
+    '#size'          => 16,
+    '#required'      => TRUE,
     '#default_value' => $function
   );
 
   $form['submit'] = array(
-    '#type' => 'submit',
+    '#type'  => 'submit',
     '#value' => t("Save")
   );
 
@@ -325,7 +327,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   $type = $form_state['values']['type'];
   $meter = $form_state['values']['meter'];
 
-  db_query("UPDATE logger_meters SET function = '%s', type = '%s' WHERE meter = '%s'", $function, $type, $meter);
+  db_query("UPDATE {logger_meters} SET function = '%s', type = '%s' WHERE meter = '%s'", $function, $type, $meter);
 
   global $user;
   $uid = $user->uid;
@@ -340,7 +342,7 @@ function _get_sensor($meter) {
       m.type AS type,
       m.function AS function
     FROM
-      logger_meters m
+      {logger_meters} m
     WHERE
       m.meter = '%s'";
 
@@ -355,7 +357,7 @@ function _logger_function_name_validate($function, $meter) {
     SELECT
       count(*)
     FROM
-      logger_meters m
+      {logger_meters} m
     WHERE
       m.function = '%s' AND
       m.uid = %d AND
@@ -381,9 +383,9 @@ function _logger_account_privacy_form() {
   global $user;
 
   $form['privacy'] = array(
-    '#title' => t('Set your preferred privacy mode'),
-    '#type' => 'radios',
-    '#options' => array(
+    '#title'    => t('Set your preferred privacy mode'),
+    '#type'     => 'radios',
+    '#options'  => array(
       t('Shared within Flukso'),
       t('Private'),
     ),

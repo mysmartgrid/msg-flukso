@@ -1,19 +1,30 @@
 <?php
-// $Id$
-
-//Device states
-define('UNINSTALLED',  t('Uninstalled'));
-define('NO_HEARTBEAT', t('No Heartbeat'));
-define('CORRUPTED',    t('Corrupted Heartbeat'));
-define('WORKING',      t('Working'));
-
 
 /**
- * Display help and module information
- * @param path which path of the site we're displaying help
- * @param arg array that holds the current path as would be returned from arg() function
- * @return help text for the path
+ * This module allows the user to see devices' statuses.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+//Device states
+define('UNINSTALLED',   t('Uninstalled'));
+define('NO_HEARTBEAT',  t('No Heartbeat'));
+define('CORRUPTED',     t('Corrupted Heartbeat'));
+define('WORKING',       t('Working'));
+
 function deployment_overview_help($path, $arg) {
   $output = '';
   switch ($path) {
@@ -24,43 +35,41 @@ function deployment_overview_help($path, $arg) {
   return $output;
 }
 
-/**
- * Valid permissions for this module
- * @return array An array of valid permissions for the onthisdate module
- */
 function deployment_overview_perm() {
   return array('device deployment overview');
-}
-
-/**
- * Menu items.
- */
-function deployment_overview_menu() {
-      
-  $items = array();
-
-  $items['deploymentoverview'] = array(
-    'title' => 'Deployment Overview',
-    'page callback' => 'deployment_overview_list',
-    'access arguments' => array('device deployment overview'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  $items['devicecheckup'] = array(
-    'title' => 'Device Check Up',
-    'page callback' => 'deployment_overview_show_checkup',
-    'access arguments' => array('device deployment overview'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
 }
 
 function deployment_overview_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-function deployment_overview_list() {
+function deployment_overview_menu() {
+
+  $items = array();
+
+  $items['deploymentoverview'] = array(
+    'title'             => 'Deployment Overview',
+    'page callback'     => 'deployment_overview_list_page',
+    'access arguments'  => array('device deployment overview'),
+    'type'              => MENU_NORMAL_ITEM
+  );
+
+  $items['devicecheckup'] = array(
+    'title'             => 'Device Check Up',
+    'page callback'     => 'deployment_overview_checkup_page',
+    'access arguments'  => array('device deployment overview'),
+    'type'              => MENU_NORMAL_ITEM
+  );
+
+  return $items;
+}
+
+/**
+ * Builds the device deployment overview page.
+ *
+ * @return the device deployment overview page.
+ */
+function deployment_overview_list_page() {
 
   $headers = array(
     array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'desc'),
@@ -69,7 +78,7 @@ function deployment_overview_list() {
     array('data' => t('State'),         'field' => 'state',  'sort'=> 'desc')
   );
 
-  $data = _get_devices($headers);
+  $data = _deployment_overview_get_devices($headers);
 
   if($data){
     $output = theme('table', $headers, $data);
@@ -79,19 +88,26 @@ function deployment_overview_list() {
   return $output;
 }
 
-function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
+/**
+ * Returns the list of user devices.
+ *
+ * @param $headers The field headers (optional).
+ * @param $limit   The number of items in a table page (optional).
+ * @param $serial  The serial number for selecting a single device (optionally).
+ * @return the array of user devices.
+ */
+function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
   global $user;
   $tzdif = $user->timezone / (60 * 60);
   $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
 
-  $output = '';
-
   $states = array(
-	 0 => UNINSTALLED,
-	 1 => NO_HEARTBEAT,
-	 2 => CORRUPTED,
-	 3 => WORKING);
+    0 => UNINSTALLED,
+    1 => NO_HEARTBEAT,
+    2 => CORRUPTED,
+    3 => WORKING
+  );
 
   $sql = "
     SELECT
@@ -101,10 +117,10 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
       IF(u.uid = 0, 0,
         IF(SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL 2 HOUR), 1,
           IF(EXISTS(
-            SELECT 
+            SELECT
               1
             FROM
-	      {logger_meters} m
+              {logger_meters} m
             WHERE
               d.device = m.device AND
               m.type = 'electricity' AND
@@ -116,18 +132,13 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
   $sql_count = NULL;
   $args = array();
-  
+
   if($serial) {
     $sql .= " WHERE d.serial = %d";
     $args[] = $serial;
+    $sql_count = "SELECT COUNT(*) FROM {logger_devices}";
 
-    $sql_count = "
-      SELECT
-        count(*)
-      FROM
-        {logger_devices} d";
-
-    $sql_count = db_rewrite_sql($sql_count); 
+    $sql_count = db_rewrite_sql($sql_count);
   }
 
   if ($headers) {
@@ -138,36 +149,42 @@ function _get_devices($headers = NULL, $limit = 15, $serial = NULL) {
   $data = array();
 
   while($entry = db_fetch_array($result)) {
-      
+
     $state_id = $entry['state'];
 
     $data[] = array(
       'serial' => $entry['serial'],
-      'name' => $entry['name'],
-      'latest' => $entry['latest'], 
-      'state' => $states[$state_id]);
+      'name'   => $entry['name'],
+      'latest' => $entry['latest'],
+      'state'  => $states[$state_id]
+    );
   }
   return $data;
 }
 
-function deployment_overview_show_checkup() {
+/**
+ * Builds the device status checkup page.
+ *
+ * @return the device status checkup page.
+ */
+function deployment_overview_checkup_page() {
   $output .= drupal_get_form('deployment_overview_checkup_form');
   return $output;
 }
 
 function deployment_overview_checkup_form() {
-    
+
   $form['serial'] = array(
-    '#type' => 'textfield',
-    '#title' => t("Serial"),
-    '#size' => 32,
-    '#maxlength' => 40,
-    '#required' => 1,
+    '#type'        => 'textfield',
+    '#title'       => t("Serial"),
+    '#size'        => 32,
+    '#maxlength'   => 40,
+    '#required'    => 1,
     '#description' => t('Enter the device serial number you want to check up')
   );
 
   $form['submit'] = array(
-    '#type' => 'submit',
+    '#type'  => 'submit',
     '#value' => t("Check Up")
   );
  
@@ -177,7 +194,7 @@ function deployment_overview_checkup_form() {
 function deployment_overview_checkup_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
-  $result = _get_devices(NULL, 1, $serial);
+  $result = _deployment_overview_get_devices(NULL, 1, $serial);
 
   if (empty($result)) {
     drupal_set_message(t('No device was found with such serial number.'));

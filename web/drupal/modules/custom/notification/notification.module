@@ -1,8 +1,40 @@
 <?php
-// $Id$
+
+/**
+ * This module manages Flukso devices' event notifications.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+function notification_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#notification":
+      $output = '<p>'.t("Allows the users to manage device event notifications.").'</p>';
+      break;
+  }
+  return $output;
+}
 
 function notification_perm() {
   return array('manage notifications');
+}
+
+function notification_settings_access($permission, $account) {
+  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
 function notification_menu() {
@@ -10,39 +42,45 @@ function notification_menu() {
   $items = array();
 
   $items['notification_list'] = array(
-    'title' => 'Event Notifications',
-    'page callback' => 'notification_list_page',
-    'access arguments' => array('manage notifications'),
-    'type' => MENU_NORMAL_ITEM
+    'title'             => 'Event Notifications',
+    'page callback'     => 'notification_list_page',
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_NORMAL_ITEM
   );
 
   $items['notification_delete'] = array(
-    'title' => $items['notification_list']['title'],
-    'page callback' => 'notification_delete',
-    'page arguments' => array(1, 2),
-    'access arguments' => array('manage notifications'),
-    'type' => MENU_CALLBACK
+    'title'             => $items['notification_list']['title'],
+    'page callback'     => 'notification_delete',
+    'page arguments'    => array(1, 2),
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
   );
 
   $items['notification_register'] = array(
-    'title' => 'Event Notification Registration',
-    'page callback' => 'notification_register_page',
-    'access arguments' => array('manage notifications'),
-    'type' => MENU_CALLBACK
+    'title'             => 'Event Notification Registration',
+    'page callback'     => 'notification_register_page',
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
   );
 
   return $items;
 }
 
-function notification_settings_access($permission, $account) {
-  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
-}
-
+/**
+ * Builds the event registration page.
+ *
+ * @return the event registration page.
+ */
 function notification_register_page() {
   $output .= drupal_get_form('notification_register_form');
   return $output;
 }
 
+/**
+ * Builds the events list page.
+ *
+ * @return the events list page.
+ */
 function notification_list_page() {
 
   $sql = "
@@ -63,9 +101,10 @@ function notification_list_page() {
       n.event_id = e.id";
 
   $header = array(
-    array('data' => t('Device'), 'field' => 'serial', 'sort' => 'ASC'),
-    array('data' => t('Event'), 'field' => 'event_name', 'sort' => 'ASC'),
-    array('data' => t('Target e-mail'), 'field' => 'email')
+    array('data' => t('Device'),        'field' => 'serial',     'sort' => 'ASC'),
+    array('data' => t('Event'),         'field' => 'event_name', 'sort' => 'ASC'),
+    array('data' => t('Target e-mail'), 'field' => 'email'),
+    array('data' => t('Operation'))
   );
 
   global $user;
@@ -78,7 +117,7 @@ function notification_list_page() {
     $row['serial'] = $object['serial'];
     $row['event_name'] = _notification_format_event_name($object['event_id'], $object['event_name'], $object['limit_up']);
     $row['email'] = $object['email'];
-    $row[] = l('Remove', 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
+    $row[] = l(t('Remove'), 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
 
     $rows[] = $row;
   }
@@ -89,6 +128,14 @@ function notification_list_page() {
   return $output;
 }
 
+/**
+ * Formats an event name to be shown in a web page.
+ *
+ * @param $event_id   The event id.
+ * @param $event_name The event name.
+ * @param $limit_up   The event related maximum value.
+ * @return the event formatted name.
+ */
 function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
   $name = t($event_name);
@@ -101,11 +148,16 @@ function _notification_format_event_name($event_id, $event_name, $limit_up) {
   return $name;
 }
 
+/**
+ * Returns an array of user devices' serial numbers indexed by their respective
+ * hash codes.
+ *
+ * @return the array of devices.
+ */
 function _notification_get_devices_options() {
-  
-  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
 
   global $user;
+  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
   $result = db_query($sql, $user->uid);
 
   $devices = array();
@@ -113,9 +165,14 @@ function _notification_get_devices_options() {
     $devices[$row['device']] = $row['serial'];
   }
 
-  return $devices;    
-}	
+  return $devices;
+}
 
+/**
+ * Returns an array of translated event names.
+ *
+ * @return the array of event names.
+ */
 function _notification_get_events_options() {
 
   $sql = "SELECT id, name FROM {event} ORDER BY id";
@@ -124,7 +181,7 @@ function _notification_get_events_options() {
   $events = array();
   while ($row = db_fetch_array($result)) {
     $events[$row['id']] = t($row['name']);
-  }  
+  }
 
   return $events;
 }
@@ -134,51 +191,50 @@ function notification_register_form() {
   global $user;
 
   $form['email'] = array(
-    '#type' => 'textfield',
-    '#description' => t('Enter the e-mail to which the notification will be sent.'),
-    '#maxlength' => 64,
-    '#size' => 20,
-    '#default_value' => $user->mail
+    '#type'           => 'textfield',
+    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
+    '#maxlength'      => 64,
+    '#size'           => 20,
+    '#default_value'  => $user->mail
   );
 
   $form['device'] = array(
-    '#type' => 'select',
-    '#description' => t('Select the serial number of the monitored device.'),
-    '#options' => _notification_get_devices_options()
+    '#type'         => 'select',
+    '#description'  => t('Select the serial number of the monitored device.'),
+    '#options'      => _notification_get_devices_options()
   );
 
   $form['event_id'] = array(
-    '#type' => 'select',
-    '#description' => t('Select the event to be detected and notified.'),
-    '#options' => _notification_get_events_options(),
-    '#default_value' => 1,
-    '#attributes' => array(
-      'onchange' => '
+    '#type'           => 'select',
+    '#description'    => t('Select the event to be detected and notified.'),
+    '#options'        => _notification_get_events_options(),
+    '#default_value'  => 1,
+    '#attributes'     => array('onchange' => '
       wrapper = document.getElementById("edit-limit-up-wrapper");
       wrapper.style.visibility = (this.value == 2? "hidden" : "visible");'
     )
   );
 
   $form['limit_up'] = array(
-    '#type' => 'textfield',
-    '#description' => t('For "Peak Consumption", enter the maximum electricity consumption in watts.
+    '#type'           => 'textfield',
+    '#description'    => t('For "Peak Consumption", enter the maximum electricity consumption in watts.
     Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
-    '#maxlength' => 6,
-    '#size' => 6,
-    '#default_value' => 120
+    '#maxlength'      => 6,
+    '#size'           => 6,
+    '#default_value'  => 120
   );
 
   $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save')
+    '#type'   => 'submit',
+    '#value'  => t('Save')
   );
-  
+
   return $form;
 }
 
 function notification_register_form_submit($form, &$form_state) {
 
-  $device = $form_state['values']['device'];
+  $device   = $form_state['values']['device'];
   $event_id = $form_state['values']['event_id'];
   $email = $form_state['values']['email'];
   $limit_up = $form_state['values']['limit_up'];
@@ -207,20 +263,41 @@ function notification_register_form_validate($form, &$form_state) {
   }
 }
 
+/**
+ * Event notification deletion callback.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @return the events list page.
+ */
 function notification_delete($device, $event_id) {
 
   _notification_delete($device, $event_id);
   return notification_list_page();
 }
 
+/**
+ * Deletes an event notification.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ */
 function _notification_delete($device, $event_id) {
 
   $sql = "DELETE FROM {notification} WHERE device = '%s' AND event_id = %d";
   db_query($sql, $device, $event_id);
 }
 
+/**
+ * Registers an event notification.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @param $email     The notification e-mail.
+ * @param $limit_up  An event related maximum value.
+ */
 function _notification_insert($device, $event_id, $email, $limit_up) {
-      
+
   $sql = "INSERT INTO {notification} (device, event_id, email, limit_up) VALUES('%s', %d, '%s', %d)";
   db_query($sql, $device, $event_id, $email, $limit_up);
 }
@@ -233,16 +310,20 @@ function notification_cron() {
   _notification_send_peak_consumption_emails();
 }
 
+/**
+ * Sends e-mails notifying users of "No Heartbeat" events.
+ * 
+ * @param $event_id  The actual event that is causing the notification to be sent.
+ *                   It can be either "No Heartbeat" or "Any Heartbeat Failure".
+ */
 function _notification_send_no_heartbeat_emails($event_id = 1) {
 
-  global $user;
-  $tzdif = $user->timezone / (60 * 60);
-  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+  $tz = _notification_get_user_timezone();
 
   $sql = "
     SELECT
       u.name AS user_name,
-      n.email AS email,       
+      n.email AS email,
       d.serial AS serial,
       CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
       n.limit_up AS limit_up
@@ -266,11 +347,15 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
   _notification_send_emails($sql, $message);
 }
 
+/**
+ * Sends e-mails notifying users of "Corrupted Heartbeat" events.
+ *
+ * @param $event_id  The actual event that is causing the notification to be sent.
+ *                   It can be either "Corrupted Heartbeat" or "Any Heartbeat Failure".
+ */
 function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
 
-  global $user;
-  $tzdif = $user->timezone / (60 * 60);
-  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+  $tz = _notification_get_user_timezone();
 
   $sql = "
     SELECT
@@ -297,17 +382,21 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
   _notification_send_emails($sql, $message);
 }
 
+/**
+ * Sends e-mails notifying users of "Any Heartbeat Failure" events.
+ */
 function _notification_send_any_heartbeat_failure_emails() {
 
   _notification_send_no_heartbeat_emails(3);
   _notification_send_corrupted_heartbeat_emails(3);
 }
 
+/**
+ * Sends em-mails notifying users of the occurrence of Peak Consumption events.
+ */
 function _notification_send_peak_consumption_emails() {
 
-  global $user;
-  $tzdif = $user->timezone / (60 * 60);
-  $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+  $tz = _notification_get_user_timezone();
 
   $sql = "
     SELECT
@@ -343,9 +432,16 @@ function _notification_send_peak_consumption_emails() {
   _notification_send_emails($sql, $message);
 }
 
+/**
+ * Composes an e-mail that notifies a general event.
+ *
+ * @param $description  The event description.
+ * @param $complement   Complementary information about the error.
+ * @return the e-mail message.
+ */
 function _notification_compose_email($description, $complement = "") {
-      
-  global $base_url;    
+
+  global $base_url;
 
   return "
     <p>Dear user %user_name
@@ -362,6 +458,13 @@ function _notification_compose_email($description, $complement = "") {
     <p>mySmartGrid Team</p>";
 }
 
+/**
+ * Composes an e-mail that notifies an error event.
+ *
+ * @param $description    The error description.
+ * @param $recommendation The recommendation for the user of how to solve the problem.
+ * @return the e-mail message.
+ */
 function _notification_compose_error_email($description, $recommendation = NULL) {
 
   $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
@@ -369,7 +472,7 @@ function _notification_compose_error_email($description, $recommendation = NULL)
   global $base_url;
 
   return _notification_compose_email($description, "
-      
+
     In order to identify and solve the problem, please take the following actions.
     <ul>
       $recommendation
@@ -385,6 +488,12 @@ function _notification_compose_error_email($description, $recommendation = NULL)
     </ul>");
 }
 
+/**
+ * Sends event notification e-mails to notifiable users.
+ *
+ * @param $sql     The SQL statement for selecting the events.
+ * @param $message The e-mail message.
+ */
 function _notification_send_emails($sql, $message) {
 
   global $user;
@@ -394,7 +503,7 @@ function _notification_send_emails($sql, $message) {
   $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
 
   while ($object = db_fetch_array($result)) {
-      
+
     $variables = array();
     foreach ($object as $key => $value) {
       $variables["%$key"] = $value;
@@ -417,4 +526,15 @@ function notification_mail($key, &$message, $params) {
   $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];
+}
+
+/**
+ * Returns the user formatted timezone.
+ * 
+ * @return the formatted timezone.
+ */
+function _notification_get_user_timezone() {
+  global $user;
+  $hours = $user->timezone / (60 * 60);
+  return $hours < 0 ? "'$hours:00'" : "'+$hours:00'";
 }

@@ -1,69 +1,54 @@
 <?php
 
-//
-// logger.module : support module for charting data stored in RRD's
-// Copyright (c) 2008-2009 jokamajo.org
-//               2010 flukso.net
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-//
-// $Id: logger.module 109 2010-03-12 17:18:32Z icarus75 $
-//
-
 /**
- * @file
- * Support module for charting data stored in RRD's
+ * Support module for charting data stored in RRD's.
+ *
+ * Copyright (c) 2008-2009 jokamajo.org
+ *               2010 flukso.net
+ *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-
-/**
- * Constants
- */
-define('RED',    'F1572F');
-define('BLUE',   '44C3D3');
-define('GREEN',  '7AAB5A');
-define('ORANGE', 'F37E2B');
-define('YELLOW', 'FBEB0D');
-define('PURPLE', 'A052A0');
-define('BROWN', '808000');
-define('PINK', 'FF0080');
-define('CYAN', '00ffff');
+define('RED',     'F1572F');
+define('BLUE',    '44C3D3');
+define('GREEN',   '7AAB5A');
+define('ORANGE',  'F37E2B');
+define('YELLOW',  'FBEB0D');
+define('PURPLE',  'A052A0');
+define('BROWN',   '808000');
+define('PINK',    'FF0080');
+define('CYAN',    '00ffff');
 define('SKYBLUE', '0080FF');
 
-/**
- * Implementation of hook_init().
- */
 function logger_init() {
   global $user;
   // Workaround for collapse.js not being loaded within  _logger_fluksonians_form  when block caching is on.
-  if ($user->uid > 0) drupal_add_js('misc/collapse.js');
+  if ($user->uid > 0) {
+    drupal_add_js('misc/collapse.js');
+  }
 }
 
-/**
- * Implementation of hook_perm().
- */
 function logger_perm() {
   return array('logger', 'register devices');
 }
 
-/**
- * Implementation of hook_menu() for logger
- * Don't forget to create a primary menu item in the Drupal administration section with the title 'ecology' linking to the '/logger' path
- */
 function logger_menu() {
+
   $items = array();
+  //TODO: Don't forget to create a primary menu item in the Drupal administration section with the title 'ecology' linking to the '/logger' path
 
   $items['admin/settings/logger'] = array(
     'title'               => 'Logger settings',
@@ -105,13 +90,13 @@ function logger_menu() {
 
   $items['logger/electricity'] = array(
     'title'               => 'electricity',
-//    'page callback'       => '_logger_dashboard',
-//    'page arguments'      => array('electricity', 'main', 'hour'),
+    //'page callback'     => '_logger_dashboard',
+    //'page arguments'    => array('electricity', 'main', 'hour'),
     'access callback'     => TRUE,
     'type'                => MENU_DEFAULT_LOCAL_TASK,
   );
 
-/**
+  /*
   $items['logger/water'] = array(
     'title'               => 'water',
     'page callback'       => '_logger_dashboard',
@@ -127,7 +112,7 @@ function logger_menu() {
     'access callback'     => TRUE,
     'type'                => MENU_LOCAL_TASK,
   );
-**/
+  */
 
   $items['logger/electricity/hour'] = array(
     'title'               => t('hour'),
@@ -257,20 +242,20 @@ function logger_menu() {
 }
 
 function _logger_installation() {
-  $output = '<div class="install">';
-  $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step1.png' height='120' width='150' alt='step 1'/></a>";
-  $output .= "<p><b>STEP 1: CONFIGURING WIFI</b><br/>Power up the Fluksometer. Connect your computer to the Fluksometer's ethernet port. Surf to <a href = 'http://192.168.255.1'>http://192.168.255.1</a>. Configure the wireless interface with the proper name and security key.</p>";
-  $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step2.png' height='120' width='150' alt='step 2'/></a>";
-  $output .= "<p><b>STEP 2: SECURING THE FLUKSOMETER</b><br/>Disconnect all cables from the Fluksometer. Find a suitable location near the fuse box to install the Fluksometer. Secure the Fluksometer with the plastic cable tie.</p>";
-  $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step3.png' height='120' width='150' alt='step 3'/></a>";
-  $output .= "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>For safety reasons, switch off the main electricity supply. For a single phase supply, attach the current clamp to one of the two cables running from the electricity meter to the fuse box. Close the clamp firmly.</p>";
-  $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step4.png' height='120' width='150' alt='step 4'/></a>";
-  $output .= "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>Connect the cable from the current clamp to the Fluksometer's input port. Take care of connecting the black and red cable as shown in the drawing on the left. Only apply gentle force when fastening the two screws.</p>";
-  $output .= "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step5.png' height='120' width='150' alt='step 4'/></a>";
-  $output .= "<p><b>STEP 5: POWERING UP</b><br/>Switch the main electricity supply back on. Activate the Fluksometer by connecting the power plug.</p>";
-  $output .= "</div>";
 
-  return $output;
+  return
+  '<div class="install">' . PHP_EOL .
+  "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step1.png' height='120' width='150' alt='step 1'/></a>" . PHP_EOL .
+  "<p><b>STEP 1: CONFIGURING WIFI</b><br/>Power up the Fluksometer. Connect your computer to the Fluksometer's ethernet port. Surf to <a href = 'http://192.168.255.1'>http://192.168.255.1</a>. Configure the wireless interface with the proper name and security key.</p>" . PHP_EOL .
+  "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step2.png' height='120' width='150' alt='step 2'/></a>" . PHP_EOL .
+  "<p><b>STEP 2: SECURING THE FLUKSOMETER</b><br/>Disconnect all cables from the Fluksometer. Find a suitable location near the fuse box to install the Fluksometer. Secure the Fluksometer with the plastic cable tie.</p>" . PHP_EOL .
+  "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step3.png' height='120' width='150' alt='step 3'/></a>" .
+  "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>For safety reasons, switch off the main electricity supply. For a single phase supply, attach the current clamp to one of the two cables running from the electricity meter to the fuse box. Close the clamp firmly.</p>" . PHP_EOL .
+  "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step4.png' height='120' width='150' alt='step 4'/></a>" . PHP_EOL .
+  "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>Connect the cable from the current clamp to the Fluksometer's input port. Take care of connecting the black and red cable as shown in the drawing on the left. Only apply gentle force when fastening the two screws.</p>" . PHP_EOL .
+  "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step5.png' height='120' width='150' alt='step 4'/></a>" . PHP_EOL .
+  "<p><b>STEP 5: POWERING UP</b><br/>Switch the main electricity supply back on. Activate the Fluksometer by connecting the power plug.</p>" . PHP_EOL .
+  "</div>". PHP_EOL;
 }
 
 /**
@@ -298,27 +283,34 @@ function _logger_dashboard($type, $function, $interval) {
   }
 
   $root_path = drupal_get_path('module', 'logger');
-  $graph_path = $root_path .'/graphs/'. $interval .'/';
+  $graph_path = "$root_path/graphs/$interval/";
+  $data_base_path = "$root_path/data/base/";
+
   $pngid = md5(uniqid()); //generate random numbers for the png chart so that the browser doesn't use the cached one, use cron to clean up the dir hourly
+
   switch ($interval) {
     case 'hour':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1h';
       break;
+
     case 'day':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1d';
       break;
+
     case 'month':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-60d';
       break;
+
     case 'year':
-      $data_path = $root_path .'/data/base/';
+      $data_path = $data_base_path;
       $start = 'end-1y';
       break;
+
     case 'night':
-      $data_path = $root_path .'/data/night/';
+      $data_path = "$root_path/data/night/";
       $start = 'end-60d';
       break;
   }
@@ -385,10 +377,12 @@ function _logger_dashboard($type, $function, $interval) {
           $unit = 'kWh/year';
           $factor = 31536;
           break;
+
         case 'eur':
           $unit = 'euro/year';
           $factor = 5676; // 18 EURcent/kWh
           break;
+
         case 'aud':
           $unit = 'aud/year';
           $factor = 5991; // 19 AUDcent/kWh
@@ -406,21 +400,23 @@ function _logger_dashboard($type, $function, $interval) {
     if ($sensor->private && $sensor->uid != $user->uid) {
       
         // shift the data left by 1 year = 31556926 seconds to prevent the datastream from being displayed
-        $string->def  .= ' DEF:data'. $i .'='. $data_path . $sensor->meter .'.rrd:meter:AVERAGE'.
-                         ' CDEF:meter'. $i .'=data'. $i .','. $factor .',*'.
-                         ' SHIFT:meter'. $i .':-31556926';
+        $string->def  .=
+                ' DEF:data'. $i .'='. $data_path . $sensor->meter .'.rrd:meter:AVERAGE'.
+                ' CDEF:meter'. $i .'=data'. $i .','. $factor .',*'.
+                ' SHIFT:meter'. $i .':-31556926';
 
         // substitute the actual min/max/avg/last values by 'prv'
-        $string->line .= ' LINE1:meter'. $i .'#'. $color[$i % count($color)] .':'.'"'. substr($sensor->username.'               ', 0, 15) .'"'.
-                         ' COMMENT:"min\:  prv"'.
-                         ' COMMENT:"\tmax\:  prv"'.
-                         ' COMMENT:"\tavg\:  prv"'.
-                         ' COMMENT:"\tlast\:  prv\l"';	  
+        $string->line .=
+                ' LINE1:meter'. $i .'#'. $color[$i % count($color)] .':'.'"'. substr($sensor->username.'               ', 0, 15) .'"'.
+                ' COMMENT:"min\:  prv"'.
+                ' COMMENT:"\tmax\:  prv"'.
+                ' COMMENT:"\tavg\:  prv"'.
+                ' COMMENT:"\tlast\:  prv\l"';	  
 
     } else {
       $line_name = $sensor->uid == $user->uid && user_access('logger') ? $sensor->function : $sensor->username;
 
-      $string->def  .= _logger_chart_def($i, $data_path, $sensor->meter, $factor);
+      $string->def .= _logger_chart_def($i, $data_path, $sensor->meter, $factor);
       $string->line .= _logger_chart_line($i, $color[$i % count($color)], $line_name);
     }
 
@@ -487,11 +483,12 @@ function _logger_add($uid) {
 
   // don't allow users to add themselves
   if ($uid != $user->uid) { 
+
     // max subscriptions = 4
     if ($result['COUNT(rid)'] < 4) {
       user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-    }
-    else {
+
+    } else {
       //check whether the requested relationship doesn't already exist
       if (!db_result(db_query("SELECT rid
                                FROM {user_relationships}
@@ -512,7 +509,9 @@ function _logger_add($uid) {
 }
 
 function _logger_remove($rid) {
+
   global $user;
+
   // check whether the to-be-deleted relationship was created by the same user
   if ($user->uid == db_result(db_query("SELECT requester_id
                                         FROM {user_relationships}
@@ -520,8 +519,8 @@ function _logger_remove($rid) {
     db_query("DELETE
               FROM {user_relationships}
               WHERE rid = %d", $rid);
-  }
-  else {
+
+  } else {
     watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
   }
 
@@ -531,7 +530,9 @@ function _logger_remove($rid) {
 }
 
 function _logger_unit($unit) {
+
   global $user;
+
   // hardcoded type and function
   db_query("UPDATE {logger_meters}
             SET unit = '%s'
@@ -546,7 +547,9 @@ function _logger_unit($unit) {
  * Clear the specific (per user) cache entry in the {cache_block} table
  */
 function _logger_cache_clear($delta) {
+
   global $theme;
+
   //the theme variable isn't set on these callbacks so force it
   $theme = 'flukso';
 
@@ -555,8 +558,11 @@ function _logger_cache_clear($delta) {
                                      WHERE module = '%s' AND delta = '%s' AND theme = '%s'", 'logger', $delta, 'flukso'));
 
   $cid = _block_get_cache_id($block);
+
   // prevent the whole chache_block being cleared when _block_get_cache_id returns an empty string (e.g. uid = 1)
-  if ($cid != '') cache_clear_all($cid, 'cache_block');
+  if ($cid != '') {
+    cache_clear_all($cid, 'cache_block');
+  }
   //watchdog('block_cache', '%cid | %cache', array('%cid' => $cid, '%cache' => variable_get('block_cache', 100)), WATCHDOG_DEBUG);
 }
 
@@ -574,25 +580,27 @@ function logger_user($op) {
   }
 }
 
-/**
- * Implementation of hook_theme() for logger
- */
 function logger_theme() {
+
   return array(
     'chart' => array(
       'arguments' => array('chart' => NULL),
     ),
+
     'logger_item_list' => array(
       'arguments' => array('items' => NULL, 'title' => NULL),
     ),
+
     'logger_account_devices' => array(
       'arguments' => array('form' => NULL),
       'file' => 'logger.admin.inc',
     ),
+
     'logger_account_devices_list' => array(
       'arguments' => array('items' => NULL),
       'file' => 'logger.admin.inc',
     ),
+
     'logger_account_sensors_list' => array(
       'arguments' => array('items' => NULL),
       'file' => 'logger.admin.inc',
@@ -614,6 +622,7 @@ function theme_chart($chart) {
  * another one for selecting the desired unit
  */
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
+
   global $user;
 
   switch ($op) {
@@ -647,9 +656,8 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       if ($delta == 'fluksonians' && user_access('logger')) {
         $block['content'] = drupal_get_form('_logger_fluksonians_form');
-      }
 
-      elseif ($delta == 'unit' && user_access('logger')) {
+      } elseif ($delta == 'unit' && user_access('logger')) {
         //hardcoded the type and function parameters for now
         $unit = db_result(db_query("SELECT unit
                                     FROM {logger_meters}
@@ -666,23 +674,29 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
           case 'watt':
             $items[0] = 'watt';
             break;
+
           case 'kwh':
             $items[1] = 'kWh/year';
             break;
+
           case 'eur':
             $items[2] = 'euro/year [@ 0.18eur/kWh]';
             break;
+
           case 'aud':
             $items[3] = 'aud/year [@ 0.19aud/kWh]';
             break;
         }
+
         $block['subject'] = t('Unit');
         $block['content'] = theme('logger_item_list', $items);
-      }
 
-      elseif ($delta == 'posts' && user_access('access content')) {
+      } elseif ($delta == 'posts' && user_access('access content')) {
+
         $result = db_query_range(db_rewrite_sql("SELECT n.nid, n.title, n.created FROM {node} n WHERE n.type = 'blogpost' AND n.status = 1 ORDER BY n.created DESC"), 0, 5);
-        if ($node_title_list = node_title_list($result)) {
+        $node_title_list = node_title_list($result);
+
+        if ($node_title_list) {
           $block['subject'] = t('Recent blog posts');
           $block['content'] = $node_title_list;
           $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
@@ -699,7 +713,7 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 function theme_logger_item_list($items, $title = NULL) {
   $output = '';
   foreach ($items as $item) {
-    $output .= $item .'<br />';
+    $output .= $item . '<br/>';
   }
   return $output;
 }
@@ -708,6 +722,7 @@ function theme_logger_item_list($items, $title = NULL) {
  * Generates the fluksonians block form.
  */
 function _logger_fluksonians_form() {
+
   global $user;
   $destination = drupal_get_destination();
 
@@ -731,34 +746,38 @@ function _logger_fluksonians_form() {
   $subscription = db_fetch_object($subscriptions);
 
   while ($fluksonian = db_fetch_object($fluksonians)) {
+
     if ($i > 3) {
       $rows[] = $row;
       $row = array();
       $i = 0;
     }
+
     if ($fluksonian->uid == $subscription->uid) {
       $row[] = l('[x]', 'logger/remove/'. $subscription->rid, array('attributes' => array('title' => "unsubscribe from ". $subscription->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($subscription->name, 'user/'. $subscription->uid, array('alias' => FALSE));
       $subscription = db_fetch_object($subscriptions);
-    }
-    else {
-      $row[] = l('[+]', 'logger/add/'. $fluksonian->uid, array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"), 'query' => $destination, 'ali
-as' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
+
+    } else {
+      $row[] = l('[+]', 'logger/add/'. $fluksonian->uid,
+              array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"),
+                  'query' => $destination, 'alias' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
     }
     $i++;
   }
   $rows[] = $row;
 
   $form['fluksonians'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Fluksonians'),
+    '#type'        => 'fieldset',
+    '#title'       => t('Fluksonians'),
     '#description' => t('Select the Fluksonians you wish to add to [+] or clear from [x] the chart.'),
     '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
+    '#collapsed'   => TRUE,
   );
+
   $form['fluksonians']['list'] = array(
-    '#type' => 'item',
+    '#type'    => 'item',
     //'#title' => t('Title'),
-    '#value' => theme('table', array(), $rows),
+    '#value'   => theme('table', array(), $rows),
   );
 
   return $form;
@@ -768,6 +787,7 @@ as' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias
  * Implementation of hook_form_alter().
  */
 function logger_form_alter(&$form, &$form_state, $form_id) {
+
   if ($form_id == 'user_login') {
     $form['#redirect'] = 'logger';
     $form['name']['#size'] = 20;
@@ -779,10 +799,8 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
  * Access callback ensuring the user account tabs are visible only to the
  * owner.
  *
- * @param $permission
- *   Required permission to view the item.
- * @param $account
- *   A user object.
+ * @param $permission Required permission to view the item.
+ * @param $account    A user object.
  */
 function _logger_account_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
@@ -825,13 +843,16 @@ function _logger_device_access($permission, $serial) {
 }
 
 /**
- * Implementation of hook_cron().
  * Cron will call this hook periodically [e.g. 1 hour interval] to perform housekeeping on the png's.
  */
 function logger_cron() {
-  exec('rm sites/all/modules/logger/graphs/hour/*');
-  exec('rm sites/all/modules/logger/graphs/day/*');
-  exec('rm sites/all/modules/logger/graphs/month/*');
-  exec('rm sites/all/modules/logger/graphs/year/*');
-  exec('rm sites/all/modules/logger/graphs/night/*');
+  
+  $root_path = drupal_get_path('module', 'logger');
+  $graph_path = "$root_path/graphs";
+  
+  exec("rm $graph_path/hour/*");
+  exec("rm $graph_path/day/*");
+  exec("rm $graph_path/month/*");
+  exec("rm $graph_path/year/*");
+  exec("rm $graph_path/night/*");
 }
