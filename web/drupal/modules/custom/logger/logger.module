@@ -34,7 +34,11 @@ define('PINK',    'FF0080');
 define('CYAN',    '00ffff');
 define('SKYBLUE', '0080FF');
 
-define('ROOT_PATH', drupal_get_path('module', 'logger'));
+define('ROOT_PATH',   drupal_get_path('module', 'logger'));
+define('GRAPH_PATH',  ROOT_PATH . '/graphs');
+define('DATA_PATH',   ROOT_PATH . '/data/base');
+define('AGG_DB_PATH', DATA_PATH . "/aggregate.rrd");
+define('RRDTOOL',     ROOT_PATH . '/rrdtool');
 
 function logger_init() {
   global $user;
@@ -286,10 +290,14 @@ function _logger_dashboard($type, $function, $interval) {
 
   foreach ($sensors as &$sensor) {
 
+    //Check if the user whose datastream is to be superimposed on the graph is in private mode
+    $shifted = $sensor->private && ($sensor->uid != $user->uid);
+    $caption = user_access('logger') && !$shifted ? $sensor->function : $sensor->username;
+    $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
     $color = $colors[$i % count($colors)];
 
-    $chart->def  .= _logger_chart_def($i, $sensor, $chart);
-    $chart->line .= _logger_chart_line($i, $sensor, $color);
+    $chart->def  .= _logger_chart_def($i, $file_path, $chart->factor, $shifted);
+    $chart->line .= _logger_chart_line($i, $color, $caption, $shifted);
 
     $i++;
   }
@@ -297,7 +305,7 @@ function _logger_dashboard($type, $function, $interval) {
   $TZ = _logger_get_timezone_attribution();
 
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
-  $command = $TZ . ' ' . ROOT_PATH . '/rrdtool graph ' . $chart->file_path . ' -s ' . $chart->start .
+  $command = $TZ . ' ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
     ' --vertical-label ' . $chart->unit . 
     ' --lower-limit 0 -w 500 -h 350 -E -X 0' .
     ' --font LEGEND:8:' . $chart->def . $chart->line;
@@ -319,8 +327,8 @@ function _logger_get_chart_params($interval, $type, $sensors) {
   //Default
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data_path = ROOT_PATH . "/data/base/";
-  $params->file_path = ROOT_PATH . "/graphs/$interval/$unique_id.png";
+  $params->data_path = DATA_PATH;
+  $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
 
   switch ($interval) {
     case 'hour':
@@ -341,7 +349,7 @@ function _logger_get_chart_params($interval, $type, $sensors) {
 
     case 'night':
       $params->start = 'end-60d';
-      $params->data_path = ROOT_PATH . "/data/night/";
+      $params->data_path = DATA_PATH . "/night";
       break;
   }
 
@@ -460,17 +468,11 @@ function _logger_get_timezone_attribution() {
   return 'TZ="GMT' . $signal . $hours . '"';
 }
 
-function _logger_chart_def($i, $sensor, $chart) {
-
-  global $user;
-  $file_path = $chart->data_path . $sensor->meter . '.rrd';
-
-  //Check if the user whose datastream is to be superimposed on the graph is in private mode
-  $shifted = $sensor->private && ($sensor->uid != $user->uid);
+function _logger_chart_def($i, $file_path, $factor, $shifted) {
 
   $def =
     ' DEF:data'   . $i . '='. $file_path . ':meter:AVERAGE' .
-    ' CDEF:meter' . $i . '=data' . $i . ',' . $chart->factor . ',*';
+    ' CDEF:meter' . $i . '=data' . $i . ',' . $factor . ',*';
 
   $def .= $shifted ?
     ' SHIFT:meter' . $i . ':-31556926' :
@@ -483,14 +485,8 @@ function _logger_chart_def($i, $sensor, $chart) {
   return $def;
 }
 
-function _logger_chart_line($i, $sensor, $color) {
+function _logger_chart_line($i, $color, $caption, $shifted) {
 
-  global $user;
-
-  //Check if the user whose datastream is to be superimposed on the graph is in private mode
-  $shifted = $sensor->private && ($sensor->uid != $user->uid);
-
-  $caption = user_access('logger') && !$shifted ? $sensor->function : $sensor->username;
   $caption = substr($caption . '               ', 0, 15);
 
   $line =
@@ -883,14 +879,11 @@ function _logger_device_access($permission, $serial) {
  */
 function logger_cron() {
 
-  $root_path = drupal_get_path('module', 'logger');
-  $graph_path = "$root_path/graphs";
-
-  exec("rm $graph_path/hour/*");
-  exec("rm $graph_path/day/*");
-  exec("rm $graph_path/month/*");
-  exec("rm $graph_path/year/*");
-  exec("rm $graph_path/night/*");
+  exec('rm ' . GRAPH_PATH . '/hour/*');
+  exec('rm ' . GRAPH_PATH . '/day/*');
+  exec('rm ' . GRAPH_PATH . '/month/*');
+  exec('rm ' . GRAPH_PATH . '/year/*');
+  exec('rm ' . GRAPH_PATH . '/night/*');
 
   _logger_aggregate();
 }
@@ -900,17 +893,14 @@ function _logger_aggregate() {
   $timestamp = time();
 
   $ds_name = 'aggregation';
-  $root_path = drupal_get_path('module', 'logger');
-  $data_path = "$root_path/data/base";
-  $data_file_path = "$data_path/aggregation.rrd";
-  
-  if (file_exists($data_file_path)) {
+
+  if (file_exists(AGG_DB_PATH)) {
     //Updates datafile
 
     $sql = "SELECT SUM(m.value) FROM {logger_meters} m WHERE m.type = '%s' AND m.unit = '%s'";
     $total = db_fetch_object( db_query($sql, 'electricity', 'watt'));
 
-    $command = "$root_path/rrdtool update $data_file_path $timestamp:$total";
+    $command = RRDTOOL . " update " . AGG_DB_PATH . " $timestamp:$total";
 
   } else {
     //Creates datafile
@@ -920,7 +910,7 @@ function _logger_aggregate() {
     $min = 0;
     $max = 20;
   
-    $command = "$root_path/rrdtool create $data_file_path " .
+    $command = RRDTOOL . " create " . AGG_DB_PATH . " " .
       "-b 1199487600 -s 60 DS:$ds_name:$ds_type:$reset_time:$min:$max " .
       "RRA:AVERAGE:0.5:1:120 " .
       "RRA:AVERAGE:0.5:15:192 " .
