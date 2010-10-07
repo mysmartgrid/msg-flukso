@@ -40,6 +40,7 @@ define('DATA_PATH',   ROOT_PATH . '/data/base');
 define('AGG_DB_PATH', DATA_PATH . "/aggregate.rrd");
 define('RRDTOOL',     ROOT_PATH . '/rrdtool');
 
+
 function logger_init() {
   global $user;
   // Workaround for collapse.js not being loaded within  _logger_fluksonians_form  when block caching is on.
@@ -269,10 +270,6 @@ function _logger_installation() {
     "</div>". PHP_EOL;
 }
 
-function _logger_front_page() {
-
-}
-
 /**
  * Builds the dashboard page.
  * 
@@ -283,46 +280,40 @@ function _logger_front_page() {
  */
 function _logger_dashboard($type, $function, $interval) {
 
-  $sensors = _logger_get_user_sensors($type, $function);
-  if (empty($sensors)) {
-    return theme('chart', '');
+  if (user_access('logger')) {
+    drupal_set_title(t('Your power consumption'));
+
+    $sensors = _logger_get_user_sensors($type, $function);
+    $chart = _logger_get_chart_params($interval, $type, $sensors[0]->unit);
+
+    global $user;
+    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
+    $i = 0;
+
+    foreach ($sensors as &$sensor) {
+
+      //Check if the user whose datastream is to be superimposed on the graph is in private mode
+      $shifted = $sensor->private && ($sensor->uid != $user->uid);
+      $caption = $shifted ? $sensor->username : $sensor->function;
+
+      $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
+      $color = $colors[$i % count($colors)];
+
+      $chart->def  .= _logger_chart_def($i, $file_path, $chart->factor, $shifted);
+      $chart->line .= _logger_chart_line($i, $color, $caption, $shifted);
+
+      $i++;
+    }
+
+  } else {
+    drupal_set_title(t('Aggregate power consumption'));
+
+    $chart = _logger_get_chart_params($interval, $type, 'watt');
+    $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor, FALSE);
+    $chart->line .= _logger_chart_line(0, BLUE, t('All Users'), FALSE);
   }
 
-  $chart = _logger_get_chart_params($interval, $type, $sensors[0]->unit);
-  $chart->line = ' COMMENT:"\s"';
-  $chart->def = '';
-
-  $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
-  $i = 0;
-
-  global $user;
-
-  foreach ($sensors as &$sensor) {
-
-    //Check if the user whose datastream is to be superimposed on the graph is in private mode
-    $shifted = $sensor->private && ($sensor->uid != $user->uid);
-    $caption = user_access('logger') && !$shifted ? $sensor->function : $sensor->username;
-
-    $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
-    $color = $colors[$i % count($colors)];
-
-    $chart->def  .= _logger_chart_def($i, $file_path, $chart->factor, $shifted);
-    $chart->line .= _logger_chart_line($i, $color, $caption, $shifted);
-
-    $i++;
-  }
-
-  $TZ = _logger_get_timezone_attribution();
-
-  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
-  $command = $TZ . ' ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
-    ' --vertical-label ' . $chart->unit . 
-    ' --lower-limit 0 -w 500 -h 350 -E -X 0' .
-    ' --font LEGEND:8:' . $chart->def . $chart->line;
-
-  exec($command, $output, $return);
-
-  drupal_set_title(t('Your power consumption'));
+  _logger_create_chart_file($chart);
 
   return theme('chart', $chart->file_path);
 }
@@ -339,6 +330,8 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit) {
   $params->factor = 3600; // 1Wh/s = 3600 W
   $params->data_path = DATA_PATH;
   $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
+  $params->line = ' COMMENT:"\s"';
+  $params->def = '';
 
   switch ($interval) {
     case 'hour':
@@ -514,6 +507,19 @@ function _logger_chart_line($i, $color, $caption, $shifted) {
     ' GPRINT:last' . $i . ':"\tlast\:%5.0lf\l"';
 
   return $line;
+}
+
+function _logger_create_chart_file($chart) {
+
+  $TZ = _logger_get_timezone_attribution();
+
+  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
+  $command = $TZ . ' ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
+    ' --vertical-label ' . $chart->unit .
+    ' --lower-limit 0 -w 500 -h 350 -E -X 0' .
+    ' --font LEGEND:8:' . $chart->def . $chart->line;
+
+  exec($command, $output, $return);
 }
 
 function _logger_add($uid) {
@@ -905,18 +911,16 @@ function _logger_aggregate() {
   if (!file_exists(AGG_DB_PATH)) {
 
     //Creates datafile
-    $ds_name = 'aggregation';
-    $ds_type = 'DERIVE';
     $reset_time = 100 * 24 * 60 * 60; //100 days
-    $min = 0;
-    $max = 20;
 
     $command = $TZ . ' ' . RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
-      "-b 1199487600 -s 60 DS:$ds_name:$ds_type:$reset_time:$min:$max " .
+      "-b 1199487600 -s 60 DS:meter:DERIVE:$reset_time:0:20 " .
       "RRA:AVERAGE:0.5:1:120 " .
       "RRA:AVERAGE:0.5:15:192 " .
       "RRA:AVERAGE:0.5:1440:60 " .
       "RRA:AVERAGE:0.5:10080:520";
+
+    exec($command, $output, $return);
   }
 
   $sql = "SELECT SUM(m.value) FROM {logger_meters} m WHERE m.type = '%s' AND m.unit = '%s'";
@@ -925,7 +929,7 @@ function _logger_aggregate() {
 
   $command = $TZ . ' ' . RRDTOOL . ' update ' . AGG_DB_PATH . " $timestamp:$total";
 
-  system($command, $return);
+  exec($command, $output, $return);
 
   //TODO: error logging
 }
