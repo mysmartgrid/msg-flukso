@@ -279,6 +279,7 @@ function _logger_installation() {
  */
 function _logger_dashboard($type, $function, $interval) {
 
+  global $user;
   $sensors = _logger_get_user_sensors($type, $function);
 
   $chart = _logger_get_chart_params($interval, $type, $sensors);
