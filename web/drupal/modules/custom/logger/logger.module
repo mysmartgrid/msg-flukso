@@ -269,6 +269,10 @@ function _logger_installation() {
     "</div>". PHP_EOL;
 }
 
+function _logger_front_page() {
+
+}
+
 /**
  * Builds the dashboard page.
  * 
@@ -279,21 +283,26 @@ function _logger_installation() {
  */
 function _logger_dashboard($type, $function, $interval) {
 
-  global $user;
   $sensors = _logger_get_user_sensors($type, $function);
+  if (empty($sensors)) {
+    return theme('chart', '');
+  }
 
-  $chart = _logger_get_chart_params($interval, $type, $sensors);
+  $chart = _logger_get_chart_params($interval, $type, $sensors[0]->unit);
   $chart->line = ' COMMENT:"\s"';
   $chart->def = '';
 
   $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
   $i = 0;
 
+  global $user;
+
   foreach ($sensors as &$sensor) {
 
     //Check if the user whose datastream is to be superimposed on the graph is in private mode
     $shifted = $sensor->private && ($sensor->uid != $user->uid);
     $caption = user_access('logger') && !$shifted ? $sensor->function : $sensor->username;
+
     $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
     $color = $colors[$i % count($colors)];
 
@@ -318,7 +327,7 @@ function _logger_dashboard($type, $function, $interval) {
   return theme('chart', $chart->file_path);
 }
 
-function _logger_get_chart_params($interval, $type, $sensors) {
+function _logger_get_chart_params($interval, $type, $unformatted_unit) {
 
   $params = new stdClass();
 
@@ -356,7 +365,7 @@ function _logger_get_chart_params($interval, $type, $sensors) {
 
   switch ($type) {
     case 'electricity':
-      switch ($sensors[0]->unit) {
+      switch ($unformatted_unit) {
         case 'kwh':
           $params->unit = 'kWh/year';
           $params->factor = 31536;
