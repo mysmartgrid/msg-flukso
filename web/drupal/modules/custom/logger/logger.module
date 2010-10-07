@@ -891,33 +891,30 @@ function logger_cron() {
 
 function _logger_aggregate() {
 
-  $timestamp = time();
+  $TZ = _logger_get_timezone_attribution();
 
-  $ds_name = 'aggregation';
+  if (!file_exists(AGG_DB_PATH)) {
 
-  if (file_exists(AGG_DB_PATH)) {
-    //Updates datafile
-
-    $sql = "SELECT SUM(m.value) FROM {logger_meters} m WHERE m.type = '%s' AND m.unit = '%s'";
-    $total = db_fetch_object( db_query($sql, 'electricity', 'watt'));
-
-    $command = RRDTOOL . " update " . AGG_DB_PATH . " $timestamp:$total";
-
-  } else {
     //Creates datafile
-
+    $ds_name = 'aggregation';
     $ds_type = 'DERIVE';
     $reset_time = 100 * 24 * 60 * 60; //100 days
     $min = 0;
     $max = 20;
-  
-    $command = RRDTOOL . " create " . AGG_DB_PATH . " " .
+
+    $command = $TZ . ' ' . RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
       "-b 1199487600 -s 60 DS:$ds_name:$ds_type:$reset_time:$min:$max " .
       "RRA:AVERAGE:0.5:1:120 " .
       "RRA:AVERAGE:0.5:15:192 " .
       "RRA:AVERAGE:0.5:1440:60 " .
       "RRA:AVERAGE:0.5:10080:520";
   }
+
+  $sql = "SELECT SUM(m.value) FROM {logger_meters} m WHERE m.type = '%s' AND m.unit = '%s'";
+  $total = db_fetch_object( db_query($sql, 'electricity', 'watt'));
+  $timestamp = time();
+
+  $command = $TZ . ' ' . RRDTOOL . ' update ' . AGG_DB_PATH . " $timestamp:$total";
 
   system($command, $return);
 
