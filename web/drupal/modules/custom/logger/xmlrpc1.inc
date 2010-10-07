@@ -67,9 +67,33 @@ function _logger_heartbeat($auth, $monitor) {
 
   if (_logger_authenticate_hmac_sha1($auth, $monitor)) {
 
-    $device = db_fetch_object(db_query("SELECT sha, upgrade, resets FROM {logger_devices} WHERE device = '%s'", $auth['device']));
+    $device = db_fetch_object(db_query("
+       SELECT
+         sha,
+         upgrade,
+         resets
+       FROM
+         {logger_devices}
+       WHERE
+         device = '%s'", $auth['device']));
+
     $device->resets += $monitor['reset'];
-    db_query("UPDATE {logger_devices} SET access = %d, version = %d, upgrade = %d, resets = %d, uptime = %d, memtotal = %d, memfree = %d, memcached = %d, membuffers = %d, uart_oe = %d WHERE device = '%s'", time(), $monitor['version'], 0, $device->resets, $monitor['uptime'], $monitor['memtotal'], $monitor['memfree'], $monitor['memcached'], $monitor['membuffers'], $monitor['uart_oe'], $auth['device']);
+    db_query("
+      UPDATE
+        {logger_devices}
+      SET
+        access = %d,
+        version = %d,
+        upgrade = %d,
+        resets = %d,
+        uptime = %d,
+        memtotal = %d,
+        memfree = %d,
+        memcached = %d,
+        membuffers = %d,
+        uart_oe = %d
+      WHERE
+        device = '%s'", time(), $monitor['version'], 0, $device->resets, $monitor['uptime'], $monitor['memtotal'], $monitor['memfree'], $monitor['memcached'], $monitor['membuffers'], $monitor['uart_oe'], $auth['device']);
 
     $action['upgrade'] = (int) $device->upgrade;
     if ($action['upgrade']) {
@@ -99,13 +123,14 @@ function _logger_measurement_add($auth, $logs) {
       $meterdata = db_fetch_object(db_query("SELECT device, night, factor FROM {logger_meters} WHERE meter = '%s'", $meter));
 
       if ($meterdata->device == $auth['device']) { // extra security check
-        $command = $path->root .'/rrdtool update '. $path->base . $meter .'.rrd ';
+
+        $command = $path->root . '/rrdtool update ' . $path->base . $meter . '.rrd ';
         ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
 
         foreach ($measurements as $timestamp => $value) {
 
           if (is_numeric($timestamp) and is_numeric($value)) {
-            $command .= $timestamp .':'. $value*$meterdata->factor .' ';
+            $command .= $timestamp . ':' . $value * $meterdata->factor . ' ';
 
           } else {
             watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value),WATCHDOG_ERROR);
@@ -119,6 +144,7 @@ function _logger_measurement_add($auth, $logs) {
 
           // update the night rrd every day at 6AM local time
           if (time() > $meterdata->night) {
+
             $midnight = _logger_midnight(time(), $auth['device']);
             $start = $midnight + 7200; // 2AM local time
             $end = $start + 10800; // 3h time interval
@@ -129,7 +155,7 @@ function _logger_measurement_add($auth, $logs) {
             system($command, $return);
 
             if ($return == 0) {
-                watchdog_xmlrpc('logger.measurementAdd', 'successful update for night rrd: %command | midnight = %midnight', array('%command' => $command, '%midnight' => $midnight), WATCHDOG_NOTICE); //debugging
+              watchdog_xmlrpc('logger.measurementAdd', 'successful update for night rrd: %command | midnight = %midnight', array('%command' => $command, '%midnight' => $midnight), WATCHDOG_NOTICE); //debugging
 
             } else {
               watchdog_xmlrpc('logger.measurementAdd', 'error updating night rrd: %command', array('%command' => $command), WATCHDOG_ERROR); //debugging
@@ -157,11 +183,22 @@ function _logger_measurement_add($auth, $logs) {
  */
 function _logger_midnight($timestamp, $device) {
 
-  $timezone = db_result(db_query("SELECT u.timezone FROM {logger_devices} ld INNER JOIN {users} u ON ld.uid = u.uid WHERE ld.device = '%s'", $device));
+  $timezone = db_result(db_query("
+    SELECT
+      u.timezone
+    FROM
+      {logger_devices} ld
+        INNER JOIN {users} u ON ld.uid = u.uid
+    WHERE
+      ld.device = '%s'", $device));
+
   // add one day to make sure $midnight > $timestamp
   $midnight = floor($timestamp/86400 + 1)*86400 - $timezone;
+
   // search for first $midnight < $timestamp
-  while ($midnight > $timestamp) $midnight -= 86400;
+  while ($midnight > $timestamp) {
+    $midnight -= 86400;
+  }
 
   return $midnight;
 }
@@ -171,7 +208,7 @@ function _logger_authenticate_hmac_sha1($auth, $message) {
   $auth['key'] = db_result(db_query("SELECT sha FROM {logger_devices} WHERE device = '%s'", $auth['device']));
 
   if (hash_hmac('sha1', $auth['timestamp'] .':'. _logger_serialise($message) .':'. $auth['key'], $auth['key']) == $auth['signature'] && $auth['timestamp'] > time() - 300) {
-     // debugging:  watchdog_xmlrpc('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
+    // debugging:  watchdog_xmlrpc('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
     return TRUE;
 
   } else {

@@ -46,9 +46,28 @@ function logger_xmlrpc() {
 
 function _logger_heartbeat($device, $version, $resets, $uptime) {
 
-  $dev = db_fetch_object(db_query("SELECT upgrade, resets FROM {logger_devices} WHERE device = '%s'", $device));
+  $dev = db_fetch_object(db_query("
+    SELECT
+      upgrade,
+      resets
+    FROM
+      {logger_devices}
+    WHERE
+      device = '%s'", $device));
+
   $dev->resets += $resets;
-  db_query("UPDATE {logger_devices} SET access = %d, version = %d, upgrade = %d, resets = %d, uptime = %d WHERE device = '%s'", time(), $version, 0, $dev->resets, $uptime, $device);
+
+  db_query("
+    UPDATE
+      {logger_devices}
+    SET
+      access = %d,
+      version = %d,
+      upgrade = %d,
+      resets = %d,
+      uptime = %d
+    WHERE
+      device = '%s'", time(), $version, 0, $dev->resets, $uptime, $device);
 
   return $dev->upgrade;
 }
@@ -67,13 +86,14 @@ function _logger_measurement_add($logs) {
     $meterdata = db_fetch_object(db_query("SELECT uid, night, factor FROM {logger_meters} WHERE meter = '%s'", $meter));
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
-      $command = $path->root .'/rrdtool update '. $path->base . $meter .'.rrd ';
+
+      $command = $path->root . '/rrdtool update ' . $path->base . $meter . '.rrd ';
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
 
       foreach ($measurements as $timestamp => $value) {
 
         if (is_numeric($timestamp) and is_numeric($value)) {
-          $command .= $timestamp .':'. $value*$meterdata->factor .' ';
+          $command .= $timestamp . ':' . $value * $meterdata->factor . ' ';
 
         } else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
@@ -91,7 +111,7 @@ function _logger_measurement_add($logs) {
           $start = $midnight + 7200; // 2AM local time
           $end = $start + 10800; // 3h time interval
           $command = $path->root ."/rrdtool fetch ". $path->base . $meter .".rrd AVERAGE -r 900 -s ". $start ." -e ". $end ." | tail -n 12 | awk -F': ' '{SUM += $2} END {print SUM/12}'";
-          $night = (float)shell_exec($command); //test shell_exec iso system
+          $night = (float) shell_exec($command); //test shell_exec iso system
           $command = $path->root .'/rrdtool update '. $path->night . $meter .'.rrd '. $end .':'. $night;
           system($command, $return);
 
@@ -119,7 +139,15 @@ function _logger_measurement_add($logs) {
  */
 function _logger_midnight($timestamp, $device) {
 
-  $timezone = db_result(db_query("SELECT u.timezone FROM {logger_devices} ld INNER JOIN {users} u ON ld.uid = u.uid WHERE ld.device = '%s'", $device));
+  $timezone = db_result(db_query("
+    SELECT
+      u.timezone
+    FROM
+      {logger_devices} ld
+      INNER JOIN {users} u ON ld.uid = u.uid
+    WHERE
+      ld.device = '%s'", $device));
+
   // add one day to make sure $midnight > $timestamp
   $midnight = floor($timestamp/86400 + 1)*86400 - $timezone;
 
