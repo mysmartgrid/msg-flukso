@@ -448,27 +448,35 @@ function _logger_get_user_sensors($type, $function) {
 }
 
 /**
- * Returns the user timezone attribution statement formatted as 'TZ=GMT-02:00'.
+ * Returns the user timezone formatted for display.
  *
- * @return the timezone attribution statement.
+ * @return the formatted timezone.
  */
-function _logger_get_timezone_attribution() {
+function _logger_get_formatted_timezone() {
 
   global $user;
 
-  if ($user->timezone > 0) {
+  if ($user->uid) {
+    $offset = $user->timezone;
+
+  } else {
+    $offset = 2 * 60 * 60; //TODO: find another way
+  }
+
+  $hours = gmdate('h:i', abs($offset));
+
+  if ($offset > 0) {
     $signal = '-';
 
-  } elseif ($user->timezone < 0) {
+  } elseif ($offset < 0) {
     $signal = '+';
 
   } else {
     $signal = '';
+    $hours = '';
   }
 
-  $hours = gmdate('h:i', abs($user->timezone));
-
-  return 'TZ="GMT' . $signal . $hours . '"';
+  return "GMT$signal$hours";
 }
 
 function _logger_chart_def($i, $file_path, $factor, $shifted) {
@@ -511,15 +519,16 @@ function _logger_chart_line($i, $color, $caption, $shifted) {
 
 function _logger_create_chart_file($chart) {
 
-  $TZ = _logger_get_timezone_attribution();
+  $tz = _logger_get_formatted_timezone();
 
   //insert the TZ prior to launching rrdtool to obtain a proper time conversion
-  $command = $TZ . ' ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
+  $command = 'TZ="' . $tz . '" ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
     ' --vertical-label ' . $chart->unit .
     ' --lower-limit 0 -w 500 -h 350 -E -X 0' .
     ' --font LEGEND:8:' . $chart->def . $chart->line;
 
   exec($command, $output, $return);
+  //TODO: error logging
 }
 
 function _logger_add($uid) {
@@ -906,28 +915,38 @@ function logger_cron() {
 
 function _logger_aggregate() {
 
-  $TZ = _logger_get_timezone_attribution();
-
   if (!file_exists(AGG_DB_PATH)) {
 
     //Creates datafile
     $reset_time = 100 * 24 * 60 * 60; //100 days
 
-    $command = $TZ . ' ' . RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
-      "-b 1199487600 -s 60 DS:meter:DERIVE:$reset_time:0:20 " .
+    $command = RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
+      "-b 1199487600 -s 60 DS:meter:DERIVE:$reset_time:0:100000000 " .
       "RRA:AVERAGE:0.5:1:120 " .
       "RRA:AVERAGE:0.5:15:192 " .
       "RRA:AVERAGE:0.5:1440:60 " .
       "RRA:AVERAGE:0.5:10080:520";
 
     exec($command, $output, $return);
+
+    //TODO: error logging
   }
 
-  $sql = "SELECT SUM(m.value) FROM {logger_meters} m WHERE m.type = '%s' AND m.unit = '%s'";
-  $total = db_fetch_object( db_query($sql, 'electricity', 'watt'));
+  $tz = _logger_get_formatted_timezone();
   $timestamp = time();
 
-  $command = $TZ . ' ' . RRDTOOL . ' update ' . AGG_DB_PATH . " $timestamp:$total";
+  $sql = "
+    SELECT
+      SUM(m.value) AS total
+    FROM
+      {logger_meters} m
+    WHERE
+      m.type = '%s' AND
+      m.unit = '%s'";
+
+  $aggregation = db_fetch_object( db_query($sql, 'electricity', 'watt'));
+
+  $command = 'TZ="' . $tz . '" ' . RRDTOOL . ' update ' . AGG_DB_PATH . ' ' . $timestamp . ':' . $aggregation->total;
 
   exec($command, $output, $return);
 
