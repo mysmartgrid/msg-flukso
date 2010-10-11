@@ -308,9 +308,9 @@ function _logger_dashboard($type, $function, $interval) {
   } else {
     drupal_set_title(t('Aggregate power consumption'));
 
-    $chart = _logger_get_chart_params($interval, $type, 'watt');
-    $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor, FALSE);
-    $chart->line .= _logger_chart_line(0, BLUE, t('All Users'), FALSE);
+    $chart = _logger_get_chart_params($interval, $type, 'kw');
+    $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor);
+    $chart->line .= _logger_chart_line(0, BLUE, t('All Users'));
   }
 
   _logger_create_chart_file($chart);
@@ -330,7 +330,7 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit) {
   $params->factor = 3600; // 1Wh/s = 3600 W
   $params->data_path = DATA_PATH;
   $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
-  $params->line = ' COMMENT:"\s"';
+  $params->line = ' COMMENT:"\s" ';
   $params->def = '';
 
   switch ($interval) {
@@ -359,6 +359,11 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit) {
   switch ($type) {
     case 'electricity':
       switch ($unformatted_unit) {
+        case 'kw':
+          $params->unit = 'kW';
+          $params->factor = 0.001;
+          break;
+
         case 'kwh':
           $params->unit = 'kWh/year';
           $params->factor = 31536;
@@ -477,58 +482,6 @@ function _logger_get_formatted_timezone() {
   }
 
   return "GMT$signal$hours";
-}
-
-function _logger_chart_def($i, $file_path, $factor, $shifted) {
-
-  $def =
-    ' DEF:data'   . $i . '='. $file_path . ':meter:AVERAGE' .
-    ' CDEF:meter' . $i . '=data' . $i . ',' . $factor . ',*';
-
-  $def .= $shifted ?
-    ' SHIFT:meter' . $i . ':-31556926' :
-
-    ' VDEF:min'  . $i . '=meter' . $i . ',MINIMUM' .
-    ' VDEF:max'  . $i . '=meter' . $i . ',MAXIMUM' .
-    ' VDEF:avg'  . $i . '=meter' . $i . ',AVERAGE' .
-    ' VDEF:last' . $i . '=meter' . $i . ',LAST';
-
-  return $def;
-}
-
-function _logger_chart_line($i, $color, $caption, $shifted) {
-
-  $caption = substr($caption . '               ', 0, 15);
-
-  $line =
-    ' LINE1:meter' . $i . '#' . $color . ':' . '"' . $caption . '"';
-
-  $line .= $shifted ?
-    ' COMMENT:"min\:  prv"' .
-    ' COMMENT:"\tmax\:  prv"' .
-    ' COMMENT:"\tavg\:  prv"' .
-    ' COMMENT:"\tlast\:  prv\l"' :
-
-    ' GPRINT:min'  . $i . ':"min\:%5.0lf"'.
-    ' GPRINT:max'  . $i . ':"\tmax\:%5.0lf"'.
-    ' GPRINT:avg'  . $i . ':"\tavg\:%5.0lf"'.
-    ' GPRINT:last' . $i . ':"\tlast\:%5.0lf\l"';
-
-  return $line;
-}
-
-function _logger_create_chart_file($chart) {
-
-  $tz = _logger_get_formatted_timezone();
-
-  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
-  $command = 'TZ="' . $tz . '" ' . RRDTOOL . ' graph ' . $chart->file_path . ' -s ' . $chart->start .
-    ' --vertical-label ' . $chart->unit .
-    ' --lower-limit 0 -w 500 -h 350 -E -X 0' .
-    ' --font LEGEND:8:' . $chart->def . $chart->line;
-
-  exec($command, $output, $return);
-  //TODO: error logging
 }
 
 function _logger_add($uid) {
@@ -915,26 +868,6 @@ function logger_cron() {
 
 function _logger_aggregate() {
 
-  if (!file_exists(AGG_DB_PATH)) {
-
-    //Creates datafile
-    $reset_time = 100 * 24 * 60 * 60; //100 days
-
-    $command = RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
-      "-b 1199487600 -s 60 DS:meter:DERIVE:$reset_time:0:100000000 " .
-      "RRA:AVERAGE:0.5:1:120 " .
-      "RRA:AVERAGE:0.5:15:192 " .
-      "RRA:AVERAGE:0.5:1440:60 " .
-      "RRA:AVERAGE:0.5:10080:520";
-
-    exec($command, $output, $return);
-
-    //TODO: error logging
-  }
-
-  $tz = _logger_get_formatted_timezone();
-  $timestamp = time();
-
   $sql = "
     SELECT
       SUM(m.value) AS total
@@ -946,9 +879,101 @@ function _logger_aggregate() {
 
   $aggregation = db_fetch_object( db_query($sql, 'electricity', 'watt'));
 
-  $command = 'TZ="' . $tz . '" ' . RRDTOOL . ' update ' . AGG_DB_PATH . ' ' . $timestamp . ':' . $aggregation->total;
+  if (!file_exists(AGG_DB_PATH)) {
+
+    _logger_create_aggregate_rrd(2 * $aggregation->total);
+  }
+
+  _logger_update_aggregate_rrd($aggregation->total);
+}
+
+function _logger_create_aggregate_rrd($max) {
+
+  $step = 30 * 60;          //half an hour
+  $timeout = 2 * $step;     //1 hour
+  $start_time = 1199487600; //04 Jan 2008 23:00:00 GMT
+
+  $command = RRDTOOL . ' create ' . AGG_DB_PATH . ' ' .
+    "--start $start_time " .
+    "--step $step " .
+
+    "DS:meter:DERIVE:$timeout:0:$max " .
+
+    "RRA:AVERAGE:0.5:1:96 "    . //every half an hour, stored for 2 days
+    "RRA:AVERAGE:0.5:2:336 "   . //every hour, stored for 7 days
+    "RRA:AVERAGE:0.5:48:60 "   . //every day, stored for 2 months
+    "RRA:AVERAGE:0.5:336:520";   //every week, stored for 10 years
 
   exec($command, $output, $return);
+  //TODO: error logging
+}
 
+function _logger_update_aggregate_rrd($total) {
+
+  $tz = _logger_get_formatted_timezone();
+  $now = time();
+
+  $command = "TZ=\"$tz\" " . RRDTOOL . ' update ' . AGG_DB_PATH . " $now:$total";
+
+  exec($command, $output, $return);
+  //TODO: error logging
+}
+
+function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
+
+  $def =
+    "DEF:data$i"   . '='. $file_path . ':meter:AVERAGE ' .
+    "CDEF:meter$i" . '='. "data$i" . ',' . $factor . ',* ';
+
+  $def .= $shifted ?
+    "SHIFT:meter$i" . ':-31556926 ' :
+
+    "VDEF:min$i"  . "=meter$i" . ',MINIMUM ' .
+    "VDEF:max$i"  . "=meter$i" . ',MAXIMUM ' .
+    "VDEF:avg$i"  . "=meter$i" . ',AVERAGE ' .
+    "VDEF:last$i" . "=meter$i" . ',LAST ';
+
+  return $def;
+}
+
+function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
+
+  $caption = substr($caption . '               ', 0, 15);
+
+  $line =
+    "LINE1:meter$i" . "#$color:" . "\"$caption\" ";
+
+  $line .= $shifted ?
+    'COMMENT:"min\:  prv" ' .
+    'COMMENT:"\tmax\:  prv" ' .
+    'COMMENT:"\tavg\:  prv" ' .
+    'COMMENT:"\tlast\:  prv\l" ' :
+
+    "GPRINT:min$i"  . ':"min\:%5.0lf" '.
+    "GPRINT:max$i"  . ':"\tmax\:%5.0lf" '.
+    "GPRINT:avg$i"  . ':"\tavg\:%5.0lf" '.
+    "GPRINT:last$i" . ':"\tlast\:%5.0lf\l" ';
+
+  return $line;
+}
+
+function _logger_create_chart_file($chart) {
+
+  $tz = _logger_get_formatted_timezone();
+
+  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
+  $command = "TZ=\"$tz\" " . RRDTOOL . ' graph ' . $chart->file_path . ' ' .
+    '--start ' . $chart->start . ' ' .
+    '--vertical-label ' . $chart->unit . ' ' .
+    '--lower-limit 0  ' .
+    '--width 500 ' .
+    '--height 350 ' .
+    '--slope-mode ' . 
+    '--units-exponent 0 ' .
+    '--font LEGEND:8: ' .
+    $chart->def . ' ' .
+    $chart->line;
+
+  exec($command, $output, $return);
   //TODO: error logging
 }
