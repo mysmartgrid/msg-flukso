@@ -1,7 +1,7 @@
 <?php
+
 /**
- * @file node.tpl.php
- * The node rendering logic for Flukso.
+ * The node rendering logic for mySmartgrid.
  *
  * In addition to the standard variables Drupal makes available to node.tpl.php,
  * these variables are made available by the theme:
@@ -20,7 +20,22 @@
  * - $mysmartgrid_node_timestamp - The timestamp for this type, if one should be
  *   rendered for this type.
  *
- * $Id$
+ * Copyright (c) 2010 flukso.net
+ *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">

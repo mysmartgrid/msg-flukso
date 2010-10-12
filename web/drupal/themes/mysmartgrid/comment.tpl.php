@@ -1,5 +1,4 @@
 <?php
-// $Id: comment.tpl.php,v 1.5 2008/11/23 22:16:19 shannonlucas Exp $
 
 $comment_class = 'comment' . (($comment->new) ? ' comment-new' : '') . 
                  ' ' . $status . ' ' . $zebra;

@@ -1,8 +1,6 @@
 <?php
-// $Id: search-theme-form.tpl.php,v 1.1 2007/10/31 18:06:38 dries Exp $
 
 /**
- * @file search-theme-form.tpl.php
  * Default theme implementation for displaying a search form directly into the
  * theme layout. Not to be confused with the search block or the search page.
  *
@@ -31,6 +29,23 @@
  *   <?php print '<pre>'. check_plain(print_r($search, 1)) .'</pre>'; ?>
  *
  * @see template_preprocess_search_theme_form()
+ *
+ * Copyright (c) 2010 flukso.net
+ *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 ?>
 <div id="search" class="container-inline">
