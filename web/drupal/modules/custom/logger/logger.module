@@ -860,11 +860,9 @@ function _logger_device_access($permission, $serial) {
   return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-/**
- * Cron will call this hook periodically [e.g. 1 hour interval] to perform housekeeping on the png's.
- */
 function logger_cron() {
 
+  //Delete png files
   exec('rm ' . GRAPH_PATH . '/hour/*');
   exec('rm ' . GRAPH_PATH . '/day/*');
   exec('rm ' . GRAPH_PATH . '/month/*');
@@ -874,6 +872,9 @@ function logger_cron() {
   _logger_aggregate();
 }
 
+/**
+ * Aggregates power consumption of all users.
+ */
 function _logger_aggregate() {
 
   $sql = "
@@ -895,6 +896,11 @@ function _logger_aggregate() {
   _logger_update_aggregate_rrd($aggregation->total);
 }
 
+/**
+ * Creates aggregate power consumption RRD database.
+ *
+ * @param $max  The maximum valid value.
+ */
 function _logger_create_aggregate_rrd($max) {
 
   $step = 15 * MINUTE;
@@ -916,6 +922,14 @@ function _logger_create_aggregate_rrd($max) {
   exec($command);
 }
 
+/**
+ * Creates an RRA tag of an RRD chart.
+ *
+ * @param $frequency    The period of time whose results are averaged.
+ * @param $storage_time The period of time during when the averages are stored.
+ * @param $step         The period of time within which a new value is received.
+ * @return the RRA definition.
+ */
 function _logger_rra_average($frequency, $storage_time, $step) {
 
   $f = $frequency / $step;
@@ -924,6 +938,11 @@ function _logger_rra_average($frequency, $storage_time, $step) {
   return "RRA:AVERAGE:0.5:$f:$s ";
 }
 
+/**
+ * Updates the database with a new power consmumption aggregate.
+ *
+ * @param $total the power consmumption aggregate.
+ */
 function _logger_update_aggregate_rrd($total) {
 
   $tz = _logger_get_formatted_timezone();
@@ -934,6 +953,15 @@ function _logger_update_aggregate_rrd($total) {
   exec($command);
 }
 
+/**
+ * Creates a DEF tag of an RRD chart.
+ *
+ * @param $i          the meter index.
+ * @param $file_path  the data file path.
+ * @param $factor     the unit conversion factor.
+ * @param $shifted    whether the series are to be shifted to the left, in order to be hidden.
+ * @return the RRD DEF tag.
+ */
 function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
 
   $def =
@@ -951,6 +979,15 @@ function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
   return $def;
 }
 
+/**
+ * Creates a LINE tag of an RRD chart.
+ *
+ * @param $i        the meter index.
+ * @param $color    the series color.
+ * @param $caption  the series caption.
+ * @param $shifted  whether the series are to be shifted to the left, in order to be hidden.
+ * @return the RRD LINE tag.
+ */
 function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 
   $caption = substr($caption . '          ', 0, 10);
@@ -972,6 +1009,11 @@ function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
   return $line;
 }
 
+/**
+ * Creates a RRD chart file.
+ *
+ * @param $chart  the chart properties.
+ */
 function _logger_create_chart_file($chart) {
 
   $tz = _logger_get_formatted_timezone();
