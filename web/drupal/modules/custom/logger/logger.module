@@ -40,8 +40,7 @@ define('DATA_PATH',   ROOT_PATH . '/data/base');
 define('AGG_DB_PATH', DATA_PATH . "/aggregate.rrd");
 define('RRDTOOL',     ROOT_PATH . '/rrdtool');
 
-define('SECOND',  1);
-define('MINUTE', 60 * SECOND);
+define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
@@ -50,7 +49,7 @@ define('YEAR',  365 * DAY);
 
 function logger_init() {
   global $user;
-  // Workaround for collapse.js not being loaded within  _logger_fluksonians_form  when block caching is on.
+  // Workaround for collapse.js not being loaded within  _logger_fluksonians_form when block caching is on.
   if ($user->uid > 0) {
     drupal_add_js('misc/collapse.js');
   }
@@ -64,6 +63,14 @@ function logger_menu() {
 
   $items = array();
 
+  $items['installation'] = array(
+    'title'            => '',
+    'description'      => 'Howto install a Fluksometer',
+    'page callback'    => '_logger_installation',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
   $items['admin/settings/logger'] = array(
     'title'            => 'Logger settings',
     'description'      => 'Configure settings for logging metering values.',
@@ -72,35 +79,51 @@ function logger_menu() {
     'access arguments' => array('administer site configuration'),
   );
 
+  $items['user/%user_uid_optional/privacy'] = array(
+    'title'            => 'Privacy',
+    'page callback'    => '_logger_account_privacy',
+    'access callback'  => '_logger_account_access',
+    'access arguments' => array('logger', 1),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'logger.admin.inc',
+    'weight'           => 2,
+  );
+
+
+  //Chart operations
+
   $items['logger'] = array(
-    'title'            => 'your dashboard', // isn't printed as title on the page, therefore resort to drupal_set_title (t('your ecological dashboard')) in ecology_dashboard;
-    'description'      => 'Configure settings for logging metering values.',
-    'page callback'    => '_logger_dashboard', //takes the callback from the MENU_DEFAULT_LOCAL_TASK -> lightest level-two menu
+    'title'            => 'your dashboard',
+    'description'      => 'Show the dashboard.',
+    'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'hour'),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK,
   );
 
   $items['logger/add'] = array(
-    'title'            => 'add this user to the chart',
+    'title'            => 'Add this user to the chart',
     'page callback'    => '_logger_add',
     'access arguments' => array('logger'),
     'type'             => MENU_CALLBACK,
   );
 
   $items['logger/remove'] = array(
-    'title'            => 'remove this user from the chart',
+    'title'            => 'Remove this user from the chart',
     'page callback'    => '_logger_remove',
     'access arguments' => array('logger'),
     'type'             => MENU_CALLBACK,
   );
 
   $items['logger/unit'] = array(
-    'title'            => 'change the unit',
+    'title'            => 'Change the unit',
     'page callback'    => '_logger_unit',
     'access arguments' => array('logger'),
     'type'             => MENU_CALLBACK,
   );
+
+
+  // First level tab links
 
   $items['logger/electricity'] = array(
     'title'            => 'electricity',
@@ -110,7 +133,8 @@ function logger_menu() {
     'type'             => MENU_DEFAULT_LOCAL_TASK,
   );
 
-  /*
+  /* Operations not yet available
+
   $items['logger/water'] = array(
     'title'            => 'water',
     'page callback'    => '_logger_dashboard',
@@ -125,8 +149,10 @@ function logger_menu() {
     'page arguments'   => array('gas', 'main', 'hour'),
     'access callback'  => TRUE,
     'type'             => MENU_LOCAL_TASK,
-  );
-  */
+  );*/
+
+
+  //Sub links for tab "Electricity"
 
   $items['logger/electricity/hour'] = array(
     'title'            => 'hour',
@@ -173,23 +199,8 @@ function logger_menu() {
     'weight'           => 4,
   );
 
-  $items['installation'] = array(
-    'title'            => '',
-    'description'      => 'Howto install a Fluksometer',
-    'page callback'    => '_logger_installation',
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
 
-  $items['user/%user_uid_optional/privacy'] = array(
-    'title'            => 'Privacy',
-    'page callback'    => '_logger_account_privacy',
-    'access callback'  => '_logger_account_access',
-    'access arguments' => array('logger', 1),
-    'type'             => MENU_LOCAL_TASK,
-    'file'             => 'logger.admin.inc',
-    'weight'           => 2,
-  );
+  //Devices' operations
 
   $items['user/%user_uid_optional/devices'] = array(
     'title'            => 'Devices',
@@ -201,6 +212,19 @@ function logger_menu() {
     'file'             => 'logger.admin.inc',
     'weight'           => 3,
   );
+
+  $items['device/deactivate'] = array(
+    'title'            => $items['user/%user_uid_optional/devices']['title'],
+    'page callback'    => '_logger_device_deactivate',
+    'page arguments'   => array(2),
+    'access callback'  => '_logger_device_access',
+    'access arguments' => array('logger', 2),
+    'type'             => MENU_CALLBACK,
+    'file'             => 'logger.admin.inc'
+  );
+
+
+  //Sensors' operations
 
   $items['user/%user_uid_optional/sensors'] = array(
     'title'            => 'Sensors',
@@ -237,16 +261,6 @@ function logger_menu() {
     'page callback'    => '_logger_sensor_activate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
-    'type'             => MENU_CALLBACK,
-    'file'             => 'logger.admin.inc'
-  );
-
-  $items['device/deactivate'] = array(
-    'title'            => $items['user/%user_uid_optional/devices']['title'],
-    'page callback'    => '_logger_device_deactivate',
-    'page arguments'   => array(2),
-    'access callback'  => '_logger_device_access',
     'access arguments' => array('logger', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
@@ -323,6 +337,14 @@ function _logger_dashboard($type, $function, $interval) {
   _logger_create_chart_file($chart);
 
   return theme('chart', $chart->file_path);
+}
+
+function _logger_count_installations() {
+
+  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> 0";
+  $aggregation = db_fetch_object( db_query($sql));
+
+  return $aggregation->total;
 }
 
 function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') {
@@ -638,10 +660,12 @@ function logger_theme() {
  * Theming the chart
  */
 function theme_chart($chart) {
+
   $output .=
     '<p id="chart">
       <img src="'. base_path() . $chart .'" alt="Flukso"/>
-    </p><!-- end chart-->';
+    </p>';
+
   return $output;
 }
 
@@ -991,20 +1015,26 @@ function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
 function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 
   $caption = substr($caption . '          ', 0, 10);
+  
+  //Labels
+  $latest = t('latest');
+  $min = t('min');
+  $max = t('max');
+  $avg = t('avg');
 
   $line =
     "LINE1:meter$i" . "#$color:" . "\"$caption\" ";
 
   $line .= $shifted ?
-    'COMMENT:"min\: prv" ' .
-    'COMMENT:"\tmax\: prv" ' .
-    'COMMENT:"\tavg\: prv" ' .
-    'COMMENT:"\tlast\: prv\l" ' :
+    'COMMENT:"'   . $min .    '\: prv" ' .
+    'COMMENT:"  ' . $max .    '\: prv" ' .
+    'COMMENT:"  ' . $avg .    '\: prv" ' .
+    'COMMENT:"  ' . $latest . '\: prv\l" ' :
 
-    "GPRINT:min$i"  . ':"min\: %5.0lf" '.
-    "GPRINT:max$i"  . ':"  max\: %5.0lf" '.
-    "GPRINT:avg$i"  . ':"  avg\: %5.0lf" '.
-    "GPRINT:last$i" . ':"  last\: %5.0lf\l" ';
+    "GPRINT:min$i"  . ':"'   . $min    . '\: %5.0lf" '.
+    "GPRINT:max$i"  . ':"  ' . $max    . '\: %5.0lf" '.
+    "GPRINT:avg$i"  . ':"  ' . $avg    . '\: %5.0lf" '.
+    "GPRINT:last$i" . ':"  ' . $latest . '\: %5.0lf\l" ';
 
   return $line;
 }
