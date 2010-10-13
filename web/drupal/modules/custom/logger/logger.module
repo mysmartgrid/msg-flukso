@@ -743,11 +743,6 @@ function theme_chart($chart) {
   return $output;
 }
 
-/**
- * Implementation of hook_block() for logger.
- * Adds two blocks to the logger pages for (de-)selecting users and
- * another one for selecting the desired unit.
- */
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
   global $user;
@@ -778,83 +773,105 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       return $blocks;
 
     case 'view':
-      //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
-      $destination = drupal_get_destination();
 
       if ($delta == 'fluksonians' && user_access('logger')) {
+
         $block['content'] = drupal_get_form('_logger_fluksonians_form');
 
       } elseif ($delta == 'unit' && user_access('logger')) {
 
-        //hardcoded the type and function parameters for now
-
-        $sql = "
-          SELECT
-            unit
-          FROM
-            {logger_meters}
-          WHERE
-            uid = %d AND
-            type = '%s' AND
-            function = '%s'";
-        
-        $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
-
-        $items = array();
-        $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
-        $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
-        $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
-        $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
-
-        // 'unlink' the currently selected unit option
-        switch ($unit) {
-          case 'watt':
-            $items[0] = 'watt';
-            break;
-
-          case 'kwh':
-            $items[1] = 'kWh/year';
-            break;
-
-          case 'eur':
-            $items[2] = 'euro/year [@ 0.18eur/kWh]';
-            break;
-
-          case 'aud':
-            $items[3] = 'aud/year [@ 0.19aud/kWh]';
-            break;
-        }
-
-        $block['subject'] = t('Unit');
-        $block['content'] = theme('logger_item_list', $items);
+        $block = _logger_create_units_block();
 
       } elseif ($delta == 'posts' && user_access('access content')) {
 
-        $sql = "
-          SELECT
-            n.nid,
-            n.title,
-            n.created
-          FROM
-            {node} n
-          WHERE
-            n.type = 'blogpost' AND
-            n.status = 1
-          ORDER BY
-            n.created DESC";
-
-        $result = db_query_range(db_rewrite_sql($sql), 0, 5);
-        $node_title_list = node_title_list($result);
-
-        if ($node_title_list) {
-          $block['subject'] = t('Recent blog posts');
-          $block['content'] = $node_title_list;
-          $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
-        }
+        $block = _logger_create_recent_blogs_block();
       }
 
       return $block;
   }
+}
+
+function _logger_create_units_block() {
+
+  $block = array();
+
+  global $user;
+
+  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
+  $destination = drupal_get_destination();
+
+  //hardcoded the type and function parameters for now
+
+  $sql = "
+    SELECT
+      unit
+    FROM
+      {logger_meters}
+    WHERE
+      uid = %d AND
+      type = '%s' AND
+      function = '%s'";
+
+  $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
+
+  $items = array();
+  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
+  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
+
+  // 'unlink' the currently selected unit option
+  switch ($unit) {
+    case 'watt':
+      $items[0] = 'watt';
+      break;
+
+    case 'kwh':
+      $items[1] = 'kWh/year';
+      break;
+
+    case 'eur':
+      $items[2] = 'euro/year [@ 0.18eur/kWh]';
+      break;
+
+    case 'aud':
+      $items[3] = 'aud/year [@ 0.19aud/kWh]';
+      break;
+  }
+
+  $block['subject'] = t('Unit');
+  $block['content'] = theme('logger_item_list', $items);
+
+  return $block;
+}
+
+function _logger_create_recent_blogs_block() {
+
+  $block = array();
+
+  $sql = "
+    SELECT
+      n.nid,
+      n.title,
+      n.created
+    FROM
+      {node} n
+    WHERE
+      n.type = 'blogpost' AND
+      n.status = 1
+    ORDER BY
+      n.created DESC";
+
+  $result = db_query_range(db_rewrite_sql($sql), 0, 5);
+  $node_title_list = node_title_list($result);
+
+  if ($node_title_list) {
+    $block['subject'] = t('Recent blog posts');
+    $block['content'] = $node_title_list;
+    $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
+  }
+
+  return $block;
 }
 
 /**
