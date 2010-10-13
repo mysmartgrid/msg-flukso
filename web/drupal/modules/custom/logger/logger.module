@@ -315,7 +315,7 @@ function _logger_dashboard($type, $function, $interval) {
 
       //Check if the user whose datastream is to be superimposed on the graph is in private mode
       $shifted = $sensor->private && ($sensor->uid != $user->uid);
-      $caption = $shifted ? $sensor->username : $sensor->function;
+      $caption = $sensor->uid == $user->uid ? $sensor->function : $sensor->username;
 
       $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
       $color = $colors[$i % count($colors)];
@@ -1016,25 +1016,19 @@ function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 
   $caption = substr($caption . '          ', 0, 10);
   
-  //Labels
-  $latest = t('latest');
-  $min = t('min');
-  $max = t('max');
-  $avg = t('avg');
-
   $line =
     "LINE1:meter$i" . "#$color:" . "\"$caption\" ";
 
   $line .= $shifted ?
-    'COMMENT:"'   . $min .    '\: prv" ' .
-    'COMMENT:"  ' . $max .    '\: prv" ' .
-    'COMMENT:"  ' . $avg .    '\: prv" ' .
-    'COMMENT:"  ' . $latest . '\: prv\l" ' :
+    'COMMENT:"min\:  prv" ' .
+    'COMMENT:"\tmax\:  prv" ' .
+    'COMMENT:"\tavg\:  prv" ' .
+    'COMMENT:"\tlast\:  prv\l" ' :
 
-    "GPRINT:min$i"  . ':"'   . $min    . '\: %5.0lf" '.
-    "GPRINT:max$i"  . ':"  ' . $max    . '\: %5.0lf" '.
-    "GPRINT:avg$i"  . ':"  ' . $avg    . '\: %5.0lf" '.
-    "GPRINT:last$i" . ':"  ' . $latest . '\: %5.0lf\l" ';
+    "GPRINT:min$i"  . ':"min\:%5.0lf" '.
+    "GPRINT:max$i"  . ':"\tmax\:%5.0lf" '.
+    "GPRINT:avg$i"  . ':"\tavg\:%5.0lf" '.
+    "GPRINT:last$i" . ':"\tlast\:%5.0lf\l" ';
 
   return $line;
 }
