@@ -227,12 +227,12 @@ function phptemplate_img_assist_inline($node, $size, $attributes) {
         'top' => $note->position_top,
         'left' => $note->position_left,
         'text' => $text,
-        // notes should be added when residing on the image page
+        //notes should be added when residing on the image page
         'editable' => FALSE,
       );
     }
    
-    // Build the field settings
+    //Build the field settings
     $settings = array(array(
       'nid' => $node->nid,
       'field' => 'image',
@@ -257,7 +257,7 @@ function phptemplate_img_assist_inline($node, $size, $attributes) {
     $img_tag = img_assist_display($node, $size);
   }
 
-  // Always define an alignment class, even if it is 'none'.
+  //Always define an alignment class, even if it is 'none'.
   $output = '<span class="inline inline-'. $attributes['align'] .'">';
 
   $link = $attributes['link'];

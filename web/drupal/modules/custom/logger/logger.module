@@ -47,8 +47,11 @@ define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
+
 function logger_init() {
+  
   global $user;
+
   // Workaround for collapse.js not being loaded within  _logger_fluksonians_form when block caching is on.
   if ($user->uid > 0) {
     drupal_add_js('misc/collapse.js');
@@ -62,6 +65,15 @@ function logger_perm() {
 function logger_menu() {
 
   $items = array();
+
+  $items['logger'] = array(
+    'title'            => 'Dashboard',
+    'description'      => 'Show the dashboard.',
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
 
   $items['installation'] = array(
     'title'            => '',
@@ -87,15 +99,6 @@ function logger_menu() {
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
     'weight'           => 2,
-  );
-
-  $items['logger'] = array(
-    'title'            => 'your dashboard',
-    'description'      => 'Show the dashboard.',
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
   );
 
 
@@ -273,35 +276,72 @@ function _logger_installation() {
 
   return
     '<div class="install">' . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step1.png' height='120' width='150' alt='step 1'/></a>" . PHP_EOL .
+    "<a class='img' href = 'http://www.flukso.net/installation'>
+       <img src='http://www.flukso.net/sites/default/files/images/step1.png'
+       height='120' width='150' alt='step 1'/>
+     </a>" . PHP_EOL .
 
-    "<p><b>STEP 1: CONFIGURING WIFI</b><br/>Power up the Fluksometer. Connect your computer to the Fluksometer's ethernet port. Surf to <a href = 'http://192.168.255.1'>http://192.168.255.1</a>. Configure the wireless interface with the proper name and security key.</p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step2.png' height='120' width='150' alt='step 2'/></a>" . PHP_EOL .
+    "<p><b>STEP 1: CONFIGURING WIFI</b><br/>
+       Power up the Fluksometer. Connect your computer to the Fluksometer's
+       ethernet port. Surf to
+       <a href = 'http://192.168.255.1'>http://192.168.255.1</a>.
+       Configure the wireless interface with the proper name and security key.
+     </p>" . PHP_EOL .
+    "<a class='img' href = 'http://www.flukso.net/installation'>
+       <img src='http://www.flukso.net/sites/default/files/images/step2.png'
+       height='120' width='150' alt='step 2'/>
+     </a>" . PHP_EOL .
 
-    "<p><b>STEP 2: SECURING THE FLUKSOMETER</b><br/>Disconnect all cables from the Fluksometer. Find a suitable location near the fuse box to install the Fluksometer. Secure the Fluksometer with the plastic cable tie.</p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step3.png' height='120' width='150' alt='step 3'/></a>" .
+    "<p><b>STEP 2: SECURING THE FLUKSOMETER</b><br/>
+       Disconnect all cables from the Fluksometer.
+       Find a suitable location near the fuse box to install the Fluksometer.
+       Secure the Fluksometer with the plastic cable tie.
+     </p>" . PHP_EOL .
+    "<a class='img' href = 'http://www.flukso.net/installation'>
+       <img src='http://www.flukso.net/sites/default/files/images/step3.png'
+       height='120' width='150' alt='step 3'/>
+     </a>" .
 
-    "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>For safety reasons, switch off the main electricity supply. For a single phase supply, attach the current clamp to one of the two cables running from the electricity meter to the fuse box. Close the clamp firmly.</p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step4.png' height='120' width='150' alt='step 4'/></a>" . PHP_EOL .
+    "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>
+       For safety reasons, switch off the main electricity supply.
+       For a single phase supply, attach the current clamp to one of the two
+       cables running from the electricity meter to the fuse box.
+       Close the clamp firmly.
+     </p>" . PHP_EOL .
+    "<a class='img' href = 'http://www.flukso.net/installation'>
+       <img src='http://www.flukso.net/sites/default/files/images/step4.png'
+       height='120' width='150' alt='step 4'/>
+     </a>" . PHP_EOL .
 
-    "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>Connect the cable from the current clamp to the Fluksometer's input port. Take care of connecting the black and red cable as shown in the drawing on the left. Only apply gentle force when fastening the two screws.</p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'><img src='http://www.flukso.net/sites/default/files/images/step5.png' height='120' width='150' alt='step 4'/></a>" . PHP_EOL .
+    "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>
+       Connect the cable from the current clamp to the Fluksometer's input port.
+       Take care of connecting the black and red cable as shown in the drawing
+       on the left. Only apply gentle force when fastening the two screws.
+     </p>" . PHP_EOL .
+    "<a class='img' href = 'http://www.flukso.net/installation'>
+       <img src='http://www.flukso.net/sites/default/files/images/step5.png'
+       height='120' width='150' alt='step 4'/>
+     </a>" . PHP_EOL .
 
-    "<p><b>STEP 5: POWERING UP</b><br/>Switch the main electricity supply back on. Activate the Fluksometer by connecting the power plug.</p>" . PHP_EOL .
+    "<p><b>STEP 5: POWERING UP</b><br/>
+       Switch the main electricity supply back on.
+       Activate the Fluksometer by connecting the power plug.
+     </p>"  . PHP_EOL .
     "</div>". PHP_EOL;
 }
 
 /**
  * Builds the dashboard page.
  * 
- * @param $type     the sensor type.
- * @param $function the sensor function.
- * @param $interval the time interval.
+ * @param $type     The sensor type.
+ * @param $function The sensor function.
+ * @param $interval The time interval.
  * @return the dashboard page
  */
 function _logger_dashboard($type, $function, $interval) {
 
   if (user_access('logger')) {
+
     drupal_set_title(t('Your power consumption'));
 
     $sensors = _logger_get_user_sensors($type, $function);
@@ -327,6 +367,7 @@ function _logger_dashboard($type, $function, $interval) {
     }
 
   } else {
+
     drupal_set_title(t('Aggregate power consumption'));
 
     $chart = _logger_get_chart_params($interval, $type);
@@ -413,11 +454,11 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') 
 }
 
 /**
- * Returns an array containing all sensors either owned by the user or 
- * selected by him to be plotted on the chart.
+ * Returns an array containing all sensors either owned by the user or selected
+ * by him to be plotted on the chart.
  * 
- * @param $type       the type of sensors to be returned.
- * @param $function   the function of the sensors to be returned.
+ * @param $type       The type of sensors to be returned.
+ * @param $function   The function of the sensors to be returned.
  * @return the array of user sensors.
  */
 function _logger_get_user_sensors($type, $function) {
@@ -517,14 +558,24 @@ function _logger_get_formatted_timezone() {
 function _logger_add($uid) {
 
   global $user;
-  $rtid = db_result(db_query("SELECT rtid
-                              FROM {user_relationship_types}
-                              WHERE name = '%s'", 'subscription'));
 
-  $result = db_fetch_array(db_query("SELECT COUNT(rid), MAX(rid)
-                                     FROM {user_relationships}
-                                     WHERE requester_id = %d AND rtid = %d
-                                     GROUP BY rtid", $user->uid, $rtid));
+  $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
+
+  $rtid = db_result(db_query($sql, 'subscription'));
+
+  $sql = "
+    SELECT
+      COUNT(rid),
+      MAX(rid)
+    FROM
+      {user_relationships}
+    WHERE
+      requester_id = %d AND
+      rtid = %d
+    GROUP BY
+      rtid";
+
+  $result = db_fetch_array(db_query($sql, $user->uid, $rtid));
 
   // don't allow users to add themselves
   if ($uid != $user->uid) { 
@@ -535,14 +586,21 @@ function _logger_add($uid) {
 
     } else {
       //check whether the requested relationship doesn't already exist
-      if (!db_result(db_query("SELECT rid
-                               FROM {user_relationships}
-                               WHERE requester_id = %d AND requestee_id = %d AND rtid = %d", $user->uid, $uid, $rtid))) {
+
+      $sql = "
+        SELECT
+          rid
+        FROM
+          {user_relationships}
+        WHERE
+          requester_id = %d AND
+          requestee_id = %d AND
+          rtid = %d";
+      
+      if (!db_result(db_query($sql, $user->uid, $uid, $rtid))) {
 
         // if not, delete the most recently added relationship and replace it with the newly selected one
-        db_query("DELETE
-                  FROM {user_relationships}
-                  WHERE rid = %d", $result['MAX(rid)']);
+        db_query("DELETE FROM {user_relationships} WHERE rid = %d", $result['MAX(rid)']);
 
         user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
       }
@@ -558,13 +616,12 @@ function _logger_remove($rid) {
 
   global $user;
 
-  // check whether the to-be-deleted relationship was created by the same user
-  if ($user->uid == db_result(db_query("SELECT requester_id
-                                        FROM {user_relationships}
-                                        WHERE rid = %d", $rid))) {
-    db_query("DELETE
-              FROM {user_relationships}
-              WHERE rid = %d", $rid);
+  //check whether the to-be-deleted relationship was created by the same user
+  
+  $sql = "SELECT requester_id FROM {user_relationships} WHERE rid = %d";
+  
+  if ($user->uid == db_result(db_query($sql, $rid))) {
+    db_query("DELETE FROM {user_relationships} WHERE rid = %d", $rid);
 
   } else {
     watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
@@ -580,18 +637,28 @@ function _logger_unit($unit) {
 
   global $user;
 
-  // hardcoded type and function
-  db_query("UPDATE {logger_meters}
-            SET unit = '%s'
-            WHERE uid = %d AND type = '%s' AND function = '%s'", $unit, $user->uid, 'electricity', 'main');
+  //hardcoded type and function
+
+  $sql = "
+    UPDATE
+      {logger_meters}
+    SET
+      unit = '%s'
+    WHERE
+      uid = %d AND
+      type = '%s' AND
+      function = '%s'";
+
+  db_query($sql, $unit, $user->uid, 'electricity', 'main');
 
   _logger_cache_clear('unit');
+
   $destination = drupal_get_destination();
   drupal_goto($destination);
 }
 
 /**
- * Clear the specific (per user) cache entry in the {cache_block} table
+ * Clear the specific (per user) cache entry in the {cache_block} table.
  */
 function _logger_cache_clear($delta) {
 
@@ -600,10 +667,17 @@ function _logger_cache_clear($delta) {
   //the theme variable isn't set on these callbacks so force it
   $theme = 'flukso';
 
-  $block = db_fetch_object(db_query("
-    SELECT *
-    FROM {blocks}
-    WHERE module = '%s' AND delta = '%s' AND theme = '%s'", 'logger', $delta, 'flukso'));
+  $sql = "
+    SELECT
+      *
+    FROM
+      {blocks}
+    WHERE
+      module = '%s' AND
+      delta = '%s' AND
+      theme = '%s'";
+
+  $block = db_fetch_object(db_query($sql, 'logger', $delta, 'flukso'));
 
   $cid = _block_get_cache_id($block);
 
@@ -615,8 +689,8 @@ function _logger_cache_clear($delta) {
 }
 
 /**
- * Implementation of hook_user() for logger
- * Flush the fluksonians block entries in the block cache 
+ * Implementation of hook_user() for logger.
+ * Flush the fluksonians block entries in the block cache.
  */
 function logger_user($op) {
   switch($op) {
@@ -657,7 +731,7 @@ function logger_theme() {
 }
 
 /**
- * Theming the chart
+ * Theming the chart.
  */
 function theme_chart($chart) {
 
@@ -670,9 +744,9 @@ function theme_chart($chart) {
 }
 
 /**
- * Implementation of hook_block() for logger
+ * Implementation of hook_block() for logger.
  * Adds two blocks to the logger pages for (de-)selecting users and
- * another one for selecting the desired unit
+ * another one for selecting the desired unit.
  */
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
@@ -713,9 +787,18 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       } elseif ($delta == 'unit' && user_access('logger')) {
 
         //hardcoded the type and function parameters for now
-        $unit = db_result(db_query("SELECT unit
-                                    FROM {logger_meters}
-                                    WHERE uid = %d AND type = '%s' AND function = '%s'", $user->uid, 'electricity', 'main'));
+
+        $sql = "
+          SELECT
+            unit
+          FROM
+            {logger_meters}
+          WHERE
+            uid = %d AND
+            type = '%s' AND
+            function = '%s'";
+        
+        $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
 
         $items = array();
         $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
@@ -747,7 +830,20 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       } elseif ($delta == 'posts' && user_access('access content')) {
 
-        $result = db_query_range(db_rewrite_sql("SELECT n.nid, n.title, n.created FROM {node} n WHERE n.type = 'blogpost' AND n.status = 1 ORDER BY n.created DESC"), 0, 5);
+        $sql = "
+          SELECT
+            n.nid,
+            n.title,
+            n.created
+          FROM
+            {node} n
+          WHERE
+            n.type = 'blogpost' AND
+            n.status = 1
+          ORDER BY
+            n.created DESC";
+
+        $result = db_query_range(db_rewrite_sql($sql), 0, 5);
         $node_title_list = node_title_list($result);
 
         if ($node_title_list) {
@@ -780,19 +876,38 @@ function _logger_fluksonians_form() {
   global $user;
   $destination = drupal_get_destination();
 
-  $fluksonians = db_query("SELECT u.uid, u.name
-                           FROM ({users} u
-                           INNER JOIN {users_roles} ur ON u.uid = ur.uid)
-                           INNER JOIN {role} r ON ur.rid = r.rid
-                           WHERE r.name = '%s' AND NOT u.uid = %d
-                           ORDER BY u.name", 'fluksonian', $user->uid);
+  $sql = "
+    SELECT
+      u.uid,
+      u.name
+    FROM
+      ({users} u
+      INNER JOIN {users_roles} ur ON u.uid = ur.uid)
+      INNER JOIN {role} r ON ur.rid = r.rid
+    WHERE
+      r.name = '%s' AND
+      NOT u.uid = %d
+    ORDER BY
+      u.name";
 
-  $subscriptions = db_query("SELECT u.uid, u.name, ur.rid
-                             FROM ({users} u
-                             INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-                             INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid
-                             WHERE ur.requester_id = %d AND urt.name = '%s'
-                             ORDER BY u.name", $user->uid, 'subscription');
+  $fluksonians = db_query($sql, 'fluksonian', $user->uid);
+
+  $sql = "
+    SELECT
+      u.uid,
+      u.name,
+      ur.rid
+    FROM
+      ({users} u
+      INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
+      INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid
+    WHERE
+      ur.requester_id = %d AND
+      urt.name = '%s'
+    ORDER BY
+      u.name";
+
+  $subscriptions = db_query($sql, $user->uid, 'subscription');
 
   $i = 0;
   $rows = array();
@@ -837,9 +952,6 @@ function _logger_fluksonians_form() {
   return $form;
 }
 
-/**
- * Implementation of hook_form_alter().
- */
 function logger_form_alter(&$form, &$form_state, $form_id) {
 
   if ($form_id == 'user_login') {
@@ -850,8 +962,7 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
 }
 
 /**
- * Access callback ensuring the user account tabs are visible only to the
- * owner.
+ * Access callback ensuring the user account tabs are visible only to the owner.
  *
  * @param $permission Required permission to view the item.
  * @param $account    A user object.
@@ -980,10 +1091,10 @@ function _logger_update_aggregate_rrd($total) {
 /**
  * Creates a DEF tag of an RRD chart.
  *
- * @param $i          the meter index.
- * @param $file_path  the data file path.
- * @param $factor     the unit conversion factor.
- * @param $shifted    whether the series are to be shifted to the left, in order to be hidden.
+ * @param $i          The meter index.
+ * @param $file_path  The data file path.
+ * @param $factor     The unit conversion factor.
+ * @param $shifted    Whether the series are to be shifted to the left, in order to be hidden.
  * @return the RRD DEF tag.
  */
 function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
@@ -1006,10 +1117,10 @@ function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
 /**
  * Creates a LINE tag of an RRD chart.
  *
- * @param $i        the meter index.
- * @param $color    the series color.
- * @param $caption  the series caption.
- * @param $shifted  whether the series are to be shifted to the left, in order to be hidden.
+ * @param $i        The meter index.
+ * @param $color    The series color.
+ * @param $caption  The series caption.
+ * @param $shifted  Whether the series are to be shifted to the left, in order to be hidden.
  * @return the RRD LINE tag.
  */
 function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
@@ -1036,7 +1147,7 @@ function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 /**
  * Creates a RRD chart file.
  *
- * @param $chart  the chart properties.
+ * @param $chart  The chart properties.
  */
 function _logger_create_chart_file($chart) {
 
