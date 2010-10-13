@@ -82,8 +82,6 @@
 	
 	<?php if ($left) { ?> <div id="contentboxes"><?php print $left ?></div> <?php } ?>
 	
-	
-
 
 	</DIV>
 
@@ -126,6 +124,5 @@
 			</P>
 		</DIV><!-- #print-footer -->
 		<!-- FOOTER include end -->
-
 		
 </BODY></HTML>

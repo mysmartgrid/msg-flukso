@@ -90,12 +90,12 @@ function mysmartgrid_preprocess_node(&$vars) {
   $vars['mysmartgrid_node_links']  = mysmartgrid_separate_links($vars['links']);
   $vars['mysmartgrid_perma_title'] = t('Permanent Link to !title', array('!title' => $vars['title']));
 
-  // -- Node authorship.
+  //Node authorship.
   if (!empty($vars['submitted'])) {
     $vars['mysmartgrid_node_author'] = t('Posted by !author', array('!author' => $vars['name']));
   }
 
-  // -- Timestamp for this type?
+  //Timestamp for this type?
   if (!empty($vars['submitted']) && isset($node->created)) {
     $vars['mysmartgrid_node_timestamp'] = format_date($node->created, 'custom', t('d M Y'));
   }
@@ -118,9 +118,8 @@ function mysmartgrid_preprocess_page(&$vars) {
 }
 
 /**
-  * Support for image_annotate on image nodes
-  *
-  */
+ * Support for image_annotate on image nodes
+ */
 function phptemplate_image_body($node, $size) {
 
   if (user_access('view image annotations') || user_access('create image annotations') || user_access('administer image annotations')) {
@@ -155,7 +154,7 @@ function phptemplate_image_body($node, $size) {
       );
     }
    
-    // Build the field settings
+    //Build the field settings
     $settings = array(array(
       'nid' => $node->nid,
       'field' => 'image',
@@ -164,12 +163,14 @@ function phptemplate_image_body($node, $size) {
     ));
    
     module_load_include('module', 'jquery_ui');
-    // Load all the JS and CSS magic
+
+    //Load all the JS and CSS magic
     drupal_add_js(array('imageAnnotate' => $settings), 'setting');
     jquery_ui_add(array('ui.resizable', 'ui.draggable'));
     drupal_add_js('misc/collapse.js');
     drupal_add_js(drupal_get_path('module', 'image_annotate') .'/tag.js');
     drupal_add_css(drupal_get_path('module', 'image_annotate') .'/tag.css');
+
     //BVDM 13/09/09: substitute image-annotate-image for image-annotate-nid-$node->nid to create a unique class per inserted image
     $class = 'imagefield imagefield-image image-annotate-nid-' . $node->nid;
 
@@ -178,9 +179,8 @@ function phptemplate_image_body($node, $size) {
 }
 
 /**
-  * Support for image_annotate on img_assist inserted images
-  *
-  */
+ * Support for image_annotate on img_assist inserted images
+ */
 function phptemplate_img_assist_inline($node, $size, $attributes) {
 
   $caption = '';
@@ -194,18 +194,20 @@ function phptemplate_img_assist_inline($node, $size, $attributes) {
   } elseif ($attributes['desc']) {
     $caption = $attributes['desc'];
   }
-  // Change the node title because img_assist_display() uses the node title for
-  // alt and title.
+
+  //Change the node title because img_assist_display() uses the node title for alt and title.
   $node->title = strip_tags($caption);
 
   if (user_access('view image annotations') || user_access('create image annotations') || user_access('administer image annotations')) {
-    // Retrieve all the annotations for that image field
-    // We sort by area (height*width) to make sure small annotations are always on the top and avoid having some unhoverable ones
+
+    //Retrieve all the annotations for that image field
+    //We sort by area (height*width) to make sure small annotations are always on the top and avoid having some unhoverable ones
     $result = db_query('SELECT i.*, c.uid, c.comment, u.name FROM {image_annotate} i INNER JOIN {comments} c ON i.cid = c.cid JOIN {users} u ON c.uid = u.uid WHERE c.nid = %d ORDER BY (i.size_height*i.size_width) ASC', $node->nid);
 
-    // Build the array of notes settings
+    //Build the array of notes settings
     global $user;
     $notes = array();
+
     while ($note = db_fetch_object($result)) {
 
       $editable = user_access('administer image annotations') || (user_access('create image annotations') && $note->uid && $note->uid == $user->uid);
@@ -239,12 +241,14 @@ function phptemplate_img_assist_inline($node, $size, $attributes) {
     ));
 
     module_load_include('module', 'jquery_ui');
-    // Load all the JS and CSS magic
+
+    //Load all the JS and CSS magic
     drupal_add_js(array('imageAnnotate' => $settings), 'setting');
     jquery_ui_add(array('ui.resizable', 'ui.draggable'));
     drupal_add_js('misc/collapse.js');
     drupal_add_js(drupal_get_path('module', 'image_annotate') .'/tag.js');
     drupal_add_css(drupal_get_path('module', 'image_annotate') .'/tag.css');
+
     //BVDM 13/09/09: substitute image-annotate-image for image-annotate-nid-$node->nid to create a unique class per inserted image
     $class = 'imagefield imagefield-image image-annotate-nid-' . $node->nid;
     $img_tag = img_assist_display($node, $size, array('class' => $class));
@@ -258,7 +262,8 @@ function phptemplate_img_assist_inline($node, $size, $attributes) {
 
   $link = $attributes['link'];
   $url  = '';
-  // Backwards compatibility: Also parse link/url in the format link=url,foo.
+
+  //Backwards compatibility: Also parse link/url in the format link=url,foo.
   if (strpos($link, ',') !== FALSE) {
     list($link, $url) = explode(',', $link, 2);
 

@@ -89,9 +89,6 @@ function logger_menu() {
     'weight'           => 2,
   );
 
-
-  //Chart operations
-
   $items['logger'] = array(
     'title'            => 'your dashboard',
     'description'      => 'Show the dashboard.',
@@ -100,6 +97,9 @@ function logger_menu() {
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK,
   );
+
+
+  //Chart operations
 
   $items['logger/add'] = array(
     'title'            => 'Add this user to the chart',
