@@ -457,6 +457,41 @@ function _logger_overview($type, $function, $interval) {
 
   drupal_set_title(t('Overview'));
 
+  //General explanation
+  $output .= theme('overview_topic', t('What it is'),
+    t('<b>mySmartGrid</b> is the smart device control for your home.
+    It enables you to understand your energy consumption and share your
+    experiences with others.'), 'content/das-projekt');
+
+  //Latest blogpost
+  $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
+  $result = db_fetch_object(db_query($sql, "blogpost"));
+
+  if ($result) {
+
+    $blog = node_load(array('nid' => $result->nid));
+
+    $output .= theme('overview_topic', $blog->title, $blog->body, 'blog');
+  }
+
+  //Current Status
+  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> %d";
+  $result = db_fetch_object( db_query($sql, 0));
+  $devcounter = $result->total;
+
+  $sql = "SELECT count(*) as total FROM {users}";
+  $result = db_fetch_object( db_query($sql));
+  $usercounter = $result->total;
+
+  $output .= theme('overview_topic', t('Current Status'),
+    t('Currently, <b>@devcounter</b> Flukso devices are
+      installed in <b>@usercounter</b> households.
+      The following chart shows their aggregate electricity consumption.',
+      array(
+        '@devcounter'  => $devcounter,
+        '@usercounter' => $usercounter)));
+
+  //Chart
   $chart = _logger_get_chart_params($interval, $type);
   $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor);
   $chart->line .= _logger_chart_line(0, BLUE, t('All'));
@@ -466,14 +501,6 @@ function _logger_overview($type, $function, $interval) {
   $output .= theme('chart', $chart->file_path, 'overview');
 
   return $output;
-}
-
-function _logger_count_installations() {
-
-  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> 0";
-  $aggregation = db_fetch_object( db_query($sql));
-
-  return $aggregation->total;
 }
 
 function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') {
@@ -794,25 +821,38 @@ function logger_theme() {
 
   return array(
     'chart' => array(
-      'arguments' => array('chart' => NULL),
+      'arguments' => array(
+        'chart' => NULL),
+    ),
+
+    'overview_topic' => array(
+      'arguments' => array(
+        'title' => NULL,
+        'body' => NULL,
+        'link' => NULL),
     ),
 
     'logger_item_list' => array(
-      'arguments' => array('items' => NULL, 'title' => NULL),
+      'arguments' => array(
+        'items' => NULL,
+        'title' => NULL),
     ),
 
     'logger_account_devices' => array(
-      'arguments' => array('form' => NULL),
+      'arguments' => array(
+        'form' => NULL),
       'file'      => 'logger.admin.inc',
     ),
 
     'logger_account_devices_list' => array(
-      'arguments' => array('items' => NULL),
+      'arguments' => array(
+        'items' => NULL),
       'file'      => 'logger.admin.inc',
     ),
 
     'logger_account_sensors_list' => array(
-      'arguments' => array('items' => NULL),
+      'arguments' => array(
+        'items' => NULL),
       'file'      => 'logger.admin.inc',
     ),
   );
@@ -823,10 +863,14 @@ function logger_theme() {
  */
 function theme_chart($chart_file_path, $context) {
 
+  /*
   $primary = array(
     l(t('Electricity'), "$context/electricity")
   );
 
+  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
+  */
+  
   $secondary = array(
     l(t('Hour'),  "$context/electricity/hour"),
     l(t('Day'),   "$context/electricity/day"),
@@ -835,13 +879,29 @@ function theme_chart($chart_file_path, $context) {
     //l(t('Night'), "$context/electricity/night")
   );
 
-  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
   $output .= theme_item_list($secondary, NULL, 'ul', array('class' => 'tabs secondary'));
 
   $output .= '
     <p id="chart">
       <img src="'. base_path() . $chart_file_path .'" alt="Flukso"/>
     </p>';
+
+  return $output;
+}
+
+function theme_overview_topic($title, $body, $link = NULL) {
+
+  if($title) {
+    $output .= '<h3 class="node-headline">' . $title . '</h3>';
+  }
+  
+  $output .= '<p>' . $body;
+
+  if($link) {
+    $output .= ' ' . l(t('read more'), $more);
+  }
+
+  $output .= '</p>';
 
   return $output;
 }
