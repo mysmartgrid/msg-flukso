@@ -67,9 +67,18 @@ function logger_menu() {
   $items = array();
 
   $items['logger'] = array(
-    'title'            => 'Dashboard',
+    'title'            => 'Your power consumption',
     'description'      => 'Show the dashboard.',
     'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['overview'] = array(
+    'title'            => 'Overview',
+    'description'      => 'Show the project overview.',
+    'page callback'    => '_logger_overview',
     'page arguments'   => array('electricity', 'main', 'hour'),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK,
@@ -126,79 +135,148 @@ function logger_menu() {
   );
 
 
-  // First level tab links
+  // Dashboard operations
 
   $items['logger/electricity'] = array(
-    'title'            => 'electricity',
-    //'page callback'  => '_logger_dashboard',
-    //'page arguments' => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_DEFAULT_LOCAL_TASK,
-  );
-
-  /* Operations not yet available
-
-  $items['logger/water'] = array(
-    'title'            => 'water',
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('water', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
-  );
-
-  $items['logger/gas'] = array(
-    'title'            => 'gas',
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('gas', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
-  );*/
-
-
-  //Sub links for tab "Electricity"
-
-  $items['logger/electricity/hour'] = array(
-    'title'            => 'hour',
+    'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'hour'),
     'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
+  );
+
+  /*
+  $items['logger/water'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('water', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['logger/gas'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('gas', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );*/
+
+  $items['logger/electricity/hour'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
     'weight'           => 0,
   );
 
   $items['logger/electricity/day'] = array(
-    'title'            => 'day',
+    'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'day'),
     'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
     'weight'           => 1,
   );
 
   $items['logger/electricity/month'] = array(
-    'title'            => 'month',
+    'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'month'),
     'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
     'weight'           => 2,
   );
 
   $items['logger/electricity/year'] = array(
-    'title'            => 'year',
+    'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'year'),
     'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
     'weight'           => 3,
   );
 
   $items['logger/electricity/night'] = array(
-    'title'            => 'night',
+    'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'night'),
     'access callback'  => TRUE,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
+    'weight'           => 4,
+  );
+
+
+  // Overview operations
+
+  $items['overview/electricity'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
+  /*
+  $items['overview/water'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('water', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['overview/gas'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('gas', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );*/
+
+  $items['overview/electricity/hour'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+    'weight'           => 0,
+  );
+
+  $items['overview/electricity/day'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'day'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+    'weight'           => 1,
+  );
+
+  $items['overview/electricity/month'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'month'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+    'weight'           => 2,
+  );
+
+  $items['overview/electricity/year'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'year'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+    'weight'           => 3,
+  );
+
+  $items['overview/electricity/night'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'main', 'night'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
     'weight'           => 4,
   );
 
@@ -353,7 +431,6 @@ function _logger_dashboard($type, $function, $interval) {
 
     foreach ($sensors as &$sensor) {
 
-      //Check if the user whose datastream is to be superimposed on the graph is in private mode
       $shifted = $sensor->private && ($sensor->uid != $user->uid);
       $caption = $sensor->uid == $user->uid ? $sensor->function : $sensor->username;
 
@@ -366,18 +443,29 @@ function _logger_dashboard($type, $function, $interval) {
       $i++;
     }
 
+    _logger_create_chart_file($chart);
+
+    return theme('chart', $chart->file_path, 'logger');
+
   } else {
 
-    drupal_set_title(t('Aggregate power consumption'));
-
-    $chart = _logger_get_chart_params($interval, $type);
-    $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor);
-    $chart->line .= _logger_chart_line(0, BLUE, t('All'));
+    return _logger_overview($type, $function, $interval);
   }
+}
+
+function _logger_overview($type, $function, $interval) {
+
+  drupal_set_title(t('Overview'));
+
+  $chart = _logger_get_chart_params($interval, $type);
+  $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor);
+  $chart->line .= _logger_chart_line(0, BLUE, t('All'));
 
   _logger_create_chart_file($chart);
 
-  return theme('chart', $chart->file_path);
+  $output .= theme('chart', $chart->file_path, 'overview');
+
+  return $output;
 }
 
 function _logger_count_installations() {
@@ -733,11 +821,26 @@ function logger_theme() {
 /**
  * Theming the chart.
  */
-function theme_chart($chart) {
+function theme_chart($chart_file_path, $context) {
 
-  $output .=
-    '<p id="chart">
-      <img src="'. base_path() . $chart .'" alt="Flukso"/>
+  $primary = array(
+    l(t('Electricity'), "$context/electricity")
+  );
+
+  $secondary = array(
+    l(t('Hour'),  "$context/electricity/hour"),
+    l(t('Day'),   "$context/electricity/day"),
+    l(t('Month'), "$context/electricity/month"),
+    l(t('Year'),  "$context/electricity/year"),
+    //l(t('Night'), "$context/electricity/night")
+  );
+
+  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
+  $output .= theme_item_list($secondary, NULL, 'ul', array('class' => 'tabs secondary'));
+
+  $output .= '
+    <p id="chart">
+      <img src="'. base_path() . $chart_file_path .'" alt="Flukso"/>
     </p>';
 
   return $output;
