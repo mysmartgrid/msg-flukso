@@ -20,12 +20,15 @@
  */
 
 function notification_help($path, $arg) {
+  
   $output = '';
+
   switch ($path) {
     case "admin/help#notification":
       $output = '<p>'.t("Allows the users to manage device event notifications.").'</p>';
       break;
   }
+
   return $output;
 }
 
@@ -139,6 +142,7 @@ function notification_list_page() {
 function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
   $name = t($event_name);
+
   if ($event_id == 1 || $event_id == 3) {
     $name .= " (in $limit_up min)";
 
@@ -298,7 +302,12 @@ function _notification_delete($device, $event_id) {
  */
 function _notification_insert($device, $event_id, $email, $limit_up) {
 
-  $sql = "INSERT INTO {notification} (device, event_id, email, limit_up) VALUES('%s', %d, '%s', %d)";
+  $sql = "
+    INSERT INTO
+      {notification} (device, event_id, email, limit_up)
+    VALUES
+      ('%s', %d, '%s', %d)";
+
   db_query($sql, $device, $event_id, $email, $limit_up);
 }
 

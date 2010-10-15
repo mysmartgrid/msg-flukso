@@ -26,12 +26,15 @@ define('CORRUPTED',     t('Corrupted Heartbeat'));
 define('WORKING',       t('Working'));
 
 function deployment_overview_help($path, $arg) {
+
   $output = '';
+
   switch ($path) {
     case "admin/help#deployment_overview":
       $output = '<p>'.t("Informs Flukso devices' deployment statuses.").'</p>';
       break;
   }
+
   return $output;
 }
 

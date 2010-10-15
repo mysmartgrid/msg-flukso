@@ -23,6 +23,7 @@
  */
 
 function logger_drush_command() {
+
   $items = array();
 
   $items['logger create node'] = array(
@@ -74,13 +75,11 @@ function logger_drush_command() {
   return $items;
 }
 
-/**
- * Drush command callbacks.
- */
 function _logger_create_node($serial, $country ="", $uid = 0) {
 
-  // guard against duplicating entries for the same S/N
-  $count = db_result(db_query("SELECT COUNT(device) FROM {logger_devices} WHERE serial = %d", $serial));
+  //guard against duplicating entries for the same S/N
+  $sql = "SELECT COUNT(device) FROM {logger_devices} WHERE serial = %d";
+  $count = db_result(db_query($sql, $serial));
 
   if ($count > 0) {
     drush_set_error(
@@ -90,18 +89,23 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
   } else {
 
     if ($uid > 0) {
-      $result = db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $uid, 0);
+
+      $sql = "INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)";
+      $result = db_query($sql, $uid, 0);
+
       if (!$result) {
         drush_set_error('LOGGER_CREATE_USERS_ENTRY', dt('Error creating a user entry for @uid.', array('@uid' => $uid)));
       }
     }
 
-    // create an entry in the {logger_devices} table
+    //create an entry in the {logger_devices} table
     $device  = md5(uniqid(rand(), TRUE));
     $sha     = md5(uniqid(rand(), TRUE));
     $created = time();
 
-    $result = db_query("INSERT INTO {logger_devices} (device, serial, uid, sha, created, country) VALUES ('%s', %d, %d, '%s', %d, '%s')", $device, $serial, $uid, $sha, $created, $country);
+    $sql = "INSERT INTO {logger_devices} (device, serial, uid, sha, created, country) VALUES ('%s', %d, %d, '%s', %d, '%s')";
+    $result = db_query($sql, $device, $serial, $uid, $sha, $created, $country);
+
     if (!$result) {
       drush_set_error('LOGGER_CREATE_DEVICE_ENTRY', dt('Error creating a device entry for @device.', array('@device' => $device)));
     }
@@ -112,7 +116,7 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
       $pipe[] .= 'KEY=' . $sha;
     }
 
-    // create an entry in the {logger_meters} table
+    //create an entry in the {logger_meters} table
     for ($i = 0; $i < 4; $i++) {
 
       $permissions = 62;
@@ -124,8 +128,11 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
       $path->base = $path->root .'/data/base/';
       $path->night = $path->root .'/data/night/';
 
-      $result = db_query("INSERT INTO {logger_meters} (meter, uid, device, created) VALUES ('%s', %d, '%s', %d)", $meter, $uid, $device, $created); 
-      $insert = db_query("INSERT INTO {logger_tokens} (token, meter, permissions) VALUES ('%s', '%s', %d)", $token, $meter, $permissions);
+      $sql = "INSERT INTO {logger_meters} (meter, uid, device, created) VALUES ('%s', %d, '%s', %d)";
+      $result = db_query($sql, $meter, $uid, $device, $created);
+
+      $sql = "INSERT INTO {logger_tokens} (token, meter, permissions) VALUES ('%s', '%s', %d)";
+      $insert = db_query($sql, $token, $meter, $permissions);
 
       if (!($result && $insert)) {
         drush_set_error('LOGGER_CREATE_METER_ENTRY', dt('Error creating meter entry for @meter.', array('@meter' => $meter)));
@@ -166,16 +173,24 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
 
 function _logger_assign_node($serial, $country, $uid) {
 
-// check the existence of S/N
-  $device = db_result(db_query("SELECT device FROM {logger_devices} WHERE serial = %d", $serial));
+  $sql = "SELECT device FROM {logger_devices} WHERE serial = %d";
+  $device = db_result(db_query($sql, $serial));
+
+  //check the existence of S/N
   if ($device == '') {
     drush_set_error('LOGGER_ASSIGN_SERIAL_NON_EXISTENT', dt('The S/N: @serial does not exist.', array('@serial' => $serial)));
 
   } else {
-    db_query("UPDATE {logger_devices} SET uid = %d, country = '%s' WHERE serial = %d", $uid, $country, $serial);   
-    db_query("UPDATE {logger_meters} SET uid = %d WHERE device = '%s'", $uid, $device);
-    
-    $result = db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $uid, 0);
+
+    $sql = "UPDATE {logger_devices} SET uid = %d, country = '%s' WHERE serial = %d";
+    db_query($sql, $uid, $country, $serial);
+
+    $sql = "UPDATE {logger_meters} SET uid = %d WHERE device = '%s'";
+    db_query($sql, $uid, $device);
+
+    $sql = "INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)";
+    $result = db_query($sql, $uid, 0);
+
     if (!$result) {
       drush_log(dt('uid: @uid already exists in the {logger_users} table', array('@uid' => $uid)), 'notice');
     }
@@ -192,8 +207,19 @@ function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit
 
   if (_logger_function_name_validate($function, $meter)) {
 
-    $result = db_query("UPDATE {logger_meters} SET type = '%s', function = '%s', phase = %d, constant = %d, unit = '%s' WHERE meter = '%s'",
-      $type, $function, $phase, $constant, $unit, $meter);
+    $sql = "
+      UPDATE
+        {logger_meters}
+      SET
+        type = '%s',
+        function = '%s',
+        phase = %d,
+        constant = %d,
+        unit = '%s'
+      WHERE
+        meter = '%s'";
+
+    $result = db_query($sql, $type, $function, $phase, $constant, $unit, $meter);
 
     drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');  
     drush_print_pipe('ok');
@@ -201,7 +227,8 @@ function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit
   } else {
     drush_set_error(
       'LOGGER_NON_UNIQUE_METER_FUNCTION',
-      dt('The function name: @function is already been used by another sensor.', array('@function' => $function)));
+      dt('The function name: @function is already been used by another sensor.',
+        array('@function' => $function)));
   }
 }
 
@@ -209,14 +236,20 @@ function _logger_tokens($meter = "", $permissions = 62) {
 
   if ($meter == "") {
 
-    $result = db_query("SELECT meter FROM {logger_meters}");
+    $sql = "SELECT meter FROM {logger_meters}";
+    $result = db_query($sql);
+
     while ($meter = db_fetch_object($result)) {
 
-      $count = db_result(db_query("SELECT COUNT(meter) FROM {logger_tokens} WHERE meter = '%s'", $meter->meter));
+      $sql = "SELECT COUNT(meter) FROM {logger_tokens} WHERE meter = '%s'";
+      $count = db_result(db_query($sql, $meter->meter));
+
       if ($count == 0) {
 
         $token = md5(uniqid(rand(), TRUE));
-        $insert = db_query("INSERT INTO {logger_tokens} (token, meter, permissions) VALUES ('%s', '%s', %d)", $token, $meter->meter, $permissions);
+
+        $sql = "INSERT INTO {logger_tokens} (token, meter, permissions) VALUES ('%s', '%s', %d)";
+        $insert = db_query($sql, $token, $meter->meter, $permissions);
 
         if (!$insert) {
           drush_set_error('LOGGER_CREATE_TOKEN_ENTRY', dt('Error creating token entry for @meter.', array('@meter' => $meter->meter)));

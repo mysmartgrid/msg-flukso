@@ -111,25 +111,14 @@ function msg_printcode_print_form_submit($form, &$form_state) {
 
       if (stripos($serial,'-') < 1) {
 
-        $result = db_query("
-          SELECT
-            *
-          FROM
-            {logger_devices}
-          WHERE
-            serial = %d", $serial);
+        $sql = "SELECT * FROM {logger_devices} WHERE serial = %d";
+        $result = db_query($sql, $serial);
 
       } else {
         preg_match_all('/([\d]*)-([\d]*)/', $serial, $match);
 
-        $result = db_query("
-          SELECT
-            *
-          FROM
-            {logger_devices}
-          WHERE
-            serial >= %d AND
-            serial <= %d", $match[1][0], $match[2][0]);
+        $sql = "SELECT * FROM {logger_devices} WHERE serial >= %d AND serial <= %d";
+        $result = db_query($sql, $match[1][0], $match[2][0]);
       }
 
       if ($result) {

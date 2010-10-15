@@ -458,7 +458,7 @@ function _logger_overview($type, $function, $interval) {
   drupal_set_title(t('Overview'));
 
   //General explanation
-  $output .= theme('overview_topic', t('What it is'),
+  $output .= theme('overview_topic', NULL,
     t('<b>mySmartGrid</b> is the smart device control for your home.
     It enables you to understand your energy consumption and share your
     experiences with others.'), 'content/das-projekt');
@@ -484,9 +484,9 @@ function _logger_overview($type, $function, $interval) {
   $usercounter = $result->total;
 
   $output .= theme('overview_topic', t('Current Status'),
-    t('Currently, <b>@devcounter</b> Flukso devices are
-      installed in <b>@usercounter</b> households.
-      The following chart shows their aggregate electricity consumption.',
+    t('Currently, <b>@devcounter</b> Flukso devices are installed 
+      in <b>@usercounter</b> households. The following chart shows their
+      aggregate electricity consumption.',
       array(
         '@devcounter'  => $devcounter,
         '@usercounter' => $usercounter)));

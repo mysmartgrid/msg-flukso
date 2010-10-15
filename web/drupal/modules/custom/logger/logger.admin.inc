@@ -116,18 +116,27 @@ function _logger_device_deactivate($serial) {
  *
  * @ingroup themeable
  *
- * @param $form
- *   The device form array.
+ * @param $form The device form array.
  */
 function theme_logger_account_devices($form) {
 
   global $user;
   $rows = array();
 
-  $result = db_query("SELECT serial, access, resets, uptime
-                      FROM {logger_devices}
-                      WHERE uid = %d
-                      ORDER BY serial", $user->uid);
+  $sql = "
+    SELECT
+      serial,
+      access,
+      resets,
+      uptime
+    FROM
+      {logger_devices}
+    WHERE
+      uid = %d
+    ORDER BY
+      serial";
+
+  $result = db_query($sql, $user->uid);
 
   function unix_to_userlocaltime($unix) {
     global $user;
@@ -170,6 +179,7 @@ function theme_logger_account_devices($form) {
 function theme_logger_account_devices_list($items) {
       
   if (count($items) > 0) {
+
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
     $output  = theme('table', $headers, $items);
 
@@ -191,11 +201,22 @@ function _logger_account_sensors() {
   global $user;
   $rows = array();
 
-  $result = db_query("SELECT lm.meter, lm.function, lm.type, lt.token, lt.permissions 
-                      FROM {logger_meters} lm
-                      INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
-                      WHERE lm.uid = %d
-                      ORDER BY lm.function DESC", $user->uid);
+  $sql = "
+    SELECT
+      lm.meter,
+      lm.function,
+      lm.type,
+      lt.token,
+      lt.permissions
+    FROM
+      {logger_meters} lm
+      INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
+    WHERE
+      lm.uid = %d
+    ORDER BY
+      lm.function DESC";
+
+  $result = db_query($sql, $user->uid);
 
   while ($sensor = db_fetch_object($result)) {
       
@@ -237,6 +258,7 @@ function _logger_account_sensors() {
 function theme_logger_account_sensors_list($items) {
 
   if (count($items) > 0) {
+
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
     $output  = theme('table', $headers, $items);
 
@@ -249,7 +271,16 @@ function theme_logger_account_sensors_list($items) {
 
 function _logger_sensor_deactivate($meter) {
 
-  db_query("UPDATE logger_meters SET function = NULL, type = NULL WHERE meter = '%s'", $meter);
+  $sql = "
+    UPDATE
+      logger_meters
+    SET
+      function = NULL,
+      type = NULL
+    WHERE
+      meter = '%s'";
+
+  db_query($sql, $meter);
 
   global $user;
   $uid = $user->uid;
@@ -323,15 +354,24 @@ function logger_sensor_form_validate($form, &$form_state) {
 
 function logger_sensor_form_submit($form, &$form_state) {
 
+  global $user;
+
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
   $meter = $form_state['values']['meter'];
 
-  db_query("UPDATE {logger_meters} SET function = '%s', type = '%s' WHERE meter = '%s'", $function, $type, $meter);
+  $sql = "
+    UPDATE
+      {logger_meters}
+    SET
+      function = '%s',
+      type = '%s'
+    WHERE
+      meter = '%s'";
 
-  global $user;
-  $uid = $user->uid;
-  $form_state['redirect'] = "user/$uid/sensors";
+  db_query($sql, $function, $type, $meter);
+
+  $form_state['redirect'] = "user/" . $user->uid . "/sensors";
 }
 
 function _get_sensor($meter) {
@@ -372,6 +412,7 @@ function _logger_function_name_validate($function, $meter) {
  * Callback function for the user/x/privacy page
  */
 function _logger_account_privacy() {
+
   $output .= drupal_get_form('_logger_account_privacy_form');
   return $output;
 }
@@ -380,7 +421,11 @@ function _logger_account_privacy() {
  * Generates the privacy form.
  */
 function _logger_account_privacy_form() {
+
   global $user;
+
+  $sql = "SELECT private FROM {logger_users} WHERE uid = %d";
+  $private = db_result(db_query($sql, $user->uid));
 
   $form['privacy'] = array(
     '#title'    => t('Set your preferred privacy mode'),
@@ -390,9 +435,7 @@ function _logger_account_privacy_form() {
       t('Private'),
     ),
     '#description' => t("When selecting Private mode, your data stream will not be drawn on other people's graph and all statistics will be marked as 'prv'. Conversely, nobody else's data stream will be drawn on your chart."),
-    '#default_value' => db_result(db_query("SELECT private
-                                            FROM {logger_users}
-                                            WHERE uid = %d", $user->uid)),
+    '#default_value' => $private,
   );
 
   $form['submit'] = array(
@@ -406,13 +449,20 @@ function _logger_account_privacy_form() {
  * Process settings form submissions.
  */
 function _logger_account_privacy_form_submit($form, &$form_state) {
+
   global $user;
 
-  // the built-in validation function already checks elements with options
   $private = $form_state['values']['privacy'];
-  db_query("UPDATE {logger_users}
-            SET private = %d
-            WHERE uid = %d", $private, $user->uid);
+  
+  $sql = "
+    UPDATE
+      {logger_users}
+    SET
+      private = %d
+    WHERE
+      uid = %d";
+  
+  db_query($sql, $private, $user->uid);
 
   // page redirection to the dashboard after form submission
   $form_state['redirect'] = 'logger';
