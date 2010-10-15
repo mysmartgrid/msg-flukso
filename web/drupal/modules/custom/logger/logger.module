@@ -675,7 +675,6 @@ function _logger_add($uid) {
   global $user;
 
   $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
-
   $rtid = db_result(db_query($sql, 'subscription'));
 
   $sql = "
@@ -714,8 +713,10 @@ function _logger_add($uid) {
       
       if (!db_result(db_query($sql, $user->uid, $uid, $rtid))) {
 
-        // if not, delete the most recently added relationship and replace it with the newly selected one
-        db_query("DELETE FROM {user_relationships} WHERE rid = %d", $result['MAX(rid)']);
+        //if not, delete the most recently added relationship and replace it with the newly selected one
+
+        $sql = "DELETE FROM {user_relationships} WHERE rid = %d";
+        db_query($sql, $result['MAX(rid)']);
 
         user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
       }
@@ -916,14 +917,14 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       $blocks['fluksonians']['status'] = TRUE;
       $blocks['fluksonians']['region'] = 'content';
       $blocks['fluksonians']['weight'] = 1;
-      $blocks['fluksonians']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['fluksonians']['pages'] = 'logger/\nlogger/*';
       $blocks['fluksonians']['cache'] = BLOCK_CACHE_PER_USER;
 
       $blocks['unit']['info'] = t('Unit');
       $blocks['unit']['status'] = TRUE;
-      $blocks['unit']['region'] = 'right';
+      $blocks['unit']['region'] = 'content';
       $blocks['unit']['weight'] = 2;
-      $blocks['unit']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['unit']['pages'] = 'logger/\nlogger/*';
       $blocks['unit']['cache'] = BLOCK_CACHE_PER_USER;
 
       $blocks['posts']['info'] = t('Recent blog posts');
@@ -943,7 +944,7 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       } elseif ($delta == 'unit' && user_access('logger')) {
 
-        $block = _logger_create_units_block();
+        $block['content'] = drupal_get_form('_logger_units_form');
 
       } elseif ($delta == 'posts' && user_access('access content')) {
 
@@ -952,60 +953,6 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       return $block;
   }
-}
-
-function _logger_create_units_block() {
-
-  $block = array();
-
-  global $user;
-
-  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
-  $destination = drupal_get_destination();
-
-  //hardcoded the type and function parameters for now
-
-  $sql = "
-    SELECT
-      unit
-    FROM
-      {logger_meters}
-    WHERE
-      uid = %d AND
-      type = '%s' AND
-      function = '%s'";
-
-  $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
-
-  $items = array();
-  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
-  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
-
-  // 'unlink' the currently selected unit option
-  switch ($unit) {
-    case 'watt':
-      $items[0] = 'watt';
-      break;
-
-    case 'kwh':
-      $items[1] = 'kWh/year';
-      break;
-
-    case 'eur':
-      $items[2] = 'euro/year [@ 0.18eur/kWh]';
-      break;
-
-    case 'aud':
-      $items[3] = 'aud/year [@ 0.19aud/kWh]';
-      break;
-  }
-
-  $block['subject'] = t('Unit');
-  $block['content'] = theme('logger_item_list', $items);
-
-  return $block;
 }
 
 function _logger_create_recent_blogs_block() {
@@ -1120,13 +1067,79 @@ function _logger_fluksonians_form() {
     '#title'       => t('Fluksonians'),
     '#description' => t('Select the Fluksonians you wish to add to [+] or clear from [x] the chart.'),
     '#collapsible' => TRUE,
-    '#collapsed'   => TRUE,
+    '#collapsed'   => FALSE,
   );
 
   $form['fluksonians']['list'] = array(
     '#type'    => 'item',
     //'#title' => t('Title'),
     '#value'   => theme('table', array(), $rows),
+  );
+
+  return $form;
+}
+
+/**
+ * Generates the units block form.
+ */
+function _logger_units_form() {
+
+  global $user;
+
+  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
+  $destination = drupal_get_destination();
+
+  //hardcoded the type and function parameters for now
+
+  $sql = "
+    SELECT
+      unit
+    FROM
+      {logger_meters}
+    WHERE
+      uid = %d AND
+      type = '%s' AND
+      function = '%s'";
+
+  $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
+
+  $items = array();
+  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
+  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
+
+  // 'unlink' the currently selected unit option
+  switch ($unit) {
+    case 'watt':
+      $items[0] = 'watt';
+      break;
+
+    case 'kwh':
+      $items[1] = 'kWh/year';
+      break;
+
+    case 'eur':
+      $items[2] = 'euro/year [@ 0.18eur/kWh]';
+      break;
+
+    case 'aud':
+      $items[3] = 'aud/year [@ 0.19aud/kWh]';
+      break;
+  }
+
+  $form['units'] = array(
+    '#type'        => 'fieldset',
+    '#title'       => t('Unit'),
+    '#description' => t('Select the chart unit.'),
+    '#collapsible' => TRUE,
+    '#collapsed'   => FALSE,
+  );
+
+  $form['units']['list'] = array(
+    '#type'    => 'item',
+    //'#title' => t('Title'),
+    '#value'   => theme('logger_item_list', $items),
   );
 
   return $form;
