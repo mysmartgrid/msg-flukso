@@ -898,7 +898,7 @@ function theme_overview_topic($title, $body, $link = NULL) {
   $output .= '<p>' . $body;
 
   if($link) {
-    $output .= ' ' . l(t('read more'), $more);
+    $output .= ' ' . l(t('read more'), $link);
   }
 
   $output .= '</p>';
