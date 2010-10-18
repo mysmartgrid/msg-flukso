@@ -2,6 +2,20 @@
 
 function notification_install() {
   drupal_install_schema('notification');
+
+  global $user;
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (1, 'No Heartbeat')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (2, 'Corrupted Heartbeat')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (3, 'Any Heartbeat Failure')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (4, 'Peak Consumption')";
+  db_query($sql, $user->uid);
 }
 
 function notification_uninstall() {
@@ -46,6 +60,13 @@ function notification_schema() {
         'type' => 'varchar',
         'length' => '64',
         'not null' => TRUE,
+      ),
+      'base_value' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
       ),
       'limit_up' => array(
         'type' => 'int',

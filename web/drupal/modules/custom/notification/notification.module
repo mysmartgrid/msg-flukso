@@ -302,13 +302,34 @@ function _notification_delete($device, $event_id) {
  */
 function _notification_insert($device, $event_id, $email, $limit_up) {
 
+  global $user;
+  $base_value = 0;
+
+  //If event = Peak Consumption
+  if ($event_id == 4) {
+
+    $sql = "
+      SELECT
+        SUM(m.value) AS total
+      FROM
+        {logger_meters} m
+      WHERE
+        m.type = '%s' AND
+        m.unit = '%s' AND
+        m.uid = %d";
+
+    $result = db_fetch_object( db_query($sql, 'electricity', 'watt', $user->uid));
+
+    $base_value = $result->total;
+  }
+
   $sql = "
     INSERT INTO
-      {notification} (device, event_id, email, limit_up)
+      {notification} (device, event_id, email, base_value, limit_up)
     VALUES
-      ('%s', %d, '%s', %d)";
+      ('%s', %d, '%s', %d, %d)";
 
-  db_query($sql, $device, $event_id, $email, $limit_up);
+  db_query($sql, $device, $event_id, $email, $base_value, $limit_up);
 }
 
 function notification_cron() {
@@ -413,7 +434,8 @@ function _notification_send_peak_consumption_emails() {
       n.email AS email,
       d.serial AS serial,
       CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
-      n.limit_up AS limit_up
+      n.limit_up AS limit_up,
+      n.base_value AS base_value
     FROM
       {users} u,
       {logger_devices} d,
@@ -430,9 +452,10 @@ function _notification_send_peak_consumption_emails() {
       u.name,
       n.email,
       d.access,
-      n.limit_up
+      n.limit_up,
+      n.base_value
     HAVING
-      sum(m.value) > n.limit_up";
+      SUM(m.value) - n.base_value > n.limit_up";
 
   $message = _notification_compose_email("
     Your Flukso device (serial number: %serial) has registered an electricity consumption
