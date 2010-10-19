@@ -147,8 +147,8 @@ function logger_menu() {
   // Overview operations
 
   $items['overview'] = array(
-    'title'            => 'Overview',
-    'description'      => 'Show the project overview.',
+    'title'            => 'Overall View',
+    'description'      => 'Show the project overall view.',
     'page callback'    => '_logger_overview',
     'page arguments'   => array('electricity', 'hour'),
     'access callback'  => TRUE,
@@ -448,7 +448,7 @@ function _logger_dashboard($type, $function, $interval) {
 
 function _logger_overview($type, $interval) {
 
-  drupal_set_title(t('Overview'));
+  drupal_set_title(t('Overall View'));
 
   //General explanation
   $output .= theme('overview_topic', NULL,
@@ -464,7 +464,7 @@ function _logger_overview($type, $interval) {
 
     $blog = node_load(array('nid' => $result->nid));
 
-    $output .= theme('overview_topic', $blog->title, $blog->body, 'blog');
+    $output .= theme('overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
   }
 
   //Current Status
@@ -472,17 +472,33 @@ function _logger_overview($type, $interval) {
   $result = db_fetch_object( db_query($sql, 0));
   $devcounter = $result->total;
 
-  $sql = "SELECT count(*) as total FROM {users}";
+  $sql = "
+    SELECT
+      count(*) as total
+    FROM
+      {users} u
+    WHERE
+      EXISTS(
+        SELECT
+          1
+        FROM
+          {logger_devices} d
+        WHERE
+          d.uid = u.uid
+      )";
+
   $result = db_fetch_object( db_query($sql));
   $usercounter = $result->total;
 
-  $output .= theme('overview_topic', t('Current Status'),
+  $output .= theme('overview_topic', t('Total Consumption of All Participants'),
     t('Currently, <b>@devcounter</b> Flukso devices are installed 
       in <b>@usercounter</b> households. The following chart shows their
       aggregate electricity consumption.',
       array(
         '@devcounter'  => $devcounter,
         '@usercounter' => $usercounter)));
+
+  $output .= "<br>";
 
   //Chart
   $chart = _logger_get_chart_params($interval, $type);
@@ -886,16 +902,14 @@ function theme_chart($chart_file_path, $context) {
 function theme_overview_topic($title, $body, $link = NULL) {
 
   if($title) {
-    $output .= '<h3 class="node-headline">' . $title . '</h3>';
+    $output .= '<br><h3 class="node-headline">' . $title . '</h3>';
   }
   
-  $output .= '<p>' . $body;
+  $output .= "<p> $body </p>";
 
   if($link) {
-    $output .= ' ' . l(t('read more'), $link);
+    $output .= '<p>' . l(t('read more'), $link) . '</p>';
   }
-
-  $output .= '</p>';
 
   return $output;
 }
