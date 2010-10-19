@@ -203,9 +203,9 @@ function notification_register_form() {
   );
 
   $form['device'] = array(
-    '#type'         => 'select',
-    '#description'  => t('Select the serial number of the monitored device.'),
-    '#options'      => _notification_get_devices_options()
+    '#type'           => 'select',
+    '#description'    => t('Select the serial number of the monitored device.'),
+    '#options'        => _notification_get_devices_options()
   );
 
   $form['event_id'] = array(
@@ -325,11 +325,32 @@ function _notification_insert($device, $event_id, $email, $limit_up) {
 
   $sql = "
     INSERT INTO
-      {notification} (device, event_id, email, base_value, limit_up)
+      {notification} (device, event_id, email, base_value, limit_up, latest_sent)
     VALUES
-      ('%s', %d, '%s', %d, %d)";
+      ('%s', %d, '%s', %d, %d, %d)";
 
-  db_query($sql, $device, $event_id, $email, $base_value, $limit_up);
+  db_query($sql, $device, $event_id, $email, $base_value, $limit_up, 0);
+}
+
+/**
+ * Updates an event notification.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @param $latest_sent The timestamp when the latest email was sent.
+ */
+function _notification_update($device, $event_id, $latest_sent) {
+
+  $sql = "
+    UPDATE
+      {notification}
+    SET
+      latest_sent = %d
+    WHERE
+      device = '%s' AND
+      event_id = %d";
+
+  db_query($sql, $latest_sent, $device, $event_id);
 }
 
 function notification_cron() {
@@ -352,6 +373,8 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
 
   $sql = "
     SELECT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
@@ -365,6 +388,7 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
       u.uid = d.uid AND
       d.device = n.device AND
       SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
+      SYSDATE() > (FROM_UNIXTIME(n.latest_sent) + INTERVAL 1 DAY) AND
       n.event_id = $event_id";
 
   $message = _notification_compose_error_email("
@@ -389,6 +413,8 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
 
   $sql = "
     SELECT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
@@ -403,6 +429,7 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
       d.device = m.device AND
       m.type = 'electricity' AND
       SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR) AND
+      SYSDATE() > (FROM_UNIXTIME(n.latest_sent) + INTERVAL 1 DAY) AND
       d.device = n.device AND
       n.event_id = $event_id";
 
@@ -430,6 +457,8 @@ function _notification_send_peak_consumption_emails() {
 
   $sql = "
     SELECT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
@@ -447,7 +476,8 @@ function _notification_send_peak_consumption_emails() {
       n.event_id = 4 AND
       d.device = m.device AND
       m.type = 'electricity' AND
-      m.unit = 'watt'
+      m.unit = 'watt' AND
+      SYSDATE() > (FROM_UNIXTIME(n.latest_sent) + INTERVAL 1 DAY)
     GROUP BY
       u.name,
       n.email,
@@ -548,6 +578,8 @@ function _notification_send_emails($sql, $message) {
       'subject' => $subject,
       'body' => $body
     );
+
+    _notification_update($object['device'], $object['event_id'], time());
 
     drupal_mail('notification', 'notice', $object['email'], $language, $params);
   }
