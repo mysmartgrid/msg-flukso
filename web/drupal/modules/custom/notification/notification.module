@@ -172,31 +172,14 @@ function _notification_get_devices_options() {
   return $devices;
 }
 
-/**
- * Returns an array of translated event names.
- *
- * @return the array of event names.
- */
-function _notification_get_events_options() {
-
-  $sql = "SELECT id, name FROM {event} ORDER BY id";
-  $result = db_query($sql);
-
-  $events = array();
-  while ($row = db_fetch_array($result)) {
-    $events[$row['id']] = t($row['name']);
-  }
-
-  return $events;
-}
-
 function notification_register_form() {
 
   global $user;
 
   $form['email'] = array(
     '#type'           => 'textfield',
-    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
+    '#title'          => t('E-mail'),
+    '#description'    => t('Enter the e-mail which will receive the event notification.'),
     '#maxlength'      => 64,
     '#size'           => 20,
     '#default_value'  => $user->mail
@@ -204,28 +187,98 @@ function notification_register_form() {
 
   $form['device'] = array(
     '#type'           => 'select',
+    '#title'          => t('Serial Number'),
     '#description'    => t('Select the serial number of the monitored device.'),
     '#options'        => _notification_get_devices_options()
   );
 
-  $form['event_id'] = array(
-    '#type'           => 'select',
-    '#description'    => t('Select the event to be detected and notified.'),
-    '#options'        => _notification_get_events_options(),
-    '#default_value'  => 1,
-    '#attributes'     => array('onchange' => '
-      wrapper = document.getElementById("edit-limit-up-wrapper");
-      wrapper.style.visibility = (this.value == 2? "hidden" : "visible");'
-    )
+  $form['events'] = array(
+    '#type'           => 'fieldset',
+    '#title'          => t('Events'),
+    '#prefix'         => '<br>'
   );
 
-  $form['limit_up'] = array(
+  $form['events']['event_id1'] = array(
+    '#title'          => _notification_get_event_name(1),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<br><table width="100%"><tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes' => array(
+      'onchange' => '
+      limit_up1 = document.getElementById("limit_up1");
+      limit_up1.disabled = !this.checked;
+      limit_up1.value = this.checked? 120 : ""'
+    ),
+  );
+
+  $form['events']['limit_up1'] = array(
     '#type'           => 'textfield',
-    '#description'    => t('For "Peak Consumption", enter the maximum electricity consumption in watts.
-    Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
-    '#maxlength'      => 6,
-    '#size'           => 6,
-    '#default_value'  => 120
+    '#description'    => t('Here you can set the maximum heartbeat delay in minutes. Beyond this limit, the device is considered faulty.'),
+    '#maxlength'      => 9,
+    '#size'           => 12,
+    '#disabled'       => TRUE,
+    '#field_suffix'   => t('minutes'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+  );
+
+  $form['events']['event_id3'] = array(
+    '#title'          => _notification_get_event_name(3),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes' => array(
+      'onchange' => '
+      limit_up3 = document.getElementById("limit_up3");
+      limit_up3.disabled = !this.checked;
+      limit_up3.value = this.checked? 120 : ""'
+    ),
+  );
+
+  $form['events']['limit_up3'] = array(
+    '#type'           => 'textfield',
+    '#description'    => t('Here you can set the maximum heartbeat delay in minutes. Beyond this limit, the device is considered faulty.'),
+    '#maxlength'      => 9,
+    '#size'           => 12,
+    '#disabled'       => TRUE,
+    '#field_suffix'   => t('minutes'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+  );
+
+  $form['events']['event_id4'] = array(
+    '#title'          => _notification_get_event_name(4),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes' => array(
+      'onchange' => '
+      limit_up4 = document.getElementById("limit_up4");
+      limit_up4.disabled = !this.checked;
+      limit_up4.value = this.checked? 5000 : ""'
+    ),
+  );
+
+  $form['events']['limit_up4'] = array(
+    '#type'           => 'textfield',
+    '#description'    => t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.'),
+    '#maxlength'      => 12,
+    '#size'           => 12,
+    '#disabled'       => TRUE,
+    '#field_suffix'   => t('watt'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+  );
+
+  $form['events']['event_id2'] = array(
+    '#title'          => _notification_get_event_name(2),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td><td></td></tr></table>',
   );
 
   $form['submit'] = array(
@@ -236,15 +289,50 @@ function notification_register_form() {
   return $form;
 }
 
+function _notification_get_event_name($event_id) {
+
+  $sql = "SELECT name FROM {event} WHERE id = %d";
+  $result = db_fetch_object(db_query($sql, $event_id));
+
+  return t($result->name);
+}
+
 function notification_register_form_submit($form, &$form_state) {
 
-  $device   = $form_state['values']['device'];
-  $event_id = $form_state['values']['event_id'];
-  $email = $form_state['values']['email'];
-  $limit_up = $form_state['values']['limit_up'];
+  $device    = $form_state['values']['device'];
+  $email     = $form_state['values']['email'];
 
-  _notification_delete($device, $event_id);
-  _notification_insert($device, $event_id, $email, $limit_up);
+  $event_id1 = $form_state['values']['event_id1'];
+  $limit_up1 = $form_state['values']['limit_up1'];
+
+  $event_id2 = $form_state['values']['event_id2'];
+
+  $event_id3 = $form_state['values']['event_id3'];
+  $limit_up3 = $form_state['values']['limit_up3'];
+
+  $event_id4 = $form_state['values']['event_id4'];
+  $limit_up4 = $form_state['values']['limit_up4'];
+
+  _notification_delete($device, 1);
+  _notification_delete($device, 2);
+  _notification_delete($device, 3);
+  _notification_delete($device, 4);
+
+  if ($event_id1) {
+    _notification_insert($device, 1, $email, $limit_up1);
+  }
+
+  if ($event_id2) {
+    _notification_insert($device, 2, $email, 0);
+  }
+
+  if ($event_id3) {
+    _notification_insert($device, 3, $email, $limit_up3);
+  }
+
+  if ($event_id4) {
+    _notification_insert($device, 4, $email, $limit_up4);
+  }
 
   $form_state['redirect'] = 'notification_list';
 }
@@ -252,18 +340,30 @@ function notification_register_form_submit($form, &$form_state) {
 function notification_register_form_validate($form, &$form_state) {
 
   $email = $form_state['values']['email'];
-  $event_id = $form_state['values']['event_id'];
-  $limit_up = $form_state['values']['limit_up'];
+
+  $event_id1 = $form_state['values']['event_id1'];
+  $event_id2 = $form_state['values']['event_id2'];
+  $event_id3 = $form_state['values']['event_id3'];
+  $event_id4 = $form_state['values']['event_id4'];
+
+  $limit_up1 = $form_state['values']['limit_up1'];
+  $limit_up3 = $form_state['values']['limit_up3'];
+  $limit_up4 = $form_state['values']['limit_up4'];
 
   if (!valid_email_address($email)) {
     form_set_error('email', t('Invalid e-mail.'));
   }
 
-  if(($event_id == 1 || $event_id == 3) && $limit_up < 30) {
-    form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
+  if($event_id1 && $limit_up1 < 30) {
+    form_set_error('limit_up1', t('Delay time can not be less than 30 minutes.'));
+  }
 
-  } else if ($event_id == 4 && $limit_up < 1) {
-    form_set_error('limit_up', t('Peak consumption can not be less than 1 watt.'));
+  if($event_id3 && $limit_up3 < 30) {
+    form_set_error('limit_up3', t('Delay time can not be less than 30 minutes.'));
+  }
+  
+  if ($event_id4 && $limit_up4 < 1) {
+    form_set_error('limit_up4', t('Peak consumption can not be less than 1 watt.'));
   }
 }
 
