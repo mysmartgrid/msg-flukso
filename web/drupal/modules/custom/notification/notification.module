@@ -61,7 +61,15 @@ function notification_menu() {
 
   $items['notification_register'] = array(
     'title'             => 'Event Notification Registration',
-    'page callback'     => 'notification_register_page',
+    'page callback'     => 'notification_registration_page',
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
+  );
+
+  $items['notification_edit'] = array(
+    'title'             => 'Event Notification Edition',
+    'page callback'     => 'notification_edition_page',
+    'page arguments'    => array(1, 2),
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_CALLBACK
   );
@@ -70,12 +78,59 @@ function notification_menu() {
 }
 
 /**
+ * Event notification deletion callback.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @return the events list page.
+ */
+function notification_delete($device, $event_id) {
+
+  _notification_delete($device, $event_id);
+  return notification_list_page();
+}
+
+/**
  * Builds the event registration page.
  *
  * @return the event registration page.
  */
-function notification_register_page() {
-  $output .= drupal_get_form('notification_register_form');
+function notification_registration_page() {
+  $output .= drupal_get_form('notification_registration_form');
+  return $output;
+}
+
+/**
+ * Builds the event notification edition page.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @return the event notification edition page.
+ */
+function notification_edition_page($device, $event_id) {
+
+  $sql = "
+    SELECT
+      e.id AS event_id,
+      e.name AS event_name,
+      n.device AS device,
+      d.serial AS serial,
+      n.email AS email,
+      n.limit_up AS limit_up
+    FROM
+      {event} e,
+      {notification} n,
+      {logger_devices} d
+    WHERE
+      d.device = '%s' AND
+      d.device = n.device AND
+      n.event_id = e.id AND
+      e.id = %d";
+
+  $notification = db_fetch_object(db_query($sql, $device, $event_id));
+
+  $output .= drupal_get_form('notification_edition_form', $notification);
+
   return $output;
 }
 
@@ -120,7 +175,8 @@ function notification_list_page() {
     $row['serial'] = $object['serial'];
     $row['event_name'] = _notification_format_event_name($object['event_id'], $object['event_name'], $object['limit_up']);
     $row['email'] = $object['email'];
-    $row[] = l(t('Remove'), 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
+    $row[] = l(t('Remove'), 'notification_delete/' . $object['device'] . '/' . $object['event_id']) . ' ' .
+             l(t('Edit'),   'notification_edit/'   . $object['device'] . '/' . $object['event_id']);
 
     $rows[] = $row;
   }
@@ -131,48 +187,7 @@ function notification_list_page() {
   return $output;
 }
 
-/**
- * Formats an event name to be shown in a web page.
- *
- * @param $event_id   The event id.
- * @param $event_name The event name.
- * @param $limit_up   The event related maximum value.
- * @return the event formatted name.
- */
-function _notification_format_event_name($event_id, $event_name, $limit_up) {
-
-  $name = t($event_name);
-
-  if ($event_id == 1 || $event_id == 3) {
-    $name .= " (in $limit_up min)";
-
-  } else if ($event_id == 4) {
-    $name .= " ($limit_up watts)";
-  }
-  return $name;
-}
-
-/**
- * Returns an array of user devices' serial numbers indexed by their respective
- * hash codes.
- *
- * @return the array of devices.
- */
-function _notification_get_devices_options() {
-
-  global $user;
-  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
-  $result = db_query($sql, $user->uid);
-
-  $devices = array();
-  while ($row = db_fetch_array($result)) {
-    $devices[$row['device']] = $row['serial'];
-  }
-
-  return $devices;
-}
-
-function notification_register_form() {
+function notification_registration_form() {
 
   global $user;
 
@@ -214,7 +229,7 @@ function notification_register_form() {
 
   $form['events']['limit_up1'] = array(
     '#type'           => 'textfield',
-    '#description'    => t('Here you can set the maximum heartbeat delay in minutes. Beyond this limit, the device is considered faulty.'),
+    '#description'    => t('Here you can set the maximum heartbeat delay. Beyond this limit, the device is considered faulty.'),
     '#maxlength'      => 9,
     '#size'           => 12,
     '#disabled'       => TRUE,
@@ -239,7 +254,7 @@ function notification_register_form() {
 
   $form['events']['limit_up3'] = array(
     '#type'           => 'textfield',
-    '#description'    => t('Here you can set the maximum heartbeat delay in minutes. Beyond this limit, the device is considered faulty.'),
+    '#description'    => $form['events']['limit_up1']['#description'],
     '#maxlength'      => 9,
     '#size'           => 12,
     '#disabled'       => TRUE,
@@ -289,55 +304,79 @@ function notification_register_form() {
   return $form;
 }
 
-function _notification_get_event_name($event_id) {
+function notification_edition_form(&$form_state, $notification) {
 
-  $sql = "SELECT name FROM {event} WHERE id = %d";
-  $result = db_fetch_object(db_query($sql, $event_id));
+  $form['device'] = array(
+    '#type'          => 'hidden',
+    '#default_value' => $notification->device,
+  );
 
-  return t($result->name);
+  $form['event_id'] = array(
+    '#type'          => 'hidden',
+    '#default_value' => $notification->event_id,
+  );
+
+  $form['event_name'] = array(
+    '#type'          => 'textfield',
+    '#title'         => t('Event'),
+    '#default_value' => $notification->event_name,
+    '#attributes'    => array('readonly' => 'readonly')
+  );
+
+  $form['serial'] = array(
+    '#type'          => 'textfield',
+    '#title'         => t('Serial Number'),
+    '#default_value' => $notification->serial,
+    '#attributes'    => array('readonly' => 'readonly')
+  );
+
+  $form['email'] = array(
+    '#type'          => 'textfield',
+    '#title'         => t('E-mail'),
+    '#description'   => t('Enter the e-mail which will receive the event notification.'),
+    '#maxlength'     => 64,
+    '#size'          => 20,
+    '#default_value' => $notification->email
+  );
+
+  switch ($notification->event_id) {
+    case 1:
+    case 3:
+      $form['limit_up'] = array(
+        '#type'          => 'textfield',
+        '#title'         => t('Maximum Delay'),
+        '#description'   => t('Here you can set the maximum heartbeat delay. Beyond this limit, the device is considered faulty.'),
+        '#maxlength'     => 9,
+        '#size'          => 12,
+        '#field_suffix'  => t('minutes'),
+        '#default_value' => $notification->limit_up
+      );
+      break;
+
+    case 4:
+      $form['limit_up'] = array(
+        '#type'          => 'textfield',
+        '#title'         => t('Maximum Consumption'),
+        '#description'   => t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.'),
+        '#maxlength'     => 9,
+        '#size'          => 12,
+        '#field_suffix'  => t('watts'),
+        '#default_value' => $notification->limit_up
+      );
+      break;
+    case 2:
+      break;
+  }
+
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Save')
+  );
+
+  return $form;
 }
 
-function notification_register_form_submit($form, &$form_state) {
-
-  $device    = $form_state['values']['device'];
-  $email     = $form_state['values']['email'];
-
-  $event_id1 = $form_state['values']['event_id1'];
-  $limit_up1 = $form_state['values']['limit_up1'];
-
-  $event_id2 = $form_state['values']['event_id2'];
-
-  $event_id3 = $form_state['values']['event_id3'];
-  $limit_up3 = $form_state['values']['limit_up3'];
-
-  $event_id4 = $form_state['values']['event_id4'];
-  $limit_up4 = $form_state['values']['limit_up4'];
-
-  _notification_delete($device, 1);
-  _notification_delete($device, 2);
-  _notification_delete($device, 3);
-  _notification_delete($device, 4);
-
-  if ($event_id1) {
-    _notification_insert($device, 1, $email, $limit_up1);
-  }
-
-  if ($event_id2) {
-    _notification_insert($device, 2, $email, 0);
-  }
-
-  if ($event_id3) {
-    _notification_insert($device, 3, $email, $limit_up3);
-  }
-
-  if ($event_id4) {
-    _notification_insert($device, 4, $email, $limit_up4);
-  }
-
-  $form_state['redirect'] = 'notification_list';
-}
-
-function notification_register_form_validate($form, &$form_state) {
+function notification_registration_form_validate($form, &$form_state) {
 
   $email = $form_state['values']['email'];
 
@@ -367,17 +406,124 @@ function notification_register_form_validate($form, &$form_state) {
   }
 }
 
-/**
- * Event notification deletion callback.
- *
- * @param $device    The monitored device.
- * @param $event_id  The event id.
- * @return the events list page.
- */
-function notification_delete($device, $event_id) {
+function notification_edition_form_validate($form, &$form_state) {
+
+  $email = $form_state['values']['email'];
+  $event_id = $form_state['values']['event_id'];
+  $limit_up = $form_state['values']['limit_up'];
+
+  if (!valid_email_address($email)) {
+    form_set_error('email', t('Invalid e-mail.'));
+  }
+
+  if(($event_id == 1 || $event_id == 3) && $limit_up < 30) {
+    form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
+  }
+
+  if ($event_id == 4 && $limit_up < 1) {
+    form_set_error('limit_up', t('Peak consumption can not be less than 1 watt.'));
+  }
+}
+
+function notification_registration_form_submit($form, &$form_state) {
+
+  $device    = $form_state['values']['device'];
+  $email     = $form_state['values']['email'];
+
+  $event_id1 = $form_state['values']['event_id1'];
+  $limit_up1 = $form_state['values']['limit_up1'];
+
+  $event_id2 = $form_state['values']['event_id2'];
+
+  $event_id3 = $form_state['values']['event_id3'];
+  $limit_up3 = $form_state['values']['limit_up3'];
+
+  $event_id4 = $form_state['values']['event_id4'];
+  $limit_up4 = $form_state['values']['limit_up4'];
+
+  if ($event_id1) {
+    _notification_delete($device, 1);
+    _notification_insert($device, 1, $email, $limit_up1);
+  }
+
+  if ($event_id2) {
+    _notification_delete($device, 2);
+    _notification_insert($device, 2, $email, 0);
+  }
+
+  if ($event_id3) {
+    _notification_delete($device, 3);
+    _notification_insert($device, 3, $email, $limit_up3);
+  }
+
+  if ($event_id4) {
+    _notification_delete($device, 4);
+    _notification_insert($device, 4, $email, $limit_up4);
+  }
+
+  $form_state['redirect'] = 'notification_list';
+}
+
+function notification_edition_form_submit($form, &$form_state) {
+
+  $device   = $form_state['values']['device'];
+  $email    = $form_state['values']['email'];
+  $event_id = $form_state['values']['event_id'];
+  $limit_up = $event_id == 2? 0 : $form_state['values']['limit_up'];
 
   _notification_delete($device, $event_id);
-  return notification_list_page();
+  _notification_insert($device, $event_id, $email, $limit_up);
+
+  $form_state['redirect'] = 'notification_list';
+}
+
+function _notification_get_event_name($event_id) {
+
+  $sql = "SELECT name FROM {event} WHERE id = %d";
+  $result = db_fetch_object(db_query($sql, $event_id));
+
+  return t($result->name);
+}
+
+/**
+ * Formats an event name to be shown in a web page.
+ *
+ * @param $event_id   The event id.
+ * @param $event_name The event name.
+ * @param $limit_up   The event related maximum value.
+ * @return the event formatted name.
+ */
+function _notification_format_event_name($event_id, $event_name, $limit_up) {
+
+  $name = t($event_name);
+
+  if ($event_id == 1 || $event_id == 3) {
+    $name .= " (in $limit_up min)";
+
+  } else if ($event_id == 4) {
+    $name .= " ($limit_up watts)";
+  }
+  return $name;
+}
+
+/**
+ * Returns an array of user devices' serial numbers indexed by their respective
+ * hash codes.
+ *
+ * @return the array of devices.
+ */
+function _notification_get_devices_options() {
+
+  global $user;
+  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
+  $result = db_query($sql, $user->uid);
+
+  $devices = array();
+  while ($row = db_fetch_array($result)) {
+    $devices[$row['device']] = $row['serial'];
+  }
+
+  return $devices;
 }
 
 /**
@@ -388,7 +534,13 @@ function notification_delete($device, $event_id) {
  */
 function _notification_delete($device, $event_id) {
 
-  $sql = "DELETE FROM {notification} WHERE device = '%s' AND event_id = %d";
+  $sql = "
+    DELETE FROM
+      {notification}
+    WHERE
+      device = '%s' AND
+      event_id = %d";
+
   db_query($sql, $device, $event_id);
 }
 
