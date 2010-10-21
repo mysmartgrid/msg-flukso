@@ -75,7 +75,14 @@ function notification_schema() {
         'default'    => 0,
         'disp-width' => '10',
       ),
-      'latest_sent' => array(
+      'latest_checkup' => array(
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
+        'disp-width' => '10',
+      ),
+      'last_sent' => array(
         'type'       => 'int',
         'unsigned'   => TRUE,
         'not null'   => TRUE,
