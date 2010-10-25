@@ -19,9 +19,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+define('NO_HEARTBEAT',          1);
+define('CORRUPTED_HEARTBEAT',   2);
+define('ANY_HEARTBEAT_FAILURE', 3);
+define('PEAK_CONSUMPTION',      4);
+
 function notification_help($path, $arg) {
   
-  $output = '';
+  $output = ''; 
 
   switch ($path) {
     case "admin/help#notification":
@@ -194,7 +199,7 @@ function notification_registration_form() {
   $form['email'] = array(
     '#type'           => 'textfield',
     '#title'          => t('E-mail'),
-    '#description'    => t('Enter the e-mail which will receive the event notification.'),
+    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
     '#maxlength'      => 64,
     '#size'           => 20,
     '#default_value'  => $user->mail,
@@ -332,7 +337,7 @@ function notification_edition_form(&$form_state, $notification) {
   $form['event_name'] = array(
     '#type'              => 'textfield',
     '#title'             => t('Event'),
-    '#default_value'     => $notification->event_name,
+    '#default_value'     => t($notification->event_name),
     '#attributes'        => array('readOnly' => 'true')
   );
 
@@ -346,7 +351,7 @@ function notification_edition_form(&$form_state, $notification) {
   $form['email'] = array(
     '#type'              => 'textfield',
     '#title'             => t('E-mail'),
-    '#description'       => t('Enter the e-mail which will receive the event notification.'),
+    '#description'       => t('Enter the e-mail to which the notification will be sent.'),
     '#maxlength'         => 64,
     '#size'              => 20,
     '#default_value'     => $notification->email,
@@ -425,38 +430,38 @@ function notification_edition_form_validate($form, &$form_state) {
   }
 }
 
-function notification_email_validate($element, $form_state) {
+function notification_email_validate($field, $form_state) {
 
   if (!valid_email_address($form_state['values']['email'])) {
-    form_error($element, t('Invalid e-mail.'));
+    form_error($field, t('Invalid e-mail.'));
   }
 }
 
 /**
  * Validates a field to enter minutes.
  *
- * @param $field  The field name.
+ * @param $field_name  The field name.
  */
-function _notification_validate_minutes($field, $form_state) {
+function _notification_validate_minutes($field_name, $form_state) {
 
-  $limit_up = $form_state['values'][$field];
+  $limit_up = $form_state['values'][$field_name];
 
   if($limit_up < 30) {
-    form_set_error($field, t('Delay time can not be less than 30 minutes.'));
+    form_set_error($field_name, t('Delay time can not be less than 30 minutes.'));
   }
 }
 
 /**
  * Validates a field to enter watts.
  *
- * @param $field  The field name.
+ * @param $field_name  The field name.
  */
-function _notification_validate_watts($field, $form_state) {
+function _notification_validate_watts($field_name, $form_state) {
 
-  $limit_up = $form_state['values'][$field];
+  $limit_up = $form_state['values'][$field_name];
   
   if($limit_up < 1) {
-    form_set_error($field, t('Peak consumption can not be less than 1 watt.'));
+    form_set_error($field_name, t('Peak consumption can not be less than 1 watt.'));
   }
 }
 
@@ -504,7 +509,7 @@ function notification_edition_form_submit($form, &$form_state) {
   $device   = $form_state['values']['device'];
   $email    = $form_state['values']['email'];
   $event_id = $form_state['values']['event_id'];
-  $limit_up = $event_id == 2? 0 : $form_state['values']['limit_up'];
+  $limit_up = $event_id == CORRUPTED_HEARTBEAT? 0 : $form_state['values']['limit_up'];
 
   _notification_delete($device, $event_id);
   _notification_insert($device, $event_id, $email, $limit_up);
@@ -538,10 +543,10 @@ function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
   $name = t($event_name);
 
-  if ($event_id == 1 || $event_id == 3) {
+  if ($event_id == NO_HEARTBEAT || $event_id == ANY_HEARTBEAT_FAILURE_EVENT_ID) {
     $name .= "<br>(in $limit_up min)";
 
-  } else if ($event_id == 4) {
+  } else if ($event_id == PEAK_CONSUMPTION) {
     $name .= "<br>($limit_up watt / h)";
   }
   return $name;
@@ -595,7 +600,6 @@ function _notification_delete($device, $event_id) {
  */
 function _notification_insert($device, $event_id, $email, $limit_up) {
 
-  global $user;
   $base_value = 0;
 
   //If event = Peak Consumption
@@ -607,11 +611,11 @@ function _notification_insert($device, $event_id, $email, $limit_up) {
       FROM
         {logger_meters} m
       WHERE
-        m.type = '%s' AND
-        m.unit = '%s' AND
-        m.uid = %d";
+        m.type   = '%s' AND
+        m.unit   = '%s' AND
+        m.device = '%s' ";
 
-    $result = db_fetch_object( db_query($sql, 'electricity', 'watt', $user->uid));
+    $result = db_fetch_object( db_query($sql, 'electricity', 'watt', $device));
 
     $base_value = $result->total;
   }
@@ -648,33 +652,40 @@ function _notification_update($device, $event_id, $last_sent) {
 
 /**
  * Updates notification checkup date.
+ *
+ * @param $now       The event checkup time.
  */
-function _notification_update_checkups() {
+function _notification_update_checkups($now) {
 
   $sql = "UPDATE {notification} SET latest_checkup = %d";
 
-  db_query($sql, time());
+  db_query($sql, $now);
 }
 
 function notification_cron() {
 
-  _notification_send_no_heartbeat_emails();
-  _notification_send_corrupted_heartbeat_emails();
-  _notification_send_any_heartbeat_failure_emails();
-  _notification_send_peak_consumption_emails();
+  $now = time();
 
-  _notification_update_checkups();
+  _notification_send_no_heartbeat_emails($now);
+  _notification_send_corrupted_heartbeat_emails($now);
+  _notification_send_any_heartbeat_failure_emails($now);
+  _notification_send_peak_consumption_emails($now);
+
+  _notification_update_checkups($now);
 }
 
 /**
  * Sends e-mails notifying users of "No Heartbeat" events.
- * 
+ *
+ * @param $now       The event checkup time.
  * @param $event_id  The actual event that is causing the notification to be sent.
  *                   It can be either "No Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_no_heartbeat_emails($event_id = 1) {
+function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
 
   $tz = _notification_get_user_timezone();
+  $minute = 60;
+  $day = 86400;
 
   $sql = "
     SELECT
@@ -690,11 +701,20 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
       {logger_devices} d,
       {notification} n
     WHERE
-      u.uid = d.uid AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
-      SYSDATE() > (FROM_UNIXTIME(n.last_sent) + INTERVAL 1 DAY) AND
-      n.event_id = $event_id";
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      $now > (d.access + n.limit_up * $minute) AND
+      NOT EXISTS(
+        SELECT
+          1
+        FROM
+          {logger_meters} m
+        WHERE
+          m.device = d.device AND
+          m.corrupted <> 0
+      )";
 
   $message = _notification_compose_error_email("
     Your Flukso device (serial number: %serial) has not been sending heartbeats for more
@@ -709,12 +729,14 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
 /**
  * Sends e-mails notifying users of "Corrupted Heartbeat" events.
  *
+ * @param $now       The event checkup time.
  * @param $event_id  The actual event that is causing the notification to be sent.
  *                   It can be either "Corrupted Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
+function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPTED_HEARTBEAT) {
 
   $tz = _notification_get_user_timezone();
+  $day = 86400;
 
   $sql = "
     SELECT
@@ -723,20 +745,19 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time
+      CONVERT_TZ(FROM_UNIXTIME(m.corrupted),'+00:00',$tz) AS event_time
     FROM
       {users} u,
       {logger_devices} d,
       {logger_meters} m,
       {notification} n
     WHERE
-      u.uid = d.uid AND
-      d.device = m.device AND
-      m.type = 'electricity' AND
-      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR) AND
-      SYSDATE() > (FROM_UNIXTIME(n.last_sent) + INTERVAL 1 DAY) AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      n.event_id = $event_id";
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      m.device = d.device AND
+      m.corrupted <> 0";
 
   $message = _notification_compose_error_email("
     Your Flukso device (serial number: %serial) has sent a heartbeat with corrupted data at %event_time.");
@@ -746,22 +767,29 @@ function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
 
 /**
  * Sends e-mails notifying users of "Any Heartbeat Failure" events.
+ *
+ * @param $now  The event checkup time.
  */
-function _notification_send_any_heartbeat_failure_emails() {
+function _notification_send_any_heartbeat_failure_emails($now) {
 
-  _notification_send_no_heartbeat_emails(3);
-  _notification_send_corrupted_heartbeat_emails(3);
+  _notification_send_no_heartbeat_emails($now, 3);
+  _notification_send_corrupted_heartbeat_emails($now, 3);
 }
 
 /**
  * Sends em-mails notifying users of the occurrence of Peak Consumption events.
+ *
+ * @param $now  The event checkup time.
  */
-function _notification_send_peak_consumption_emails() {
+function _notification_send_peak_consumption_emails($now) {
 
   $tz = _notification_get_user_timezone();
+  $event_id = PEAK_CONSUMPTION;
+  $hour = 3600;
+  $day = 86400;
 
   $sql = "
-    SELECT
+    SELECT DISTINCT
       d.device AS device,
       n.event_id AS event_id,
       u.name AS user_name,
@@ -777,13 +805,13 @@ function _notification_send_peak_consumption_emails() {
       {logger_meters} m,
       {notification} n
     WHERE
-      u.uid = d.uid AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      n.event_id = 4 AND
-      d.device = m.device AND
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      m.device = d.device AND
       m.type = 'electricity' AND
-      m.unit = 'watt' AND
-      SYSDATE() > (FROM_UNIXTIME(n.last_sent) + INTERVAL 1 DAY)
+      m.unit = 'watt'
     GROUP BY
       u.name,
       n.email,
@@ -791,7 +819,7 @@ function _notification_send_peak_consumption_emails() {
       n.limit_up,
       n.base_value
     HAVING
-      (SUM(m.value) - n.base_value) / ((UNIX_TIMESTAMP(SYSDATE()) - n.latest_checkup) / 3600) > n.limit_up";
+      (SUM(m.value) - n.base_value) / (($now - n.latest_checkup) / $hour) > n.limit_up";
 
   $message = _notification_compose_email("
     Your Flukso device (serial number: %serial) has registered an electricity consumption
@@ -799,24 +827,7 @@ function _notification_send_peak_consumption_emails() {
 
   _notification_send_emails($sql, $message);
 
-  //Register consumption
-  $sql = "
-    UPDATE
-      {notification}
-    SET
-      base_value =
-        SELECT
-          SUM(m.value)
-        FROM
-          {logger_meters} m
-        WHERE
-          m.type = '%s' AND
-          m.unit = '%s' AND
-          m.device = notification.device
-    WHERE
-      notification.event_id = 4";
-
-  db_query($sql, 'electricity', 'watt');
+  _notification_register_consumption();
 }
 
 function _notification_register_consumption() {
@@ -835,20 +846,9 @@ function _notification_register_consumption() {
           m.unit = '%s' AND
           m.device = notification.device
     WHERE
-      notification.event_id = 4";
+      notification.event_id = %d";
 
-  db_query($sql, 'electricity', 'watt');
-
-
-  $now = time();
-
-  $sql = "
-    UPDATE
-      {notification}
-    SET
-      latest_checkup = $now";
-
-  db_query($sql, 'electricity', 'watt');
+  db_query($sql, 'electricity', 'watt', PEAK_CONSUMPTION);
 }
 
 /**
@@ -886,9 +886,8 @@ function _notification_compose_email($description, $complement = "") {
  */
 function _notification_compose_error_email($description, $recommendation = NULL) {
 
-  $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
-
   global $base_url;
+  $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
 
   return _notification_compose_email($description, "
 
@@ -956,6 +955,6 @@ function notification_mail($key, &$message, $params) {
  */
 function _notification_get_user_timezone() {
   global $user;
-  $hours = $user->timezone / (60 * 60);
+  $hours = $user->timezone / (3600);
   return $hours < 0 ? "'$hours:00'" : "'+$hours:00'";
 }
