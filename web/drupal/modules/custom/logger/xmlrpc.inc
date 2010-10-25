@@ -93,6 +93,8 @@ function _logger_measurement_add($logs) {
       $command = $path->root . '/rrdtool update ' . $path->base . $meter . '.rrd ';
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
 
+      $corrupted_time = 0;
+
       foreach ($measurements as $timestamp => $value) {
 
         if (is_numeric($timestamp) and is_numeric($value)) {
@@ -100,8 +102,11 @@ function _logger_measurement_add($logs) {
 
         } else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
+          $corrupted_time = time();
         }
       }
+
+      _logger_update_meter_integrity($meter, $corrupted_time);
 
       system($command, $return);
 
@@ -139,6 +144,19 @@ function _logger_measurement_add($logs) {
     }
   }
   return $command; //using $command for testing purposes, replace by $info afterwards
+}
+
+/**
+ * Updates the meter integrity flag.
+ *
+ * @param $meter            The meter being updated.
+ * @param $corruption_time  The time when a corrupted heartbeat was received.
+ *                          The value 0 means that the heartbeat was sound.
+ */
+function _logger_update_meter_integrity($meter, $corruption_time) {
+
+    $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
+    db_query($sql, $corruption_time, $meter);
 }
 
 /**
