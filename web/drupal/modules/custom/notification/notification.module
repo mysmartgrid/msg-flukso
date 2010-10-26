@@ -146,11 +146,14 @@ function notification_edition_page($device, $event_id) {
  */
 function notification_list_page() {
 
+  $tz = _notification_get_user_timezone();
+
   $sql = "
     SELECT
       d.serial AS serial,
       e.name AS event_name,
       n.email AS email,
+      IF(n.last_sent = 0, NULL, CONVERT_TZ(FROM_UNIXTIME(n.last_sent),'+00:00',$tz)) AS last_sent,
       n.limit_up AS limit_up,
       d.device AS device,
       e.id AS event_id
@@ -167,6 +170,7 @@ function notification_list_page() {
     array('data' => t('Device'),        'field' => 'serial',     'sort' => 'ASC'),
     array('data' => t('Event'),         'field' => 'event_name', 'sort' => 'ASC'),
     array('data' => t('Target e-mail'), 'field' => 'email'),
+    array('data' => t('Sent'),          'field' => 'last_sent'),
     array('data' => t('Operation'))
   );
 
@@ -180,6 +184,7 @@ function notification_list_page() {
     $row['serial'] = $object['serial'];
     $row['event_name'] = _notification_format_event_name($object['event_id'], $object['event_name'], $object['limit_up']);
     $row['email'] = $object['email'];
+    $row['last_sent'] = $object['last_sent'];
     $row[] = l(t('Remove'), 'notification/delete/' . $object['device'] . '/' . $object['event_id']) . '<br>' .
              l(t('Edit'),   'notification/edit/'   . $object['device'] . '/' . $object['event_id']);
 
@@ -828,7 +833,7 @@ function _notification_send_peak_consumption_emails($now) {
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_email(
     "Your Flukso device (serial number: %serial) has registered an " .
-    "electricity consumption beyond %limit_up watt/h, at %event_time.");
+    "electricity consumption beyond %limit_up watt / h, at %event_time.");
 
   _notification_send_emails($sql, $message);
 
@@ -859,24 +864,26 @@ function _notification_register_consumption() {
 /**
  * Composes an e-mail that notifies a general event.
  *
- * @param $description  The event description.
+ * @param $description  The event description. 
  * @param $complement   Complementary information about the error.
  * @return the e-mail message.
  */
-function _notification_compose_email($description, $complement = "") {
-
-  global $base_url;
+function _notification_compose_email($description, $complement = NULL) {
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
+
+  $complement = $complement == NULL? "" : "<p>$complement</p> ";
+
   return
     "<p>Dear user %user_name " .
     "<br> &nbsp;<br></p> " .
 
     "<p>$description</p> " .
-    "<p>$complement</p> " .
+
+    $complement .
 
     "<p>If you want to stop receiving this notification, please remove it from your " .
-    "<a href='$base_url/notification/list'>event notifications list</a>.</p> " .
+    "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
 
     "<p>&nbsp;<br> " .
     "Best Regards,</p> " .
@@ -892,7 +899,6 @@ function _notification_compose_email($description, $complement = "") {
  */
 function _notification_compose_error_email($description, $recommendation = NULL) {
 
-  global $base_url;
   $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
@@ -903,10 +909,10 @@ function _notification_compose_error_email($description, $recommendation = NULL)
       $recommendation .
 
       "<li>Check if the device complies with the " .
-      "<a href='$base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>. " .
+      "<a href='!base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>. " .
       "It might be improperly installed or misconfigured.<br><br> " .
 
-      "<li>Visit our <a href='$base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
+      "<li>Visit our <a href='!base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
       "and read the answers to questions made by other users in similar situations.<br><br> " .
 
       "<li>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de. " .
@@ -917,7 +923,7 @@ function _notification_compose_error_email($description, $recommendation = NULL)
  * Sends event notification e-mails to notifiable users.
  *
  * @param $sql     The SQL statement for selecting the events.
- * @param $message The e-mail message.
+ * @param $message The e-mail message. 
  */
 function _notification_send_emails($sql, $message) {
 
@@ -925,17 +931,18 @@ function _notification_send_emails($sql, $message) {
   global $base_url;
   $language = user_preferred_language($user);
   $result = db_query($sql);
-  $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
 
   while ($object = db_fetch_array($result)) {
 
     $variables = array();
+    $variables["!base_url"] = $base_url;
     foreach ($object as $key => $value) {
       $variables["%$key"] = $value;
     }
 
     $subject = t('Event Notification');
 
+    $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
     $body = t($message, $variables, $language->language) . $logo;
 
     $params = array(
