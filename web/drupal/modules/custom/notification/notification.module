@@ -234,7 +234,7 @@ function notification_registration_form() {
       'onchange' => '
         limit_up1 = document.getElementById("limit_up1");
         limit_up1.readOnly = !this.checked;
-        limit_up1.value = this.checked ? 120 : "";'
+        limit_up1.value = this.checked ? 120 : "";',
     ),
   );
 
@@ -247,9 +247,9 @@ function notification_registration_form() {
     '#prefix'         => '<td>',
     '#suffix'         => '</td></tr>',
     '#attributes'     => array(
-      'onchange' => '
+      'onfocus' => '
         event_id1 = document.getElementById("event_id1");
-        limit_up1.readOnly = !event_id1.checked;'
+        this.readOnly = !event_id1.checked;',
     ),
   );
 
@@ -263,7 +263,7 @@ function notification_registration_form() {
       'onchange' => '
         limit_up3 = document.getElementById("limit_up3");
         limit_up3.readOnly = !this.checked;
-        limit_up3.value = this.checked ? 120 : "";'
+        limit_up3.value = this.checked ? 120 : "";',
     ),
   );
 
@@ -276,9 +276,9 @@ function notification_registration_form() {
     '#prefix'         => '<td>',
     '#suffix'         => '</td></tr>',
     '#attributes'     => array(
-      'onchange' => '
+      'onfocus' => '
         event_id3 = document.getElementById("event_id3");
-        limit_up3.readOnly = !event_id3.checked;'
+        this.readOnly = !event_id3.checked;',
     ),
   );
 
@@ -292,7 +292,7 @@ function notification_registration_form() {
       'onchange' => '
         limit_up4 = document.getElementById("limit_up4");
         limit_up4.readOnly = !this.checked;
-        limit_up4.value = this.checked ? 5000 : "";'
+        limit_up4.value = this.checked ? 5000 : "";',
     ),
   );
 
@@ -305,9 +305,9 @@ function notification_registration_form() {
     '#prefix'         => '<td>',
     '#suffix'         => '</td></tr>',
     '#attributes'     => array(
-      'onchange' => '
+      'onfocus' => ' 
         event_id4 = document.getElementById("event_id4");
-        limit_up4.readOnly = !event_id4.checked;' 
+        this.readOnly = !event_id4.checked;',
     ),
   );
 
@@ -321,7 +321,7 @@ function notification_registration_form() {
 
   $form['submit'] = array(
     '#type'   => 'submit',
-    '#value'  => t('Save')
+    '#value'  => t('Save'),
   );
 
   return $form;
@@ -394,7 +394,7 @@ function notification_edition_form(&$form_state, $notification) {
 
   $form['submit'] = array(
     '#type'  => 'submit',
-    '#value' => t('Save')
+    '#value' => t('Save'),
   );
 
   return $form;
