@@ -36,8 +36,8 @@ define('SKYBLUE', '0080FF');
 
 define('ROOT_PATH',   drupal_get_path('module', 'logger'));
 define('GRAPH_PATH',  ROOT_PATH . '/graphs');
-define('DATA_PATH',   ROOT_PATH . '/data/base');
-define('AGG_DB_PATH', DATA_PATH . "/aggregate.rrd");
+define('DATA_PATH',   ROOT_PATH . '/data');
+define('AGG_DB_PATH', DATA_PATH . "/base/aggregate.rrd");
 define('RRDTOOL',     ROOT_PATH . '/rrdtool');
 
 define('MINUTE', 60);
@@ -529,7 +529,7 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') 
   //Default
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data_path = DATA_PATH;
+  $params->data_path = DATA_PATH . '/base';
   $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
   $params->line = ' COMMENT:"\s" ';
   $params->def = '';
@@ -896,7 +896,7 @@ function theme_chart($chart_file_path, $context) {
     l(t('Day'),   "$context/electricity/day"),
     l(t('Month'), "$context/electricity/month"),
     l(t('Year'),  "$context/electricity/year"),
-    //l(t('Night'), "$context/electricity/night")
+    l(t('Night'), "$context/electricity/night")
   );
 
   $output .= theme_item_list($secondary, NULL, 'ul', array('class' => 'tabs secondary'));
