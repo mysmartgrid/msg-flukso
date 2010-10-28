@@ -464,9 +464,9 @@ function _notification_validate_minutes($field_name, $form_state) {
 function _notification_validate_watts($field_name, $form_state) {
 
   $limit_up = $form_state['values'][$field_name];
-  
+
   if($limit_up < 1) {
-    form_set_error($field_name, t('Peak consumption can not be less than 1 watt.'));
+    form_set_error($field_name, t('Peak consumption can not be less than 1 watt / h.'));
   }
 }
 
@@ -617,10 +617,11 @@ function _notification_insert($device, $event_id, $email, $limit_up) {
         {logger_meters} m
       WHERE
         m.type   = '%s' AND
-        m.unit   = '%s' AND
         m.device = '%s' ";
 
-    $result = db_fetch_object( db_query($sql, 'electricity', 'watt', $device));
+    //Note: the values are stored in unit 'watt'
+
+    $result = db_fetch_object( db_query($sql, 'electricity', $device));
 
     $base_value = $result->total;
   }
@@ -819,8 +820,7 @@ function _notification_send_peak_consumption_emails($now) {
       n.event_id = $event_id AND
       $now > (n.last_sent + $day) AND
       m.device = d.device AND
-      m.type = 'electricity' AND
-      m.unit = 'watt'
+      m.type = 'electricity'
     GROUP BY
       u.name,
       n.email,
@@ -842,6 +842,8 @@ function _notification_send_peak_consumption_emails($now) {
 
 function _notification_register_consumption() {
 
+  //Note: the values are stored in unit 'watt'
+
   $sql = "
     UPDATE
       {notification}
@@ -853,12 +855,11 @@ function _notification_register_consumption() {
           {logger_meters} m
         WHERE
           m.type = '%s' AND
-          m.unit = '%s' AND
           m.device = notification.device
     WHERE
       notification.event_id = %d";
 
-  db_query($sql, 'electricity', 'watt', PEAK_CONSUMPTION);
+  db_query($sql, 'electricity', PEAK_CONSUMPTION);
 }
 
 /**
