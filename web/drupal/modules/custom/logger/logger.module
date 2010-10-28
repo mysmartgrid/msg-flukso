@@ -66,6 +66,7 @@ function logger_menu() {
 
   $items = array();
 
+  //TODO: remove the function name "main" from the callbacks
 
   // Dashboard operations
 
@@ -425,7 +426,13 @@ function _logger_dashboard($type, $function, $interval) {
     foreach ($sensors as &$sensor) {
 
       $shifted = $sensor->private && ($sensor->uid != $user->uid);
-      $caption = $sensor->uid == $user->uid ? $sensor->function : $sensor->username;
+
+      if ($sensor->uid == $user->uid) {
+        $caption = $sensor->function;
+
+      } else {
+        $caption = $sensor->username . ' ' . $sensor->function;
+      }
 
       $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
       $color = $colors[$i % count($colors)];
@@ -603,7 +610,8 @@ function _logger_get_user_sensors($type, $function) {
       INNER JOIN {logger_users} lu ON lm.uid = lu.uid
     WHERE
       lm.uid = %d AND
-      lm.type = '%s'
+      lm.type = '%s' AND
+      lm.function IS NOT NULL
     ORDER BY
       lm.function";
 
@@ -612,6 +620,8 @@ function _logger_get_user_sensors($type, $function) {
   while ($sensor = db_fetch_object($result)) {
     $sensors[] = $sensor;
   }
+
+  //TODO: If the user has multiple sensors, should they all be aggregated?
 
   if (user_access('logger')) {
 
@@ -633,11 +643,11 @@ function _logger_get_user_sensors($type, $function) {
         ur.requester_id = %d AND
         urt.name = '%s' AND
         lm.type = '%s' AND
-        lm.function = '%s'
+        lm.function IS NOT NULL
       ORDER BY
         ur.rid";
 
-    $result = db_query($sql, $user->uid, 'subscription', $type, $function);
+    $result = db_query($sql, $user->uid, 'subscription', $type);
 
     while($sensor = db_fetch_object($result)) {
       $sensors[] = $sensor;
@@ -762,7 +772,7 @@ function _logger_unit($unit) {
 
   global $user;
 
-  //hardcoded type and function
+  //hardcoded type
 
   $sql = "
     UPDATE
@@ -772,9 +782,9 @@ function _logger_unit($unit) {
     WHERE
       uid = %d AND
       type = '%s' AND
-      function = '%s'";
+      function IS NOT NULL";
 
-  db_query($sql, $unit, $user->uid, 'electricity', 'main');
+  db_query($sql, $unit, $user->uid, 'electricity');
 
   _logger_cache_clear('unit');
 
@@ -1096,19 +1106,18 @@ function _logger_units_form() {
   //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
   $destination = drupal_get_destination();
 
-  //hardcoded the type and function parameters for now
+  //hardcoded the type parameter for now
 
   $sql = "
-    SELECT
+    SELECT DISTINCT
       unit
     FROM
       {logger_meters}
     WHERE
       uid = %d AND
-      type = '%s' AND
-      function = '%s'";
+      type = '%s'";
 
-  $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
+  $unit = db_result(db_query($sql, $user->uid, 'electricity'));
 
   $items = array();
   $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
@@ -1219,7 +1228,8 @@ function _logger_aggregate() {
       {logger_meters} m
     WHERE
       m.type = '%s' AND
-      m.unit = '%s'";
+      m.unit = '%s' AND
+      m.function IS NOT NULL";
 
   $aggregation = db_fetch_object( db_query($sql, 'electricity', 'watt'));
 
@@ -1325,7 +1335,7 @@ function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
  */
 function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 
-  $caption = substr($caption . '          ', 0, 10);
+  $caption = substr($caption . '               ', 0, 15);
   
   $line =
     "LINE1:meter$i" . "#$color:" . "\"$caption\" ";
