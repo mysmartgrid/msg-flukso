@@ -676,9 +676,10 @@ function _logger_get_formatted_timezone() {
   if ($user->uid) {
     $offset = $user->timezone;
 
-  } else {
-    //Default: GMT+2:00
-    $offset = 2 * 60 * 60;
+  } else { //If user is not logged in
+
+    //Gets timezone used in the browser. Auto Timezone option must be turned on.
+    $offset = $_SESSION['timezone'];
   }
 
   $hours = gmdate('h:i', abs($offset));

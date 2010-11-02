@@ -146,22 +146,22 @@ function notification_edition_page($device, $event_id) {
  */
 function notification_list_page() {
 
-  $tz = _notification_get_user_timezone();
-
   $sql = "
     SELECT
       d.serial AS serial,
       e.name AS event_name,
       n.email AS email,
-      IF(n.last_sent = 0, NULL, CONVERT_TZ(FROM_UNIXTIME(n.last_sent),'+00:00',$tz)) AS last_sent,
+      IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone)) AS last_sent,
       n.limit_up AS limit_up,
       d.device AS device,
       e.id AS event_id
     FROM
+      {users} u,
       {logger_devices} d,
       {notification} n,
       {event} e
     WHERE
+      u.uid = d.uid AND
       d.uid = %d AND
       d.device = n.device AND
       n.event_id = e.id";
@@ -689,7 +689,6 @@ function notification_cron() {
  */
 function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
 
-  $tz = _notification_get_user_timezone();
   $minute = 60;
   $day = 86400;
 
@@ -700,7 +699,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
+      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
       n.limit_up AS limit_up
     FROM
       {users} u,
@@ -743,7 +742,6 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
  */
 function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPTED_HEARTBEAT) {
 
-  $tz = _notification_get_user_timezone();
   $day = 86400;
 
   $sql = "
@@ -753,7 +751,7 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(m.corrupted),'+00:00',$tz) AS event_time
+      FROM_UNIXTIME(m.corrupted + u.timezone) AS event_time
     FROM
       {users} u,
       {logger_devices} d,
@@ -793,7 +791,6 @@ function _notification_send_any_heartbeat_failure_emails($now) {
  */
 function _notification_send_peak_consumption_emails($now) {
 
-  $tz = _notification_get_user_timezone();
   $event_id = PEAK_CONSUMPTION;
   $hour = 3600;
   $day = 86400;
@@ -805,7 +802,7 @@ function _notification_send_peak_consumption_emails($now) {
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
+      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
       n.limit_up AS limit_up,
       n.base_value AS base_value,
       n.latest_checkup AS latest_checkup
@@ -962,15 +959,4 @@ function notification_mail($key, &$message, $params) {
   $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];
-}
-
-/**
- * Returns the user formatted timezone.
- * 
- * @return the formatted timezone.
- */
-function _notification_get_user_timezone() {
-  global $user;
-  $hours = $user->timezone / (3600);
-  return $hours < 0 ? "'$hours:00'" : "'+$hours:00'";
 }

@@ -104,8 +104,9 @@ function deployment_overview_list_page() {
 function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
   global $user;
-  $tzdif = $user->timezone / (3600); //divided by 1 hour
+  $tzdif = $user->timezone / 3600; //divided by 1 hour
   $tz = $tzdif < 0 ? "'$tzdif:00'" : "'+$tzdif:00'";
+
   $now = time();
   $heartbeat_timeout = 7200; //2 hs
 
