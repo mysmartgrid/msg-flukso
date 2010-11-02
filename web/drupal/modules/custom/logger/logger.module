@@ -33,6 +33,11 @@ define('BROWN',   '808000');
 define('PINK',    'FF0080');
 define('CYAN',    '00ffff');
 define('SKYBLUE', '0080FF');
+define('BLACK',   '050305');
+define('GREY',    '809090');
+define('GREEN2',  '00FF00');
+define('GREEN3',  '9ED3C0');
+define('BROWN2',  'DED00F');
 
 define('ROOT_PATH',   drupal_get_path('module', 'logger'));
 define('GRAPH_PATH',  ROOT_PATH . '/graphs');
@@ -422,7 +427,7 @@ function _logger_dashboard($type, $function, $interval) {
     $chart = _logger_get_chart_params($interval, $type);
 
     global $user;
-    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
+    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE, GREEN2, BLACK, GREY, GREEN3, BROWN2);
     $i = 0;
 
     foreach ($sensors as &$sensor) {
@@ -722,33 +727,7 @@ function _logger_add($uid) {
   // don't allow users to add themselves
   if ($uid != $user->uid) { 
 
-    // max subscriptions = 4
-    if ($result['COUNT(rid)'] < 4) {
-      user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-
-    } else {
-      //check whether the requested relationship doesn't already exist
-
-      $sql = "
-        SELECT
-          rid
-        FROM
-          {user_relationships}
-        WHERE
-          requester_id = %d AND
-          requestee_id = %d AND
-          rtid = %d";
-      
-      if (!db_result(db_query($sql, $user->uid, $uid, $rtid))) {
-
-        //if not, delete the most recently added relationship and replace it with the newly selected one
-
-        $sql = "DELETE FROM {user_relationships} WHERE rid = %d";
-        db_query($sql, $result['MAX(rid)']);
-
-        user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-      }
-    }
+    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
 
     //Clear cache of the block "fluksonians"
     _logger_cache_clear('fluksonians');
