@@ -925,9 +925,8 @@ function _notification_compose_error_email($description, $recommendation = NULL)
  */
 function _notification_send_emails($sql, $message) {
 
-  global $user;
   global $base_url;
-  $language = user_preferred_language($user);
+
   $result = db_query($sql);
 
   while ($object = db_fetch_array($result)) {
@@ -941,7 +940,7 @@ function _notification_send_emails($sql, $message) {
     $subject = t('Event Notification');
 
     $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
-    $body = t($message, $variables, $language->language) . $logo;
+    $body = t($message, $variables) . $logo;
 
     $params = array(
       'subject' => $subject,
