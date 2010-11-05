@@ -2,6 +2,20 @@
 
 function notification_install() {
   drupal_install_schema('notification');
+
+  global $user;
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (1, 'No Heartbeat')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (2, 'Corrupted Heartbeat')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (3, 'Any Heartbeat Failure')";
+  db_query($sql, $user->uid);
+
+  $sql = "INSERT INTO {event} (id, name) VALUE (4, 'Peak Consumption')";
+  db_query($sql, $user->uid);
 }
 
 function notification_uninstall() {
@@ -14,13 +28,13 @@ function notification_schema() {
     'description' => t('Stores Flukso events'),
     'fields' => array(
       'id' => array(
-        'type' => 'int',
-        'not null' => TRUE,
+        'type'      => 'int',
+        'not null'  => TRUE,
         'unasigned' => TRUE,
       ),
       'name' => array(
         'type' => 'varchar',
-        'length' => '50',
+        'length'   => '50',
         'not null' => TRUE,
       ),
     ),
@@ -32,26 +46,47 @@ function notification_schema() {
   $schema['notification'] = array(
     'description' => t('Stores event notifications'),
     'fields' => array(
-      'device' => array(
-        'type' => 'varchar',
-        'length' => '32',
-        'not null' => TRUE,
+      'device'       => array(
+        'type'       => 'varchar',
+        'length'     => '32',
+        'not null'   => TRUE,
       ),
       'event_id' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'unasigned' => TRUE,
+        'type'       => 'int',
+        'not null'   => TRUE,
+        'unasigned'  => TRUE,
       ),
       'email' => array(
-        'type' => 'varchar',
-        'length' => '64',
-        'not null' => TRUE,
+        'type'       => 'varchar',
+        'length'     => '64',
+        'not null'   => TRUE,
+      ),
+      'base_value' => array(
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
+        'disp-width' => '10',
       ),
       'limit_up' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
+        'disp-width' => '10',
+      ),
+      'latest_checkup' => array(
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
+        'disp-width' => '10',
+      ),
+      'last_sent' => array(
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
         'disp-width' => '10',
       ),
     ),

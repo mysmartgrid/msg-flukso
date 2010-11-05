@@ -33,11 +33,16 @@ define('BROWN',   '808000');
 define('PINK',    'FF0080');
 define('CYAN',    '00ffff');
 define('SKYBLUE', '0080FF');
+define('BLACK',   '050305');
+define('GREY',    '809090');
+define('GREEN2',  '00FF00');
+define('GREEN3',  '9ED3C0');
+define('BROWN2',  'DED00F');
 
 define('ROOT_PATH',   drupal_get_path('module', 'logger'));
 define('GRAPH_PATH',  ROOT_PATH . '/graphs');
-define('DATA_PATH',   ROOT_PATH . '/data/base');
-define('AGG_DB_PATH', DATA_PATH . "/aggregate.rrd");
+define('DATA_PATH',   ROOT_PATH . '/data');
+define('AGG_DB_PATH', DATA_PATH . "/base/aggregate.rrd");
 define('RRDTOOL',     ROOT_PATH . '/rrdtool');
 
 define('MINUTE', 60);
@@ -46,6 +51,8 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
+
+define(SELECTED_CHART_UNIT, 'logger_selected_chart_unit');
 
 
 function logger_init() {
@@ -66,48 +73,159 @@ function logger_menu() {
 
   $items = array();
 
+  //TODO: remove the function name "main" from the callbacks
+
+  // Dashboard operations
+
   $items['logger'] = array(
     'title'            => 'Your power consumption',
     'description'      => 'Show the dashboard.',
     'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'hour'),
     'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
+    'type'             => MENU_CALLBACK
   );
 
-  $items['overview'] = array(
-    'title'            => 'Overview',
-    'description'      => 'Show the project overview.',
-    'page callback'    => '_logger_overview',
+  $items['logger/electricity'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
     'page arguments'   => array('electricity', 'main', 'hour'),
     'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
+    'type'             => MENU_CALLBACK
   );
 
-  $items['installation'] = array(
-    'title'            => '',
-    'description'      => 'Howto install a Fluksometer',
-    'page callback'    => '_logger_installation',
+  /*
+  $items['logger/water'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('water', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/gas'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('gas', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );*/
+
+  $items['logger/electricity/hour'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/electricity/day'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'day'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/electricity/month'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'month'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/electricity/year'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'year'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/electricity/night'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'main', 'night'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+
+  // Overview operations
+
+  $items['overview'] = array(
+    'title'            => 'Overall View',
+    'description'      => 'Show the project overall view.',
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['overview/electricity'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  /*
+  $items['overview/water'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('water', 'hour'),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK,
   );
 
-  $items['admin/settings/logger'] = array(
-    'title'            => 'Logger settings',
-    'description'      => 'Configure settings for logging metering values.',
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('_logger_admin_settings'),
-    'access arguments' => array('administer site configuration'),
+  $items['overview/gas'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('gas', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );*/
+
+  $items['overview/electricity/hour'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'hour'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
   );
 
-  $items['user/%user_uid_optional/privacy'] = array(
-    'title'            => 'Privacy',
-    'page callback'    => '_logger_account_privacy',
-    'access callback'  => '_logger_account_access',
-    'access arguments' => array('logger', 1),
-    'type'             => MENU_LOCAL_TASK,
-    'file'             => 'logger.admin.inc',
-    'weight'           => 2,
+  $items['overview/electricity/day'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'day'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['overview/electricity/month'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'month'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['overview/electricity/year'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'year'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['overview/electricity/night'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'night'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
   );
 
 
@@ -132,152 +250,6 @@ function logger_menu() {
     'page callback'    => '_logger_unit',
     'access arguments' => array('logger'),
     'type'             => MENU_CALLBACK,
-  );
-
-
-  // Dashboard operations
-
-  $items['logger/electricity'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  /*
-  $items['logger/water'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('water', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  $items['logger/gas'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('gas', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );*/
-
-  $items['logger/electricity/hour'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 0,
-  );
-
-  $items['logger/electricity/day'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 1,
-  );
-
-  $items['logger/electricity/month'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 2,
-  );
-
-  $items['logger/electricity/year'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 3,
-  );
-
-  $items['logger/electricity/night'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'main', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 4,
-  );
-
-
-  // Overview operations
-
-  $items['overview/electricity'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  /*
-  $items['overview/water'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('water', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  $items['overview/gas'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('gas', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );*/
-
-  $items['overview/electricity/hour'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 0,
-  );
-
-  $items['overview/electricity/day'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 1,
-  );
-
-  $items['overview/electricity/month'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 2,
-  );
-
-  $items['overview/electricity/year'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 3,
-  );
-
-  $items['overview/electricity/night'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'main', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-    'weight'           => 4,
   );
 
 
@@ -345,6 +317,35 @@ function logger_menu() {
     'access arguments' => array('logger', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
+  );
+
+
+  /* Other operations */
+
+  $items['installation'] = array(
+    'title'            => '',
+    'description'      => 'Howto install a Fluksometer',
+    'page callback'    => '_logger_installation',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['admin/settings/logger'] = array(
+    'title'            => 'Logger settings',
+    'description'      => 'Configure settings for logging metering values.',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('_logger_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+  );
+
+  $items['user/%user_uid_optional/privacy'] = array(
+    'title'            => 'Privacy',
+    'page callback'    => '_logger_account_privacy',
+    'access callback'  => '_logger_account_access',
+    'access arguments' => array('logger', 1),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'logger.admin.inc',
+    'weight'           => 2,
   );
 
   return $items;
@@ -423,16 +424,22 @@ function _logger_dashboard($type, $function, $interval) {
     drupal_set_title(t('Your power consumption'));
 
     $sensors = _logger_get_user_sensors($type, $function);
-    $chart = _logger_get_chart_params($interval, $type, $sensors[0]->unit);
+    $chart = _logger_get_chart_params($interval, $type);
 
     global $user;
-    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE);
+    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE, GREEN2, BLACK, GREY, GREEN3, BROWN2);
     $i = 0;
 
     foreach ($sensors as &$sensor) {
 
       $shifted = $sensor->private && ($sensor->uid != $user->uid);
-      $caption = $sensor->uid == $user->uid ? $sensor->function : $sensor->username;
+
+      if ($sensor->uid == $user->uid) {
+        $caption = $sensor->function;
+
+      } else {
+        $caption = $sensor->username . ' ' . $sensor->function;
+      }
 
       $file_path = $chart->data_path . '/' . $sensor->meter . '.rrd';
       $color = $colors[$i % count($colors)];
@@ -449,14 +456,65 @@ function _logger_dashboard($type, $function, $interval) {
 
   } else {
 
-    return _logger_overview($type, $function, $interval);
+    return _logger_overview($type, $interval);
   }
 }
 
-function _logger_overview($type, $function, $interval) {
+function _logger_overview($type, $interval) {
 
-  drupal_set_title(t('Overview'));
+  drupal_set_title(t('Overall View'));
 
+  //General explanation
+  $output .= theme('overview_topic', NULL,
+    t('<b>mySmartGrid</b> is the smart device control for your home.
+    It enables you to understand your energy consumption and share your
+    experiences with others.'), 'content/das-projekt');
+
+  //Latest blogpost
+  $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
+  $result = db_fetch_object(db_query($sql, "blogpost"));
+
+  if ($result) {
+
+    $blog = node_load(array('nid' => $result->nid));
+
+    $output .= theme('overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+  }
+
+  //Current Status
+  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> %d";
+  $result = db_fetch_object( db_query($sql, 0));
+  $devcounter = $result->total;
+
+  $sql = "
+    SELECT
+      count(*) as total
+    FROM
+      {users} u
+    WHERE
+      EXISTS(
+        SELECT
+          1
+        FROM
+          {logger_devices} d
+        WHERE
+          d.uid = u.uid
+      )";
+
+  $result = db_fetch_object( db_query($sql));
+  $usercounter = $result->total;
+
+  $output .= theme('overview_topic', t('Total Consumption of All Participants'),
+    t('Currently, <b>@devcounter</b> Flukso devices are installed 
+      in <b>@usercounter</b> households. The following chart shows their
+      aggregate electricity consumption.',
+      array(
+        '@devcounter'  => $devcounter,
+        '@usercounter' => $usercounter)));
+
+  $output .= "<br>";
+
+  //Chart
   $chart = _logger_get_chart_params($interval, $type);
   $chart->def  .= _logger_chart_def(0, AGG_DB_PATH, $chart->factor);
   $chart->line .= _logger_chart_line(0, BLUE, t('All'));
@@ -468,15 +526,13 @@ function _logger_overview($type, $function, $interval) {
   return $output;
 }
 
-function _logger_count_installations() {
+function _logger_get_chart_params($interval, $type) {
 
-  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> 0";
-  $aggregation = db_fetch_object( db_query($sql));
+  $unformatted_unit = $_SESSION[SELECTED_CHART_UNIT];
 
-  return $aggregation->total;
-}
-
-function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') {
+  if ($unformatted_unit == '' || $unformatted_unit == NULL) {
+    $unformatted_unit = 'watt';
+  }
 
   $params = new stdClass();
 
@@ -486,7 +542,7 @@ function _logger_get_chart_params($interval, $type, $unformatted_unit = 'watt') 
   //Default
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data_path = DATA_PATH;
+  $params->data_path = DATA_PATH . '/base';
   $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
   $params->line = ' COMMENT:"\s" ';
   $params->def = '';
@@ -567,7 +623,8 @@ function _logger_get_user_sensors($type, $function) {
       INNER JOIN {logger_users} lu ON lm.uid = lu.uid
     WHERE
       lm.uid = %d AND
-      lm.type = '%s'
+      lm.type = '%s' AND
+      lm.function IS NOT NULL
     ORDER BY
       lm.function";
 
@@ -576,6 +633,8 @@ function _logger_get_user_sensors($type, $function) {
   while ($sensor = db_fetch_object($result)) {
     $sensors[] = $sensor;
   }
+
+  //TODO: If the user has multiple sensors, should they all be aggregated?
 
   if (user_access('logger')) {
 
@@ -597,11 +656,11 @@ function _logger_get_user_sensors($type, $function) {
         ur.requester_id = %d AND
         urt.name = '%s' AND
         lm.type = '%s' AND
-        lm.function = '%s'
+        lm.function IS NOT NULL
       ORDER BY
         ur.rid";
 
-    $result = db_query($sql, $user->uid, 'subscription', $type, $function);
+    $result = db_query($sql, $user->uid, 'subscription', $type);
 
     while($sensor = db_fetch_object($result)) {
       $sensors[] = $sensor;
@@ -622,9 +681,10 @@ function _logger_get_formatted_timezone() {
   if ($user->uid) {
     $offset = $user->timezone;
 
-  } else {
-    //Default: GMT+2:00
-    $offset = 2 * 60 * 60;
+  } else { //If user is not logged in
+
+    //Gets timezone used in the browser. Auto Timezone option must be turned on.
+    $offset = $_SESSION['timezone'];
   }
 
   $hours = gmdate('h:i', abs($offset));
@@ -648,7 +708,6 @@ function _logger_add($uid) {
   global $user;
 
   $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
-
   $rtid = db_result(db_query($sql, 'subscription'));
 
   $sql = "
@@ -668,31 +727,9 @@ function _logger_add($uid) {
   // don't allow users to add themselves
   if ($uid != $user->uid) { 
 
-    // max subscriptions = 4
-    if ($result['COUNT(rid)'] < 4) {
-      user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
+    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
 
-    } else {
-      //check whether the requested relationship doesn't already exist
-
-      $sql = "
-        SELECT
-          rid
-        FROM
-          {user_relationships}
-        WHERE
-          requester_id = %d AND
-          requestee_id = %d AND
-          rtid = %d";
-      
-      if (!db_result(db_query($sql, $user->uid, $uid, $rtid))) {
-
-        // if not, delete the most recently added relationship and replace it with the newly selected one
-        db_query("DELETE FROM {user_relationships} WHERE rid = %d", $result['MAX(rid)']);
-
-        user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-      }
-    }
+    //Clear cache of the block "fluksonians"
     _logger_cache_clear('fluksonians');
   }
 
@@ -715,6 +752,7 @@ function _logger_remove($rid) {
     watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
   }
 
+  //Clear cache of the block "fluksonians"
   _logger_cache_clear('fluksonians');
 
   $destination = drupal_get_destination();
@@ -723,22 +761,9 @@ function _logger_remove($rid) {
 
 function _logger_unit($unit) {
 
-  global $user;
+  $_SESSION[SELECTED_CHART_UNIT] = $unit;
 
-  //hardcoded type and function
-
-  $sql = "
-    UPDATE
-      {logger_meters}
-    SET
-      unit = '%s'
-    WHERE
-      uid = %d AND
-      type = '%s' AND
-      function = '%s'";
-
-  db_query($sql, $unit, $user->uid, 'electricity', 'main');
-
+  //Clear cache of the block "unit"
   _logger_cache_clear('unit');
 
   $destination = drupal_get_destination();
@@ -794,25 +819,38 @@ function logger_theme() {
 
   return array(
     'chart' => array(
-      'arguments' => array('chart' => NULL),
+      'arguments' => array(
+        'chart' => NULL),
+    ),
+
+    'overview_topic' => array(
+      'arguments' => array(
+        'title' => NULL,
+        'body' => NULL,
+        'link' => NULL),
     ),
 
     'logger_item_list' => array(
-      'arguments' => array('items' => NULL, 'title' => NULL),
+      'arguments' => array(
+        'items' => NULL,
+        'title' => NULL),
     ),
 
     'logger_account_devices' => array(
-      'arguments' => array('form' => NULL),
+      'arguments' => array(
+        'form' => NULL),
       'file'      => 'logger.admin.inc',
     ),
 
     'logger_account_devices_list' => array(
-      'arguments' => array('items' => NULL),
+      'arguments' => array(
+        'items' => NULL),
       'file'      => 'logger.admin.inc',
     ),
 
     'logger_account_sensors_list' => array(
-      'arguments' => array('items' => NULL),
+      'arguments' => array(
+        'items' => NULL),
       'file'      => 'logger.admin.inc',
     ),
   );
@@ -823,25 +861,43 @@ function logger_theme() {
  */
 function theme_chart($chart_file_path, $context) {
 
+  /*
   $primary = array(
     l(t('Electricity'), "$context/electricity")
   );
 
+  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
+  */
+  
   $secondary = array(
     l(t('Hour'),  "$context/electricity/hour"),
     l(t('Day'),   "$context/electricity/day"),
     l(t('Month'), "$context/electricity/month"),
     l(t('Year'),  "$context/electricity/year"),
-    //l(t('Night'), "$context/electricity/night")
+    l(t('Night'), "$context/electricity/night")
   );
 
-  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
   $output .= theme_item_list($secondary, NULL, 'ul', array('class' => 'tabs secondary'));
 
   $output .= '
     <p id="chart">
       <img src="'. base_path() . $chart_file_path .'" alt="Flukso"/>
     </p>';
+
+  return $output;
+}
+
+function theme_overview_topic($title, $body, $link = NULL) {
+
+  if($title) {
+    $output .= '<br><h3 class="node-headline">' . $title . '</h3>';
+  }
+  
+  $output .= "<p> $body </p>";
+
+  if($link) {
+    $output .= '<p>' . l(t('read more'), $link) . '</p>';
+  }
 
   return $output;
 }
@@ -856,14 +912,14 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       $blocks['fluksonians']['status'] = TRUE;
       $blocks['fluksonians']['region'] = 'content';
       $blocks['fluksonians']['weight'] = 1;
-      $blocks['fluksonians']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['fluksonians']['pages'] = 'logger/\nlogger/*';
       $blocks['fluksonians']['cache'] = BLOCK_CACHE_PER_USER;
 
       $blocks['unit']['info'] = t('Unit');
       $blocks['unit']['status'] = TRUE;
-      $blocks['unit']['region'] = 'right';
+      $blocks['unit']['region'] = 'content';
       $blocks['unit']['weight'] = 2;
-      $blocks['unit']['pages'] = '<front>\nlogger/\nlogger/*';
+      $blocks['unit']['pages'] = 'logger/\nlogger/*';
       $blocks['unit']['cache'] = BLOCK_CACHE_PER_USER;
 
       $blocks['posts']['info'] = t('Recent blog posts');
@@ -883,7 +939,7 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       } elseif ($delta == 'unit' && user_access('logger')) {
 
-        $block = _logger_create_units_block();
+        $block['content'] = drupal_get_form('_logger_units_form');
 
       } elseif ($delta == 'posts' && user_access('access content')) {
 
@@ -892,60 +948,6 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
       return $block;
   }
-}
-
-function _logger_create_units_block() {
-
-  $block = array();
-
-  global $user;
-
-  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
-  $destination = drupal_get_destination();
-
-  //hardcoded the type and function parameters for now
-
-  $sql = "
-    SELECT
-      unit
-    FROM
-      {logger_meters}
-    WHERE
-      uid = %d AND
-      type = '%s' AND
-      function = '%s'";
-
-  $unit = db_result(db_query($sql, $user->uid, 'electricity', 'main'));
-
-  $items = array();
-  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
-  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
-
-  // 'unlink' the currently selected unit option
-  switch ($unit) {
-    case 'watt':
-      $items[0] = 'watt';
-      break;
-
-    case 'kwh':
-      $items[1] = 'kWh/year';
-      break;
-
-    case 'eur':
-      $items[2] = 'euro/year [@ 0.18eur/kWh]';
-      break;
-
-    case 'aud':
-      $items[3] = 'aud/year [@ 0.19aud/kWh]';
-      break;
-  }
-
-  $block['subject'] = t('Unit');
-  $block['content'] = theme('logger_item_list', $items);
-
-  return $block;
 }
 
 function _logger_create_recent_blogs_block() {
@@ -1060,13 +1062,68 @@ function _logger_fluksonians_form() {
     '#title'       => t('Fluksonians'),
     '#description' => t('Select the Fluksonians you wish to add to [+] or clear from [x] the chart.'),
     '#collapsible' => TRUE,
-    '#collapsed'   => TRUE,
+    '#collapsed'   => FALSE,
   );
 
   $form['fluksonians']['list'] = array(
     '#type'    => 'item',
     //'#title' => t('Title'),
     '#value'   => theme('table', array(), $rows),
+  );
+
+  return $form;
+}
+
+/**
+ * Generates the units block form.
+ */
+function _logger_units_form() {
+
+  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
+  $destination = drupal_get_destination();
+
+  $unit = $_SESSION[SELECTED_CHART_UNIT];
+  if (!$unit) {
+    $unit = 'watt';
+  }
+
+  $items = array();
+  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
+  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
+  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
+
+  // 'unlink' the currently selected unit option
+  switch ($unit) {
+    case 'watt':
+      $items[0] = 'watt';
+      break;
+
+    case 'kwh':
+      $items[1] = 'kWh/year';
+      break;
+
+    case 'eur':
+      $items[2] = 'euro/year [@ 0.18eur/kWh]';
+      break;
+
+    case 'aud':
+      $items[3] = 'aud/year [@ 0.19aud/kWh]';
+      break;
+  }
+
+  $form['units'] = array(
+    '#type'        => 'fieldset',
+    '#title'       => t('Unit'),
+    '#description' => t('Select the chart unit.'),
+    '#collapsible' => TRUE,
+    '#collapsed'   => FALSE,
+  );
+
+  $form['units']['list'] = array(
+    '#type'    => 'item',
+    //'#title' => t('Title'),
+    '#value'   => theme('logger_item_list', $items),
   );
 
   return $form;
@@ -1139,7 +1196,8 @@ function _logger_aggregate() {
       {logger_meters} m
     WHERE
       m.type = '%s' AND
-      m.unit = '%s'";
+      m.unit = '%s' AND
+      m.function IS NOT NULL";
 
   $aggregation = db_fetch_object( db_query($sql, 'electricity', 'watt'));
 
@@ -1245,7 +1303,7 @@ function _logger_chart_def($i, $file_path, $factor, $shifted = FALSE) {
  */
 function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
 
-  $caption = substr($caption . '          ', 0, 10);
+  $caption = substr($caption . '               ', 0, 15);
   
   $line =
     "LINE1:meter$i" . "#$color:" . "\"$caption\" ";

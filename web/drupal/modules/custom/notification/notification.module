@@ -19,13 +19,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+define('NO_HEARTBEAT',          1);
+define('CORRUPTED_HEARTBEAT',   2);
+define('ANY_HEARTBEAT_FAILURE', 3);
+define('PEAK_CONSUMPTION',      4);
+
 function notification_help($path, $arg) {
-  $output = '';
+  
+  $output = ''; 
+
   switch ($path) {
     case "admin/help#notification":
       $output = '<p>'.t("Allows the users to manage device event notifications.").'</p>';
       break;
   }
+
   return $output;
 }
 
@@ -41,24 +49,32 @@ function notification_menu() {
 
   $items = array();
 
-  $items['notification_list'] = array(
+  $items['notification/list'] = array(
     'title'             => 'Event Notifications',
     'page callback'     => 'notification_list_page',
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_NORMAL_ITEM
   );
 
-  $items['notification_delete'] = array(
-    'title'             => $items['notification_list']['title'],
+  $items['notification/delete'] = array(
+    'title'             => $items['notification/list']['title'],
     'page callback'     => 'notification_delete',
-    'page arguments'    => array(1, 2),
+    'page arguments'    => array(2, 3),
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_CALLBACK
   );
 
-  $items['notification_register'] = array(
+  $items['notification/register'] = array(
     'title'             => 'Event Notification Registration',
-    'page callback'     => 'notification_register_page',
+    'page callback'     => 'notification_registration_page',
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
+  );
+
+  $items['notification/edit'] = array(
+    'title'             => 'Event Notification Edition',
+    'page callback'     => 'notification_edition_page',
+    'page arguments'    => array(2, 3),
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_CALLBACK
   );
@@ -67,12 +83,59 @@ function notification_menu() {
 }
 
 /**
+ * Event notification deletion callback.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @return the events list page.
+ */
+function notification_delete($device, $event_id) {
+
+  _notification_delete($device, $event_id);
+  return notification_list_page();
+}
+
+/**
  * Builds the event registration page.
  *
  * @return the event registration page.
  */
-function notification_register_page() {
-  $output .= drupal_get_form('notification_register_form');
+function notification_registration_page() {
+  $output .= drupal_get_form('notification_registration_form');
+  return $output;
+}
+
+/**
+ * Builds the event notification edition page.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @return the event notification edition page.
+ */
+function notification_edition_page($device, $event_id) {
+
+  $sql = "
+    SELECT
+      e.id AS event_id,
+      e.name AS event_name,
+      n.device AS device,
+      d.serial AS serial,
+      n.email AS email,
+      n.limit_up AS limit_up
+    FROM
+      {event} e,
+      {notification} n,
+      {logger_devices} d
+    WHERE
+      d.device = '%s' AND
+      d.device = n.device AND
+      n.event_id = e.id AND
+      e.id = %d";
+
+  $notification = db_fetch_object(db_query($sql, $device, $event_id));
+
+  $output .= drupal_get_form('notification_edition_form', $notification);
+
   return $output;
 }
 
@@ -88,14 +151,17 @@ function notification_list_page() {
       d.serial AS serial,
       e.name AS event_name,
       n.email AS email,
+      IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone)) AS last_sent,
       n.limit_up AS limit_up,
       d.device AS device,
       e.id AS event_id
     FROM
+      {users} u,
       {logger_devices} d,
       {notification} n,
       {event} e
     WHERE
+      u.uid = d.uid AND
       d.uid = %d AND
       d.device = n.device AND
       n.event_id = e.id";
@@ -104,6 +170,7 @@ function notification_list_page() {
     array('data' => t('Device'),        'field' => 'serial',     'sort' => 'ASC'),
     array('data' => t('Event'),         'field' => 'event_name', 'sort' => 'ASC'),
     array('data' => t('Target e-mail'), 'field' => 'email'),
+    array('data' => t('Sent'),          'field' => 'last_sent'),
     array('data' => t('Operation'))
   );
 
@@ -117,15 +184,356 @@ function notification_list_page() {
     $row['serial'] = $object['serial'];
     $row['event_name'] = _notification_format_event_name($object['event_id'], $object['event_name'], $object['limit_up']);
     $row['email'] = $object['email'];
-    $row[] = l(t('Remove'), 'notification_delete/' . $object['device'] . '/' . $object['event_id']);
+    $row['last_sent'] = $object['last_sent'];
+    $row[] = l(t('Remove'), 'notification/delete/' . $object['device'] . '/' . $object['event_id']) . '<br>' .
+             l(t('Edit'),   'notification/edit/'   . $object['device'] . '/' . $object['event_id']);
 
     $rows[] = $row;
   }
 
-  $caption = '<p>' . l(t('Register Notification'), 'notification_register') . '</p>';
+  $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '</p>';
 
   $output .= theme('table', $header, $rows, array(), $caption);
   return $output;
+}
+
+function notification_registration_form() {
+
+  global $user;
+
+  $form['email'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('E-mail'),
+    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
+    '#maxlength'      => 64,
+    '#size'           => 20,
+    '#default_value'  => $user->mail,
+    '#element_validate'  => array('notification_email_validate'),
+  );
+
+  $form['device'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Serial Number'),
+    '#description'    => t('Select the serial number of the monitored device.'),
+    '#options'        => _notification_get_devices_options()
+  );
+
+  $form['events'] = array(
+    '#type'           => 'fieldset',
+    '#title'          => t('Events'),
+    '#prefix'         => '<br>'
+  );
+
+  $form['events']['event_id1'] = array(
+    '#title'          => _notification_get_event_name(1),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<br><table width="100%"><tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes'     => array(
+      'onchange' => '
+        limit_up1 = document.getElementById("limit_up1");
+        limit_up1.readOnly = !this.checked;
+        limit_up1.value = this.checked ? 120 : "";',
+    ),
+  );
+
+  $form['events']['limit_up1'] = array(
+    '#type'           => 'textfield',
+    '#description'    => t('Here you can set the maximum heartbeat delay. Beyond this limit, the device is considered faulty.'),
+    '#maxlength'      => 9,
+    '#size'           => 12,
+    '#field_suffix'   => t('minutes'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+    '#attributes'     => array(
+      'onfocus' => '
+        event_id1 = document.getElementById("event_id1");
+        this.readOnly = !event_id1.checked;',
+    ),
+  );
+
+  $form['events']['event_id3'] = array(
+    '#title'          => _notification_get_event_name(3),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes'     => array(
+      'onchange' => '
+        limit_up3 = document.getElementById("limit_up3");
+        limit_up3.readOnly = !this.checked;
+        limit_up3.value = this.checked ? 120 : "";',
+    ),
+  );
+
+  $form['events']['limit_up3'] = array(
+    '#type'           => 'textfield',
+    '#description'    => $form['events']['limit_up1']['#description'],
+    '#maxlength'      => 9,
+    '#size'           => 12,
+    '#field_suffix'   => t('minutes'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+    '#attributes'     => array(
+      'onfocus' => '
+        event_id3 = document.getElementById("event_id3");
+        this.readOnly = !event_id3.checked;',
+    ),
+  );
+
+  $form['events']['event_id4'] = array(
+    '#title'          => _notification_get_event_name(4),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td>',
+    '#attributes'     => array(
+      'onchange' => '
+        limit_up4 = document.getElementById("limit_up4");
+        limit_up4.readOnly = !this.checked;
+        limit_up4.value = this.checked ? 5000 : "";',
+    ),
+  );
+
+  $form['events']['limit_up4'] = array(
+    '#type'           => 'textfield',
+    '#description'    => t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.'),
+    '#maxlength'      => 12,
+    '#size'           => 12,
+    '#field_suffix'   => t('watt / h'),
+    '#prefix'         => '<td>',
+    '#suffix'         => '</td></tr>',
+    '#attributes'     => array(
+      'onfocus' => ' 
+        event_id4 = document.getElementById("event_id4");
+        this.readOnly = !event_id4.checked;',
+    ),
+  );
+
+  $form['events']['event_id2'] = array(
+    '#title'          => _notification_get_event_name(2),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td>',
+    '#suffix'         => '</td><td></td></tr></table>'
+  );
+
+  $form['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Save'),
+  );
+
+  return $form;
+}
+
+function notification_edition_form(&$form_state, $notification) {
+
+  $form['device'] = array(
+    '#type'              => 'hidden',
+    '#default_value'     => $notification->device,
+  );
+
+  $form['event_id'] = array(
+    '#type'              => 'hidden',
+    '#default_value'     => $notification->event_id,
+  );
+
+  $form['event_name'] = array(
+    '#type'              => 'textfield',
+    '#title'             => t('Event'),
+    '#default_value'     => t($notification->event_name),
+    '#attributes'        => array('readOnly' => 'true')
+  );
+
+  $form['serial'] = array(
+    '#type'              => 'textfield',
+    '#title'             => t('Serial Number'),
+    '#default_value'     => $notification->serial,
+    '#attributes'        => array('readOnly' => 'true')
+  );
+
+  $form['email'] = array(
+    '#type'              => 'textfield',
+    '#title'             => t('E-mail'),
+    '#description'       => t('Enter the e-mail to which the notification will be sent.'),
+    '#maxlength'         => 64,
+    '#size'              => 20,
+    '#default_value'     => $notification->email,
+    '#element_validate'  => array('notification_email_validate'),
+  );
+
+  switch ($notification->event_id) {
+    case 1:
+    case 3:
+      $form['limit_up'] = array(
+        '#type'          => 'textfield',
+        '#title'         => t('Maximum Delay'),
+        '#description'   => t('Here you can set the maximum heartbeat delay. Beyond this limit, the device is considered faulty.'),
+        '#maxlength'     => 9,
+        '#size'          => 12,
+        '#field_suffix'  => t('minutes'),
+        '#default_value' => $notification->limit_up
+      );
+      break;
+
+    case 4:
+      $form['limit_up'] = array(
+        '#type'          => 'textfield',
+        '#title'         => t('Maximum Consumption'),
+        '#description'   => t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.'),
+        '#maxlength'     => 9,
+        '#size'          => 12,
+        '#field_suffix'  => t('watt / h'),
+        '#default_value' => $notification->limit_up
+      );
+      break;
+    case 2:
+      break;
+  } 
+
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Save'),
+  );
+
+  return $form;
+}
+
+function notification_registration_form_validate($form, &$form_state) {
+
+  $event_id1 = $form_state['values']['event_id1'];
+  $event_id3 = $form_state['values']['event_id3'];
+  $event_id4 = $form_state['values']['event_id4'];
+
+  if($event_id1) {
+    _notification_validate_minutes('limit_up1', $form_state);
+  }
+
+  if($event_id3) {
+    _notification_validate_minutes('limit_up3', $form_state);
+  }
+  
+  if ($event_id4) {
+    _notification_validate_watts('limit_up4', $form_state);
+  }
+}
+
+function notification_edition_form_validate($form, &$form_state) {
+
+  $event_id = $form_state['values']['event_id'];
+
+  switch ($event_id) {
+    case 1 :
+    case 3 :
+      _notification_validate_minutes('limit_up', $form_state);
+      break;
+
+    case 4 :
+      _notification_validate_watts('limit_up', $form_state);
+      break;
+  }
+}
+
+function notification_email_validate($field, $form_state) {
+
+  if (!valid_email_address($form_state['values']['email'])) {
+    form_error($field, t('Invalid e-mail.'));
+  }
+}
+
+/**
+ * Validates a field to enter minutes.
+ *
+ * @param $field_name  The field name.
+ */
+function _notification_validate_minutes($field_name, $form_state) {
+
+  $limit_up = $form_state['values'][$field_name];
+
+  if($limit_up < 30) {
+    form_set_error($field_name, t('Delay time can not be less than 30 minutes.'));
+  }
+}
+
+/**
+ * Validates a field to enter watts.
+ *
+ * @param $field_name  The field name.
+ */
+function _notification_validate_watts($field_name, $form_state) {
+
+  $limit_up = $form_state['values'][$field_name];
+
+  if($limit_up < 1) {
+    form_set_error($field_name, t('Peak consumption can not be less than 1 watt / h.'));
+  }
+}
+
+function notification_registration_form_submit($form, &$form_state) {
+
+  $device    = $form_state['values']['device'];
+  $email     = $form_state['values']['email'];
+
+  $event_id1 = $form_state['values']['event_id1'];
+  $limit_up1 = $form_state['values']['limit_up1'];
+
+  $event_id2 = $form_state['values']['event_id2'];
+
+  $event_id3 = $form_state['values']['event_id3'];
+  $limit_up3 = $form_state['values']['limit_up3'];
+
+  $event_id4 = $form_state['values']['event_id4'];
+  $limit_up4 = $form_state['values']['limit_up4'];
+
+  if ($event_id1) {
+    _notification_delete($device, 1);
+    _notification_insert($device, 1, $email, $limit_up1);
+  }
+
+  if ($event_id2) {
+    _notification_delete($device, 2);
+    _notification_insert($device, 2, $email, 0);
+  }
+
+  if ($event_id3) {
+    _notification_delete($device, 3);
+    _notification_insert($device, 3, $email, $limit_up3);
+  }
+
+  if ($event_id4) {
+    _notification_delete($device, 4);
+    _notification_insert($device, 4, $email, $limit_up4);
+  }
+
+  $form_state['redirect'] = 'notification/list';
+}
+
+function notification_edition_form_submit($form, &$form_state) {
+
+  $device   = $form_state['values']['device'];
+  $email    = $form_state['values']['email'];
+  $event_id = $form_state['values']['event_id'];
+  $limit_up = $event_id == CORRUPTED_HEARTBEAT? 0 : $form_state['values']['limit_up'];
+
+  _notification_delete($device, $event_id);
+  _notification_insert($device, $event_id, $email, $limit_up);
+
+  $form_state['redirect'] = 'notification/list';
+}
+
+/**
+ * Returns an event name.
+ *
+ * @param $event_id  The event id.
+ * @return the event name.
+ */
+function _notification_get_event_name($event_id) {
+
+  $sql = "SELECT name FROM {event} WHERE id = %d";
+  $result = db_fetch_object(db_query($sql, $event_id));
+
+  return t($result->name);
 }
 
 /**
@@ -139,11 +547,12 @@ function notification_list_page() {
 function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
   $name = t($event_name);
-  if ($event_id == 1 || $event_id == 3) {
-    $name .= " (in $limit_up min)";
 
-  } else if ($event_id == 4) {
-    $name .= " ($limit_up watts)";
+  if ($event_id == NO_HEARTBEAT || $event_id == ANY_HEARTBEAT_FAILURE_EVENT_ID) {
+    $name .= "<br>(in $limit_up min)";
+
+  } else if ($event_id == PEAK_CONSUMPTION) {
+    $name .= "<br>($limit_up watt / h)";
   }
   return $name;
 }
@@ -169,114 +578,6 @@ function _notification_get_devices_options() {
 }
 
 /**
- * Returns an array of translated event names.
- *
- * @return the array of event names.
- */
-function _notification_get_events_options() {
-
-  $sql = "SELECT id, name FROM {event} ORDER BY id";
-  $result = db_query($sql);
-
-  $events = array();
-  while ($row = db_fetch_array($result)) {
-    $events[$row['id']] = t($row['name']);
-  }
-
-  return $events;
-}
-
-function notification_register_form() {
-
-  global $user;
-
-  $form['email'] = array(
-    '#type'           => 'textfield',
-    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
-    '#maxlength'      => 64,
-    '#size'           => 20,
-    '#default_value'  => $user->mail
-  );
-
-  $form['device'] = array(
-    '#type'         => 'select',
-    '#description'  => t('Select the serial number of the monitored device.'),
-    '#options'      => _notification_get_devices_options()
-  );
-
-  $form['event_id'] = array(
-    '#type'           => 'select',
-    '#description'    => t('Select the event to be detected and notified.'),
-    '#options'        => _notification_get_events_options(),
-    '#default_value'  => 1,
-    '#attributes'     => array('onchange' => '
-      wrapper = document.getElementById("edit-limit-up-wrapper");
-      wrapper.style.visibility = (this.value == 2? "hidden" : "visible");'
-    )
-  );
-
-  $form['limit_up'] = array(
-    '#type'           => 'textfield',
-    '#description'    => t('For "Peak Consumption", enter the maximum electricity consumption in watts.
-    Otherwise, enter the maximum heartbeat delay in minutes. Beyond these limits, the device is considered faulty.'),
-    '#maxlength'      => 6,
-    '#size'           => 6,
-    '#default_value'  => 120
-  );
-
-  $form['submit'] = array(
-    '#type'   => 'submit',
-    '#value'  => t('Save')
-  );
-
-  return $form;
-}
-
-function notification_register_form_submit($form, &$form_state) {
-
-  $device   = $form_state['values']['device'];
-  $event_id = $form_state['values']['event_id'];
-  $email = $form_state['values']['email'];
-  $limit_up = $form_state['values']['limit_up'];
-
-  _notification_delete($device, $event_id);
-  _notification_insert($device, $event_id, $email, $limit_up);
-
-  $form_state['redirect'] = 'notification_list';
-}
-
-function notification_register_form_validate($form, &$form_state) {
-
-  $email = $form_state['values']['email'];
-  $event_id = $form_state['values']['event_id'];
-  $limit_up = $form_state['values']['limit_up'];
-
-  if (!valid_email_address($email)) {
-    form_set_error('email', t('Invalid e-mail.'));
-  }
-
-  if(($event_id == 1 || $event_id == 3) && $limit_up < 30) {
-    form_set_error('limit_up', t('Delay time can not be less than 30 minutes.'));
-
-  } else if ($event_id == 4 && $limit_up < 1) {
-    form_set_error('limit_up', t('Peak consumption can not be less than 1 watt.'));
-  }
-}
-
-/**
- * Event notification deletion callback.
- *
- * @param $device    The monitored device.
- * @param $event_id  The event id.
- * @return the events list page.
- */
-function notification_delete($device, $event_id) {
-
-  _notification_delete($device, $event_id);
-  return notification_list_page();
-}
-
-/**
  * Deletes an event notification.
  *
  * @param $device    The monitored device.
@@ -284,7 +585,13 @@ function notification_delete($device, $event_id) {
  */
 function _notification_delete($device, $event_id) {
 
-  $sql = "DELETE FROM {notification} WHERE device = '%s' AND event_id = %d";
+  $sql = "
+    DELETE FROM
+      {notification}
+    WHERE
+      device = '%s' AND
+      event_id = %d";
+
   db_query($sql, $device, $event_id);
 }
 
@@ -298,51 +605,130 @@ function _notification_delete($device, $event_id) {
  */
 function _notification_insert($device, $event_id, $email, $limit_up) {
 
-  $sql = "INSERT INTO {notification} (device, event_id, email, limit_up) VALUES('%s', %d, '%s', %d)";
-  db_query($sql, $device, $event_id, $email, $limit_up);
+  $base_value = 0;
+
+  //If event = Peak Consumption
+  if ($event_id == 4) {
+
+    $sql = "
+      SELECT
+        SUM(m.value) AS total
+      FROM
+        {logger_meters} m
+      WHERE
+        m.type   = '%s' AND
+        m.device = '%s' ";
+
+    //Note: the values are stored in unit 'watt'
+
+    $result = db_fetch_object( db_query($sql, 'electricity', $device));
+
+    $base_value = $result->total;
+  }
+
+  $sql = "
+    INSERT INTO
+      {notification} (device, event_id, email, base_value, latest_checkup, limit_up, last_sent)
+    VALUES
+      ('%s', %d, '%s', %d, %d, %d, %d)";
+
+  db_query($sql, $device, $event_id, $email, $base_value, time(), $limit_up, 0);
+}
+
+/**
+ * Updates an event notification.
+ *
+ * @param $device    The monitored device.
+ * @param $event_id  The event id.
+ * @param $last_sent The timestamp when the latest email was sent.
+ */
+function _notification_update($device, $event_id, $last_sent) {
+
+  $sql = "
+    UPDATE
+      {notification}
+    SET
+      last_sent = %d
+    WHERE
+      device = '%s' AND
+      event_id = %d";
+
+  db_query($sql, $last_sent, $device, $event_id);
+}
+
+/**
+ * Updates notification checkup date.
+ *
+ * @param $now       The event checkup time.
+ */
+function _notification_update_checkups($now) {
+
+  $sql = "UPDATE {notification} SET latest_checkup = %d";
+
+  db_query($sql, $now);
 }
 
 function notification_cron() {
 
-  _notification_send_no_heartbeat_emails();
-  _notification_send_corrupted_heartbeat_emails();
-  _notification_send_any_heartbeat_failure_emails();
-  _notification_send_peak_consumption_emails();
+  $now = time();
+
+  _notification_send_no_heartbeat_emails($now);
+  _notification_send_corrupted_heartbeat_emails($now);
+  _notification_send_any_heartbeat_failure_emails($now);
+  _notification_send_peak_consumption_emails($now);
+
+  _notification_update_checkups($now);
 }
 
 /**
  * Sends e-mails notifying users of "No Heartbeat" events.
- * 
+ *
+ * @param $now       The event checkup time.
  * @param $event_id  The actual event that is causing the notification to be sent.
  *                   It can be either "No Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_no_heartbeat_emails($event_id = 1) {
+function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
 
-  $tz = _notification_get_user_timezone();
+  $minute = 60;
+  $day = 86400;
 
   $sql = "
     SELECT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
+      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
       n.limit_up AS limit_up
     FROM
       {users} u,
       {logger_devices} d,
       {notification} n
     WHERE
-      u.uid = d.uid AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      SYSDATE() > (FROM_UNIXTIME(d.access) + INTERVAL n.limit_up MINUTE) AND
-      n.event_id = $event_id";
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      $now > (d.access + n.limit_up * $minute) AND
+      NOT EXISTS(
+        SELECT
+          1
+        FROM
+          {logger_meters} m
+        WHERE
+          m.device = d.device AND
+          m.corrupted <> 0
+      )";
 
-  $message = _notification_compose_error_email("
-    Your Flukso device (serial number: %serial) has not been sending heartbeats for more
-    than %limit_up minutes, since %event_time.",
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = _notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has not been sending " .
+    "heartbeats for more than %limit_up minutes, since %event_time.",
 
-    "Check your WLAN configuration and make sure that it remains active for at least 1 hour per day.
-    The device might be working fine, but it is failing to send the heartbeats over the internet.");
+    "Check your WLAN configuration and make sure that it remains active for " . 
+    "at least 1 hour per day. The device might be working fine, but it is " .
+    "failing to send the heartbeats over the internet.");
 
   _notification_send_emails($sql, $message);
 }
@@ -350,112 +736,156 @@ function _notification_send_no_heartbeat_emails($event_id = 1) {
 /**
  * Sends e-mails notifying users of "Corrupted Heartbeat" events.
  *
+ * @param $now       The event checkup time.
  * @param $event_id  The actual event that is causing the notification to be sent.
  *                   It can be either "Corrupted Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_corrupted_heartbeat_emails($event_id = 2) {
+function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPTED_HEARTBEAT) {
 
-  $tz = _notification_get_user_timezone();
+  $day = 86400;
 
   $sql = "
     SELECT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time
+      FROM_UNIXTIME(m.corrupted + u.timezone) AS event_time
     FROM
       {users} u,
       {logger_devices} d,
       {logger_meters} m,
       {notification} n
     WHERE
-      u.uid = d.uid AND
-      d.device = m.device AND
-      m.type = 'electricity' AND
-      SYSDATE() > (FROM_UNIXTIME(m.access) + INTERVAL 2 HOUR) AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      n.event_id = $event_id";
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      m.device = d.device AND
+      m.corrupted <> 0";
 
-  $message = _notification_compose_error_email("
-    Your Flukso device (serial number: %serial) has sent a heartbeat with corrupted data at %event_time.");
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = _notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has sent a heartbeat with " .
+    "corrupted data at %event_time.");
 
   _notification_send_emails($sql, $message);
 }
 
 /**
  * Sends e-mails notifying users of "Any Heartbeat Failure" events.
+ *
+ * @param $now  The event checkup time.
  */
-function _notification_send_any_heartbeat_failure_emails() {
+function _notification_send_any_heartbeat_failure_emails($now) {
 
-  _notification_send_no_heartbeat_emails(3);
-  _notification_send_corrupted_heartbeat_emails(3);
+  _notification_send_no_heartbeat_emails($now, 3);
+  _notification_send_corrupted_heartbeat_emails($now, 3);
 }
 
 /**
  * Sends em-mails notifying users of the occurrence of Peak Consumption events.
+ *
+ * @param $now  The event checkup time.
  */
-function _notification_send_peak_consumption_emails() {
+function _notification_send_peak_consumption_emails($now) {
 
-  $tz = _notification_get_user_timezone();
+  $event_id = PEAK_CONSUMPTION;
+  $hour = 3600;
+  $day = 86400;
 
   $sql = "
-    SELECT
+    SELECT DISTINCT
+      d.device AS device,
+      n.event_id AS event_id,
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      CONVERT_TZ(FROM_UNIXTIME(d.access),'+00:00',$tz) AS event_time,
-      n.limit_up AS limit_up
+      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
+      n.limit_up AS limit_up,
+      n.base_value AS base_value,
+      n.latest_checkup AS latest_checkup
     FROM
       {users} u,
       {logger_devices} d,
       {logger_meters} m,
       {notification} n
     WHERE
-      u.uid = d.uid AND
+      d.uid = u.uid AND
       d.device = n.device AND
-      n.event_id = 4 AND
-      d.device = m.device AND
-      m.type = 'electricity' AND
-      m.unit = 'watt'
+      n.event_id = $event_id AND
+      $now > (n.last_sent + $day) AND
+      m.device = d.device AND
+      m.type = 'electricity'
     GROUP BY
       u.name,
       n.email,
       d.access,
-      n.limit_up
+      n.limit_up,
+      n.base_value
     HAVING
-      sum(m.value) > n.limit_up";
+      (SUM(m.value) - n.base_value) / (($now - n.latest_checkup) / $hour) > n.limit_up";
 
-  $message = _notification_compose_email("
-    Your Flukso device (serial number: %serial) has registered an electricity consumption
-    beyond %limit_up watts, at %event_time.");
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = _notification_compose_email(
+    "Your Flukso device (serial number: %serial) has registered an " .
+    "electricity consumption beyond %limit_up watt / h, at %event_time.");
 
   _notification_send_emails($sql, $message);
+
+  _notification_register_consumption();
+}
+
+function _notification_register_consumption() {
+
+  //Note: the values are stored in unit 'watt'
+
+  $sql = "
+    UPDATE
+      {notification}
+    SET
+      base_value =
+        SELECT
+          SUM(m.value)
+        FROM
+          {logger_meters} m
+        WHERE
+          m.type = '%s' AND
+          m.device = notification.device
+    WHERE
+      notification.event_id = %d";
+
+  db_query($sql, 'electricity', PEAK_CONSUMPTION);
 }
 
 /**
  * Composes an e-mail that notifies a general event.
  *
- * @param $description  The event description.
+ * @param $description  The event description. 
  * @param $complement   Complementary information about the error.
  * @return the e-mail message.
  */
-function _notification_compose_email($description, $complement = "") {
+function _notification_compose_email($description, $complement = NULL) {
 
-  global $base_url;
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
 
-  return "
-    <p>Dear user %user_name
-    <br> &nbsp;<br></p>
+  $complement = $complement == NULL? "" : "<p>$complement</p> ";
 
-    <p>$description</p>
-    <p>$complement</p>
+  return
+    "<p>Dear user %user_name " .
+    "<br> &nbsp;<br></p> " .
 
-    <p>If you want to stop receiving this notification, please remove it from your
-    <a href='$base_url/notification_list'>event notifications list</a>.</p>
+    "<p>$description</p> " .
 
-    <p>&nbsp;<br>
-    Best Regards,</p>
-    <p>mySmartGrid Team</p>";
+    $complement .
+
+    "<p>If you want to stop receiving this notification, please remove it from your " .
+    "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
+
+    "<p>&nbsp;<br> " .
+    "Best Regards,</p> " .
+    "<p>mySmartGrid Team</p>";
 }
 
 /**
@@ -469,53 +899,55 @@ function _notification_compose_error_email($description, $recommendation = NULL)
 
   $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
 
-  global $base_url;
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  return _notification_compose_email($description,
 
-  return _notification_compose_email($description, "
+    "In order to identify and solve the problem, please take the following actions. " .
+    "<ul> " .
+      $recommendation .
 
-    In order to identify and solve the problem, please take the following actions.
-    <ul>
-      $recommendation
+      "<li>Check if the device complies with the " .
+      "<a href='!base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>. " .
+      "It might be improperly installed or misconfigured.<br><br> " .
 
-      <li>Check if the device complies with the
-      <a href='$base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>.
-      It might be improperly installed or misconfigured.<br><br>
+      "<li>Visit our <a href='!base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
+      "and read the answers to questions made by other users in similar situations.<br><br> " .
 
-      <li>Visit our <a href='$base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, and
-      read the answers to questions made by other users in similar situations.<br><br>
-
-      <li>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de.
-    </ul>");
+      "<li>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de. " .
+    "</ul>");
 }
 
 /**
  * Sends event notification e-mails to notifiable users.
  *
  * @param $sql     The SQL statement for selecting the events.
- * @param $message The e-mail message.
+ * @param $message The e-mail message. 
  */
 function _notification_send_emails($sql, $message) {
 
-  global $user;
   global $base_url;
-  $language = user_preferred_language($user);
+
   $result = db_query($sql);
-  $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
 
   while ($object = db_fetch_array($result)) {
 
     $variables = array();
+    $variables["!base_url"] = $base_url;
     foreach ($object as $key => $value) {
       $variables["%$key"] = $value;
     }
 
     $subject = t('Event Notification');
-    $body = t($message, $variables, $language->language) . $logo;
+
+    $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
+    $body = t($message, $variables) . $logo;
 
     $params = array(
       'subject' => $subject,
       'body' => $body
     );
+
+    _notification_update($object['device'], $object['event_id'], time());
 
     drupal_mail('notification', 'notice', $object['email'], $language, $params);
   }
@@ -526,15 +958,4 @@ function notification_mail($key, &$message, $params) {
   $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];
-}
-
-/**
- * Returns the user formatted timezone.
- * 
- * @return the formatted timezone.
- */
-function _notification_get_user_timezone() {
-  global $user;
-  $hours = $user->timezone / (60 * 60);
-  return $hours < 0 ? "'$hours:00'" : "'+$hours:00'";
 }

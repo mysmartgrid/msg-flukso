@@ -23,7 +23,9 @@ define('DB_RELATIVE_PATH', 'sites/all/modules/msg_dump/db');
 define('DB_ABS_PATH',      $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DB_RELATIVE_PATH);
 
 function msg_dump_help($path, $arg) {
+  
   $output = '';
+
   switch ($path) {
     case "admin/help#msg_dump":
       $output = '<p>' . t("
@@ -32,6 +34,7 @@ function msg_dump_help($path, $arg) {
         possibility to download this data.") . '</p>';
       break;
   }
+
   return $output;
 }
 
@@ -60,7 +63,8 @@ function msg_dump_cron() {
   $now = $now->format('U');
 
   //get requested dumps from database
-  $result = db_query("SELECT stop, file FROM {msg_dump} WHERE start <= %d", $now);
+  $sql = "SELECT stop, file FROM {msg_dump} WHERE start <= %d";
+  $result = db_query($sql, $now);
   //watchdog("cron", "[msg_dump_cron] Running: " . mysqli_num_rows($result));
 
   while($data = db_fetch_object($result)) {
@@ -68,7 +72,9 @@ function msg_dump_cron() {
     if ( $data->stop + 2629743 < $now ) {
       //delete dumps older then 3 months
       exec("rm " . DB_ABS_PATH . "/" . $date->file . ".*");
-      db_query("DELETE FROM {msg_dump} WHERE file = '%s'", $date->file);
+      
+      $sql = "DELETE FROM {msg_dump} WHERE file = '%s'";
+      db_query($sql, $date->file);
 
     } elseif ( $data->stop > $now ) {
       $res = exec("flukso_archive_watts -c " . DB_ABS_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
@@ -81,10 +87,12 @@ function msg_dump_cron() {
 }
 
 function msg_dump_theme() {
+
   return array(
     'msg_dump_setup' => array(
       'arguments' => array('form' => NULL)
     ),
+
     'msg_dump_setup_list' => array(
       'arguments' => array('items' => NULL)
     ),
@@ -94,11 +102,13 @@ function msg_dump_theme() {
 function msg_dump_setup() {
 
   global $user;
+
   $newdate = new DateTime('now');
   $newdate->setTime(0, 0);
   $newdate->modify('+1 week');
 
-  $result = db_query('SELECT serial FROM {logger_devices} WHERE uid = %d', $user->uid);
+  $sql = 'SELECT serial FROM {logger_devices} WHERE uid = %d';
+  $result = db_query($sql, $user->uid);
 
   $fluksos = array();
 
@@ -106,7 +116,8 @@ function msg_dump_setup() {
     $fluksos[$serial->serial] = $serial->serial;
   }
 
-  $result = db_query('SELECT file FROM {msg_dump} WHERE uid = %d', $user->uid);
+  $sql = 'SELECT file FROM {msg_dump} WHERE uid = %d';
+  $result = db_query($sql, $user->uid);
 
   while($file = db_fetch_object($result)) {
 
@@ -128,8 +139,8 @@ function msg_dump_setup() {
   );
 
   $form['type'] = array(
-    '#type'   => 'hidden',
-    '#value'  => 'electricity',
+    '#type'         => 'hidden',
+    '#value'        => 'electricity',
   );
 
   $form['from'] = array(
@@ -140,11 +151,11 @@ function msg_dump_setup() {
   );
 
   $form['to'] = array(
-    '#type'           => 'date',
-    '#title'          => t("Until"),
-    '#after_build' => array('_limit_year'),
-    '#description' => t('The date dumping should stop on'),
-    '#default_value'  => array(
+    '#type'         => 'date',
+    '#title'        => t("Until"),
+    '#after_build'  => array('_limit_year'),
+    '#description'  => t('The date dumping should stop on'),
+    '#default_value'=> array(
       'year'  => $newdate->format("Y"),
       'month' => $newdate->format("n"),
       'day'   => $newdate->format("d")),
@@ -203,10 +214,13 @@ function msg_dump_setup_form_submit($form, &$form_state) {
     $serial = $form_state['values']['flukso'];
     $type = $form_state['values']['type'];
 
-    $result = db_query("
-      INSERT
-        INTO {msg_dump} (serial, uid, start, stop, file)
-        VALUES ('%s', %d, %d, %d, '%s')", $serial, $user->uid, $from, $to, $file);
+    $sql = "
+      INSERT INTO
+        {msg_dump} (serial, uid, start, stop, file)
+      VALUES
+        ('%s', %d, %d, %d, '%s')";
+
+    $result = db_query($sql, $serial, $user->uid, $from, $to, $file);
 
     msg_dump_register($file, $serial, $type);
 
@@ -214,7 +228,9 @@ function msg_dump_setup_form_submit($form, &$form_state) {
 
     $file = $form_state['clicked_button']['#name'];
 
-    db_query("DELETE FROM {msg_dump} WHERE file = '%s'", $file);
+    $sql = "DELETE FROM {msg_dump} WHERE file = '%s'";
+    db_query($sql, $file);
+
     exec('rm ' . DB_ABS_PATH . '/' . $file . '.*');
   }
 }
@@ -224,7 +240,8 @@ function theme_msg_dump_setup($form) {
   global $user;
   $rows = array();
 
-  $result = db_query("SELECT * FROM {msg_dump} WHERE uid = %d", $user->uid);
+  $sql = "SELECT * FROM {msg_dump} WHERE uid = %d";
+  $result = db_query($sql, $user->uid);
 
   while ($device = db_fetch_object($result)) {
 
@@ -257,7 +274,7 @@ function theme_msg_dump_setup_list($items) {
 
 function msg_dump_register($file, $serial, $type) {
 
-  $values = db_query("
+  $sql = "
     SELECT
       logger_tokens.token AS token,
       logger_meters.meter AS meter
@@ -267,7 +284,9 @@ function msg_dump_register($file, $serial, $type) {
         LEFT JOIN logger_devices ON logger_meters.device = logger_devices.device
     WHERE
       logger_devices.serial = '%s' AND
-      logger_meters.type = '%s'", $serial, $type);
+      logger_meters.type = '%s'";
+
+  $values = db_query($sql, $serial, $type);
 
   global $base_url;
 
@@ -289,21 +308,26 @@ function msg_dump_register($file, $serial, $type) {
 }
 
 function msg_dump_install() {
-  db_query("
+
+  $sql = "
     CREATE TABLE IF NOT EXISTS `msg_dump` (
-      `id` int(11) NOT NULL auto_increment,
+      `id`     int(11) NOT NULL auto_increment,
       `serial` int(10) unsigned NOT NULL,
-      `uid` int(10) unsigned NOT NULL,
-      `start` int(10) unsigned NOT NULL,
-      `stop` int(10) unsigned NOT NULL,
-      `file` varchar(32) character set utf8 NOT NULL,
-      `type` varchar(32) character set utf8 default NULL,
+      `uid`    int(10) unsigned NOT NULL,
+      `start`  int(10) unsigned NOT NULL,
+      `stop`   int(10) unsigned NOT NULL,
+      `file`   varchar(32) character set utf8 NOT NULL,
+      `type`   varchar(32) character set utf8 default NULL,
        UNIQUE KEY `id` (`id`)
-    ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1");
+    ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1";
+
+  db_query($sql);
 }
 
 function _limit_year($form_element, $form_values) {
+  
   $now = date('Y');
   $form_element['year']['#options'] = drupal_map_assoc(range($now, 2037));
+
   return $form_element;
 }

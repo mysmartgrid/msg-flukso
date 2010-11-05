@@ -35,6 +35,7 @@ function logger_xmlrpc() {
       array('int', 'string', 'int', 'int', 'int'), // Return value's type, then any parameter types (upgrade, device, version, resets, uptime)
       'Send a heartbeat to the logger.' // Description.
       ),
+
     array(
       'logger.measurementAdd', // External method name.
       '_logger_measurement_add', // Drupal callback function to run.
@@ -82,13 +83,17 @@ function _logger_measurement_add($logs) {
   $path->night = $path->root .'/data/night/';
 
   foreach ($logs as $meter => $measurements) {
+
     //load the normalisation factor, relative to 1pulse = 1Wh
-    $meterdata = db_fetch_object(db_query("SELECT uid, night, factor FROM {logger_meters} WHERE meter = '%s'", $meter));
+    $sql = "SELECT uid, night, factor FROM {logger_meters} WHERE meter = '%s'";
+    $meterdata = db_fetch_object(db_query($sql, $meter));
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
 
       $command = $path->root . '/rrdtool update ' . $path->base . $meter . '.rrd ';
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
+
+      $corrupted_time = 0;
 
       foreach ($measurements as $timestamp => $value) {
 
@@ -97,8 +102,11 @@ function _logger_measurement_add($logs) {
 
         } else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
+          $corrupted_time = time();
         }
       }
+
+      _logger_update_meter_integrity($meter, $corrupted_time);
 
       system($command, $return);
 
@@ -121,10 +129,14 @@ function _logger_measurement_add($logs) {
           } else {
             watchdog_xmlrpc('logger.measurementAdd', 'error updating night rrd: %command', array('%command' => $command), WATCHDOG_ERROR); //debugging
           }
-          $meterdata->night = $midnight + 108000; //add an offset of 30h = 6AM local time
+          
+          //add an offset of 30h = 6AM local time
+          $meterdata->night = $midnight + 108000;
         }
-        // {logger_meters} is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
-        db_query("UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'", time(), $meterdata->night, $value, $meter);
+
+        $sql = "UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'";
+        db_query($sql, time(), $meterdata->night, $value, $meter);
+        //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
       } else {
         watchdog_xmlrpc('logger.measurementAdd', 'shell command execution failed: %return %command', array('%command' => $command, '%return' => $return), WATCHDOG_ERROR);
@@ -132,6 +144,19 @@ function _logger_measurement_add($logs) {
     }
   }
   return $command; //using $command for testing purposes, replace by $info afterwards
+}
+
+/**
+ * Updates the meter integrity flag.
+ *
+ * @param $meter            The meter being updated.
+ * @param $corruption_time  The time when a corrupted heartbeat was received.
+ *                          The value 0 means that the heartbeat was sound.
+ */
+function _logger_update_meter_integrity($meter, $corruption_time) {
+
+    $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
+    db_query($sql, $corruption_time, $meter);
 }
 
 /**
