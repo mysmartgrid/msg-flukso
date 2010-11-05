@@ -1217,7 +1217,7 @@ function _logger_device_access($permission, $serial) {
 
 function logger_cron() {
 
-  //Delete png files created 1 minute ago or earlier
+  //Delete png files older than 1 minute
   exec('find ' . GRAPH_PATH . '/hour/*'  . ' -mmin +1 -exec rm {}');
   exec('find ' . GRAPH_PATH . '/day/*'   . ' -mmin +1 -exec rm {}');
   exec('find ' . GRAPH_PATH . '/month/*' . ' -mmin +1 -exec rm {}');
