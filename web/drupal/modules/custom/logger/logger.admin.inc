@@ -75,12 +75,29 @@ function _logger_account_devices_submit($form, &$form_state) {
   $code = $form_state['values']['code'];
 
   db_query("UPDATE {logger_devices} SET uid = %d WHERE device LIKE '%s%'", $user->uid, $code);
-  db_query("UPDATE {logger_meters} SET uid = %d WHERE device LIKE '%s%'", $user->uid, $code);
+
+  $result = db_query("SELECT meter, function FROM {logger_meters} WHERE device LIKE '%s%'", $code);
+  $i = 2;
+
+  while($sensor = db_fetch_object($result)) {
+
+    $function = $sensor->function;
+
+    //Find an unique name for 'function'
+    while ($function && !_logger_function_name_validate($function, $sensor->meter)) {
+      $function = "Sensor $i";
+      $i++;
+    }
+
+    db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+  }
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
   if (!user_access('logger')) {
+
     $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
     db_query("INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)", $user->uid, $rid);
     db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $user->uid, 0);
   }
@@ -95,15 +112,17 @@ function _logger_device_deactivate($serial) {
 
   $device = db_result(db_query("SELECT device FROM {logger_devices} WHERE serial = %d", $serial));
 
-  db_query("UPDATE {logger_devices} SET uid = 0 WHERE serial = %d", $serial);
-  db_query("UPDATE {logger_meters} SET uid = 0 WHERE device = '%s'", $device);
+  db_query("UPDATE {logger_devices} SET uid = %d WHERE serial = %d", 0, $serial);
+  db_query("UPDATE {logger_meters} SET uid = %d WHERE device = '%s'", 0, $device);
 
   $count = db_result(db_query("SELECT count(*) FROM {logger_devices} WHERE uid = %d", $uid));
 
   // check whether the user is still a fluksonian
   // if not, remove entries in {users_roles} and {logger_users}
   if ($count == 0) {
-    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = 'fluksonian'"));
+
+    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
     db_query("DELETE FROM {users_roles} WHERE uid = %d AND rid = %d", $uid, $rid);
     db_query("DELETE FROM {logger_users} WHERE uid = %d AND private = 0", $uid);
   }
@@ -347,6 +366,7 @@ function logger_sensor_form_validate($form, &$form_state) {
   $meter = $form_state['values']['meter'];
 
   if (!_logger_function_name_validate($function, $meter)) {
+    //TODO: use concatenation instead of multi-line string
     form_set_error('function', t('Another sensor was found with the function name: %function_name.
       Please inform another name which has not yet been used.', array('%function_name' => $function)));
   }
