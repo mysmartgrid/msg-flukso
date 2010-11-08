@@ -442,8 +442,10 @@ function _logger_dashboard($type, $function, $interval) {
 
       $color = $colors[$i % count($colors)];
 
-      $chart->def  .= _logger_chart_def($i, $chart, $sensor, $shifted);
-      $chart->line .= _logger_chart_line($i, $color, $caption, $shifted);
+      $series_id = "meter$i";
+      $chart->def  .= _logger_chart_sensor_data_series($series_id, $chart, $sensor, $shifted);
+      $chart->def  .= _logger_chart_legend_item($series_id);
+      $chart->line .= _logger_chart_line($series_id, $color, $caption, $shifted);
 
       $i++;
     }
@@ -469,6 +471,7 @@ function _logger_overview($type, $interval) {
 
   drupal_set_title(t('Overall View'));
 
+
   //General explanation
   $output .= theme('overview_topic', NULL,
     t('<b>mySmartGrid</b> is the smart device control for your home.
@@ -486,7 +489,9 @@ function _logger_overview($type, $interval) {
     $output .= theme('overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
   }
 
-  //Current Status
+
+  //Counters
+
   $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> %d";
   $result = db_fetch_object( db_query($sql, 0));
   $devcounter = $result->total;
@@ -519,16 +524,35 @@ function _logger_overview($type, $interval) {
 
   $output .= "<br>";
 
-  $sensors = _logger_get_active_sensors($type);
 
-  //Chart
-  $chart = _logger_get_chart_params($interval, $type);
-  $chart->def = _logger_create_agg_chart_def(0, $chart, $sensors);
-  $chart->line .= _logger_chart_line(0, BLUE, t('All'));
+  //Aggregated Consumption Chart
 
-  _logger_create_chart_file($chart);
-  
-  $output .= theme('chart', $chart->file_path, 'overview');
+  $chart_cid = "logger_agg_chart$interval$type";
+  $cache_table = 'cache_filter';
+
+  //cache_filter is recommended for temporary information
+  $cached_chart = cache_get($chart_cid, $cache_table);
+
+  if ($cached_chart) {
+    $chart_output = $cached_chart->data;
+
+  } else {
+
+    $sensors = _logger_get_active_sensors($type);
+
+    $chart = _logger_get_chart_params($interval, $type);
+    $chart->def = _logger_chart_agg_data_series("meter0", $chart, $sensors);
+    $chart->line .= _logger_chart_line("meter0", BLUE, t('All'));
+
+    _logger_create_chart_file($chart);
+
+    $chart_output = theme('chart', $chart->file_path, 'overview');
+
+    $expire = time() + 1 * MINUTE;
+    cache_set($chart_cid, $chart_output, $cache_table, $expire);
+  }
+
+  $output .= $chart_output;
 
   return $output;
 }
@@ -1217,7 +1241,9 @@ function _logger_device_access($permission, $serial) {
 
 function logger_cron() {
 
-  //Delete png files older than 1 minute
+  //Delete png files older than 1 minute.
+  //This limit prevents chart files from being removed before is is is sent to the user.
+
   exec('find ' . GRAPH_PATH . '/hour/*'  . ' -mmin +1 -exec rm {}');
   exec('find ' . GRAPH_PATH . '/day/*'   . ' -mmin +1 -exec rm {}');
   exec('find ' . GRAPH_PATH . '/month/*' . ' -mmin +1 -exec rm {}');
@@ -1226,7 +1252,7 @@ function logger_cron() {
 }
 
 /**
- * Creates a DEF tag to represent the series of measurements performed by a single sensor.
+ * Creates RRD tags to represent the series of measurements performed by a single sensor.
  *
  * @param $series_id  The series' id.
  * @param $chart      The chart parameters.
@@ -1234,15 +1260,16 @@ function logger_cron() {
  * @param $shifted    Whether the series are to be shifted to the left, in order to be hidden.
  * @return the RRD DEF tag.
  */
-function _logger_chart_def($series_id, $chart, $sensor, $shifted = FALSE) {
+function _logger_chart_sensor_data_series($series_id, $chart, $sensor, $shifted = FALSE) {
 
-  $def .= _logger_chart_meter_cdef($series_id, $chart, $sensor);
+  $file_path = $chart->data_path . "/" . $sensor->meter . ".rrd" ;
 
-  $def .= $shifted ?
+  $def = "DEF:data$series_id="   . "$file_path:meter:AVERAGE " .
+    "CDEF:$series_id=" . "data$series_id," . $chart->factor . ",* ";
 
-    "SHIFT:meter$series_id" . ':-31556926 ' :
-
-    _logger_chart_legend($series_id);
+  if ($shifted) {
+    $def .= "SHIFT:$series_id" . ':-31556926 ';
+  }
 
   return $def;
 }
@@ -1253,10 +1280,11 @@ function _logger_chart_def($series_id, $chart, $sensor, $shifted = FALSE) {
  * @param $series_id   The series' id.
  * @param $chart       The chart parameters.
  * @param $sensors     The array of sensors to be aggregated.
- * @return the DEF and CDEF tags.
+ * @return the DEF and CDEF tags. 
  */
-function _logger_create_agg_chart_def($series_id, $chart, $sensors) {
+function _logger_chart_agg_data_series($series_id, $chart, $sensors) {
 
+  //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = time() - 30 * MINUTE;
   $def = "";
   $variables = "";
@@ -1264,75 +1292,60 @@ function _logger_create_agg_chart_def($series_id, $chart, $sensors) {
   $i = 1;
   foreach ($sensors as $sensor) {
 
-    $def .= _logger_chart_meter_cdef($i, $chart, $sensor) .
+    $sensor_cdf = "meter$i";
+
+    $def .= _logger_chart_sensor_data_series($sensor_cdf, $chart, $sensor) .
 
       //Considers unknown measurements to be zero
-      "CDEF:var$i=" . "meter$i,UN,0,meter$i,IF " .
+      "CDEF:completeseries$i=" . "$sensor_cdf,UN,0,$sensor_cdf,IF " .
 
       //Do not consider latest 30 minutes
-      "CDEF:mvar$i=TIME,$end_time,GT,UNKN,var$i,IF ";
+      "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
 
-    $variables .= ($i > 1 ? ',' : '') . "mvar$i";
+    $variables .= ($i > 1 ? ',' : '') . "filtered$i";
     $i++;
   }
 
   $operators = str_repeat(",+", count($sensors) - 1);
 
   //Sum all measurements of a particular time
-  $def .= "CDEF:meter$series_id=$variables$operators " .
-
-    _logger_chart_legend($series_id);
+  $def .= "CDEF:$series_id=$variables$operators ";
+  
+  $def .= _logger_chart_legend_item($series_id);
 
   return $def;
 }
 
 /**
- * Creates a DEF and CDEF tag to contain the measurements of a sensor.
- *
- * @param $i          The sensor's index.
- * @param $chart      The chart parameters.
- * @param $sensor     The sensor.
- * @return the DEF and CDEF tags.
- */
-function _logger_chart_meter_cdef($i, $chart, $sensor) {
-
-  $file_path = $chart->data_path . "/" . $sensor->meter . ".rrd" ;
-  
-  return
-    "DEF:data$i="   . "$file_path:meter:AVERAGE " .
-    "CDEF:meter$i=" . "data$i," . $chart->factor . ",* ";
-}
-
-/**
  * Creates a legend for the RRD chart.
  *
- * @param $series_id  The series' index.
+ * @param $series_id  The series' id.
  * @return the legend's RRD tags.
  */
-function _logger_chart_legend($series_id) {
+function _logger_chart_legend_item($series_id) {
 
   return
-    "VDEF:min$series_id"  . "=meter$series_id" . ',MINIMUM ' .
-    "VDEF:max$series_id"  . "=meter$series_id" . ',MAXIMUM ' .
-    "VDEF:avg$series_id"  . "=meter$series_id" . ',AVERAGE ' .
-    "VDEF:last$series_id" . "=meter$series_id" . ',LAST ';
+    "VDEF:min$series_id"  . "=$series_id" . ',MINIMUM ' .
+    "VDEF:max$series_id"  . "=$series_id" . ',MAXIMUM ' .
+    "VDEF:avg$series_id"  . "=$series_id" . ',AVERAGE ' .
+    "VDEF:last$series_id" . "=$series_id" . ',LAST ';
 }
 
 /**
  * Creates a LINE tag of an RRD chart.
  *
- * @param $series_id The series' index.
- * @param $color     The series' color.
- * @param $caption   The series' caption.
- * @param $shifted  Whether the series are to be shifted to the left, in order to be hidden.
+ * @param $series_id  The series' id.
+ * @param $color      The series' color.
+ * @param $caption    The series' caption.
+ * @param $shifted    Whether the series are to be shifted to the left, in order to be hidden.
  * @return the RRD LINE tag.
  */
-function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
+function _logger_chart_line($series_id, $color, $caption, $shifted = FALSE) {
 
   $caption = substr($caption . '               ', 0, 15);
 
   $line =
-    "LINE1:meter$i" . "#$color:" . "\"$caption\" ";
+    "LINE1:$series_id" . "#$color:" . "\"$caption\" ";
 
   $line .= $shifted ?
     'COMMENT:"min\:  prv" ' .
@@ -1340,10 +1353,10 @@ function _logger_chart_line($i, $color, $caption, $shifted = FALSE) {
     'COMMENT:"\tavg\:  prv" ' .
     'COMMENT:"\tlast\:  prv\l" ' :
 
-    "GPRINT:min$i"  . ':"min\:%5.0lf" ' .
-    "GPRINT:max$i"  . ':"\tmax\:%5.0lf" ' .
-    "GPRINT:avg$i"  . ':"\tavg\:%5.0lf" ' .
-    "GPRINT:last$i" . ':"\tlast\:%5.0lf\l" ';
+    "GPRINT:min$series_id"  . ':"min\:%5.0lf" ' .
+    "GPRINT:max$series_id"  . ':"\tmax\:%5.0lf" ' .
+    "GPRINT:avg$series_id"  . ':"\tavg\:%5.0lf" ' .
+    "GPRINT:last$series_id" . ':"\tlast\:%5.0lf\l" ';
 
   return $line;
 }
