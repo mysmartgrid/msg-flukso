@@ -21,6 +21,7 @@
 
 //Device states
 define('UNINSTALLED',   t('Uninstalled'));
+define('UNREGISTERED',  t('Unregistered'));
 define('NO_HEARTBEAT',  t('No Heartbeat'));
 define('CORRUPTED',     t('Corrupted Heartbeat'));
 define('WORKING',       t('Working'));
@@ -109,14 +110,17 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
 
   $now = time();
   $heartbeat_timeout = 7200; //2 hs
+  $registration_delay = 3 * 24 * 3600; //3 days
 
   $uninstalled_id  = 0;
-  $no_heartbeat_id = 1;
-  $corrupted_id    = 2;
-  $working_id      = 3;
+  $unregistered_id = 1;
+  $no_heartbeat_id = 2;
+  $corrupted_id    = 3;
+  $working_id      = 4;
 
   $states = array(
     $uninstalled_id  => UNINSTALLED,
+    $unregistered_id => UNREGISTERED,
     $no_heartbeat_id => NO_HEARTBEAT,
     $corrupted_id    => CORRUPTED,
     $working_id      => WORKING
@@ -131,7 +135,8 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
           IF(d.corrupted > 0, d.corrupted, IF(d.access > 0, d.access, d.created))
         ), '+00:00', $tz) AS latest,
 
-        IF(d.uid = 0, $uninstalled_id,
+        IF(d.uid = 0,
+          IF(($now - d.access) > $registration_delay,  $uninstalled_id,  $unregistered_id),
           IF(d.corrupted > 0, $corrupted_id,
             IF($now > (d.access + $heartbeat_timeout), $no_heartbeat_id, $working_id)
           )
@@ -239,7 +244,10 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
     } else {
       $latest = array('%latest' => $device['latest']);
 
-      if ($state == NO_HEARTBEAT) {
+      if ($state == UNREGISTERED) {
+        drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
+
+      } else if ($state == NO_HEARTBEAT) {
         drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
 
       } else if ($state == CORRUPTED) {
