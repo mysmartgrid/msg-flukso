@@ -23,26 +23,10 @@
  */
 
 //Constants
-define('RED',     'F1572F');
-define('BLUE',    '44C3D3');
-define('GREEN',   '7AAB5A');
-define('ORANGE',  'F37E2B');
-define('YELLOW',  'FBEB0D');
-define('PURPLE',  'A052A0');
-define('BROWN',   '808000');
-define('PINK',    'FF0080');
-define('CYAN',    '00ffff');
-define('SKYBLUE', '0080FF');
-define('BLACK',   '050305');
-define('GREY',    '809090');
-define('GREEN2',  '00FF00');
-define('GREEN3',  '9ED3C0');
-define('BROWN2',  'DED00F');
-
-define('ROOT_PATH',   drupal_get_path('module', 'logger'));
-define('GRAPH_PATH',  ROOT_PATH . '/graphs');
-define('DATA_PATH',   ROOT_PATH . '/data');
-define('RRDTOOL',     ROOT_PATH . '/rrdtool');
+define('ROOT_PATH',  drupal_get_path('module', 'logger'));
+define('GRAPH_PATH', ROOT_PATH . '/graphs');
+define('DATA_PATH',  ROOT_PATH . '/data');
+define('RRDTOOL',    ROOT_PATH . '/rrdtool');
 
 define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
@@ -51,17 +35,27 @@ define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
-define(SELECTED_CHART_UNIT, 'logger_selected_chart_unit');
+define('SELECTED_CHART_UNIT', 'logger_selected_chart_unit');
 
 
 function logger_init() {
   
   global $user;
 
-  // Workaround for collapse.js not being loaded within  _logger_fluksonians_form when block caching is on.
+  // Workaround for collapse.js not being loaded within _logger_fluksonians_form when block caching is on.
   if ($user->uid > 0) {
     drupal_add_js('misc/collapse.js');
   }
+
+  //If IE
+  if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
+    drupal_add_js(ROOT_PATH . '/js/excanvas.js');
+  }
+
+  drupal_add_js(ROOT_PATH . '/js/strftime-min.js');
+  drupal_add_js(ROOT_PATH . '/js/rgbcolor.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph-canvas.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph.js');
 }
 
 function logger_perm() {
@@ -420,36 +414,8 @@ function _logger_dashboard($type, $interval) {
     drupal_set_title(t('Your power consumption'));
 
     $sensors = _logger_get_user_sensors($type);
-    $chart = _logger_get_chart_params($interval, $type);
 
-    global $user;
-    $colors = array(RED, BLUE, GREEN, YELLOW, PURPLE, ORANGE, BROWN, PINK, CYAN, SKYBLUE, GREEN2, BLACK, GREY, GREEN3, BROWN2);
-    $i = 0;
-
-    foreach ($sensors as &$sensor) {
-
-      $shifted = $sensor->private && ($sensor->uid != $user->uid);
-
-      if ($sensor->uid == $user->uid) {
-        $caption = $sensor->function;
-
-      } else {
-        $caption = $sensor->username . ' ' . $sensor->function;
-      }
-
-      $color = $colors[$i % count($colors)];
-
-      $series_id = "meter$i";
-      $chart->def  .= _logger_chart_sensor_data_series($series_id, $chart, $sensor, $shifted);
-      $chart->def  .= _logger_chart_legend_item($series_id);
-      $chart->line .= _logger_chart_line($series_id, $color, $caption, $shifted);
-
-      $i++;
-    }
-
-    _logger_create_chart_file($chart);
-
-    return theme('chart', $chart->file_path, 'logger');
+    return _logger_create_user_dygraph($sensors, $type, $interval);
 
   } else {
 
@@ -468,7 +434,6 @@ function _logger_overview($type, $interval) {
 
   drupal_set_title(t('Overall View'));
 
-
   //General explanation
   $output .= theme('overview_topic', NULL,
     t('<b>mySmartGrid</b> is the smart device control for your home. ' .
@@ -486,16 +451,13 @@ function _logger_overview($type, $interval) {
     $output .= theme('overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
   }
 
-
   //Counters
-
-  $sql = "SELECT count(*) as total FROM {logger_devices} d WHERE d.uid <> %d";
-  $result = db_fetch_object( db_query($sql, 0));
-  $devcounter = $result->total;
+  $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
+  $devcounter = db_result( db_query($sql, 0));
 
   $sql = "
     SELECT
-      count(*) as total
+      count(*)
     FROM
       {users} u
     WHERE
@@ -508,8 +470,7 @@ function _logger_overview($type, $interval) {
           d.uid = u.uid
       )";
 
-  $result = db_fetch_object( db_query($sql));
-  $usercounter = $result->total;
+  $usercounter = db_result( db_query($sql));
 
   $output .= theme('overview_topic', t('Total Consumption of All Participants'),
     t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
@@ -517,39 +478,58 @@ function _logger_overview($type, $interval) {
       'aggregate electricity consumption.',
       array(
         '@devcounter'  => $devcounter,
-        '@usercounter' => $usercounter)));
+        '@usercounter' => $usercounter))) . '<br>';
 
-  $output .= "<br>";
+  $sensors = _logger_get_active_sensors($type);
 
+  $output .= _logger_create_dygraph_agg_chart($sensors, $type, $interval) . '<br>';
 
-  //Aggregated Consumption Chart
+  return $output;
+}
 
-  $chart_cid = "logger_agg_chart$interval$type";
-  $cache_table = 'cache_filter';
+/**
+ * Creates an Aggregated Consumption Chart using DyGraphs.
+ *
+ * @param $sensors  The array of sensors to be aggregated.
+ * @param $type     The sensor type.
+ * @param $interval The time interval.
+ * @return the chart output.
+ */
+function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
-  //cache_filter is recommended for temporary information
-  $cached_chart = cache_get($chart_cid, $cache_table);
+  $exported_cdef = "meter0";
+  $chart = _logger_get_chart_params($interval, $type);
+  $chart->def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
 
-  if ($cached_chart) {
-    $chart_output = $cached_chart->data;
+  $measurements[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $chart->def, $exported_cdef);
 
-  } else {
+  return theme('dygraph', $measurements, 'overview');
+}
 
-    $sensors = _logger_get_active_sensors($type);
+/**
+ * Creates an User Dashboard Chart using DyGraphs.
+ *
+ * @param $sensors  The array of sensors to be plotted.
+ * @param $type     The sensor type.
+ * @param $interval The time interval.
+ * @return the chart output.
+ */
+function _logger_create_user_dygraph($sensors, $type, $interval) {
 
-    $chart = _logger_get_chart_params($interval, $type);
-    $chart->def = _logger_chart_agg_data_series("meter0", $chart, $sensors);
-    $chart->line .= _logger_chart_line("meter0", BLUE, t('All'));
+  $chart = _logger_get_chart_params($interval, $type);
 
-    _logger_create_chart_file($chart);
+  //TODO: hide private sensors
 
-    $chart_output = theme('chart', $chart->file_path, 'overview');
+  $measurements = array();
+  foreach ($sensors as &$sensor) {
 
-    $expire = time() + 10 * MINUTE;
-    cache_set($chart_cid, $chart_output, $cache_table, $expire);
+    $exported_cdef = "meter";
+    $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
+
+    $measurements[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
   }
 
-  $output .= $chart_output;
+  $output .= theme('dygraph', $measurements, $chart->unit, 'logger');
 
   return $output;
 }
@@ -878,9 +858,17 @@ function logger_user($op) {
 function logger_theme() {
 
   return array(
-    'chart' => array(
+    'rrdchart' => array( //Deprecated
       'arguments' => array(
-        'chart' => NULL),
+        'file_path' => NULL,
+        'context' => NULL),
+    ),
+
+    'dygraph' => array(
+      'arguments' => array(
+        'data' => NULL,
+        'unit' => NULL,
+        'context' => NULL),
     ),
 
     'overview_topic' => array(
@@ -899,60 +887,37 @@ function logger_theme() {
     'logger_account_devices' => array(
       'arguments' => array(
         'form' => NULL),
-      'file'      => 'logger.admin.inc',
+      'file' => 'logger.admin.inc',
     ),
 
     'logger_account_devices_list' => array(
       'arguments' => array(
         'items' => NULL),
-      'file'      => 'logger.admin.inc',
+      'file' => 'logger.admin.inc',
     ),
 
     'logger_account_sensors_list' => array(
       'arguments' => array(
         'items' => NULL),
-      'file'      => 'logger.admin.inc',
+      'file' => 'logger.admin.inc',
     ),
   );
 }
 
 /**
- * Theming the chart.
+ * Theming a topic of the Overview page.
+ *
+ * @param $title  The topic title.
+ * @param $body   The topic body.
+ * @param $link   The topic link.
+ * @return the topic.
  */
-function theme_chart($chart_file_path, $context) {
-
-  /*
-  $primary = array(
-    l(t('Electricity'), "$context/electricity")
-  );
-
-  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
-  */
-  
-  $secondary = array(
-    l(t('Hour'),  "$context/electricity/hour"),
-    l(t('Day'),   "$context/electricity/day"),
-    l(t('Month'), "$context/electricity/month"),
-    l(t('Year'),  "$context/electricity/year"),
-    l(t('Night'), "$context/electricity/night")
-  );
-
-  $output .= theme_item_list($secondary, NULL, 'ul', array('class' => 'tabs secondary'));
-
-  $output .= '
-    <p id="chart">
-      <img src="'. base_path() . $chart_file_path .'" alt="Flukso"/>
-    </p>';
-
-  return $output;
-}
-
 function theme_overview_topic($title, $body, $link = NULL) {
 
   if($title) {
     $output .= '<br><h3 class="node-headline">' . $title . '</h3>';
   }
-  
+
   $output .= "<p> $body </p>";
 
   if($link) {
@@ -960,6 +925,190 @@ function theme_overview_topic($title, $body, $link = NULL) {
   }
 
   return $output;
+}
+
+/**
+ * Theming the DyGraph chart.
+ *
+ * @param $data    The chart series data. {user => {sensor => {timestamp => value}}}
+ * @param $unit    The chart unit.
+ * @param $context The page where the chart is going to be placed (overview or logger).
+ * @return the chart output.
+ */
+function theme_dygraph($data, $unit, $context) {
+
+  $timestamps = array();
+  foreach($data as $user => $sensors) {
+    foreach($sensors as $sensor => $measurements) {
+      foreach(array_keys($measurements) as $timestamp) {
+        $timestamps[$timestamp] = null;
+      }
+    }
+  }
+  $timestamps = array_keys($timestamps);
+  sort($timestamps);
+
+  $header = t('Time');
+  $values = array();
+
+  $s = 1;
+
+  //For each caption
+  foreach($data as $user => $sensors) {
+    foreach($sensors as $sensor => $measurements) {
+      $header .= ',S' . $s++;
+
+      //For each timestamp
+      foreach($timestamps as $timestamp) {
+
+        $value = $measurements[$timestamp];
+        $value = $value? $value : 'null';
+
+        $values[$timestamp] .= ',' . $value;
+      }
+    }
+  }
+
+  $series = $header . '\n ';
+  foreach($values as $timestamp => $values_list) {
+    $series .= date('Y-m-d H:i', $timestamp) . $values_list . '\n ';
+  }
+
+  $colors_list = '';
+  $colors = _logger_get_series_colors();
+  foreach($colors as $color) {
+    $colors_list .= ($colors_list == ''? '': ', ') . "'$color'";
+  }
+
+  $output = _logger_create_interval_menu($context);
+
+  $output .= '
+    <div>' . $unit . '</div>
+    <div id="dygraphdiv"></div>
+    <div id="dygraphstatus" style="min-height:20px; width=450px; padding-top:10px; padding-bottom:5px;"></div>
+
+    <script type="text/javascript">
+      g = new Dygraph(
+        document.getElementById("dygraphdiv"),
+        "' . $series . '",
+        {
+          labelsDiv: document.getElementById("dygraphstatus"),
+          colors: [' . $colors_list . '],
+          width: 600,
+          height: 350
+        }
+     );
+    </script>';
+
+  $output .= _logger_create_graph_legend($data, $colors);
+
+  return $output;
+}
+
+/**
+ * Creates the chart intervals' horizontal menu.
+ *
+ * @param $context  The page where the menu is going to be placed (overview or logger).
+ * @return the list of intervals' menus.
+ */
+function _logger_create_interval_menu($context) {
+  
+  $items = array(
+    l(t('Hour'),  "$context/electricity/hour"),
+    l(t('Day'),   "$context/electricity/day"),
+    l(t('Month'), "$context/electricity/month"),
+    l(t('Year'),  "$context/electricity/year"),
+    l(t('Night'), "$context/electricity/night")
+  );
+
+  return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
+}
+
+/**
+ * Creates the chart legend.
+ *
+ * @param $data   The series data.
+ * @param $colors The series colors.
+ * @return the chart legend as a table.
+ */
+function _logger_create_graph_legend($data, $colors) {
+
+  function _format($value) {
+    return $value > 0? number_format($value, 2) : '';
+  }
+
+  $i = 0;
+  foreach($data as $user => $sensors) {
+    foreach($sensors as $sensor => $measurements) {
+
+      $total = 0;
+      $last = 0;
+      $max = 0;
+      $min = null;
+      $sum = 0;
+      $avg = 0;
+      
+      foreach($measurements as $timestamp => $value) {
+        if ($value) {
+          $total++;
+          $last = $value;
+          $max = $value > $max? $value: $max;
+          $min = !$min || $value < $min? $value: $min;
+          $sum += $value;
+        }
+      }
+      $avg = $total > 0? $sum / $total : 0;
+
+      $color = $colors[$i++ % count($colors)];
+      $mark = '<div style="width: 10px; height: 10px;background-color:' . $color . ';"/>';
+
+      $lines[] = array(
+          'mark'    => $mark,
+          'user'    => $user,
+          'sensor'  => $sensor,
+          'max'     => _format($max),
+          'min'     => _format($min),
+          'avg'     => _format($avg),
+          'last'    => _format($last)
+      );
+    }
+  }
+
+  $headers = array(
+    array(                        'field' => 'mark'),
+    array('data'  => t('User'),   'field' => 'user'),
+    array('data'  => t('Sensor'), 'field' => 'sensor'),
+    array('data'  => t('Max'),    'field' => 'max'),
+    array('data'  => t('Min'),    'field' => 'min'),
+    array('data'  => t('Avg'),    'field' => 'avg'),
+    array('data'  => t('Last'),   'field' => 'last')
+  );
+
+  return '<br>' . theme('table', $headers, $lines);
+}
+
+/**
+ * Returns the list of colors used in chart series.
+ *
+ * @return array of colors.
+ */
+function _logger_get_series_colors() {
+  return array(
+      '#377037', //GREEN
+      '#C11700', //RED
+      '#0000FC', //BLUE
+      '#F37E2B', //ORANGE
+      '#B54FC6', //PINK
+      '#665C00', //BROWN
+      '#050305', //BLACK
+      '#809090', //GREY
+      '#9ED3C0', //REEN3
+      '#00FF00', //GREEN2
+      '#0080FF', //SKYBLUE
+      '#00ffff', //CYAN
+      '#FBEB0D', //YELLOW
+      '#DED00F', //BROWN2
+      );
 }
 
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
@@ -1232,16 +1381,47 @@ function _logger_device_access($permission, $serial) {
   return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-function logger_cron() {
+/**
+ * Queries the RRDTool databases for sensors' measurements.
+ *
+ * @param $interval       The time interval.
+ * @param $start          The start time.
+ * @param $def            The rrd def tag.
+ * @param $exported_cdef  The exported cdef.
+ * @return the array of sensors' measurements.
+ */
+function _logger_query_measurements($interval, $start, $def, $exported_cdef) {
 
-  $intervals = array('hour', 'day', 'month', 'year', 'night');
+  $tz = _logger_get_formatted_timezone();
 
-  //Delete png files older than 1 minute.
-  //This limit prevents chart files from being removed before is is is sent to the user.
-  foreach($intervals as $interval) {
+  $maxrows = array('hour' => 120, 'night' => 60, 'day' => 96, 'month' => 60, 'year' => 60);
+  $step    = array('hour' => 1,   'night' => 1,  'day' => 1,  'month' => 1,  'year' => 604800);
 
-    exec('find ' . GRAPH_PATH . "/$interval/*"  . ' -mmin +1 -exec rm {} \;');
+  $command = "TZ=\"$tz\" " . RRDTOOL . ' xport ' .
+    "--start $start " .
+    "--step $step[$interval] " .
+    "--maxrows $maxrows[$interval] " .
+    "$def " .
+    "XPORT:$exported_cdef";
+
+  exec($command, $lines);
+
+  foreach($lines as $line) {
+    $line = strtolower($line);
+
+    if (strpos($line, '<row>') > 0) {
+
+      $line = str_replace(array('<row><t>', '</v></row>'), '',  $line);
+      $line = str_replace('</t><v>', ':', $line);
+      $div_pos = strpos($line, ':');
+
+      $timestamp = trim(substr($line, 0, $div_pos));
+      $value     = trim(substr($line, $div_pos + 1));
+
+      $data[$timestamp] = $value == 'nan'? null: $value;
+    }
   }
+  return $data;
 }
 
 /**
@@ -1285,12 +1465,12 @@ function _logger_chart_agg_data_series($series_id, $chart, $sensors) {
   $i = 1;
   foreach ($sensors as $sensor) {
 
-    $sensor_cdf = "meter$i";
+    $sensor_cdef = "meter$i";
 
-    $def .= _logger_chart_sensor_data_series($sensor_cdf, $chart, $sensor) .
+    $def .= _logger_chart_sensor_data_series($sensor_cdef, $chart, $sensor) .
 
       //Considers unknown measurements to be zero
-      "CDEF:completeseries$i=" . "$sensor_cdf,UN,0,$sensor_cdf,IF " .
+      "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
 
       //Do not consider latest 30 minutes
       "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
@@ -1304,41 +1484,150 @@ function _logger_chart_agg_data_series($series_id, $chart, $sensors) {
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
   
-  $def .= _logger_chart_legend_item($series_id);
-
   return $def;
 }
 
-/**
- * Creates a legend for the RRD chart.
- *
- * @param $series_id  The series' id.
- * @return the legend's RRD tags.
- */
-function _logger_chart_legend_item($series_id) {
 
-  return
-    "VDEF:min$series_id"  . "=$series_id" . ',MINIMUM ' .
-    "VDEF:max$series_id"  . "=$series_id" . ',MAXIMUM ' .
-    "VDEF:avg$series_id"  . "=$series_id" . ',AVERAGE ' .
-    "VDEF:last$series_id" . "=$series_id" . ',LAST ';
+//Deprecated Functions
+
+/**
+ * Creates an Aggregated Consumption Chart using RRDTool graph command.
+ *
+ * @deprecated
+ * @param $type     The sensor type.
+ * @param $interval The time interval.
+ * @return the chart output.
+ */
+function _logger_create_rrd_agg_chart($type, $interval) {
+
+  $chart_cid = "logger_agg_chart$interval$type";
+  $cache_table = 'cache_filter';
+
+  //cache_filter is recommended for temporary information
+  $cached_chart = cache_get($chart_cid, $cache_table);
+
+  if ($cached_chart) {
+    $chart_output = $cached_chart->data;
+
+  } else {
+
+    $sensors = _logger_get_active_sensors($type);
+
+    $cdef = "meter0";
+    $chart = _logger_get_chart_params($interval, $type);
+    $chart->def   = _logger_chart_agg_data_series($cdef, $chart, $sensors);
+    $chart->def  .= _logger_rrdchart_legend_item($cdef);
+    $chart->line .= _logger_rrdchart_line($cdef, BLUE, t('All'));
+
+    _logger_create_rrdchart_file($chart);
+
+    $chart_output = theme('chart', $chart->file_path, 'overview');
+
+    $expire = time() + 10 * MINUTE;
+    cache_set($chart_cid, $chart_output, $cache_table, $expire);
+  }
+
+  return $chart_output;
+}
+
+/**
+ * @deprecated
+ */
+function _logger_create_user_rrdchart($sensors, $type, $interval) {
+
+  $chart = _logger_get_chart_params($interval, $type);
+
+  global $user;
+  $colors = _logger_get_series_colors();
+  $i = 0;
+
+  foreach ($sensors as &$sensor) {
+
+    $shifted = $sensor->private && ($sensor->uid != $user->uid);
+    $caption = $sensor->username . ' ' . $sensor->function;
+
+    $color = $colors[$i % count($colors)];
+
+    $series_id = "meter$i";
+    $chart->def  .= _logger_chart_sensor_data_series($series_id, $chart, $sensor, $shifted);
+    $chart->def  .= _logger_rrdchart_legend_item($series_id);
+    $chart->line .= _logger_rrdchart_line($series_id, $color, $caption, $shifted);
+
+    $i++;
+  }
+
+  _logger_create_rrdchart_file($chart);
+
+  return theme('rrdchart', $chart->file_path, 'logger');
+}
+
+/**
+ * Theming the RRD chart.
+ * @deprecated
+ */
+function theme_rrdchart($chart_file_path, $context) {
+
+  /*
+  $primary = array(
+    l(t('Electricity'), "$context/electricity")
+  );
+
+  $output .= theme_item_list($primary,   NULL, 'ul', array('class' => 'tabs primary'));
+  */
+
+  $output .= _logger_create_interval_menu($context);
+
+  $output .= '
+    <p id="chart">
+      <img src="'. base_path() . $chart_file_path .'" alt="Flukso"/>
+    </p>';
+
+  return $output;
+}
+
+/**
+ * Creates a RRD chart file.
+ *
+ * @deprecated
+ * @param $chart  The chart parameters.
+ */
+function _logger_create_rrdchart_file($chart) {
+
+  $tz = _logger_get_formatted_timezone();
+
+  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
+  $command = "TZ=\"$tz\" " . RRDTOOL . ' graph ' . $chart->file_path . ' ' .
+    '--start ' . $chart->start . ' ' .
+    '--vertical-label ' . $chart->unit . ' ' .
+    '--lower-limit 0 ' .
+    '--width 500 ' .
+    '--height 350 ' .
+    '--slope-mode ' .
+    '--units-exponent 0 ' .
+    '--font LEGEND:8: ' .
+
+    $chart->def . ' ' .
+    $chart->line;
+
+  exec($command);
 }
 
 /**
  * Creates a LINE tag of an RRD chart.
  *
+ * @deprecated
  * @param $series_id  The series' id.
  * @param $color      The series' color.
  * @param $caption    The series' caption.
  * @param $shifted    Whether the series are to be shifted to the left, in order to be hidden.
  * @return the RRD LINE tag.
  */
-function _logger_chart_line($series_id, $color, $caption, $shifted = FALSE) {
+function _logger_rrdchart_line($series_id, $color, $caption, $shifted = FALSE) {
 
   $caption = substr($caption . '               ', 0, 15);
 
   $line =
-    "LINE1:$series_id" . "#$color:" . "\"$caption\" ";
+    "LINE1:$series_id" . "$color:" . "\"$caption\" ";
 
   $line .= $shifted ?
     'COMMENT:"min\:  prv" ' .
@@ -1355,27 +1644,32 @@ function _logger_chart_line($series_id, $color, $caption, $shifted = FALSE) {
 }
 
 /**
- * Creates a RRD chart file.
+ * Creates a legend for the RRD chart.
  *
- * @param $chart  The chart parameters.
+ * @deprecated
+ * @param $series_id  The series' id.
+ * @return the legend's RRD tags.
  */
-function _logger_create_chart_file($chart) {
+function _logger_rrdchart_legend_item($series_id) {
 
-  $tz = _logger_get_formatted_timezone();
+  return
+    "VDEF:min$series_id"  . "=$series_id" . ',MINIMUM ' .
+    "VDEF:max$series_id"  . "=$series_id" . ',MAXIMUM ' .
+    "VDEF:avg$series_id"  . "=$series_id" . ',AVERAGE ' .
+    "VDEF:last$series_id" . "=$series_id" . ',LAST ';
+}
 
-  //insert the TZ prior to launching rrdtool to obtain a proper time conversion
-  $command = "TZ=\"$tz\" " . RRDTOOL . ' graph ' . $chart->file_path . ' ' .
-    '--start ' . $chart->start . ' ' .
-    '--vertical-label ' . $chart->unit . ' ' .
-    '--lower-limit 0  ' .
-    '--width 500 ' .
-    '--height 350 ' .
-    '--slope-mode ' . 
-    '--units-exponent 0 ' .
-    '--font LEGEND:8: ' .
+/**
+ * @deprecated
+ */
+function logger_cron() {
 
-    $chart->def . ' ' .
-    $chart->line;
+  $intervals = array('hour', 'day', 'month', 'year', 'night');
 
-  exec($command);
+  //Delete png files older than 1 minute.
+  //This limit prevents chart files from being removed before is is is sent to the user.
+  foreach($intervals as $interval) {
+
+    exec('find ' . GRAPH_PATH . "/$interval/*"  . ' -mmin +1 -exec rm {} \;');
+  }
 }
