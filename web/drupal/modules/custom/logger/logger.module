@@ -504,7 +504,7 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
   $measurements[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $chart->def, $exported_cdef);
 
-  return theme('dygraph', $measurements, $chart->unit, 'overview');
+  return theme('dygraph', $measurements, 'watt', 'overview');
 }
 
 /**
@@ -984,7 +984,8 @@ function theme_dygraph($data, $unit, $context) {
           labelsDiv: document.getElementById("dygraphstatus"),
           colors: ["' . implode('","', $colors) . '"],
           width: 600,
-          height: 350
+          height: 350,
+          yAxisLabelWidth: 50
         }
       );
     </script>';
