@@ -36,7 +36,7 @@ define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
 define('SELECTED_CHART_UNIT', 'logger_selected_chart_unit');
-
+define('SERIES_COLOR_ID', 'logger_series_color_id');
 
 function logger_init() {
   
@@ -46,6 +46,8 @@ function logger_init() {
   if ($user->uid > 0) {
     drupal_add_js('misc/collapse.js');
   }
+
+  drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
@@ -937,28 +939,15 @@ function theme_overview_topic($title, $body, $link = NULL) {
  */
 function theme_dygraph($data, $unit, $context) {
 
-  $timestamps = array();
-  foreach($data as $user => $sensors) {
-    foreach($sensors as $sensor => $measurements) {
-      foreach(array_keys($measurements) as $timestamp) {
-        $timestamps[$timestamp] = null;
-      }
-    }
-  }
-  $timestamps = array_keys($timestamps);
-  sort($timestamps);
-
   $header = t('Time');
   $values = array();
-
+  $timestamps = _logger_get_all_timestamps($data);
   $s = 1;
 
-  //For each caption
   foreach($data as $user => $sensors) {
     foreach($sensors as $sensor => $measurements) {
       $header .= ',S' . $s++;
 
-      //For each timestamp
       foreach($timestamps as $timestamp) {
 
         $value = $measurements[$timestamp];
@@ -973,12 +962,7 @@ function theme_dygraph($data, $unit, $context) {
   foreach($values as $timestamp => $values_list) {
     $series .= date('Y-m-d H:i', $timestamp) . $values_list . '\n ';
   }
-
-  $colors_list = '';
   $colors = _logger_get_series_colors();
-  foreach($colors as $color) {
-    $colors_list .= ($colors_list == ''? '': ', ') . "'$color'";
-  }
 
   $output = _logger_create_interval_menu($context);
 
@@ -988,21 +972,42 @@ function theme_dygraph($data, $unit, $context) {
     <div id="dygraphstatus" style="min-height:20px; width=450px; padding-top:10px; padding-bottom:5px;"></div>
 
     <script type="text/javascript">
-      g = new Dygraph(
+
+      new Dygraph(
         document.getElementById("dygraphdiv"),
         "' . $series . '",
         {
           labelsDiv: document.getElementById("dygraphstatus"),
-          colors: [' . $colors_list . '],
+          colors: ["' . implode('","', $colors) . '"],
           width: 600,
           height: 350
         }
-     );
+      );
     </script>';
 
   $output .= _logger_create_graph_legend($data, $colors);
 
   return $output;
+}
+
+/**
+ * Returns a sorted array of measurements' timestamps.
+ *
+ * @param $data  The chart series data. {user => {sensor => {timestamp => value}}}
+ * @return the array of timestamps.
+ */
+function _logger_get_all_timestamps($data) {
+  $timestamps = array();
+  foreach($data as $user => $sensors) {
+    foreach($sensors as $sensor => $measurements) {
+      foreach(array_keys($measurements) as $timestamp) {
+        $timestamps[$timestamp] = null;
+      }
+    }
+  }
+  $timestamps = array_keys($timestamps);
+  sort($timestamps);
+  return $timestamps;
 }
 
 /**
@@ -1059,18 +1064,25 @@ function _logger_create_graph_legend($data, $colors) {
       }
       $avg = $total > 0? $sum / $total : 0;
 
-      $color = $colors[$i++ % count($colors)];
-      $mark = '<div style="width: 10px; height: 10px;background-color:' . $color . ';"/>';
+      $color = $colors[$i % count($colors)];
+
+      $id = SERIES_COLOR_ID . $i;
+      $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
+        style="width: 10px; height: 10px;"/>
+        <input id="' . $id . '" type="hidden" value="' . $color . '"
+        onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';';" .
+        'document.location=document.location;"/>';
 
       $lines[] = array(
-          'mark'    => $mark,
-          'user'    => $user,
-          'sensor'  => $sensor,
-          'max'     => _format($max),
-          'min'     => _format($min),
-          'avg'     => _format($avg),
-          'last'    => _format($last)
+          'mark'   => $mark,
+          'user'   => $user,
+          'sensor' => $sensor,
+          'max'    => _format($max),
+          'min'    => _format($min),
+          'avg'    => _format($avg),
+          'last'   => _format($last)
       );
+      $i++;
     }
   }
 
@@ -1093,22 +1105,28 @@ function _logger_create_graph_legend($data, $colors) {
  * @return array of colors.
  */
 function _logger_get_series_colors() {
+
+  function _get_color($i, $default) {
+    $id = SERIES_COLOR_ID . $i;
+    return isset($_COOKIE[$id])? $_COOKIE[$id] : $default;
+  }
+
   return array(
-      '#377037', //GREEN
-      '#C11700', //RED
-      '#0000FC', //BLUE
-      '#F37E2B', //ORANGE
-      '#B54FC6', //PINK
-      '#665C00', //BROWN
-      '#050305', //BLACK
-      '#809090', //GREY
-      '#9ED3C0', //REEN3
-      '#00FF00', //GREEN2
-      '#0080FF', //SKYBLUE
-      '#00ffff', //CYAN
-      '#FBEB0D', //YELLOW
-      '#DED00F', //BROWN2
-      );
+    _get_color( 0, '#377037'), //GREEN
+    _get_color( 1, '#C11700'), //RED
+    _get_color( 2, '#0000FC'), //BLUE
+    _get_color( 3, '#F37E2B'), //ORANGE
+    _get_color( 4, '#B54FC6'), //PINK
+    _get_color( 5, '#665C00'), //BROWN
+    _get_color( 6, '#050305'), //BLACK
+    _get_color( 7, '#809090'), //GREY
+    _get_color( 8, '#9ED3C0'), //REEN3
+    _get_color( 9, '#00FF00'), //GREEN2
+    _get_color(10, '#0080FF'), //SKYBLUE
+    _get_color(11, '#00ffff'), //CYAN
+    _get_color(12, '#FBEB0D'), //YELLOW
+    _get_color(13, '#DED00F')  //BROWN2
+    );
 }
 
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
