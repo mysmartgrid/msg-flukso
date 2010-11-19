@@ -24,7 +24,6 @@
 
 //Constants
 define('ROOT_PATH',  drupal_get_path('module', 'logger'));
-define('GRAPH_PATH', ROOT_PATH . '/graphs');
 define('DATA_PATH',  ROOT_PATH . '/data');
 define('RRDTOOL',    ROOT_PATH . '/rrdtool');
 
@@ -35,7 +34,7 @@ define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
-define('SELECTED_CHART_UNIT', 'logger_selected_chart_unit');
+define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 
 function logger_init() {
@@ -531,9 +530,7 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
     $measurements[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
   }
 
-  $output .= theme('dygraph', $measurements, $chart->unit, 'logger');
-
-  return $output;
+  return theme('dygraph', $measurements, $chart->unit, 'logger');
 }
 
 /**
@@ -545,11 +542,7 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
  */
 function _logger_get_chart_params($interval, $type) {
 
-  $unformatted_unit = $_SESSION[SELECTED_CHART_UNIT];
-
-  if ($unformatted_unit == '' || $unformatted_unit == NULL) {
-    $unformatted_unit = 'watt';
-  }
+  $unformatted_unit = _logger_get_unit();
 
   $params = new stdClass();
 
@@ -560,7 +553,6 @@ function _logger_get_chart_params($interval, $type) {
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
   $params->data_path = DATA_PATH . '/base';
-  $params->file_path = GRAPH_PATH . "/$interval/$unique_id.png";
   $params->line = ' COMMENT:"\s" ';
   $params->def = '';
 
@@ -801,15 +793,29 @@ function _logger_remove($rid) {
   drupal_goto($destination);
 }
 
+/**
+ * Sets the chart unit.
+ * 
+ * @param $unit  The new unit.
+ */
 function _logger_unit($unit) {
 
-  $_SESSION[SELECTED_CHART_UNIT] = $unit;
+  setcookie(CHART_UNIT, $unit, 0, '/');
 
   //Clear cache of the block "unit"
   _logger_cache_clear('unit');
 
   $destination = drupal_get_destination();
   drupal_goto($destination);
+}
+
+/**
+ * Returns the chart unit.
+ *
+ * @return the chart unit.
+ */
+function _logger_get_unit() {
+  return isset($_COOKIE[CHART_UNIT])? $_COOKIE[CHART_UNIT] : 'watt';
 }
 
 /**
@@ -1070,7 +1076,7 @@ function _logger_create_graph_legend($data, $colors) {
       $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
         style="width: 10px; height: 10px;"/>
         <input id="' . $id . '" type="hidden" value="' . $color . '"
-        onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';';" .
+        onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';path=/';" .
         'document.location=document.location;"/>';
 
       $lines[] = array(
@@ -1309,10 +1315,7 @@ function _logger_units_form() {
   //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
   $destination = drupal_get_destination();
 
-  $unit = $_SESSION[SELECTED_CHART_UNIT];
-  if (!$unit) {
-    $unit = 'watt';
-  }
+  $unit = _logger_get_unit();
 
   $items = array();
   $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
