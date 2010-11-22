@@ -36,6 +36,7 @@ define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
 define('CHART_UNIT', 'logger_chart_unit');
+define('CHART_FILE', 'logger_chart_file');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 
 function logger_init() {
@@ -499,13 +500,13 @@ function _logger_overview($type, $interval) {
  */
 function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
+  $chart = _logger_create_chart_object($interval, $type, 'overview');
+
   $exported_cdef = "meter0";
-  $chart = _logger_get_chart_params($interval, $type);
-  $chart->def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
+  $def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
+  $chart->data[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
 
-  $measurements[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $chart->def, $exported_cdef);
-
-  return theme('dygraph', $measurements, $chart, 'overview');
+  return theme('dygraph', $chart);
 }
 
 /**
@@ -518,43 +519,37 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
  */
 function _logger_create_user_dygraph($sensors, $type, $interval) {
 
-  $chart = _logger_get_chart_params($interval, $type);
+  $chart = _logger_create_chart_object($interval, $type, 'logger');
+  $exported_cdef = "meter";
 
-  $measurements = array();
   foreach ($sensors as &$sensor) {
 
-    $exported_cdef = "meter";
     $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
-
-    $measurements[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
+    $chart->data[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
   }
 
-  return theme('dygraph', $measurements, $chart, 'logger');
+  return theme('dygraph', $chart);
 }
 
 /**
  * Creates an object to hold all chart parameters.
  *
- * @param $type     The sensor type.
- * @param $interval The time interval.
+ * @param $type      The sensor type.
+ * @param $interval  The time interval.
+ * @param $context   The page where the chart is going to be placed (overview or logger).
  * @return the chart parameters.
  */
-function _logger_get_chart_params($interval, $type) {
-
-  $unformatted_unit = _logger_get_unit();
+function _logger_create_chart_object($interval, $type, $context) {
 
   $params = new stdClass();
-
-  //Generate random number for the png chart so that the browser doesn't use the cached one. Cron is used to clean up the dir.
-  $unique_id = md5(uniqid());
 
   //Default
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
   $params->data_path = DATA_PATH . '/base';
-  $params->file_path = GRAPH_PATH . "/$interval/$unique_id.csv"; 
-  $params->line = ' COMMENT:"\s" ';
-  $params->def = '';
+  $params->data = array();
+  $params->interval = $interval;
+  $params->context = $context;
 
   switch ($interval) {
     case 'hour':
@@ -578,6 +573,8 @@ function _logger_get_chart_params($interval, $type) {
       $params->data_path = DATA_PATH . "/night";
       break;
   }
+
+  $unformatted_unit = _logger_get_unit();
 
   switch ($type) {
     case 'electricity':
@@ -868,9 +865,7 @@ function logger_theme() {
   return array(
     'dygraph' => array(
       'arguments' => array(
-        'data' => NULL,
-        'chart' => NULL,
-        'context' => NULL),
+        'chart' => NULL),
     ),
 
     'overview_topic' => array(
@@ -929,52 +924,18 @@ function theme_overview_topic($title, $body, $link = NULL) {
   return $output;
 }
 
-function _logger_save_data_file($data, $file_path) {
-
-  $header = t('Time');
-  $values = array();
-  $timestamps = _logger_get_all_timestamps($data);
-  $s = 1;
-
-  foreach($data as $user => $sensors) {
-    foreach($sensors as $sensor => $measurements) {
-      $header .= ',S' . $s++;
-
-      foreach($timestamps as $timestamp) {
-
-        $value = $measurements[$timestamp];
-        $value = $value? $value : 'null';
-
-        $values[$timestamp] .= ',' . $value;
-      }
-    }
-  }
-
-  $series = $header . PHP_EOL;
-  foreach($values as $timestamp => $values_list) {
-    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
-  }
-
-  $fh = fopen($file_path, 'w');
-  fwrite($fh, $series);
-  fclose($fh);
-}
-
 /**
  * Theming the DyGraph chart.
  *
- * @param $data    The chart series data. {user => {sensor => {timestamp => value}}}
  * @param $chart   The chart parameters.
- * @param $context The page where the chart is going to be placed (overview or logger).
  * @return the chart output.
  */
-function theme_dygraph($data, $chart, $context) {
+function theme_dygraph($chart) {
 
-  _logger_save_chart_data_file($data, $chart);
-
+  $file_path = _logger_save_chart_file($chart);
   $colors = _logger_get_series_colors();
 
-  $output = _logger_create_interval_menu($context);
+  $output = _logger_create_interval_menu($chart->context);
 
   $output .= '
     <div>' . $chart->unit . '</div>
@@ -985,7 +946,7 @@ function theme_dygraph($data, $chart, $context) {
 
       new Dygraph(
         document.getElementById("dygraphdiv"),
-        "/' . $chart->file_path . '",
+        "/' . $file_path . '",
         {
           labelsDiv: document.getElementById("dygraphstatus"),
           colors: ["' . implode('","', $colors) . '"],
@@ -996,47 +957,62 @@ function theme_dygraph($data, $chart, $context) {
       );
     </script>';
 
-  $output .= _logger_create_graph_legend($data, $colors);
+  $output .= _logger_create_graph_legend($chart->data, $colors);
 
-  $output .= '<br>' . l(t('Save Data'), $chart->file_path);
+  $output .= '<br>' . l(t('Save Data'), $file_path);
 
   return $output;
 }
 
 /**
- * Saves chart data file.
+ * Saves chart to a file.
  *
- * @param $data   The chart series data. {user => {sensor => {timestamp => value}}}
- * @param $chart  The chart parameters.
+ * @param $chart   The chart parameters.
+ * @return the data file path.
  */
-function _logger_save_chart_data_file($data, $chart) {
+function _logger_save_chart_file($chart) {
 
-  $header = t('Time');
-  $values = array();
-  $timestamps = _logger_get_all_timestamps($data);
-  $s = 1;
+  $cookie_id = CHART_FILE . $chart->interval . $chart->context;
+  $file_path = $_COOKIE[$cookie_id];
 
-  foreach($data as $user => $sensors) {
-      
-    foreach($sensors as $sensor => $measurements) {
-      $header .= ',S' . $s++;
+  if (!isset($file_path)) {
 
-      foreach($timestamps as $timestamp) {
-        $value = $measurements[$timestamp];
-        $value = $value? $value : 'null';
-        $values[$timestamp] .= ',' . $value;
+    //Generate random number for the png chart so that the browser doesn't use the cached one.
+    //Cron is used to clean up the dir.
+    $unique_id = md5(uniqid());
+    $file_path = GRAPH_PATH . '/' . $chart->interval . "/$unique_id.csv";
+
+    $header = t('Time');
+    $values = array();
+    $timestamps = _logger_get_all_timestamps($chart->data);
+    $s = 1;
+
+    foreach($chart->data as $user => $sensors) {
+
+      foreach($sensors as $sensor => $measurements) {
+        $header .= ',S' . $s++;
+
+        foreach($timestamps as $timestamp) {
+          $value = $measurements[$timestamp];
+          $value = $value? $value : 'null';
+          $values[$timestamp] .= ',' . $value;
+        }
       }
     }
+
+    $series = $header . PHP_EOL;
+    foreach($values as $timestamp => $values_list) {
+      $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
+    }
+
+    $fh = fopen($file_path, 'w');
+    fwrite($fh, $series);
+    fclose($fh);
+
+    setcookie($cookie_id, $file_path, time() + MINUTE, '/');
   }
 
-  $series = $header . PHP_EOL;
-  foreach($values as $timestamp => $values_list) {
-    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
-  }
-
-  $fh = fopen($chart->file_path, 'w');
-  fwrite($fh, $series);
-  fclose($fh);
+  return $file_path;
 }
 
 /**
