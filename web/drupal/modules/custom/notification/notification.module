@@ -79,6 +79,13 @@ function notification_menu() {
     'type'              => MENU_CALLBACK
   );
 
+  $items['newsletter/subscribe'] = array(
+    'title'             => 'Newsletter',
+    'page callback'     => 'notification_newsletter_page',
+    'access callback'   => TRUE,
+    'type'              => MENU_NORMAL_ITEM
+  );
+
   return $items;
 }
 
@@ -194,6 +201,26 @@ function notification_list_page() {
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '</p>';
 
   $output .= theme('table', $header, $rows, array(), $caption);
+  return $output;
+}
+
+/**
+ * Builds the newsletter registration page.
+ *
+ * @return the newsletter registration page.
+ */
+function notification_newsletter_page() {
+
+  $output = '<div><p>' .
+    t('We would also like to keep up to date via email. Please use the form below to sign up for our newsletter.') .
+    '<br><br></p></div>';
+
+  $output .= drupal_get_form('notification_newsletter_form');
+
+  $output .= '<div><p><br><br><br>' .
+    t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
+    '</p></div>';
+
   return $output;
 }
 
@@ -400,6 +427,44 @@ function notification_edition_form(&$form_state, $notification) {
   return $form;
 }
 
+function notification_newsletter_form() {
+
+  $form['email'] = array(
+    '#type'             => 'textfield',
+    '#title'            => t('E-mail'),
+    '#description'      => t('Enter your e-mail.'),
+    '#maxlength'        => 64,
+    '#size'             => 20,
+    '#required'         => 1,
+    '#element_validate' => array('notification_email_validate'),
+  );
+
+  $form['firstname'] = array(
+    '#type'             => 'textfield',
+    '#title'            => t('First Name'),
+    '#description'      => t('Enter your first name.'),
+    '#maxlength'        => 20,
+    '#required'         => 1,
+    '#size'             => 20,
+  );
+
+  $form['lastname'] = array(
+    '#type'             => 'textfield',
+    '#title'            => t('Last Name'),
+    '#description'      => t('Enter your last name.'),
+    '#maxlength'        => 20,
+    '#required'         => 1,
+    '#size'             => 20,
+  );
+
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t("Subscribe"),
+  );
+
+  return $form;
+}
+
 function notification_registration_form_validate($form, &$form_state) {
 
   $event_id1 = $form_state['values']['event_id1'];
@@ -520,6 +585,32 @@ function notification_edition_form_submit($form, &$form_state) {
   _notification_insert($device, $event_id, $email, $limit_up);
 
   $form_state['redirect'] = 'notification/list';
+}
+
+function notification_newsletter_form_submit($form, &$form_state) {
+
+  $email     = $form_state['values']['email'];
+  $firstname = $form_state['values']['firstname'];
+  $surname   = $form_state['values']['surname'];
+
+  $url = 'http://www.eor.de/fileadmin/verwaltung/mysmartgrid.php' .
+    '?email='     . urlencode($email) .
+    '&firstname=' . urlencode($firstname) .
+    '&surname='   . urlencode($surname);
+  //For testing, include '&test=1'
+
+  $request = drupal_http_request($url);
+  $response = $request->data;
+
+  if ($response == "ERROR_INVALID_DATA" || $response == "ERROR_INSERT_FAILED" || $response == "ERROR_UPDATE_FAILED") {
+    drupal_set_message(t('It is not possible to complete your subscription right now. Please, try again later.'));
+
+  } else if ($response == "RECORD_CREATED" || $response == "RECORD_UPDATED") {
+
+    drupal_set_message(t('Almost Finished... We need to confirm your email address. To complete the subscription process, please click the link in the email we just sent you.'));
+  }
+
+  return $output;
 }
 
 /**
