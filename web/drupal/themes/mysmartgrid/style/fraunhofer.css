@@ -1166,10 +1166,12 @@ a.close, a.close span, #main a.close, #main a .close, #main .section a.close, #m
 .initial-show {
 	display: block;
 }
+/*
 .lightbox a img {
 	cursor: -moz-zoom-in;
 	cursor: -webkit-zoom-in;
 }
+*/
 
 .linklist a.file,
 h4.file {
@@ -2359,8 +2361,10 @@ a.carousel-button {
 	background-position: right -8500px;
 }
 #main .image-gallery a {
+  /*
 	cursor: -moz-zoom-in;
 	cursor: -webkit-zoom-in;
+  */
 	display: block;
 }
 
@@ -2568,7 +2572,6 @@ ol#footnotes li { list-style-type: decimal; margin-left: 1.9em; }
 		border: 1px solid silver !important;
 		padding: 1.1em 0 0.923em 0;
 		margin-bottom: 1em;
-		zoom:1;
 	}
 
 	ul.textteaser li {

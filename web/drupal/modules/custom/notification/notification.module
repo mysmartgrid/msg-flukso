@@ -602,12 +602,19 @@ function notification_newsletter_form_submit($form, &$form_state) {
   $request = drupal_http_request($url);
   $response = $request->data;
 
-  if ($response == "ERROR_INVALID_DATA" || $response == "ERROR_INSERT_FAILED" || $response == "ERROR_UPDATE_FAILED") {
-    drupal_set_message(t('It is not possible to complete your subscription right now. Please, try again later.'));
-
-  } else if ($response == "RECORD_CREATED" || $response == "RECORD_UPDATED") {
+  if ($response == "RECORD_CREATED") {
 
     drupal_set_message(t('Almost Finished... We need to confirm your email address. To complete the subscription process, please click the link in the email we just sent you.'));
+
+  } else if ($response == "RECORD_UPDATED") {
+
+    drupal_set_message(t('The e-mail address was already present in the database. The user data has been updated.'));
+
+  } else {
+
+    drupal_set_message(t('Unfortunetelly, it is not possible to complete your subscription right now. Please, try again 10 minutes later.'));
+
+    _notification_send_system_error_email('newsletter', $response, $url);
   }
 
   return $output;
@@ -951,6 +958,49 @@ function _notification_register_consumption() {
 }
 
 /**
+ * Notifies the administrator of the occurrence of a system error.
+ *
+ * @param $context     The page or function where the error occurred.
+ * @param $error_code  The error code.
+ * @param $url         The URL that triggered the error (if any).
+ */
+function _notification_send_system_error_email($context, $error_code, $url) {
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+
+  $error_descriptions['newsletter']['ERROR_INVALID_DATA'] =
+    'Invalid e-mail address.';
+
+  $error_descriptions['newsletter']['ERROR_INSERT_FAILED'] =
+    'Error while inserting the record in mySQL database.';
+
+  $error_descriptions['newsletter']['ERROR_UPDATE_FAILED'] =
+    'Error while updating the record in mySQL database.';
+
+  $message =
+    "<p>Dear Administrator " .
+    "<br> &nbsp;<br></p> " .
+
+    "<p>The following system error has been reported.</p> " .
+    "<p>Error code: %error_code<br> " .
+    "Description: %description<br> " .
+    "Related URL: %url</p> " .
+
+    "<p>&nbsp;<br> " .
+    "<p>mySmartGrid System</p>";
+
+  $variables['%error_code'] = $error_code;
+  $variables['%description'] = t($error_descriptions[$context][$error_code]);
+  $variables['%url'] = $url;
+
+  $body = t($message, $variables);
+  $subject = t('System Error');
+  $email = 'team@mysmartgrid.de';
+
+  _notification_send_email($email, $subject, $body);
+}
+
+/**
  * Composes an e-mail that notifies a general event.
  *
  * @param $description  The event description. 
@@ -1033,15 +1083,22 @@ function _notification_send_emails($sql, $message) {
     $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
     $body = t($message, $variables) . $logo;
 
-    $params = array(
-      'subject' => $subject,
-      'body' => $body
-    );
+    _notification_send_email($object['email'], $subject, $body);
 
     _notification_update($object['device'], $object['event_id'], time());
-
-    drupal_mail('notification', 'notice', $object['email'], $language, $params);
   }
+}
+
+function _notification_send_email($email, $subject, $body) {
+
+  global $language;
+
+  $params = array(
+    'subject' => $subject,
+    'body' => $body
+  );
+
+  drupal_mail('notification', 'notice', $email, $language, $params);
 }
 
 function notification_mail($key, &$message, $params) {
