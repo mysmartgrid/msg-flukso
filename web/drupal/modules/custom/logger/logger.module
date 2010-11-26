@@ -952,7 +952,8 @@ function theme_dygraph($chart) {
           colors: ["' . implode('","', $colors) . '"],
           width: 600,
           height: 350,
-          yAxisLabelWidth: 50
+          yAxisLabelWidth: 50,
+          includeZero: true
         }
       );
     </script>';
