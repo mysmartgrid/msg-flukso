@@ -943,14 +943,14 @@ function _notification_register_consumption() {
     UPDATE
       {notification}
     SET
-      base_value =
+      base_value = (
         SELECT
           SUM(m.value)
         FROM
           {logger_meters} m
         WHERE
           m.type = '%s' AND
-          m.device = notification.device
+          m.device = notification.device)
     WHERE
       notification.event_id = %d";
 
