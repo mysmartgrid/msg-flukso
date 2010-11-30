@@ -24,6 +24,10 @@ define('CORRUPTED_HEARTBEAT',   2);
 define('ANY_HEARTBEAT_FAILURE', 3);
 define('PEAK_CONSUMPTION',      4);
 
+define('MINUTE', 60);
+define('HOUR',   60 * MINUTE);
+define('DAY',    24 * HOUR);
+
 function notification_help($path, $arg) {
   
   $output = ''; 
@@ -108,8 +112,7 @@ function notification_delete($device, $event_id) {
  * @return the event registration page.
  */
 function notification_registration_page() {
-  $output .= drupal_get_form('notification_registration_form');
-  return $output;
+  return drupal_get_form('notification_registration_form');
 }
 
 /**
@@ -128,6 +131,7 @@ function notification_edition_page($device, $event_id) {
       n.device AS device,
       d.serial AS serial,
       n.email AS email,
+      n.min_interval AS min_interval,
       n.limit_up AS limit_up
     FROM
       {event} e,
@@ -141,9 +145,7 @@ function notification_edition_page($device, $event_id) {
 
   $notification = db_fetch_object(db_query($sql, $device, $event_id));
 
-  $output .= drupal_get_form('notification_edition_form', $notification);
-
-  return $output;
+  return drupal_get_form('notification_edition_form', $notification);
 }
 
 /**
@@ -200,8 +202,7 @@ function notification_list_page() {
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '</p>';
 
-  $output .= theme('table', $header, $rows, array(), $caption);
-  return $output;
+  return theme('table', $header, $rows, array(), $caption);
 }
 
 /**
@@ -346,6 +347,15 @@ function notification_registration_form() {
     '#suffix'         => '</td><td></td></tr></table>'
   );
 
+  $form['min_interval'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Maximum Frequency'),
+    '#description'    => t('Choose the maximum frequency in which consecutive notifications the same event will be sent to the user.'),
+    '#default_value'  => 1440,
+    '#required'       => TRUE,
+    '#options'        => _notification_get_frequency_options(),
+  );
+
   $form['submit'] = array(
     '#type'   => 'submit',
     '#value'  => t('Save'),
@@ -418,6 +428,15 @@ function notification_edition_form(&$form_state, $notification) {
     case 2:
       break;
   } 
+
+  $form['min_interval'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Maximum Frequency'),
+    '#description'    => t('Choose the maximum frequency in which consecutive notifications the same event will be sent to the user.'),
+    '#required'       => TRUE,
+    '#options'        => _notification_get_frequency_options(),
+    '#default_value'  => $notification->min_interval,
+  );
 
   $form['submit'] = array(
     '#type'  => 'submit',
@@ -537,8 +556,9 @@ function _notification_validate_watts($field_name, $form_state) {
 
 function notification_registration_form_submit($form, &$form_state) {
 
-  $device    = $form_state['values']['device'];
-  $email     = $form_state['values']['email'];
+  $device       = $form_state['values']['device'];
+  $email        = $form_state['values']['email'];
+  $min_interval = $form_state['values']['min_interval'];
 
   $event_id1 = $form_state['values']['event_id1'];
   $limit_up1 = $form_state['values']['limit_up1'];
@@ -553,22 +573,22 @@ function notification_registration_form_submit($form, &$form_state) {
 
   if ($event_id1) {
     _notification_delete($device, 1);
-    _notification_insert($device, 1, $email, $limit_up1);
+    _notification_insert($device, 1, $email, $min_interval, $limit_up1);
   }
 
   if ($event_id2) {
     _notification_delete($device, 2);
-    _notification_insert($device, 2, $email, 0);
+    _notification_insert($device, 2, $email, $min_interval, 0);
   }
 
   if ($event_id3) {
     _notification_delete($device, 3);
-    _notification_insert($device, 3, $email, $limit_up3);
+    _notification_insert($device, 3, $email, $min_interval, $limit_up3);
   }
 
   if ($event_id4) {
     _notification_delete($device, 4);
-    _notification_insert($device, 4, $email, $limit_up4);
+    _notification_insert($device, 4, $email, $min_interval, $limit_up4);
   }
 
   $form_state['redirect'] = 'notification/list';
@@ -580,9 +600,10 @@ function notification_edition_form_submit($form, &$form_state) {
   $email    = $form_state['values']['email'];
   $event_id = $form_state['values']['event_id'];
   $limit_up = $event_id == CORRUPTED_HEARTBEAT? 0 : $form_state['values']['limit_up'];
+  $min_interval = $form_state['values']['min_interval'];
 
   _notification_delete($device, $event_id);
-  _notification_insert($device, $event_id, $email, $limit_up);
+  _notification_insert($device, $event_id, $email, $min_interval, $limit_up);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -676,6 +697,22 @@ function _notification_get_devices_options() {
 }
 
 /**
+ * Returns an array of notification frequencies indexed by their respective
+ * time intervals in minutes.
+ * 
+ * @return the array of frequencies.
+ */
+function _notification_get_frequency_options() {
+  return array(
+    1440 => t('1 per day'),
+    720  => t('2 per day'),
+    60   => t('1 per hour'),
+    30   => t('2 per hour'),
+    0    => t('No Limit - whenever the event occurs')
+  );
+}
+
+/**
  * Deletes an event notification.
  *
  * @param $device    The monitored device.
@@ -696,12 +733,13 @@ function _notification_delete($device, $event_id) {
 /**
  * Registers an event notification.
  *
- * @param $device    The monitored device.
- * @param $event_id  The event id.
- * @param $email     The notification e-mail.
+ * @param $device        The monitored device.
+ * @param $event_id      The event id.
+ * @param $email         The notification e-mail.
+ * @param $min_interval  The minimum time interval between consecutive notifications of the same event.
  * @param $limit_up  An event related maximum value.
  */
-function _notification_insert($device, $event_id, $email, $limit_up) {
+function _notification_insert($device, $event_id, $email, $min_interval, $limit_up) {
 
   $base_value = 0;
 
@@ -726,11 +764,11 @@ function _notification_insert($device, $event_id, $email, $limit_up) {
 
   $sql = "
     INSERT INTO
-      {notification} (device, event_id, email, base_value, latest_checkup, limit_up, last_sent)
+      {notification} (device, event_id, email, min_interval, base_value, latest_checkup, limit_up, last_sent)
     VALUES
-      ('%s', %d, '%s', %d, %d, %d, %d)";
+      ('%s', %d, '%s', %d, %d, %d, %d, %d)";
 
-  db_query($sql, $device, $event_id, $email, $base_value, time(), $limit_up, 0);
+  db_query($sql, $device, $event_id, $email, $min_interval, $base_value, time(), $limit_up, 0);
 }
 
 /**
@@ -787,8 +825,7 @@ function notification_cron() {
  */
 function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
 
-  $minute = 60;
-  $day = 86400;
+  $minute = MINUTE;
 
   $sql = "
     SELECT
@@ -807,8 +844,9 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
       d.uid = u.uid AND
       d.device = n.device AND
       n.event_id = $event_id AND
-      $now > (n.last_sent + $day) AND
       $now > (d.access + n.limit_up * $minute) AND
+      $now > (n.last_sent + n.limit_up * $minute) AND
+      $now > (n.last_sent + n.min_interval * $minute) AND
       NOT EXISTS(
         SELECT
           1
@@ -840,7 +878,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
  */
 function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPTED_HEARTBEAT) {
 
-  $day = 86400;
+  $minute = MINUTE;
 
   $sql = "
     SELECT
@@ -859,7 +897,7 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
       d.uid = u.uid AND
       d.device = n.device AND
       n.event_id = $event_id AND
-      $now > (n.last_sent + $day) AND
+      $now > (n.last_sent + n.min_interval * $minute) AND
       m.device = d.device AND
       m.corrupted <> 0";
 
@@ -890,8 +928,8 @@ function _notification_send_any_heartbeat_failure_emails($now) {
 function _notification_send_peak_consumption_emails($now) {
 
   $event_id = PEAK_CONSUMPTION;
-  $hour = 3600;
-  $day = 86400;
+  $hour = HOUR;
+  $minute = MINUTE;
 
   $sql = "
     SELECT DISTINCT
@@ -913,7 +951,7 @@ function _notification_send_peak_consumption_emails($now) {
       d.uid = u.uid AND
       d.device = n.device AND
       n.event_id = $event_id AND
-      $now > (n.last_sent + $day) AND
+      $now > (n.last_sent + n.min_interval * $minute) AND
       m.device = d.device AND
       m.type = 'electricity'
     GROUP BY
