@@ -36,7 +36,6 @@ define('MONTH',  30 * DAY);
 define('YEAR',  365 * DAY);
 
 define('CHART_UNIT', 'logger_chart_unit');
-define('CHART_FILE', 'logger_chart_file');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 
 function logger_init() {
@@ -701,11 +700,11 @@ function _logger_get_active_sensors($type) {
 }
 
 /**
- * Returns the user timezone formatted for display.
+ * Returns the user timezone offset.
  *
- * @return the formatted timezone.
+ * @return the user timezone offset.
  */
-function _logger_get_formatted_timezone() {
+function _logger_get_timezone_offset() {
 
   global $user;
 
@@ -718,20 +717,7 @@ function _logger_get_formatted_timezone() {
     $offset = $_SESSION['timezone'];
   }
 
-  $hours = gmdate('h:i', abs($offset));
-
-  if ($offset > 0) {
-    $signal = '-';
-
-  } elseif ($offset < 0) {
-    $signal = '+';
-
-  } else {
-    $signal = '';
-    $hours = '';
-  }
-
-  return "GMT$signal$hours";
+  return $offset;
 }
 
 function _logger_add($uid) {
@@ -973,45 +959,37 @@ function theme_dygraph($chart) {
  */
 function _logger_save_chart_file($chart) {
 
-  $cookie_id = CHART_FILE . $chart->interval . $chart->context;
-  $file_path = $_COOKIE[$cookie_id];
+  //Generate random number for the png chart so that the browser doesn't use the cached one.
+  //Cron is used to clean up the dir.
+  $unique_id = md5(uniqid());
+  $file_path = GRAPH_PATH . '/' . $chart->interval . "/msg-chart-$unique_id.csv";
 
-  if (!isset($file_path)) {
+  $header = t('Time');
+  $values = array();
+  $timestamps = _logger_get_all_timestamps($chart->data);
+  $s = 1;
 
-    //Generate random number for the png chart so that the browser doesn't use the cached one.
-    //Cron is used to clean up the dir.
-    $unique_id = md5(uniqid());
-    $file_path = GRAPH_PATH . '/' . $chart->interval . "/$unique_id.csv";
+  foreach($chart->data as $user => $sensors) {
 
-    $header = t('Time');
-    $values = array();
-    $timestamps = _logger_get_all_timestamps($chart->data);
-    $s = 1;
+    foreach($sensors as $sensor => $measurements) {
+      $header .= ',S' . $s++;
 
-    foreach($chart->data as $user => $sensors) {
-
-      foreach($sensors as $sensor => $measurements) {
-        $header .= ',S' . $s++;
-
-        foreach($timestamps as $timestamp) {
-          $value = $measurements[$timestamp];
-          $value = $value? $value : 'null';
-          $values[$timestamp] .= ',' . $value;
-        }
+      foreach($timestamps as $timestamp) {
+        $value = $measurements[$timestamp];
+        $value = $value? number_format($value, 3, '.', '') : '';
+        $values[$timestamp] .= ',' . $value;
       }
     }
-
-    $series = $header . PHP_EOL;
-    foreach($values as $timestamp => $values_list) {
-      $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
-    }
-
-    $fh = fopen($file_path, 'w');
-    fwrite($fh, $series);
-    fclose($fh);
-
-    setcookie($cookie_id, $file_path, time() + MINUTE, '/');
   }
+
+  $series = $header . PHP_EOL;
+  foreach($values as $timestamp => $values_list) {
+    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
+  }
+
+  $fh = fopen($file_path, 'w');
+  fwrite($fh, $series);
+  fclose($fh);
 
   return $file_path;
 }
@@ -1437,12 +1415,12 @@ function _logger_query_measurements($interval, $start, $def, $exported_cdef) {
     return array();
   }
 
-  $tz = _logger_get_formatted_timezone();
+  $offset = _logger_get_timezone_offset();
 
   $maxrows = array('hour' => 120, 'night' => 60, 'day' => 96, 'month' => 60, 'year' => 60);
   $step    = array('hour' => 1,   'night' => 1,  'day' => 1,  'month' => 1,  'year' => 604800);
 
-  $command = "TZ=\"$tz\" " . RRDTOOL . ' xport ' .
+  $command = RRDTOOL . ' xport ' .
     "--start $start " .
     "--step $step[$interval] " .
     "--maxrows $maxrows[$interval] " .
@@ -1460,7 +1438,7 @@ function _logger_query_measurements($interval, $start, $def, $exported_cdef) {
       $line = str_replace('</t><v>', ':', $line);
       $div_pos = strpos($line, ':');
 
-      $timestamp = trim(substr($line, 0, $div_pos));
+      $timestamp = trim(substr($line, 0, $div_pos)) + $offset;
       $value     = trim(substr($line, $div_pos + 1));
 
       $data[$timestamp] = $value == 'nan'? null: $value;
