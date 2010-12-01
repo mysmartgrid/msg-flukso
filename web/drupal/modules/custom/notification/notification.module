@@ -351,7 +351,7 @@ function notification_registration_form() {
     '#type'           => 'select',
     '#title'          => t('Maximum Frequency'),
     '#description'    => t('Choose the maximum frequency in which consecutive notifications the same event will be sent to the user.'),
-    '#default_value'  => 1440,
+    '#default_value'  => 0,
     '#required'       => TRUE,
     '#options'        => _notification_get_frequency_options(),
   );
@@ -704,11 +704,11 @@ function _notification_get_devices_options() {
  */
 function _notification_get_frequency_options() {
   return array(
-    1440 => t('1 per day'),
-    720  => t('2 per day'),
-    60   => t('1 per hour'),
-    30   => t('2 per hour'),
-    0    => t('No Limit - whenever the event occurs')
+       0 => t('No Limit - whenever the event occurs'),
+      30 => t('2 per hour'),
+      60 => t('1 per hour'),
+     720 => t('2 per day'),
+    1440 => t('1 per day')
   );
 }
 

@@ -105,12 +105,13 @@ function notification_schema() {
   return $schema;
 }
 
-function logger_update_6002() {
+function logger_update_6007() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {notification} ADD COLUMN min_interval int unsigned NOT NULL default '1440' AFTER email");
+      $items[0] = update_sql("ALTER TABLE {notification} ADD COLUMN min_interval int unsigned NOT NULL default '1440' AFTER email");
+      $items[1] = update_sql("ALTER TABLE {notification} MODIFY COLUMN min_interval int unsigned NOT NULL default '0' AFTER email");
       break;
     case 'pgsql':
       break;
