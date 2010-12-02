@@ -29,8 +29,8 @@ define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 
 function notification_help($path, $arg) {
-  
-  $output = ''; 
+
+  $output = '';
 
   switch ($path) {
     case "admin/help#notification":
@@ -333,7 +333,7 @@ function notification_registration_form() {
     '#prefix'         => '<td>',
     '#suffix'         => '</td></tr>',
     '#attributes'     => array(
-      'onfocus' => ' 
+      'onfocus' => '
         event_id4 = document.getElementById("event_id4");
         this.readOnly = !event_id4.checked;',
     ),
@@ -427,7 +427,7 @@ function notification_edition_form(&$form_state, $notification) {
       break;
     case 2:
       break;
-  } 
+  }
 
   $form['min_interval'] = array(
     '#type'           => 'select',
@@ -497,7 +497,7 @@ function notification_registration_form_validate($form, &$form_state) {
   if($event_id3) {
     _notification_validate_minutes('limit_up3', $form_state);
   }
-  
+
   if ($event_id4) {
     _notification_validate_watts('limit_up4', $form_state);
   }
@@ -699,7 +699,7 @@ function _notification_get_devices_options() {
 /**
  * Returns an array of notification frequencies indexed by their respective
  * time intervals in minutes.
- * 
+ *
  * @return the array of frequencies.
  */
 function _notification_get_frequency_options() {
@@ -743,7 +743,8 @@ function _notification_insert($device, $event_id, $email, $min_interval, $limit_
 
   $base_value = 0;
 
-  if ($event_id == PEAK_CONSUMPTION) {
+  //If event = Peak Consumption
+  if ($event_id == 4) {
 
     $sql = "
       SELECT
@@ -861,7 +862,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
     "Your Flukso device (serial number: %serial) has not been sending " .
     "heartbeats for more than %limit_up minutes, since %event_time.",
 
-    "Check your WLAN configuration and make sure that it remains active for " . 
+    "Check your WLAN configuration and make sure that it remains active for " .
     "at least 1 hour per day. The device might be working fine, but it is " .
     "failing to send the heartbeats over the internet.");
 
@@ -935,10 +936,12 @@ function _notification_send_peak_consumption_emails($now) {
       d.serial AS serial,
       FROM_UNIXTIME(n.latest_checkup + u.timezone) AS start_time,
       FROM_UNIXTIME(d.access + u.timezone) AS end_time,
+      u.timezone AS timezone,
       n.limit_up AS limit_up,
       n.base_value AS base_value,
       (SUM(m.value) - n.base_value) AS consumption,
-      ((%d - n.latest_checkup) / " . HOUR . ") AS elapsed_time
+      ((d.access - n.latest_checkup) / " . HOUR . ") AS elapsed_hours,
+      FORMAT(((d.access - n.latest_checkup) / " . MINUTE . "), 1) AS elapsed_minutes
     FROM
       {users} u,
       {logger_devices} d,
@@ -949,6 +952,7 @@ function _notification_send_peak_consumption_emails($now) {
       d.device = n.device AND
       n.event_id = %d AND
       %d > (n.last_sent + n.min_interval * " . MINUTE . ") AND
+      d.access > n.latest_checkup AND
       m.device = d.device AND
       m.type = '%s'
     GROUP BY
@@ -958,15 +962,18 @@ function _notification_send_peak_consumption_emails($now) {
       n.limit_up,
       n.base_value
     HAVING
-      consumption / elapsed_time > n.limit_up";
+      consumption / elapsed_hours > n.limit_up";
 
-  $args = array($now, PEAK_CONSUMPTION, $now, 'electricity');
+  $args = array(PEAK_CONSUMPTION, $now, 'electricity');
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_email(
     "Your Flukso device (serial number: %serial) has registered an " .
-    "electricity consumption of %consumption watt in %elapsed_time hours, " .
-    "between %start_time and %end_time, beyond the rate of %limit_up watt / h.<br><br>");
+    "electricity consumption of %consumption watt in %elapsed_minutes minutes, " .
+    "between %start_time and %end_time, beyond the rate of %limit_up watt / h.<br><br> " .
+
+    "The device's latest measurements are listed in the following.<br><br>" .
+    "!latest_measurements");
 
   _notification_send_emails($message, $sql, $args);
 
@@ -1041,7 +1048,7 @@ function _notification_send_system_error_email($context, $error_code, $url) {
 /**
  * Composes an e-mail that notifies a general event.
  *
- * @param $description  The event description. 
+ * @param $description  The event description.
  * @param $complement   Complementary information about the error.
  * @return the e-mail message.
  */
@@ -1118,6 +1125,13 @@ function _notification_send_emails($message, $sql, $args = array()) {
       $variables["%$key"] = $value;
     }
 
+    if(strpos($message, 'latest_measurements')) {
+
+      $variables['!latest_measurements'] = _notification_query_latest_measurements(
+          $object['device'],
+          $object['timezone']);
+    }
+
     $subject = t('Event Notification');
 
     $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
@@ -1127,6 +1141,87 @@ function _notification_send_emails($message, $sql, $args = array()) {
 
     _notification_update($object['device'], $object['event_id'], time());
   }
+}
+
+function _notification_query_latest_measurements($device, $offset) {
+
+  $measurements = _notification_query_device_measurements($device, 30 * MINUTE, $offset);
+  $list = "";
+
+  foreach ($measurements as $meter => $values) {
+    $sublist = NULL;
+
+    foreach($values as $timestamp => $value) {
+
+      if ($value > 0) {
+        $sublist = $sublist? $sublist : t('Sensor: ') . $meter . '<br> ';
+        $sublist .= date('Y-m-d H:i', $timestamp) . ' - ' .
+          number_format($value, 2, '.', '') . ' watt' . '<br> ';
+      }
+    }
+    $list .= $sublist;
+  }
+
+  return $list;
+}
+
+/**
+ * TODO: move this function to module logger.
+ */
+function _notification_query_device_measurements($device, $period, $offset) {
+
+  $sql = "SELECT m.meter FROM {logger_meters} m WHERE m.device = '%s'";
+  $sensors = db_query($sql, $device);
+  $measurements = array();
+
+  while($sensor = db_fetch_object($sensors)) {
+
+    $measurements[$sensor->meter] = _notification_query_sensor_measurements($sensor->meter, $period, $offset);
+  }
+  return $measurements;
+}
+
+/**
+ * TODO: move this function to module logger.
+ */
+function _notification_query_sensor_measurements($meter, $period, $offset) {
+
+  $now = time();
+  $exported_cdef = "meter";
+
+  $file_path = drupal_get_path('module', 'logger') . '/data/base/' . $meter . ".rrd" ;
+
+  $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
+    "CDEF:$exported_cdef=" . "data$exported_cdef,3600,* ";
+  
+  $command = RRDTOOL . ' xport ' .
+    "--start end-1h " .
+    "--step 1 " .
+    "--maxrows 120 " .
+    "$def " .
+    "XPORT:$exported_cdef";
+
+  exec($command, $lines);
+
+  foreach($lines as $line) {
+    $line = strtolower($line);
+
+    if (strpos($line, '<row>') > 0) {
+
+      $line = str_replace(array('<row><t>', '</v></row>'), '',  $line);
+      $line = str_replace('</t><v>', ':', $line);
+      $div_pos = strpos($line, ':');
+      $timestamp = trim(substr($line, 0, $div_pos));
+
+      if ($now - $timestamp <= $period) {
+
+        $timestamp += $offset;
+        $value = trim(substr($line, $div_pos + 1));
+        $data[$timestamp] = $value == 'nan'? null: $value;
+      }
+    }
+  }
+  return $data;
 }
 
 function _notification_send_email($email, $subject, $body) {
