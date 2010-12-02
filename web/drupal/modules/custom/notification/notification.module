@@ -975,6 +975,7 @@ function _notification_register_consumption() {
     UPDATE
       {notification}
     SET
+      base_time = (notification.base_time + " . HOUR . " * ((%d - notification.base_time) % " . HOUR . ")),
       base_value = (
         SELECT
           SUM(m.value)
@@ -984,9 +985,11 @@ function _notification_register_consumption() {
           m.type = '%s' AND
           m.device = notification.device)
     WHERE
-      notification.event_id = %d";
+      notification.event_id = %d AND
+      (%d - notification.base_time) > " . HOUR;
 
-  db_query($sql, 'electricity', PEAK_CONSUMPTION);
+  $now = time();
+  db_query($sql, $now, 'electricity', PEAK_CONSUMPTION, $now);
 }
 
 /**
