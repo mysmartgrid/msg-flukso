@@ -1093,13 +1093,13 @@ function _logger_create_graph_legend($data, $colors) {
   }
 
   $headers = array(
-    array('data'  => t('Color'),  'field' => 'mark'),
-    array('data'  => t('User'),   'field' => 'user'),
-    array('data'  => t('Sensor'), 'field' => 'sensor'),
-    array('data'  => t('Max'),    'field' => 'max'),
-    array('data'  => t('Min'),    'field' => 'min'),
-    array('data'  => t('Avg'),    'field' => 'avg'),
-    array('data'  => t('Last'),   'field' => 'last')
+    array('data'  => t('Color')),
+    array('data'  => t('User')),
+    array('data'  => t('Sensor')),
+    array('data'  => t('Max')),
+    array('data'  => t('Min')),
+    array('data'  => t('Avg')),
+    array('data'  => t('Last'))
   );
 
   return '<br>' . theme('table', $headers, $lines);
