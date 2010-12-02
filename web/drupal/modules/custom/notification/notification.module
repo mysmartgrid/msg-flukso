@@ -1145,7 +1145,8 @@ function _notification_send_emails($message, $sql, $args = array()) {
 
 function _notification_query_latest_measurements($device, $offset) {
 
-  $measurements = _notification_query_device_measurements($device, 30 * MINUTE, $offset);
+  $now = time() + $offset;
+  $measurements = logger_query_device_measurements('hour', 'end-1h', $device, $offset);
   $list = "";
 
   foreach ($measurements as $meter => $values) {
@@ -1153,7 +1154,9 @@ function _notification_query_latest_measurements($device, $offset) {
 
     foreach($values as $timestamp => $value) {
 
-      if ($value > 0) {
+      $elapsed = $now - $timestamp;
+
+      if ($value > 0 && $elapsed <= HOUR) {
         $sublist = $sublist? $sublist : t('Sensor: ') . $meter . '<br> ';
         $sublist .= date('Y-m-d H:i', $timestamp) . ' - ' .
           number_format($value, 2, '.', '') . ' watt' . '<br> ';
@@ -1163,65 +1166,6 @@ function _notification_query_latest_measurements($device, $offset) {
   }
 
   return $list;
-}
-
-/**
- * TODO: move this function to module logger.
- */
-function _notification_query_device_measurements($device, $period, $offset) {
-
-  $sql = "SELECT m.meter FROM {logger_meters} m WHERE m.device = '%s'";
-  $sensors = db_query($sql, $device);
-  $measurements = array();
-
-  while($sensor = db_fetch_object($sensors)) {
-
-    $measurements[$sensor->meter] = _notification_query_sensor_measurements($sensor->meter, $period, $offset);
-  }
-  return $measurements;
-}
-
-/**
- * TODO: move this function to module logger.
- */
-function _notification_query_sensor_measurements($meter, $period, $offset) {
-
-  $now = time();
-  $exported_cdef = "meter";
-
-  $file_path = drupal_get_path('module', 'logger') . '/data/base/' . $meter . ".rrd" ;
-
-  $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
-    "CDEF:$exported_cdef=" . "data$exported_cdef,3600,* ";
-  
-  $command = RRDTOOL . ' xport ' .
-    "--start end-1h " .
-    "--step 1 " .
-    "--maxrows 120 " .
-    "$def " .
-    "XPORT:$exported_cdef";
-
-  exec($command, $lines);
-
-  foreach($lines as $line) {
-    $line = strtolower($line);
-
-    if (strpos($line, '<row>') > 0) {
-
-      $line = str_replace(array('<row><t>', '</v></row>'), '',  $line);
-      $line = str_replace('</t><v>', ':', $line);
-      $div_pos = strpos($line, ':');
-      $timestamp = trim(substr($line, 0, $div_pos));
-
-      if ($now - $timestamp <= $period) {
-
-        $timestamp += $offset;
-        $value = trim(substr($line, $div_pos + 1));
-        $data[$timestamp] = $value == 'nan'? null: $value;
-      }
-    }
-  }
-  return $data;
 }
 
 function _notification_send_email($email, $subject, $body) {

@@ -500,10 +500,11 @@ function _logger_overview($type, $interval) {
 function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
   $chart = _logger_create_chart_object($interval, $type, 'overview');
+  $offset = _logger_get_timezone_offset();
 
   $exported_cdef = "meter0";
   $def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
-  $chart->data[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
+  $chart->data[t('All')][t('All')] = logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
 
   return theme('dygraph', $chart);
 }
@@ -519,12 +520,13 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 function _logger_create_user_dygraph($sensors, $type, $interval) {
 
   $chart = _logger_create_chart_object($interval, $type, 'logger');
+  $offset = _logger_get_timezone_offset();
   $exported_cdef = "meter";
 
   foreach ($sensors as &$sensor) {
 
     $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
-    $chart->data[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef);
+    $chart->data[$sensor->username][$sensor->function] = logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
   }
 
   return theme('dygraph', $chart);
@@ -1091,7 +1093,7 @@ function _logger_create_graph_legend($data, $colors) {
   }
 
   $headers = array(
-    array(                        'field' => 'mark'),
+    array('data'  => t('Color'),  'field' => 'mark'),
     array('data'  => t('User'),   'field' => 'user'),
     array('data'  => t('Sensor'), 'field' => 'sensor'),
     array('data'  => t('Max'),    'field' => 'max'),
@@ -1400,6 +1402,27 @@ function _logger_device_access($permission, $serial) {
   return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
+function logger_query_device_measurements($interval, $start, $device, $offset) {
+
+  $sql = "SELECT m.meter FROM {logger_meters} m WHERE m.device = '%s'";
+  $sensors = db_query($sql, $device);
+  $measurements = array();
+
+  $exported_cdef = "meter";
+  $factor = 3600;
+
+  while($sensor = db_fetch_object($sensors)) {
+
+    $file_path = drupal_get_path('module', 'logger') . '/data/base/' . $sensor->meter . ".rrd" ;
+
+    $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
+      "CDEF:$exported_cdef=" . "data$exported_cdef," . $factor . ",* ";
+
+    $measurements[$sensor->meter] = logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
+  }
+  return $measurements;
+}
+
 /**
  * Queries the RRDTool databases for sensors' measurements.
  *
@@ -1409,13 +1432,11 @@ function _logger_device_access($permission, $serial) {
  * @param $exported_cdef  The exported cdef.
  * @return the array of sensors' measurements.
  */
-function _logger_query_measurements($interval, $start, $def, $exported_cdef) {
+function logger_query_measurements($interval, $start, $def, $exported_cdef, $offset) {
 
   if (!$def) {
     return array();
   }
-
-  $offset = _logger_get_timezone_offset();
 
   $maxrows = array('hour' => 120, 'night' => 60, 'day' => 96, 'month' => 60, 'year' => 60);
   $step    = array('hour' => 1,   'night' => 1,  'day' => 1,  'month' => 1,  'year' => 604800);
