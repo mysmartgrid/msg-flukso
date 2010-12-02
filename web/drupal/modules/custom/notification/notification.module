@@ -784,13 +784,12 @@ function _notification_update($device, $event_id, $last_sent) {
     UPDATE
       {notification}
     SET
-      last_sent = %d,
-      base_time = %d
+      last_sent = %d
     WHERE
       device = '%s' AND
       event_id = %d";
 
-  db_query($sql, $last_sent, $last_sent, $device, $event_id);
+  db_query($sql, $last_sent, $device, $event_id);
 }
 
 function notification_cron() {
@@ -921,14 +920,12 @@ function _notification_send_peak_consumption_emails($now) {
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      FROM_UNIXTIME(n.base_time + u.timezone) AS start_time,
-      FROM_UNIXTIME(d.access + u.timezone) AS end_time,
+      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
       u.timezone AS timezone,
       n.limit_up AS limit_up,
       n.base_value AS base_value,
       (SUM(m.value) - n.base_value) AS consumption,
-      ((d.access - n.base_time) / " . HOUR . ") AS elapsed_hours,
-      FORMAT(((d.access - n.base_time) / " . MINUTE . "), 1) AS elapsed_minutes
+      ((d.access - n.base_time) / " . HOUR . ") AS elapsed_hours
     FROM
       {users} u,
       {logger_devices} d,
@@ -956,8 +953,8 @@ function _notification_send_peak_consumption_emails($now) {
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_email(
     "Your Flukso device (serial number: %serial) has registered an " .
-    "electricity consumption of %consumption watt in %elapsed_minutes minutes, " .
-    "between %start_time and %end_time, above the rate of %limit_up watt / h.<br><br> " .
+    "electricity consumption of %consumption watt during the last hour, " .
+    "exceeding the rate of %limit_up watt / h.<br><br> " .
 
     "The device's latest measurements are listed in the following.<br><br> " .
     "!latest_measurements");
@@ -975,7 +972,7 @@ function _notification_register_consumption() {
     UPDATE
       {notification}
     SET
-      base_time = (notification.base_time + " . HOUR . " * ((%d - notification.base_time) % " . HOUR . ")),
+      base_time = (base_time + " . HOUR . " * ((%d - base_time) % " . HOUR . ")),
       base_value = (
         SELECT
           SUM(m.value)
@@ -985,8 +982,8 @@ function _notification_register_consumption() {
           m.type = '%s' AND
           m.device = notification.device)
     WHERE
-      notification.event_id = %d AND
-      (%d - notification.base_time) > " . HOUR;
+      event_id = %d AND
+      (%d - base_time) > " . HOUR;
 
   $now = time();
   db_query($sql, $now, 'electricity', PEAK_CONSUMPTION, $now);
