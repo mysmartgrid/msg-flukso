@@ -75,14 +75,14 @@ function notification_schema() {
         'default'    => 0,
         'disp-width' => '10',
       ),
-      'limit_up' => array(
+      'base_time' => array(
         'type'       => 'int',
         'unsigned'   => TRUE,
         'not null'   => TRUE,
         'default'    => 0,
         'disp-width' => '10',
       ),
-      'latest_checkup' => array(
+      'limit_up' => array(
         'type'       => 'int',
         'unsigned'   => TRUE,
         'not null'   => TRUE,
@@ -112,6 +112,19 @@ function logger_update_6007() {
     case 'mysqli':
       $items[0] = update_sql("ALTER TABLE {notification} ADD COLUMN min_interval int unsigned NOT NULL default '1440' AFTER email");
       $items[1] = update_sql("ALTER TABLE {notification} MODIFY COLUMN min_interval int unsigned NOT NULL default '0' AFTER email");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6008() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("ALTER TABLE {notification} CHANGE COLUMN latest_checkup base_time int unsigned NOT NULL AFTER base_value");
       break;
     case 'pgsql':
       break;

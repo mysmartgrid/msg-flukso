@@ -764,7 +764,7 @@ function _notification_insert($device, $event_id, $email, $min_interval, $limit_
 
   $sql = "
     INSERT INTO
-      {notification} (device, event_id, email, min_interval, base_value, latest_checkup, limit_up, last_sent)
+      {notification} (device, event_id, email, min_interval, base_value, base_time, limit_up, last_sent)
     VALUES
       ('%s', %d, '%s', %d, %d, %d, %d, %d)";
 
@@ -784,24 +784,13 @@ function _notification_update($device, $event_id, $last_sent) {
     UPDATE
       {notification}
     SET
-      last_sent = %d
+      last_sent = %d,
+      base_time = %d
     WHERE
       device = '%s' AND
       event_id = %d";
 
-  db_query($sql, $last_sent, $device, $event_id);
-}
-
-/**
- * Updates notification checkup date.
- *
- * @param $now       The event checkup time.
- */
-function _notification_update_checkups($now) {
-
-  $sql = "UPDATE {notification} SET latest_checkup = %d";
-
-  db_query($sql, $now);
+  db_query($sql, $last_sent, $last_sent, $device, $event_id);
 }
 
 function notification_cron() {
@@ -812,8 +801,6 @@ function notification_cron() {
   _notification_send_corrupted_heartbeat_emails($now);
   _notification_send_any_heartbeat_failure_emails($now);
   _notification_send_peak_consumption_emails($now);
-
-  _notification_update_checkups($now);
 }
 
 /**
@@ -934,14 +921,14 @@ function _notification_send_peak_consumption_emails($now) {
       u.name AS user_name,
       n.email AS email,
       d.serial AS serial,
-      FROM_UNIXTIME(n.latest_checkup + u.timezone) AS start_time,
+      FROM_UNIXTIME(n.base_time + u.timezone) AS start_time,
       FROM_UNIXTIME(d.access + u.timezone) AS end_time,
       u.timezone AS timezone,
       n.limit_up AS limit_up,
       n.base_value AS base_value,
       (SUM(m.value) - n.base_value) AS consumption,
-      ((d.access - n.latest_checkup) / " . HOUR . ") AS elapsed_hours,
-      FORMAT(((d.access - n.latest_checkup) / " . MINUTE . "), 1) AS elapsed_minutes
+      ((d.access - n.base_time) / " . HOUR . ") AS elapsed_hours,
+      FORMAT(((d.access - n.base_time) / " . MINUTE . "), 1) AS elapsed_minutes
     FROM
       {users} u,
       {logger_devices} d,
@@ -952,7 +939,7 @@ function _notification_send_peak_consumption_emails($now) {
       d.device = n.device AND
       n.event_id = %d AND
       %d > (n.last_sent + n.min_interval * " . MINUTE . ") AND
-      d.access > n.latest_checkup AND
+      d.access > n.base_time AND
       m.device = d.device AND
       m.type = '%s'
     GROUP BY
@@ -970,9 +957,9 @@ function _notification_send_peak_consumption_emails($now) {
   $message = _notification_compose_email(
     "Your Flukso device (serial number: %serial) has registered an " .
     "electricity consumption of %consumption watt in %elapsed_minutes minutes, " .
-    "between %start_time and %end_time, beyond the rate of %limit_up watt / h.<br><br> " .
+    "between %start_time and %end_time, above the rate of %limit_up watt / h.<br><br> " .
 
-    "The device's latest measurements are listed in the following.<br><br>" .
+    "The device's latest measurements are listed in the following.<br><br> " .
     "!latest_measurements");
 
   _notification_send_emails($message, $sql, $args);
