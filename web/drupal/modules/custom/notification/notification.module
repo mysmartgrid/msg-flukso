@@ -346,7 +346,7 @@ function notification_registration_form() {
   $form['min_interval'] = array(
     '#type'           => 'select',
     '#title'          => t('Maximum Frequency'),
-    '#description'    => t('Choose the maximum frequency in which consecutive notifications the same event will be sent to the user.'),
+    '#description'    => t('How often do you want to receive notifications, when the same event occurs several times consecutively?'),
     '#default_value'  => 0,
     '#required'       => TRUE,
     '#options'        => _notification_get_frequency_options(),
@@ -428,7 +428,7 @@ function notification_edition_form(&$form_state, $notification) {
   $form['min_interval'] = array(
     '#type'           => 'select',
     '#title'          => t('Maximum Frequency'),
-    '#description'    => t('Choose the maximum frequency in which consecutive notifications the same event will be sent to the user.'),
+    '#description'    => t('How often do you want to receive notifications, when the same event occurs several times consecutively?'),
     '#required'       => TRUE,
     '#options'        => _notification_get_frequency_options(),
     '#default_value'  => $notification->min_interval,
@@ -700,11 +700,11 @@ function _notification_get_devices_options() {
  */
 function _notification_get_frequency_options() {
   return array(
-       0 => t('No Limit - whenever the event occurs'),
-      30 => t('2 per hour'),
-      60 => t('1 per hour'),
-     720 => t('2 per day'),
-    1440 => t('1 per day')
+       0 => t('No limit, notify every single event'),
+      30 => t('2 notifications per hour'),
+      60 => t('1 notification per hour'),
+     720 => t('2 notifications per day'),
+    1440 => t('1 notification per day')
   );
 }
 
