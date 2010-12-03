@@ -1404,7 +1404,7 @@ function _logger_device_access($permission, $serial) {
 
 function logger_query_device_measurements($interval, $start, $device, $offset) {
 
-  $sql = "SELECT m.meter FROM {logger_meters} m WHERE m.device = '%s'";
+  $sql = "SELECT m.meter, m.function FROM {logger_meters} m WHERE m.device = '%s'";
   $sensors = db_query($sql, $device);
   $measurements = array();
 
@@ -1418,7 +1418,7 @@ function logger_query_device_measurements($interval, $start, $device, $offset) {
     $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
       "CDEF:$exported_cdef=" . "data$exported_cdef," . $factor . ",* ";
 
-    $measurements[$sensor->meter] = logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
+    $measurements[$sensor->meter][$sensor->function] = logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
   }
   return $measurements;
 }
