@@ -24,10 +24,6 @@ define('CORRUPTED_HEARTBEAT',   2);
 define('ANY_HEARTBEAT_FAILURE', 3);
 define('PEAK_CONSUMPTION',      4);
 
-define('MINUTE', 60);
-define('HOUR',   60 * MINUTE);
-define('DAY',    24 * HOUR);
-
 function notification_help($path, $arg) {
 
   $output = '';
@@ -958,17 +954,23 @@ function _notification_send_peak_consumption_emails($now) {
     "The device's latest measurements are listed in the following.<br><br> " .
     "!latest_measurements");
 
-  $devices = _notification_send_emails($message, $sql, $args);
+  $notified = _notification_send_emails($message, $sql, $args);
 
-  _notification_register_consumption($devices);
+  _notification_register_power_consumption($notified);
 }
 
-function _notification_register_consumption($devices) {
+/**
+ * Registers the power consumption of monitored devices every hours and after
+ * notifications are sent.
+ *
+ * @param $notified  The array of devices which have just been notified.
+ */
+function _notification_register_power_consumption($notified) {
 
   $now = time();
   //Note: the values are stored in unit 'watt' 
 
-  if (count($devices) > 0) {
+  if (count($notified) > 0) {
 
     $sql = "
       UPDATE
@@ -987,7 +989,7 @@ function _notification_register_consumption($devices) {
         event_id = %d AND
         device IN ('%s')";
 
-    db_query($sql, $now, 'electricity', PEAK_CONSUMPTION, implode("', '", $devices));
+    db_query($sql, $now, 'electricity', PEAK_CONSUMPTION, implode("', '", $notified));
   }
 
   $sql = "
@@ -1158,6 +1160,14 @@ function _notification_send_emails($message, $sql, $args = array()) {
   return $devices;
 }
 
+/**
+ * Returns a list of measurements performed by all sensors of the informed device.
+ *
+ * @param $device     The device's hash code.
+ * @param $start_time The start time of the period being searched.
+ * @param $offset     The user timezone offset.
+ * @return an HTML list of measurements.
+ */
 function _notification_query_latest_measurements($device, $start_time, $offset) {
 
   $measurements = logger_query_device_measurements('hour', 'end-1h', $device, $offset);
@@ -1192,6 +1202,13 @@ function _notification_query_latest_measurements($device, $start_time, $offset) 
   return $list;
 }
 
+/**
+ * Sends a notification e-mail.
+ *
+ * @param $email    The e-mail address.
+ * @param $subject  The e-mail subject.
+ * @param $body     The e-mail body.
+ */
 function _notification_send_email($email, $subject, $body) {
 
   global $language;

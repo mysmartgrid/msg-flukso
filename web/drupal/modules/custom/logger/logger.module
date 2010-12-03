@@ -504,7 +504,7 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
   $exported_cdef = "meter0";
   $def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
-  $chart->data[t('All')][t('All')] = logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+  $chart->data[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
 
   return theme('dygraph', $chart);
 }
@@ -526,7 +526,7 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
   foreach ($sensors as &$sensor) {
 
     $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
-    $chart->data[$sensor->username][$sensor->function] = logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+    $chart->data[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
   }
 
   return theme('dygraph', $chart);
@@ -1402,6 +1402,16 @@ function _logger_device_access($permission, $serial) {
   return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
+/**
+ * Queries the RRDTool databases for measurements reported by sensors of a
+ * single device.
+ *
+ * @param $interval The time interval.
+ * @param $start    The start time.
+ * @param $device   The device's hash code.
+ * @param $offset   The user timezone offset.
+ * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
+ */
 function logger_query_device_measurements($interval, $start, $device, $offset) {
 
   $sql = "SELECT m.meter, m.function FROM {logger_meters} m WHERE m.device = '%s'";
@@ -1413,12 +1423,12 @@ function logger_query_device_measurements($interval, $start, $device, $offset) {
 
   while($sensor = db_fetch_object($sensors)) {
 
-    $file_path = drupal_get_path('module', 'logger') . '/data/base/' . $sensor->meter . ".rrd" ;
+    $file_path = DATA_PATH . '/base/' . $sensor->meter . ".rrd" ;
 
     $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
       "CDEF:$exported_cdef=" . "data$exported_cdef," . $factor . ",* ";
 
-    $measurements[$sensor->meter][$sensor->function] = logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
+    $measurements[$sensor->meter][$sensor->function] = _logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
   }
   return $measurements;
 }
@@ -1430,9 +1440,10 @@ function logger_query_device_measurements($interval, $start, $device, $offset) {
  * @param $start          The start time.
  * @param $def            The rrd def tag.
  * @param $exported_cdef  The exported cdef.
+ * @param $offset         The user timezone offset.
  * @return the array of sensors' measurements.
  */
-function logger_query_measurements($interval, $start, $def, $exported_cdef, $offset) {
+function _logger_query_measurements($interval, $start, $def, $exported_cdef, $offset) {
 
   if (!$def) {
     return array();
