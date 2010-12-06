@@ -928,7 +928,9 @@ function theme_dygraph($chart) {
 
   $output .= '<br>' . l(t('Save Data'), $file_path);
 
-  $output .= drupal_get_form('logger_control_form');
+  if ($chart->context == 'logger') {
+    $output .= drupal_get_form('logger_control_form');
+  }
 
   return $output;
 }
@@ -1219,6 +1221,12 @@ function logger_control_form() {
   return $form;
 }
 
+/**
+ * Returns an array of fluksonian users indexed by their respective user id.
+ * Only users not yet plotted on the chart are returned.
+ *
+ * @return the array of fluksonian users.
+ */
 function _logger_get_fluksonians_options() {
 
   global $user;
@@ -1260,6 +1268,11 @@ function _logger_get_fluksonians_options() {
   return $options;
 }
 
+/**
+ * Returns an array of units indexed by their respective acronym.
+ *
+ * @return the array of units.
+ */
 function _logger_get_units_options() {
   
   $options['watt'] = t('watt');
