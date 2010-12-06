@@ -504,7 +504,7 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
   $exported_cdef = "meter0";
   $def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
-  $chart->data[t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+  $chart->data[0][t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
 
   return theme('dygraph', $chart);
 }
@@ -526,7 +526,7 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
   foreach ($sensors as &$sensor) {
 
     $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
-    $chart->data[$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
   }
 
   return theme('dygraph', $chart);
@@ -726,53 +726,31 @@ function _logger_add($uid) {
 
   global $user;
 
-  $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
-  $rtid = db_result(db_query($sql, 'subscription'));
-
-  $sql = "
-    SELECT
-      COUNT(rid),
-      MAX(rid)
-    FROM
-      {user_relationships}
-    WHERE
-      requester_id = %d AND
-      rtid = %d
-    GROUP BY
-      rtid";
-
-  $result = db_fetch_array(db_query($sql, $user->uid, $rtid));
-
   // don't allow users to add themselves
-  if ($uid != $user->uid) { 
+  if ($uid != $user->uid) {
+
+    $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
+    $rtid = db_result(db_query($sql, 'subscription'));
 
     user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-
-    //Clear cache of the block "fluksonians"
-    _logger_cache_clear('fluksonians');
   }
 
   $destination = drupal_get_destination();
   drupal_goto($destination);
 }
 
-function _logger_remove($rid) {
+function _logger_remove($requestee_id) {
 
   global $user;
 
-  //check whether the to-be-deleted relationship was created by the same user
-  
-  $sql = "SELECT requester_id FROM {user_relationships} WHERE rid = %d";
-  
-  if ($user->uid == db_result(db_query($sql, $rid))) {
-    db_query("DELETE FROM {user_relationships} WHERE rid = %d", $rid);
+  $sql = "
+    DELETE
+      FROM {user_relationships}
+    WHERE
+      requester_id = %d AND
+      requestee_id = %d";
 
-  } else {
-    watchdog('relationships', 'attempt to delete rid %rid by non-authorized user %uid', array('%rid' => $rid, '%uid' => $user->uid), WATCHDOG_ERROR);
-  }
-
-  //Clear cache of the block "fluksonians"
-  _logger_cache_clear('fluksonians');
+  db_query($sql, $user->uid, $requestee_id);
 
   $destination = drupal_get_destination();
   drupal_goto($destination);
@@ -950,6 +928,8 @@ function theme_dygraph($chart) {
 
   $output .= '<br>' . l(t('Save Data'), $file_path);
 
+  $output .= drupal_get_form('logger_control_form');
+
   return $output;
 }
 
@@ -1004,10 +984,12 @@ function _logger_save_chart_file($chart) {
  */
 function _logger_get_all_timestamps($data) {
   $timestamps = array();
-  foreach($data as $user => $sensors) {
-    foreach($sensors as $sensor => $measurements) {
-      foreach(array_keys($measurements) as $timestamp) {
-        $timestamps[$timestamp] = null;
+  foreach($data as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $measurements) {
+        foreach(array_keys($measurements) as $timestamp) {
+          $timestamps[$timestamp] = null;
+        }
       }
     }
   }
@@ -1044,51 +1026,59 @@ function _logger_create_interval_menu($context) {
  */
 function _logger_create_graph_legend($data, $colors) {
 
+  global $user;
+
   function _format($value) {
     return $value > 0? number_format($value, 2) : '';
   }
 
   $i = 0;
-  foreach($data as $user => $sensors) {
-    foreach($sensors as $sensor => $measurements) {
+  foreach($data as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $meter => $measurements) {
 
-      $total = 0;
-      $last = 0;
-      $max = 0;
-      $min = null;
-      $sum = 0;
-      $avg = 0;
-      
-      foreach($measurements as $timestamp => $value) {
-        if ($value) {
-          $total++;
-          $last = $value;
-          $max = $value > $max? $value: $max;
-          $min = !$min || $value < $min? $value: $min;
-          $sum += $value;
+        $total = 0;
+        $last = 0;
+        $max = 0;
+        $min = null;
+        $sum = 0;
+        $avg = 0;
+
+        foreach($measurements as $timestamp => $value) {
+          if ($value) {
+            $total++;
+            $last = $value;
+            $max = $value > $max? $value: $max;
+            $min = !$min || $value < $min? $value: $min;
+            $sum += $value;
+          }
         }
+        $avg = $total > 0? $sum / $total : 0;
+
+        $color = $colors[$i % count($colors)];
+
+        $id = SERIES_COLOR_ID . $i;
+        $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
+          style="width: 10px; height: 10px;"/>
+          <input id="' . $id . '" type="hidden" value="' . $color . '"
+          onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';path=/';" .
+          'document.location=document.location;"/>';
+
+        $operations = ($uid > 0 && $uid != $user->uid)?
+          l(t('Remove'), 'logger/remove/' . $uid) : '';
+
+        $lines[] = array(
+            'mark'      => $mark,
+            'user'      => $username,
+            'sensor'    => $meter,
+            'max'       => _format($max),
+            'min'       => _format($min),
+            'avg'       => _format($avg),
+            'last'      => _format($last),
+            'operation' => $operations
+        );
+        $i++;
       }
-      $avg = $total > 0? $sum / $total : 0;
-
-      $color = $colors[$i % count($colors)];
-
-      $id = SERIES_COLOR_ID . $i;
-      $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
-        style="width: 10px; height: 10px;"/>
-        <input id="' . $id . '" type="hidden" value="' . $color . '"
-        onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';path=/';" .
-        'document.location=document.location;"/>';
-
-      $lines[] = array(
-          'mark'   => $mark,
-          'user'   => $user,
-          'sensor' => $sensor,
-          'max'    => _format($max),
-          'min'    => _format($min),
-          'avg'    => _format($avg),
-          'last'   => _format($last)
-      );
-      $i++;
     }
   }
 
@@ -1099,7 +1089,8 @@ function _logger_create_graph_legend($data, $colors) {
     array('data'  => t('Max')),
     array('data'  => t('Min')),
     array('data'  => t('Avg')),
-    array('data'  => t('Last'))
+    array('data'  => t('Last')),
+    array('data'  => t('Operation'))
   );
 
   return '<br>' . theme('table', $headers, $lines);
@@ -1141,20 +1132,6 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
   switch ($op) {
     case 'list':
-      $blocks['fluksonians']['info'] = t('Fluksonians');
-      $blocks['fluksonians']['status'] = TRUE;
-      $blocks['fluksonians']['region'] = 'content';
-      $blocks['fluksonians']['weight'] = 1;
-      $blocks['fluksonians']['pages'] = 'logger/\nlogger/*';
-      $blocks['fluksonians']['cache'] = BLOCK_CACHE_PER_USER;
-
-      $blocks['unit']['info'] = t('Unit');
-      $blocks['unit']['status'] = TRUE;
-      $blocks['unit']['region'] = 'content';
-      $blocks['unit']['weight'] = 2;
-      $blocks['unit']['pages'] = 'logger/\nlogger/*';
-      $blocks['unit']['cache'] = BLOCK_CACHE_PER_USER;
-
       $blocks['posts']['info'] = t('Recent blog posts');
       $blocks['posts']['status'] = TRUE;
       $blocks['posts']['region'] = 'right';
@@ -1166,15 +1143,7 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
 
     case 'view':
 
-      if ($delta == 'fluksonians' && user_access('logger')) {
-
-        $block['content'] = drupal_get_form('_logger_fluksonians_form');
-
-      } elseif ($delta == 'unit' && user_access('logger')) {
-
-        $block['content'] = drupal_get_form('_logger_units_form');
-
-      } elseif ($delta == 'posts' && user_access('access content')) {
+      if ($delta == 'posts' && user_access('access content')) {
 
         $block = _logger_create_recent_blogs_block();
       }
@@ -1223,140 +1192,82 @@ function theme_logger_item_list($items, $title = NULL) {
   return $output;
 }
 
-/**
- * Generates the fluksonians block form.
- */
-function _logger_fluksonians_form() {
+function logger_control_form() {
 
-  global $user;
-  $destination = drupal_get_destination();
-
-  $sql = "
-    SELECT
-      u.uid,
-      u.name
-    FROM
-      ({users} u
-      INNER JOIN {users_roles} ur ON u.uid = ur.uid)
-      INNER JOIN {role} r ON ur.rid = r.rid
-    WHERE
-      r.name = '%s' AND
-      NOT u.uid = %d
-    ORDER BY
-      u.name";
-
-  $fluksonians = db_query($sql, 'fluksonian', $user->uid);
-
-  $sql = "
-    SELECT
-      u.uid,
-      u.name,
-      ur.rid
-    FROM
-      ({users} u
-      INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-      INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid
-    WHERE
-      ur.requester_id = %d AND
-      urt.name = '%s'
-    ORDER BY
-      u.name";
-
-  $subscriptions = db_query($sql, $user->uid, 'subscription');
-
-  $i = 0;
-  $rows = array();
-  $row = array();
-  $subscription = db_fetch_object($subscriptions);
-
-  while ($fluksonian = db_fetch_object($fluksonians)) {
-
-    if ($i > 3) {
-      $rows[] = $row;
-      $row = array();
-      $i = 0;
-    }
-
-    if ($fluksonian->uid == $subscription->uid) {
-      $row[] = l('[x]', 'logger/remove/'. $subscription->rid, array('attributes' => array('title' => "unsubscribe from ". $subscription->name ."'s stream"), 'query' => $destination, 'alias' => TRUE)) .' '. l($subscription->name, 'user/'. $subscription->uid, array('alias' => FALSE));
-      $subscription = db_fetch_object($subscriptions);
-
-    } else {
-      $row[] = l('[+]', 'logger/add/'. $fluksonian->uid,
-              array('attributes' => array('title' => "subscribe to ". $fluksonian->name ."'s stream"),
-                  'query' => $destination, 'alias' => TRUE)) .' '. l($fluksonian->name, 'user/'. $fluksonian->uid, array('alias' => FALSE));
-    }
-    $i++;
-  }
-  $rows[] = $row;
-
-  $form['fluksonians'] = array(
-    '#type'        => 'fieldset',
-    '#title'       => t('Fluksonians'),
-    '#description' => t('Select the Fluksonians you wish to add to [+] or clear from [x] the chart.'),
-    '#collapsible' => TRUE,
-    '#collapsed'   => FALSE,
+  $form['fluksonian'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Add Fluksonian'),
+    '#options'        => _logger_get_fluksonians_options(),
+    '#default_value'  => 0,
+    '#attributes'     => array(
+      'onchange'      => '
+        document.location="logger/add/" + this.value'
+    )
   );
 
-  $form['fluksonians']['list'] = array(
-    '#type'    => 'item',
-    //'#title' => t('Title'),
-    '#value'   => theme('table', array(), $rows),
+  $form['unit'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Chart Unit'),
+    '#options'        => _logger_get_units_options(),
+    '#default_value'  => _logger_get_unit(),
+    '#attributes'     => array(
+      'onchange'      => '
+        document.location="logger/unit/" + this.value'
+    )
   );
 
   return $form;
 }
 
-/**
- * Generates the units block form.
- */
-function _logger_units_form() {
+function _logger_get_fluksonians_options() {
 
-  //pass along our current destination in the query string so that logger_add and logger_remove can return after processing their task
-  $destination = drupal_get_destination();
+  global $user;
 
-  $unit = _logger_get_unit();
+  $sql = "
+    SELECT
+      f.uid,
+      f.name
+    FROM
+      {users} f,
+      {users_roles} ur,
+      {role} r
+    WHERE
+      f.uid <> %d AND
+      f.uid = ur.uid AND
+      ur.rid = r.rid AND
+      r.name = '%s' AND
+      NOT EXISTS(
+        SELECT
+          1
+        FROM
+          {user_relationships} urel,
+          {user_relationship_types} t
+        WHERE
+          t.name = '%s' AND
+          urel.rtid = t.rtid AND
+          urel.requestee_id = f.uid AND
+          urel.requester_id = %d
+      )
+    ORDER BY
+      f.name";
 
-  $items = array();
-  $items[0] = l('watt', 'logger/unit/watt', array('attributes' => array('title' => "switch to watt"), 'query' => $destination, 'alias' => TRUE));
-  $items[1] = l('kWh/year', 'logger/unit/kwh', array('attributes' => array('title' => "switch to kWh/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[2] = l('euro/year [@ 0.18eur/kWh]', 'logger/unit/eur', array('attributes' => array('title' => "switch to euro/year"), 'query' => $destination, 'alias' => TRUE));
-  $items[3] = l('aud/year [@ 0.19aud/kWh]', 'logger/unit/aud', array('attributes' => array('title' => "switch to aud/year"), 'query' => $destination, 'alias' => TRUE));
+  $fluksonians = db_query($sql, $user->uid, 'fluksonian', 'subscription', $user->uid);
 
-  // 'unlink' the currently selected unit option
-  switch ($unit) {
-    case 'watt':
-      $items[0] = 'watt';
-      break;
-
-    case 'kwh':
-      $items[1] = 'kWh/year';
-      break;
-
-    case 'eur':
-      $items[2] = 'euro/year [@ 0.18eur/kWh]';
-      break;
-
-    case 'aud':
-      $items[3] = 'aud/year [@ 0.19aud/kWh]';
-      break;
+  $options = array(0 => '');
+  while($fluksonian = db_fetch_object($fluksonians)) {
+    $options[$fluksonian->uid] = $fluksonian->name;
   }
+  return $options;
+}
 
-  $form['units'] = array(
-    '#type'        => 'fieldset',
-    '#title'       => t('Unit'),
-    '#description' => t('Select the chart unit.'),
-    '#collapsible' => TRUE,
-    '#collapsed'   => FALSE,
-  );
+function _logger_get_units_options() {
+  
+  $options['watt'] = t('watt');
+  $options['kwh']  = t('kWh/year');
+  $options['eur']  = t('euro/year [@ 0.18eur/kWh]');
+  $options['aud']  = t('aud/year [@ 0.19aud/kWh]');
 
-  $form['units']['list'] = array(
-    '#type'    => 'item',
-    //'#title' => t('Title'),
-    '#value'   => theme('logger_item_list', $items),
-  );
-
-  return $form;
+  return $options;
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
