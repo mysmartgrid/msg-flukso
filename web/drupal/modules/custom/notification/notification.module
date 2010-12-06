@@ -345,7 +345,7 @@ function notification_registration_form() {
 
   $form['min_interval'] = array(
     '#type'           => 'select',
-    '#title'          => t('Maximum Frequency'),
+    '#title'          => t('Amount of Notifications'),
     '#description'    => t('How often do you want to receive notifications, when the same event occurs several times consecutively?'),
     '#default_value'  => 0,
     '#required'       => TRUE,
@@ -427,7 +427,7 @@ function notification_edition_form(&$form_state, $notification) {
 
   $form['min_interval'] = array(
     '#type'           => 'select',
-    '#title'          => t('Maximum Frequency'),
+    '#title'          => t('Amount of Notifications'),
     '#description'    => t('How often do you want to receive notifications, when the same event occurs several times consecutively?'),
     '#required'       => TRUE,
     '#options'        => _notification_get_frequency_options(),
@@ -912,16 +912,16 @@ function _notification_send_peak_consumption_emails($now) {
   $sql = "
     SELECT DISTINCT
       d.device AS device,
-      n.event_id AS event_id,
-      u.name AS user_name,
-      n.email AS email,
       d.serial AS serial,
-      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
+      u.name AS user_name,
       u.timezone AS timezone,
+      n.event_id AS event_id,
+      n.email AS email,
       n.limit_up AS limit_up,
-      FROM_UNIXTIME(n.base_time + u.timezone) AS start_time,
+      FROM_UNIXTIME(MAX(m.access) + u.timezone) AS event_time,
+      (n.base_time + u.timezone) AS start_time,
       (SUM(m.value) - n.base_value) AS consumption,
-      ((d.access - n.base_time) / " . HOUR . ") AS elapsed_time
+      ((MAX(m.access) - n.base_time) / " . HOUR . ") AS elapsed_time
     FROM
       {users} u,
       {logger_devices} d,
@@ -932,15 +932,10 @@ function _notification_send_peak_consumption_emails($now) {
       d.device = n.device AND
       n.event_id = %d AND
       %d > (n.last_sent + n.min_interval * " . MINUTE . ") AND
-      d.access > n.base_time AND
       m.device = d.device AND
       m.type = '%s'
     GROUP BY
-      u.name,
-      n.email,
-      d.access,
-      n.limit_up,
-      n.base_value
+      d.device
     HAVING
       consumption / elapsed_time > n.limit_up";
 
