@@ -953,15 +953,16 @@ function _logger_save_chart_file($chart) {
   $timestamps = _logger_get_all_timestamps($chart->data);
   $s = 1;
 
-  foreach($chart->data as $user => $sensors) {
+  foreach($chart->data as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $measurements) {
+        $header .= ',S' . $s++;
 
-    foreach($sensors as $sensor => $measurements) {
-      $header .= ',S' . $s++;
-
-      foreach($timestamps as $timestamp) {
-        $value = $measurements[$timestamp];
-        $value = $value? number_format($value, 3, '.', '') : '';
-        $values[$timestamp] .= ',' . $value;
+        foreach($timestamps as $timestamp) {
+          $value = $measurements[$timestamp];
+          $value = $value? number_format($value, 3, '.', '') : '';
+          $values[$timestamp] .= ',' . $value;
+        }
       }
     }
   }
