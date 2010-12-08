@@ -245,6 +245,14 @@ function logger_menu() {
     'type'             => MENU_CALLBACK,
   );
 
+  $items['logger/color'] = array(
+    'title'            => 'Change the series color',
+    'page callback'    => '_logger_series_color',
+    'page arguments'   => array(2, 3),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK,
+  );
+
 
   //Devices' operations
 
@@ -763,10 +771,16 @@ function _logger_remove($requestee_id) {
  */
 function _logger_unit($unit) {
 
-  setcookie(CHART_UNIT, $unit, time() + MONTH, '/');
+  global $user;
+  $id = CHART_UNIT;
 
-  //Clear cache of the block "unit"
-  _logger_cache_clear('unit');
+  if ($user) {
+    $id .= $user->uid;
+    variable_set($id, $unit);
+
+  } else {
+    setcookie($id, $unit, time() + MONTH, '/');
+  }
 
   $destination = drupal_get_destination();
   drupal_goto($destination);
@@ -778,7 +792,18 @@ function _logger_unit($unit) {
  * @return the chart unit.
  */
 function _logger_get_unit() {
-  return isset($_COOKIE[CHART_UNIT])? $_COOKIE[CHART_UNIT] : 'watt';
+
+  global $user;
+  $id = CHART_UNIT;
+
+  if ($user) {
+    $id .= $user->uid;
+    $unit = variable_get($id, 'watt');
+
+  } else {
+    $unit = isset($_COOKIE[$id])? $_COOKIE[$id] : 'watt';
+  }
+  return $unit;
 }
 
 /**
@@ -1065,7 +1090,7 @@ function _logger_create_graph_legend($data, $colors) {
           style="width: 10px; height: 10px;"/>
           <input id="' . $id . '" type="hidden" value="' . $color . '"
           onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';path=/';" .
-          'document.location=document.location;"/>';
+          "document.location='/logger/color/$i/' + escape('#' + this.value);" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
           l(t('Remove'), 'logger/remove/' . $uid) : '';
@@ -1100,6 +1125,29 @@ function _logger_create_graph_legend($data, $colors) {
 }
 
 /**
+ * Sets the chart series color.
+ *
+ * @param $i      The chart series' index.
+ * @param $color  The new chart series' color.
+ */
+function _logger_series_color($i, $color) {
+
+  global $user;
+  $id = SERIES_COLOR_ID . $i;
+
+  if ($user) {
+    $id .= $user->uid;
+    variable_set($id, $color);
+
+  } else {
+    setcookie($id, $unit, time() + MONTH, '/');
+  }
+
+  $destination = drupal_get_destination();
+  drupal_goto($destination);
+}
+
+/**
  * Returns the list of colors used in chart series.
  *
  * @return array of colors.
@@ -1107,8 +1155,19 @@ function _logger_create_graph_legend($data, $colors) {
 function _logger_get_series_colors() {
 
   function _get_color($i, $default) {
+
+    global $user;
     $id = SERIES_COLOR_ID . $i;
-    return isset($_COOKIE[$id])? $_COOKIE[$id] : $default;
+
+    if ($user) {
+      $id .= $user->uid;
+      $color = variable_get($id, $default);
+
+    } else {
+      $color = isset($_COOKIE[$id])? $_COOKIE[$id] : $default;
+    }
+
+    return $color;
   }
 
   return array(
@@ -1204,7 +1263,7 @@ function logger_control_form() {
     '#default_value'  => 0,
     '#attributes'     => array(
       'onchange'      => '
-        document.location="logger/add/" + this.value'
+        document.location="logger/add/" + escape(this.value);'
     )
   );
 
@@ -1215,7 +1274,7 @@ function logger_control_form() {
     '#default_value'  => _logger_get_unit(),
     '#attributes'     => array(
       'onchange'      => '
-        document.location="logger/unit/" + this.value'
+        document.location="logger/unit/" + escape(this.value);'
     )
   );
 
