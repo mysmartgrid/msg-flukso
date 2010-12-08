@@ -366,9 +366,9 @@ function logger_sensor_form_validate($form, &$form_state) {
   $meter = $form_state['values']['meter'];
 
   if (!_logger_function_name_validate($function, $meter)) {
-    //TODO: use concatenation instead of multi-line string
-    form_set_error('function', t('Another sensor was found with the function name: %function_name.
-      Please inform another name which has not yet been used.', array('%function_name' => $function)));
+
+    form_set_error('function', t('Another sensor was found with the function name: %function_name. ' .
+      'Please inform another name which has not yet been used.', array('%function_name' => $function)));
   }
 }
 

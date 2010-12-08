@@ -202,7 +202,7 @@ function _logger_assign_node($serial, $country, $uid) {
 }
 
 function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
-      
+
   module_load_include('inc', 'logger', 'logger.admin');
 
   if (_logger_function_name_validate($function, $meter)) {
