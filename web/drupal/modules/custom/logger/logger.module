@@ -951,11 +951,11 @@ function theme_dygraph($chart) {
 
   $output .= _logger_create_graph_legend($chart->data, $colors);
 
-  $output .= '<br>' . l(t('Save Data'), $file_path);
-
   if ($chart->context == 'logger') {
     $output .= drupal_get_form('logger_control_form');
   }
+
+  $output .= l(t('Save Data'), $file_path);
 
   return $output;
 }
@@ -1089,8 +1089,7 @@ function _logger_create_graph_legend($data, $colors) {
         $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
           style="width: 10px; height: 10px;"/>
           <input id="' . $id . '" type="hidden" value="' . $color . '"
-          onchange="document.cookie=' . "'$id'" . " + '=#' + escape(this.value) + ';path=/';" .
-          "document.location='/logger/color/$i/' + escape('#' + this.value);" . '"/>';
+          onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value);" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
           l(t('Remove'), 'logger/remove/' . $uid) : '';
@@ -1258,12 +1257,12 @@ function logger_control_form() {
 
   $form['fluksonian'] = array(
     '#type'           => 'select',
-    '#title'          => t('Add Fluksonian'),
+    '#title'          => t('Add User'),
     '#options'        => _logger_get_fluksonians_options(),
     '#default_value'  => 0,
     '#attributes'     => array(
       'onchange'      => '
-        document.location="logger/add/" + escape(this.value);'
+        document.location="/logger/add/" + escape(this.value);'
     )
   );
 
@@ -1274,7 +1273,7 @@ function logger_control_form() {
     '#default_value'  => _logger_get_unit(),
     '#attributes'     => array(
       'onchange'      => '
-        document.location="logger/unit/" + escape(this.value);'
+        document.location="/logger/unit/" + escape(this.value);'
     )
   );
 
