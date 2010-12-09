@@ -37,6 +37,7 @@ define('YEAR',  365 * DAY);
 
 define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
+define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_id');
 
 function logger_init() {
   
@@ -224,25 +225,12 @@ function logger_menu() {
 
   //Chart operations
 
-  $items['logger/add'] = array(
-    'title'            => 'Add this user to the chart',
-    'page callback'    => '_logger_add',
-    'access arguments' => array('logger'),
-    'type'             => MENU_CALLBACK,
-  );
-
   $items['logger/remove'] = array(
     'title'            => 'Remove this user from the chart',
-    'page callback'    => '_logger_remove',
+    'page callback'    => '_logger_remove_user',
+    'page arguments'   => array(2),
     'access arguments' => array('logger'),
-    'type'             => MENU_CALLBACK,
-  );
-
-  $items['logger/unit'] = array(
-    'title'            => 'Change the unit',
-    'page callback'    => '_logger_unit',
-    'access arguments' => array('logger'),
-    'type'             => MENU_CALLBACK,
+    'type'             => MENU_CALLBACK
   );
 
   $items['logger/color'] = array(
@@ -250,7 +238,7 @@ function logger_menu() {
     'page callback'    => '_logger_series_color',
     'page arguments'   => array(2, 3),
     'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
+    'type'             => MENU_CALLBACK
   );
 
 
@@ -730,82 +718,6 @@ function _logger_get_timezone_offset() {
   return $offset;
 }
 
-function _logger_add($uid) {
-
-  global $user;
-
-  // don't allow users to add themselves
-  if ($uid != $user->uid) {
-
-    $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
-    $rtid = db_result(db_query($sql, 'subscription'));
-
-    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-  }
-
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
-}
-
-function _logger_remove($requestee_id) {
-
-  global $user;
-
-  $sql = "
-    DELETE
-      FROM {user_relationships}
-    WHERE
-      requester_id = %d AND
-      requestee_id = %d";
-
-  db_query($sql, $user->uid, $requestee_id);
-
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
-}
-
-/**
- * Sets the chart unit.
- * 
- * @param $unit  The new unit.
- */
-function _logger_unit($unit) {
-
-  global $user;
-  $id = CHART_UNIT;
-
-  if ($user) {
-    $id .= $user->uid;
-    variable_set($id, $unit);
-
-  } else {
-    setcookie($id, $unit, time() + MONTH, '/');
-  }
-
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
-}
-
-/**
- * Returns the chart unit.
- *
- * @return the chart unit.
- */
-function _logger_get_unit() {
-
-  global $user;
-  $id = CHART_UNIT;
-
-  if ($user) {
-    $id .= $user->uid;
-    $unit = variable_get($id, 'watt');
-
-  } else {
-    $unit = isset($_COOKIE[$id])? $_COOKIE[$id] : 'watt';
-  }
-  return $unit;
-}
-
 /**
  * Clear the specific (per user) cache entry in the {cache_block} table.
  */
@@ -925,6 +837,7 @@ function theme_dygraph($chart) {
 
   $file_path = _logger_save_chart_file($chart);
   $colors = _logger_get_series_colors();
+  $smoothing_level = _logger_get_smoothing_level();
 
   $output = _logger_create_interval_menu($chart->context);
 
@@ -944,7 +857,9 @@ function theme_dygraph($chart) {
           width: 600,
           height: 350,
           yAxisLabelWidth: 50,
-          includeZero: true
+          includeZero: true,
+          showRoller: false,
+          rollPeriod: ' . $smoothing_level . '
         }
       );
     </script>';
@@ -1255,29 +1170,162 @@ function theme_logger_item_list($items, $title = NULL) {
 
 function logger_control_form() {
 
-  $form['fluksonian'] = array(
+  $attributes = array(
+      'onchange'      => '
+        document.getElementById("logger-control-form").submit();'
+    );
+
+  $form['new_user'] = array(
     '#type'           => 'select',
     '#title'          => t('Add User'),
-    '#options'        => _logger_get_fluksonians_options(),
+    '#description'    => t('Select a user to be added to the chart.'),
+    '#options'        => _logger_get_users_options(),
     '#default_value'  => 0,
-    '#attributes'     => array(
-      'onchange'      => '
-        document.location="/logger/add/" + escape(this.value);'
-    )
+    '#attributes'     => $attributes
   );
 
   $form['unit'] = array(
     '#type'           => 'select',
     '#title'          => t('Chart Unit'),
+    '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_units_options(),
     '#default_value'  => _logger_get_unit(),
-    '#attributes'     => array(
-      'onchange'      => '
-        document.location="/logger/unit/" + escape(this.value);'
-    )
+    '#required'       => TRUE,
+    '#attributes'     => $attributes
   );
 
+  $form['smoothing_level'] = array(
+    '#type'           => 'textfield',
+    '#title'          => t('Smoothing Level'),
+    '#description'    => t("Enter the number of values represented by each series' point. By increasing this number, the lines are smoothed and may become more readable. However, they also loose precision as multiple values are averaged in each point."),
+    '#maxlength'      => 5,
+    '#size'           => 5,
+    '#default_value'  => _logger_get_smoothing_level(),
+    '#required'       => TRUE,
+    '#attributes'     => $attributes
+  );
+
+  $form['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Refresh')
+  );
+  
   return $form;
+}
+
+function logger_control_form_validate($form, &$form_state) {
+
+  $smoothing_level = $form_state['values']['smoothing_level'];
+
+  if ($smoothing_level < 1) {
+    form_set_error('smoothing_level', t('The smoothing level must be greater than 0.'));
+  }
+}
+
+function logger_control_form_submit($form, &$form_state) {
+
+  $new_user        = $form_state['values']['new_user'];
+  $unit            = $form_state['values']['unit'];
+  $smoothing_level = $form_state['values']['smoothing_level'];
+
+  _logger_set_smoothing_level($smoothing_level);
+  _logger_set_unit($unit);
+
+  if ($new_user > 0) {
+    _logger_add_user($new_user);
+  }
+}
+
+/**
+ * Returns an array of units indexed by their respective acronym.
+ *
+ * @return the array of units.
+ */
+function _logger_get_units_options() {
+
+  $options['watt'] = t('watt');
+  $options['kwh']  = t('kWh/year');
+  $options['eur']  = t('euro/year [@ 0.18eur/kWh]');
+  $options['aud']  = t('aud/year [@ 0.19aud/kWh]');
+
+  return $options;
+}
+
+/**
+ * Sets the chart unit.
+ *
+ * @param $unit  The new unit.
+ */
+function _logger_set_unit($unit) {
+
+  global $user;
+  $id = CHART_UNIT;
+
+  if ($user) {
+    $id .= $user->uid;
+    variable_set($id, $unit);
+
+  } else {
+    setcookie($id, $unit, time() + MONTH, '/');
+  }
+}
+
+/**
+ * Returns the chart unit.
+ *
+ * @return the chart unit.
+ */
+function _logger_get_unit() {
+
+  global $user;
+  $id = CHART_UNIT;
+
+  if ($user) {
+    $id .= $user->uid;
+    $unit = variable_get($id, 'watt');
+
+  } else {
+    $unit = isset($_COOKIE[$id])? $_COOKIE[$id] : 'watt';
+  }
+  return $unit;
+}
+
+/**
+ * Sets the chart smooting level.
+ *
+ * @param $level  The new smooting level.
+ */
+function _logger_set_smoothing_level($level) {
+
+  global $user;
+  $id = SMOOTHING_LEVEL_ID . $user->uid;
+
+  system("echo setting level $level >> /tmp/test.out");
+
+  variable_set($id, $level);
+}
+
+/**
+ * Returns the chart smooting level.
+ *
+ * @return The chart smooting level.
+ */
+function _logger_get_smoothing_level() {
+
+  global $user;
+
+  if ($user) {
+    $id = SMOOTHING_LEVEL_ID . $user->uid;
+    $level = variable_get($id, 1);
+
+    system("echo auth yes $level >> /tmp/test.out");
+
+  } else {
+    $level = 1;
+    system("echo auth no $level >> /tmp/test.out");
+  }
+
+  return $level;
 }
 
 /**
@@ -1286,7 +1334,7 @@ function logger_control_form() {
  *
  * @return the array of fluksonian users.
  */
-function _logger_get_fluksonians_options() {
+function _logger_get_users_options() {
 
   global $user;
 
@@ -1327,19 +1375,38 @@ function _logger_get_fluksonians_options() {
   return $options;
 }
 
-/**
- * Returns an array of units indexed by their respective acronym.
- *
- * @return the array of units.
- */
-function _logger_get_units_options() {
-  
-  $options['watt'] = t('watt');
-  $options['kwh']  = t('kWh/year');
-  $options['eur']  = t('euro/year [@ 0.18eur/kWh]');
-  $options['aud']  = t('aud/year [@ 0.19aud/kWh]');
+function _logger_add_user($uid) {
 
-  return $options;
+  global $user;
+
+  // don't allow users to add themselves
+  if ($uid != $user->uid) {
+
+    $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
+    $rtid = db_result(db_query($sql, 'subscription'));
+
+    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
+  }
+
+  $destination = drupal_get_destination();
+  drupal_goto($destination);
+}
+
+function _logger_remove_user($requestee_id) {
+
+  global $user;
+
+  $sql = "
+    DELETE
+      FROM {user_relationships}
+    WHERE
+      requester_id = %d AND
+      requestee_id = %d";
+
+  db_query($sql, $user->uid, $requestee_id);
+
+  $destination = drupal_get_destination();
+  drupal_goto($destination);
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {

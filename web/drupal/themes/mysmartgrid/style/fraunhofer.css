@@ -1807,12 +1807,14 @@ ul.con input {
 	height:1.33em;
 	width:20.25em;
 }
-/*added by Stephan Platz, 12.04.2010*/
 #edit-serial {
 	width:10em;
 }
 #edit-code {
 	width:10em;
+}
+#edit-smoothing-level {
+	width:5em;
 }
 ul.tabs.primary,
 ul.tabs.secondary {
