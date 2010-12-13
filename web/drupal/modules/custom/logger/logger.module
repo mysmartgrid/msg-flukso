@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Support module for charting data stored in RRD's.
+ * Support module for charting flukso measurements.
  *
  * Copyright (c) 2008-2009 jokamajo.org
  *               2010 flukso.net
@@ -24,20 +24,18 @@
 
 //Constants
 define('ROOT_PATH',  drupal_get_path('module', 'logger'));
-define('DATA_PATH',  ROOT_PATH . '/data');
 define('GRAPH_PATH', ROOT_PATH . '/graphs');
-define('RRDTOOL',    ROOT_PATH . '/rrdtool');
 
 define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
-define('MONTH',  30 * DAY);
-define('YEAR',  365 * DAY);
+define('YEAR',  520 * WEEK);
 
 define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_id');
+define('STEP_PLOT_ID', 'logger_step_plot');
 
 function logger_init() {
   
@@ -433,7 +431,7 @@ function _logger_overview($type, $interval) {
   drupal_set_title(t('Overall View'));
 
   //General explanation
-  $output .= theme('overview_topic', NULL,
+  $output .= theme('logger_overview_topic', NULL,
     t('<b>mySmartGrid</b> is the smart device control for your home. ' .
     'It enables you to understand your energy consumption and share your ' .
     'experiences with others.'), 'content/das-projekt');
@@ -446,7 +444,7 @@ function _logger_overview($type, $interval) {
 
     $blog = node_load(array('nid' => $result->nid));
 
-    $output .= theme('overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+    $output .= theme('logger_overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
   }
 
   //Counters
@@ -470,7 +468,7 @@ function _logger_overview($type, $interval) {
 
   $usercounter = db_result( db_query($sql));
 
-  $output .= theme('overview_topic', t('Total Consumption of All Participants'),
+  $output .= theme('logger_overview_topic', t('Total Consumption of All Participants'),
     t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
       'in <b>@usercounter</b> households. The following chart shows their ' .
       'aggregate electricity consumption.',
@@ -495,14 +493,14 @@ function _logger_overview($type, $interval) {
  */
 function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   $chart = _logger_create_chart_object($interval, $type, 'overview');
   $offset = _logger_get_timezone_offset();
 
-  $exported_cdef = "meter0";
-  $def = _logger_chart_agg_data_series($exported_cdef, $chart, $sensors);
-  $chart->data[0][t('All')][t('All')] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->start, $offset);
 
-  return theme('dygraph', $chart);
+  return theme('logger_dygraph', $chart);
 }
 
 /**
@@ -515,17 +513,17 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
  */
 function _logger_create_user_dygraph($sensors, $type, $interval) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   $chart = _logger_create_chart_object($interval, $type, 'logger');
   $offset = _logger_get_timezone_offset();
-  $exported_cdef = "meter";
 
   foreach ($sensors as &$sensor) {
 
-    $def = _logger_chart_sensor_data_series($exported_cdef, $chart, $sensor);
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = _logger_query_measurements($interval, $chart->start, $def, $exported_cdef, $offset);
+    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->start, $offset);
   }
 
-  return theme('dygraph', $chart);
+  return theme('logger_dygraph', $chart);
 }
 
 /**
@@ -543,7 +541,6 @@ function _logger_create_chart_object($interval, $type, $context) {
   //Default
   $params->unit = 'watt';
   $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data_path = DATA_PATH . '/base';
   $params->data = array();
   $params->interval = $interval;
   $params->context = $context;
@@ -567,7 +564,6 @@ function _logger_create_chart_object($interval, $type, $context) {
 
     case 'night':
       $params->start = 'end-60d';
-      $params->data_path = DATA_PATH . "/night";
       break;
   }
 
@@ -718,60 +714,15 @@ function _logger_get_timezone_offset() {
   return $offset;
 }
 
-/**
- * Clear the specific (per user) cache entry in the {cache_block} table.
- */
-function _logger_cache_clear($delta) {
-
-  global $theme;
-
-  //the theme variable isn't set on these callbacks so force it
-  $theme = 'flukso';
-
-  $sql = "
-    SELECT
-      *
-    FROM
-      {blocks}
-    WHERE
-      module = '%s' AND
-      delta = '%s' AND
-      theme = '%s'";
-
-  $block = db_fetch_object(db_query($sql, 'logger', $delta, 'flukso'));
-
-  $cid = _block_get_cache_id($block);
-
-  // prevent the whole chache_block being cleared when _block_get_cache_id returns an empty string (e.g. uid = 1)
-  if ($cid != '') {
-    cache_clear_all($cid, 'cache_block');
-  }
-  //watchdog('block_cache', '%cid | %cache', array('%cid' => $cid, '%cache' => variable_get('block_cache', 100)), WATCHDOG_DEBUG);
-}
-
-/**
- * Implementation of hook_user() for logger.
- * Flush the fluksonians block entries in the block cache.
- */
-function logger_user($op) {
-  switch($op) {
-    // new user is being inserted into the database
-    case 'insert':
-      // flush the fluksonians block entries
-      cache_clear_all('logger:fluksonians', 'cache_block', TRUE);
-      break;
-  }
-}
-
 function logger_theme() {
 
   return array(
-    'dygraph' => array(
+    'logger_dygraph' => array(
       'arguments' => array(
         'chart' => NULL),
     ),
 
-    'overview_topic' => array(
+    'logger_overview_topic' => array(
       'arguments' => array(
         'title' => NULL,
         'body' => NULL,
@@ -801,6 +752,11 @@ function logger_theme() {
         'items' => NULL),
       'file' => 'logger.admin.inc',
     ),
+
+    'logger_smoothing_level' => array(
+      'arguments' => array(
+        'element' => NULL),
+    ),
   );
 }
 
@@ -812,7 +768,7 @@ function logger_theme() {
  * @param $link   The topic link.
  * @return the topic.
  */
-function theme_overview_topic($title, $body, $link = NULL) {
+function theme_logger_overview_topic($title, $body, $link = NULL) {
 
   if($title) {
     $output .= '<br><h3 class="node-headline">' . $title . '</h3>';
@@ -833,11 +789,12 @@ function theme_overview_topic($title, $body, $link = NULL) {
  * @param $chart   The chart parameters.
  * @return the chart output.
  */
-function theme_dygraph($chart) {
+function theme_logger_dygraph($chart) {
 
   $file_path = _logger_save_chart_file($chart);
   $colors = _logger_get_series_colors();
   $smoothing_level = _logger_get_smoothing_level();
+  $step_plot = _logger_get_step_plot()? 'true' : 'false';
 
   $output = _logger_create_interval_menu($chart->context);
 
@@ -859,6 +816,7 @@ function theme_dygraph($chart) {
           yAxisLabelWidth: 50,
           includeZero: true,
           showRoller: false,
+          stepPlot: ' . $step_plot . ',
           rollPeriod: ' . $smoothing_level . '
         }
       );
@@ -1004,10 +962,10 @@ function _logger_create_graph_legend($data, $colors) {
         $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
           style="width: 10px; height: 10px;"/>
           <input id="' . $id . '" type="hidden" value="' . $color . '"
-          onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value);" . '"/>';
+          onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          l(t('Remove'), 'logger/remove/' . $uid) : '';
+          l(t('Remove'), "logger/remove/$uid?" . drupal_get_destination()) : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -1054,11 +1012,10 @@ function _logger_series_color($i, $color) {
     variable_set($id, $color);
 
   } else {
-    setcookie($id, $unit, time() + MONTH, '/');
+    setcookie($id, $unit, time() + WEEK, '/');
   }
 
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
+  drupal_goto($_REQUEST['destination']);
 }
 
 /**
@@ -1170,10 +1127,12 @@ function theme_logger_item_list($items, $title = NULL) {
 
 function logger_control_form() {
 
+  global $base_path;
+
   $attributes = array(
-      'onchange'      => '
-        document.getElementById("logger-control-form").submit();'
-    );
+    'onchange'      => '
+      document.getElementById("logger-control-form").submit();'
+  );
 
   $form['new_user'] = array(
     '#type'           => 'select',
@@ -1194,10 +1153,21 @@ function logger_control_form() {
     '#attributes'     => $attributes
   );
 
+  $form['step_plot'] = array(
+    '#type'           => 'checkbox',
+    '#title'          => t('Stepped Lines'),
+    '#description'    => t('Do you want the chart series to use stepped lines?'),
+    '#default_value'  => _logger_get_step_plot(),
+    '#return_value'   => 1,
+    '#required'       => TRUE,
+    '#attributes'     => $attributes
+  );
+
   $form['smoothing_level'] = array(
     '#type'           => 'textfield',
+    '#theme'          => 'logger_smoothing_level',
     '#title'          => t('Smoothing Level'),
-    '#description'    => t("Enter the number of values represented by each series' point. By increasing this number, the lines are smoothed and may become more readable. However, they also loose precision as multiple values are averaged in each point."),
+    '#description'    => t("Increase this number to smooth the series' lines and make the chart more readable."),
     '#maxlength'      => 5,
     '#size'           => 5,
     '#default_value'  => _logger_get_smoothing_level(),
@@ -1213,6 +1183,42 @@ function logger_control_form() {
   return $form;
 }
 
+function theme_logger_smoothing_level($element) {
+
+  function _operation_button($field, $caption, $step) {
+
+    $onclick = "
+      var field = document.getElementById('$field');
+      var level = field.value - (-1 * ($step));
+      field.value = level < 1? 1: level;
+      field.onchange();";
+
+    return '<input type="button" value="' . $caption . '" onclick="' . $onclick . '"/>';
+  }
+
+  _form_set_class($element, array('form-text'));
+
+  $id = $element['#id'];
+
+  $output =
+    _operation_button($id, '<<', -10) .
+    _operation_button($id, '<',  -1) .
+
+    '<input type="text"' .
+    'name="'      . $element['#name']               . '" ' .
+    'id="'        . $id                             . '" ' .
+    'maxlength="' . $element['#maxlength']          . '" ' .
+    'size="'      . $element['#size']               . '" ' .
+    'value="'     . check_plain($element['#value']) . '" ' .
+    'style="text-align: center;" ' .
+    drupal_attributes($element['#attributes']) . ' />' .
+
+    _operation_button($id, '>',   1) .
+    _operation_button($id, '>>',  10);
+
+  return theme('form_element', $element, $output);
+}
+
 function logger_control_form_validate($form, &$form_state) {
 
   $smoothing_level = $form_state['values']['smoothing_level'];
@@ -1220,20 +1226,28 @@ function logger_control_form_validate($form, &$form_state) {
   if ($smoothing_level < 1) {
     form_set_error('smoothing_level', t('The smoothing level must be greater than 0.'));
   }
+
+  $step_plot = $form_state['values']['step_plot'];
+
+  if ($step_plot != 1 && $step_plot != 0) {
+    form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
+  }
 }
 
 function logger_control_form_submit($form, &$form_state) {
 
   $new_user        = $form_state['values']['new_user'];
   $unit            = $form_state['values']['unit'];
+  $step_plot       = $form_state['values']['step_plot'];
   $smoothing_level = $form_state['values']['smoothing_level'];
-
-  _logger_set_smoothing_level($smoothing_level);
-  _logger_set_unit($unit);
 
   if ($new_user > 0) {
     _logger_add_user($new_user);
   }
+
+  _logger_set_unit($unit);
+  _logger_set_step_plot($step_plot);
+  _logger_set_smoothing_level($smoothing_level);
 }
 
 /**
@@ -1266,7 +1280,7 @@ function _logger_set_unit($unit) {
     variable_set($id, $unit);
 
   } else {
-    setcookie($id, $unit, time() + MONTH, '/');
+    setcookie($id, $unit, time() + WEEK, '/');
   }
 }
 
@@ -1300,8 +1314,6 @@ function _logger_set_smoothing_level($level) {
   global $user;
   $id = SMOOTHING_LEVEL_ID . $user->uid;
 
-  system("echo setting level $level >> /tmp/test.out");
-
   variable_set($id, $level);
 }
 
@@ -1318,14 +1330,44 @@ function _logger_get_smoothing_level() {
     $id = SMOOTHING_LEVEL_ID . $user->uid;
     $level = variable_get($id, 1);
 
-    system("echo auth yes $level >> /tmp/test.out");
-
   } else {
     $level = 1;
-    system("echo auth no $level >> /tmp/test.out");
   }
 
   return $level;
+}
+
+/**
+ * Returns whether the chart is stepped or not.
+ *
+ * @return 1 if it is, 0 otherwise.
+ */
+function _logger_get_step_plot() {
+
+  global $user;
+
+  if ($user) {
+    $id = STEP_PLOT_ID . $user->uid;
+    $step_plot = variable_get($id, 0);
+
+  } else {
+    $step_plot = 0;
+  }
+
+  return $step_plot;
+}
+
+/**
+ * Sets  whether the chart is stepped or not.
+ *
+ * @param $step_plot  1 if it is, 0 otherwise.
+ */
+function _logger_set_step_plot($step_plot) {
+
+  global $user;
+  $id = STEP_PLOT_ID . $user->uid;
+
+  variable_set($id, $step_plot);
 }
 
 /**
@@ -1388,8 +1430,7 @@ function _logger_add_user($uid) {
     user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
   }
 
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
+  drupal_goto($_REQUEST['destination']);
 }
 
 function _logger_remove_user($requestee_id) {
@@ -1405,8 +1446,7 @@ function _logger_remove_user($requestee_id) {
 
   db_query($sql, $user->uid, $requestee_id);
 
-  $destination = drupal_get_destination();
-  drupal_goto($destination);
+  drupal_goto($_REQUEST['destination']);
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
@@ -1453,8 +1493,7 @@ function _logger_device_access($permission, $serial) {
 }
 
 /**
- * Queries the RRDTool databases for measurements reported by sensors of a
- * single device.
+ * Queries the databases for measurements reported by sensors of a single device.
  *
  * @param $interval The time interval.
  * @param $start    The start time.
@@ -1464,131 +1503,17 @@ function _logger_device_access($permission, $serial) {
  */
 function logger_query_device_measurements($interval, $start, $device, $offset) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   $sql = "SELECT m.meter, m.function FROM {logger_meters} m WHERE m.device = '%s'";
   $sensors = db_query($sql, $device);
   $measurements = array();
 
-  $exported_cdef = "meter";
-  $factor = 3600;
-
   while($sensor = db_fetch_object($sensors)) {
 
-    $file_path = DATA_PATH . '/base/' . $sensor->meter . ".rrd" ;
-
-    $def = "DEF:data$exported_cdef=" . "$file_path:meter:AVERAGE " .
-      "CDEF:$exported_cdef=" . "data$exported_cdef," . $factor . ",* ";
-
-    $measurements[$sensor->meter][$sensor->function] = _logger_query_measurements($interval, $start, $def, $exported_cdef, $offset);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $start, $offset);
   }
   return $measurements;
-}
-
-/**
- * Queries the RRDTool databases for sensors' measurements.
- *
- * @param $interval       The time interval.
- * @param $start          The start time.
- * @param $def            The rrd def tag.
- * @param $exported_cdef  The exported cdef.
- * @param $offset         The user timezone offset.
- * @return the array of sensors' measurements.
- */
-function _logger_query_measurements($interval, $start, $def, $exported_cdef, $offset) {
-
-  if (!$def) {
-    return array();
-  }
-
-  $maxrows = array('hour' => 120, 'night' => 60, 'day' => 96, 'month' => 60, 'year' => 60);
-  $step    = array('hour' => 1,   'night' => 1,  'day' => 1,  'month' => 1,  'year' => 604800);
-
-  $command = RRDTOOL . ' xport ' .
-    "--start $start " .
-    "--step $step[$interval] " .
-    "--maxrows $maxrows[$interval] " .
-    "$def " .
-    "XPORT:$exported_cdef";
-
-  exec($command, $lines);
-
-  foreach($lines as $line) {
-    $line = strtolower($line);
-
-    if (strpos($line, '<row>') > 0) {
-
-      $line = str_replace(array('<row><t>', '</v></row>'), '',  $line);
-      $line = str_replace('</t><v>', ':', $line);
-      $div_pos = strpos($line, ':');
-
-      $timestamp = trim(substr($line, 0, $div_pos)) + $offset;
-      $value     = trim(substr($line, $div_pos + 1));
-
-      $data[$timestamp] = $value == 'nan'? null: $value;
-    }
-  }
-  return $data;
-}
-
-/**
- * Creates RRD tags to represent the series of measurements performed by a single sensor.
- *
- * @param $series_id  The series' id.
- * @param $chart      The chart parameters.
- * @param $sensor     The sensor being ploted.
- * @return the RRD DEF tag.
- */
-function _logger_chart_sensor_data_series($series_id, $chart, $sensor) {
-
-  global $user;
-
-  if($sensor->private > 0 && $sensor->uid != $user->uid) {
-    return null;
-  }
-
-  $file_path = $chart->data_path . "/" . $sensor->meter . ".rrd" ;
-
-  return "DEF:data$series_id="   . "$file_path:meter:AVERAGE " .
-    "CDEF:$series_id=" . "data$series_id," . $chart->factor . ",* ";
-}
-
-/**
- * Creates DEF and CDEF tags to represent the series of aggregated consumption.
- * 
- * @param $series_id   The series' id.
- * @param $chart       The chart parameters.
- * @param $sensors     The array of sensors to be aggregated.
- * @return the DEF and CDEF tags. 
- */
-function _logger_chart_agg_data_series($series_id, $chart, $sensors) {
-
-  //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = time() - 30 * MINUTE;
-  $def = "";
-  $variables = "";
-
-  $i = 1;
-  foreach ($sensors as $sensor) {
-
-    $sensor_cdef = "meter$i";
-
-    $def .= _logger_chart_sensor_data_series($sensor_cdef, $chart, $sensor) .
-
-      //Considers unknown measurements to be zero
-      "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
-
-      //Do not consider latest 30 minutes
-      "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
-
-    $variables .= ($i > 1 ? ',' : '') . "filtered$i";
-    $i++;
-  }
-
-  $operators = str_repeat(",+", count($sensors) - 1);
-
-  //Sum all measurements of a particular time
-  $def .= "CDEF:$series_id=$variables$operators ";
-  
-  return $def;
 }
 
 function logger_cron() {

@@ -123,41 +123,28 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
       $meter = md5(uniqid(rand(), TRUE));
       $token = md5(uniqid(rand(), TRUE));
 
-      $path = new stdClass();
-      $path->root = DRUPAL_ROOT .'/'. drupal_get_path('module', 'logger');
-      $path->base = $path->root .'/data/base/';
-      $path->night = $path->root .'/data/night/';
-
       $sql = "INSERT INTO {logger_meters} (meter, uid, device, created) VALUES ('%s', %d, '%s', %d)";
-      $result = db_query($sql, $meter, $uid, $device, $created);
+      $return = db_query($sql, $meter, $uid, $device, $created);
 
       $sql = "INSERT INTO {logger_tokens} (token, meter, permissions) VALUES ('%s', '%s', %d)";
       $insert = db_query($sql, $token, $meter, $permissions);
 
-      if (!($result && $insert)) {
+      if (!($return && $insert)) {
         drush_set_error('LOGGER_CREATE_METER_ENTRY', dt('Error creating meter entry for @meter.', array('@meter' => $meter)));
       }
 
       // create the meter base rrd
-      if (!file_exists($path->base . $meter .'.rrd')) {
+      $return = logger_rrd_base_create($meter);
 
-        $command = $path->root .'/rrdtool create '. $path->base . $meter .'.rrd -b 1199487600 -s 60 DS:meter:DERIVE:8640000:0:20 RRA:AVERAGE:0.5:1:120 RRA:AVERAGE:0.5:15:192 RRA:AVERAGE:0.5:1440:60 RRA:AVERAGE:0.5:10080:520';
-        system($command, $return);
-
-        if (!($return == 0)) {
-          drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
-        }
+      if (!($return == 0)) {
+        drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
       }
 
       // create the meter night rrd
-      if (!file_exists($path->night . $meter .'.rrd')) {
+      $return = logger_rrd_night_create($meter);
 
-        $command = $path->root .'/rrdtool create '. $path->night . $meter .'.rrd -b 1199487600 -s 86400 DS:meter:GAUGE:8640000:0:20 RRA:AVERAGE:0.5:1:60 RRA:AVERAGE:0.5:7:520';
-        system($command, $return);
-
-        if (!($return == 0)) {
-          drush_set_error('LOGGER_CREATE_RRD_NIGHT_ERROR', dt('Error creating the night @meter rrd.', array('@meter' => $meter)));
-        }
+      if (!($return == 0)) {
+        drush_set_error('LOGGER_CREATE_RRD_NIGHT_ERROR', dt('Error creating the night @meter rrd.', array('@meter' => $meter)));
       }
 
       if (!drush_get_error()) {

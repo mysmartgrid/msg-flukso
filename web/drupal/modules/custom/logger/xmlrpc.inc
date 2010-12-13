@@ -75,12 +75,9 @@ function _logger_heartbeat($device, $version, $resets, $uptime) {
 
 function _logger_measurement_add($logs) {
 
-  $info = 'added 5min interval measurements to the log';
+  require_once(XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc");
 
-  $path = new stdClass();
-  $path->root = XMLRPC_PATH . '/' . XMLRPC_MODULE; // need to hardcode drupal_get_path('module', 'logger');
-  $path->base = $path->root .'/data/base/';
-  $path->night = $path->root .'/data/night/';
+  $info = 'added 5min interval measurements to the log';
 
   foreach ($logs as $meter => $measurements) {
 
@@ -90,7 +87,6 @@ function _logger_measurement_add($logs) {
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
 
-      $command = $path->root . '/rrdtool update ' . $path->base . $meter . '.rrd ';
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
 
       $corrupted_time = 0;
@@ -98,7 +94,7 @@ function _logger_measurement_add($logs) {
       foreach ($measurements as $timestamp => $value) {
 
         if (is_numeric($timestamp) and is_numeric($value)) {
-          $command .= $timestamp . ':' . $value * $meterdata->factor . ' ';
+          $values[$timestamp] = $value * $meterdata->factor;
 
         } else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
@@ -108,9 +104,10 @@ function _logger_measurement_add($logs) {
 
       _logger_update_meter_integrity($meter, $corrupted_time);
 
-      system($command, $return);
+      $return = logger_rrd_update($meter, $values);
 
       if ($return == 0) {
+          watchdog_xmlrpc('logger.measurementAdd', 'successful update for base rrd: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
 
         // update the night rrd every day at 6AM local time
         if (time() > $meterdata->night) {
@@ -118,16 +115,14 @@ function _logger_measurement_add($logs) {
           $midnight = _logger_midnight(time(), $auth['device']);
           $start = $midnight + 7200; // 2AM local time
           $end = $start + 10800; // 3h time interval
-          $command = $path->root ."/rrdtool fetch ". $path->base . $meter .".rrd AVERAGE -r 900 -s ". $start ." -e ". $end ." | tail -n 12 | awk -F': ' '{SUM += $2} END {print SUM/12}'";
-          $night = (float) shell_exec($command); //test shell_exec iso system
-          $command = $path->root .'/rrdtool update '. $path->night . $meter .'.rrd '. $end .':'. $night;
-          system($command, $return);
+
+          $return = logger_rrd_night_update($meter, $start, $end);
 
           if ($return == 0) {
-            watchdog_xmlrpc('logger.measurementAdd', 'successful update for night rrd: %command | midnight = %midnight', array('%command' => $command, '%midnight' => $midnight), WATCHDOG_NOTICE); //debugging
+            watchdog_xmlrpc('logger.measurementAdd', 'successful update for night rrd: %meter | midnight = %midnight', array('%meter' => $meter, '%midnight' => $midnight), WATCHDOG_NOTICE);
 
           } else {
-            watchdog_xmlrpc('logger.measurementAdd', 'error updating night rrd: %command', array('%command' => $command), WATCHDOG_ERROR); //debugging
+            watchdog_xmlrpc('logger.measurementAdd', 'error updating night rrd: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
           }
           
           //add an offset of 30h = 6AM local time
@@ -139,11 +134,11 @@ function _logger_measurement_add($logs) {
         //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
       } else {
-        watchdog_xmlrpc('logger.measurementAdd', 'shell command execution failed: %return %command', array('%command' => $command, '%return' => $return), WATCHDOG_ERROR);
+        watchdog_xmlrpc('logger.measurementAdd', 'error updating base rrd. meter: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
       }
     }
   }
-  return $command; //using $command for testing purposes, replace by $info afterwards
+  return $info;
 }
 
 /**
@@ -155,8 +150,8 @@ function _logger_measurement_add($logs) {
  */
 function _logger_update_meter_integrity($meter, $corruption_time) {
 
-    $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
-    db_query($sql, $corruption_time, $meter);
+  $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
+  db_query($sql, $corruption_time, $meter);
 }
 
 /**
