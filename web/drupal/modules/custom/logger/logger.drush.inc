@@ -77,6 +77,8 @@ function logger_drush_command() {
 
 function _logger_create_node($serial, $country ="", $uid = 0) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   //guard against duplicating entries for the same S/N
   $sql = "SELECT COUNT(device) FROM {logger_devices} WHERE serial = %d";
   $count = db_result(db_query($sql, $serial));
