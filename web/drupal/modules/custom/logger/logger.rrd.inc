@@ -32,7 +32,8 @@ define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
-define('YEAR',  520 * WEEK);
+define('MONTH',  30 * DAY);
+define('YEAR',   52 * WEEK);
 
 define('METER', 'meter');
 
@@ -49,7 +50,7 @@ function logger_rrd_base_create($meter) {
      //resolution   storage period
      1 * MINUTE =>  2 * HOUR,
     15 * MINUTE =>  2 * DAY,
-     1 * HOUR   =>  8 * WEEK,
+     1 * DAY    =>  2 * MONTH,
      1 * WEEK   => 10 * YEAR);
 
   return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
@@ -66,8 +67,8 @@ function logger_rrd_night_create($meter) {
   $step = 24 * HOUR;
   $archives = array(
     //resolution    storage period
-    24 * HOUR   =>  8 * WEEK,
-    1 * WEEK    => 10 * YEAR);
+    1 * DAY    =>  2 * MONTH,
+    1 * WEEK   => 10 * YEAR);
 
   return _logger_rrd_create($meter, $step, 'GAUGE', $archives, 'night');
 }
@@ -131,10 +132,10 @@ function _logger_rrd_rras($step, $archives) {
   $rras = '';
   foreach($archives as $resolution => $storage_period) {
 
-    $steps = $resolution / $step;
+    $rows = $resolution / $step;
     $slots = $storage_period / $resolution;
 
-    $rras .= "RRA:AVERAGE:0.5:$steps:$slots ";
+    $rras .= "RRA:AVERAGE:0.5:$rows:$slots ";
   }
   return $rras;
 }

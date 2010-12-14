@@ -30,7 +30,7 @@ define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
-define('YEAR',  520 * WEEK);
+define('YEAR',   52 * WEEK);
 
 define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
