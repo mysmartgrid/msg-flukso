@@ -965,7 +965,8 @@ function _logger_create_graph_legend($data, $colors) {
           onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          l(t('Remove'), "logger/remove/$uid?" . drupal_get_destination()) : '';
+        '<a href="' . "/logger/remove/$uid?" . urldecode(drupal_get_destination()) . '">' . t('Remove') . '</a>' : '';
+        //TODO: make it work: l(t('Remove'), "logger/remove/$uid?" . drupal_get_destination(), array('html' => TRUE)) : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -1004,6 +1005,7 @@ function _logger_create_graph_legend($data, $colors) {
  */
 function _logger_series_color($i, $color) {
 
+  global $_REQUEST;
   global $user;
   $id = SERIES_COLOR_ID . $i;
 
@@ -1204,7 +1206,7 @@ function theme_logger_smoothing_level($element) {
     _operation_button($id, '<<', -10) .
     _operation_button($id, '<',  -1) .
 
-    '<input type="text"' .
+    '<input type="text" ' .
     'name="'      . $element['#name']               . '" ' .
     'id="'        . $id                             . '" ' .
     'maxlength="' . $element['#maxlength']          . '" ' .
@@ -1236,6 +1238,8 @@ function logger_control_form_validate($form, &$form_state) {
 
 function logger_control_form_submit($form, &$form_state) {
 
+  global $_REQUEST;
+  
   $new_user        = $form_state['values']['new_user'];
   $unit            = $form_state['values']['unit'];
   $step_plot       = $form_state['values']['step_plot'];
@@ -1248,6 +1252,8 @@ function logger_control_form_submit($form, &$form_state) {
   _logger_set_unit($unit);
   _logger_set_step_plot($step_plot);
   _logger_set_smoothing_level($smoothing_level);
+
+  $form_state['redirect'] = $_REQUEST['destination'];
 }
 
 /**
@@ -1429,12 +1435,11 @@ function _logger_add_user($uid) {
 
     user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
   }
-
-  drupal_goto($_REQUEST['destination']);
 }
 
 function _logger_remove_user($requestee_id) {
 
+  global $_REQUEST;
   global $user;
 
   $sql = "
@@ -1446,6 +1451,7 @@ function _logger_remove_user($requestee_id) {
 
   db_query($sql, $user->uid, $requestee_id);
 
+  //TODO: destination is never received
   drupal_goto($_REQUEST['destination']);
 }
 
