@@ -1451,7 +1451,6 @@ function _logger_remove_user($requestee_id) {
 
   db_query($sql, $user->uid, $requestee_id);
 
-  //TODO: destination is never received
   drupal_goto($_REQUEST['destination']);
 }
 

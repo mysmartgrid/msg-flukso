@@ -49,7 +49,7 @@ function logger_rrd_base_create($meter) {
      //resolution   storage period
      1 * MINUTE =>  2 * HOUR,
     15 * MINUTE =>  2 * DAY,
-     1 * HOUR   =>  2 * MONTH,
+     1 * HOUR   =>  8 * WEEK,
      1 * WEEK   => 10 * YEAR);
 
   return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
@@ -66,7 +66,7 @@ function logger_rrd_night_create($meter) {
   $step = 24 * HOUR;
   $archives = array(
     //resolution    storage period
-    24 * HOUR   =>  2 * MONTH,
+    24 * HOUR   =>  8 * WEEK,
     1 * WEEK    => 10 * YEAR);
 
   return _logger_rrd_create($meter, $step, 'GAUGE', $archives, 'night');
