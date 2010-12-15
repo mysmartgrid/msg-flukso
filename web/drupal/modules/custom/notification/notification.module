@@ -663,18 +663,12 @@ function _notification_format_event_name($event_id, $event_name, $limit_up) {
 
   $name = t($event_name);
 
-  system("echo NO_HEARTBEAT_EVENT_ID " . NO_HEARTBEAT_EVENT_ID . " >> /tmp/test.out");
-
   if ($event_id == NO_HEARTBEAT_EVENT_ID || $event_id == ANY_HEARTBEAT_FAILURE_EVENT_ID_EVENT_ID) {
     $name .= "<br>(in $limit_up min)";
-    system("echo 1st test >> /tmp/test.out");
 
   } else if ($event_id == PEAK_CONSUMPTION_EVENT_ID) {
     $name .= "<br>($limit_up watt / h)";
-    system("echo 2nd test >> /tmp/test.out");
   }
-
-  system("echo $event_id - $limit_up - $name >> /tmp/test.out");
 
   return $name;
 }
