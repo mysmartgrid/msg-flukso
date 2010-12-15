@@ -20,11 +20,11 @@
  */
 
 //Device states
-define('UNINSTALLED',   t('Uninstalled'));
-define('UNREGISTERED',  t('Unregistered'));
-define('NO_HEARTBEAT',  t('No Heartbeat'));
-define('CORRUPTED',     t('Corrupted Heartbeat'));
-define('WORKING',       t('Working'));
+define('UNINSTALLED_STATE_NAME',   t('Uninstalled'));
+define('UNREGISTERED_STATE_NAME',  t('Unregistered'));
+define('NO_HEARTBEAT_STATE_NAME',  t('No Heartbeat'));
+define('CORRUPTED_STATE_NAME',     t('Corrupted Heartbeat'));
+define('WORKING_STATE_NAME',       t('Working'));
 
 function deployment_overview_help($path, $arg) {
 
@@ -119,11 +119,11 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
   $working_id      = 4;
 
   $states = array(
-    $uninstalled_id  => UNINSTALLED,
-    $unregistered_id => UNREGISTERED,
-    $no_heartbeat_id => NO_HEARTBEAT,
-    $corrupted_id    => CORRUPTED,
-    $working_id      => WORKING
+    $uninstalled_id  => UNINSTALLED_STATE_NAME,
+    $unregistered_id => UNREGISTERED_STATE_NAME,
+    $no_heartbeat_id => NO_HEARTBEAT_STATE_NAME,
+    $corrupted_id    => CORRUPTED_STATE_NAME,
+    $working_id      => WORKING_STATE_NAME
   );
 
    $sql = "
@@ -238,22 +238,22 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
 
     drupal_set_message(t('Status: ') . $state);
 
-    if ($state == UNINSTALLED) {
+    if ($state == UNINSTALLED_STATE_NAME) {
       drupal_set_message(t('This device has not yet been installed.'));
 
     } else {
       $latest = array('%latest' => $device['latest']);
 
-      if ($state == UNREGISTERED) {
+      if ($state == UNREGISTERED_STATE_NAME) {
         drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
 
-      } else if ($state == NO_HEARTBEAT) {
+      } else if ($state == NO_HEARTBEAT_STATE_NAME) {
         drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
 
-      } else if ($state == CORRUPTED) {
+      } else if ($state == CORRUPTED_STATE_NAME) {
         drupal_set_message(t('This device has sent an invalid measurement at %latest.', $latest));
 
-      } else if ($state == WORKING) {
+      } else if ($state == WORKING_STATE_NAME) {
         drupal_set_message(t('This device is working fine. Latest heartbeat received at %latest.', $latest));
       }
     }
