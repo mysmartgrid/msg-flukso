@@ -1046,7 +1046,7 @@ function _notification_send_system_error_email($context, $error_code, $url) {
 
   $body = t($message, $variables);
   $subject = t('System Error');
-  $email = 'team@mysmartgrid.de';
+  $email = 'notifications@mysmartgrid.de';
 
   _notification_send_email($email, $subject, $body);
 }
