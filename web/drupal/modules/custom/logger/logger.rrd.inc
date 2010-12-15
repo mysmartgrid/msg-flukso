@@ -181,6 +181,8 @@ function logger_rrd_update($meter, $values, $subdir = NULL) {
 
   $command = RRDTOOL . " update $file_path ";
 
+  ksort($values);
+
   foreach($values as $timestamp => $value) {
     $command .= " $timestamp:$value";
   }
