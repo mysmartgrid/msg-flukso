@@ -1166,7 +1166,7 @@ function _notification_send_emails($message, $sql, $args = array()) {
  */
 function _notification_query_latest_measurements($device, $start_time, $offset) {
 
-  $measurements = logger_query_device_measurements('hour', 'end-1h', $device, $offset);
+  $measurements = logger_query_device_measurements('hour', $device, $offset);
   $list = '';
   $sum = 0;
 

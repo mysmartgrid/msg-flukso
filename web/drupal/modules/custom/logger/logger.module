@@ -498,7 +498,7 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
   $chart = _logger_create_chart_object($interval, $type, 'overview');
   $offset = _logger_get_timezone_offset();
 
-  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->start, $offset);
+  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $offset);
 
   return theme('logger_dygraph', $chart);
 }
@@ -520,7 +520,7 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
 
   foreach ($sensors as &$sensor) {
 
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->start, $offset);
+    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset);
   }
 
   return theme('logger_dygraph', $chart);
@@ -544,28 +544,6 @@ function _logger_create_chart_object($interval, $type, $context) {
   $params->data = array();
   $params->interval = $interval;
   $params->context = $context;
-
-  switch ($interval) {
-    case 'hour':
-      $params->start = 'end-1h';
-      break;
-
-    case 'day':
-      $params->start = 'end-1d';
-      break;
-
-    case 'month':
-      $params->start = 'end-60d';
-      break;
-
-    case 'year':
-      $params->start = 'end-1y';
-      break;
-
-    case 'night':
-      $params->start = 'end-60d';
-      break;
-  }
 
   $unformatted_unit = _logger_get_unit();
 
@@ -1501,12 +1479,11 @@ function _logger_device_access($permission, $serial) {
  * Queries the databases for measurements reported by sensors of a single device.
  *
  * @param $interval The time interval.
- * @param $start    The start time.
  * @param $device   The device's hash code.
  * @param $offset   The user timezone offset.
  * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
  */
-function logger_query_device_measurements($interval, $start, $device, $offset) {
+function logger_query_device_measurements($interval, $device, $offset) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -1516,7 +1493,7 @@ function logger_query_device_measurements($interval, $start, $device, $offset) {
 
   while($sensor = db_fetch_object($sensors)) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $start, $offset);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset);
   }
   return $measurements;
 }
