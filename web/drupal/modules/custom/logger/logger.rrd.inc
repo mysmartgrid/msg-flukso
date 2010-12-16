@@ -314,11 +314,12 @@ function _logger_rrd_file($meter, $interval) {
  * @param $interval       The time interval.
  * @param $def            The rrd def tag.
  * @param $exported_cdef  The exported cdef.
+ * @param $latest         The latest update time.
  * @param $offset         The user timezone offset.
  * @param $include_nan    Whether NaN values should be included in the result.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $end, $offset, $include_nan = true) {
+function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan = true) {
 
   if (!$def) {
     return array();
@@ -328,15 +329,15 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $end, $offset, $inc
     'hour'  =>  1 * HOUR,
     'day'   =>  1 * DAY,
     'month' => 60 * DAY,
-    'year'  =>  1 * YEAR,
-    'night' => 60 * DAY
+    'night' => 60 * DAY,
+    'year'  =>  1 * YEAR
   );
 
   $steps = array(
     'hour'  =>  1 * SECOND,
-    'night' =>  1 * DAY,
     'day'   => 15 * MINUTE,
     'month' =>  1 * DAY,
+    'night' =>  1 * DAY,
     'year'  =>  1 * WEEK
   );
 
@@ -349,7 +350,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $end, $offset, $inc
   $start = $now - $windows[$interval];
   $start = $start - ($start % $step);
 
-  $end = $end - ($end % $step);
+  $end = $latest - ($latest % $step);
   $maxrows = 1 + ($end - $start) / $step;
 
   $command = RRDTOOL . ' xport ' .
@@ -361,6 +362,22 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $end, $offset, $inc
     "XPORT:$exported_cdef";
 
   exec($command, $lines);
+
+  $data = _logger_rrd_parse_exported_lines($lines);
+
+  //TODO: remove this part 1 day after deployment, and increase steps for interval 'day' to 1 MINUTE
+  if ($interval == 'day') {
+
+    $hourly = _logger_rrd_export('hour', $def, $exported_cdef, $latest, $offset, $include_nan);
+    foreach($hourly as $timestamp => $value) {
+      $data[$timestamp] = $value;
+    }
+  }
+
+  return $data;
+}
+
+function _logger_rrd_parse_exported_lines($lines) {
 
   $data = array();
 
@@ -387,6 +404,5 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $end, $offset, $inc
       }
     }
   }
-  
   return $data;
 }
