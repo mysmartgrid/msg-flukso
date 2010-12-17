@@ -363,16 +363,17 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   exec($command, $lines);
 
-  return _logger_rrd_parse_exported_lines($lines);
+  return _logger_rrd_parse_exported_lines($lines, $offset);
 }
 
 /**
  * Parses output of command rrdtool xport into an array.
  * 
- * @param $lines The lines to be exported.
+ * @param $lines   The lines to be exported.
+ * @param $offset  The user timezone offset.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_parse_exported_lines($lines) {
+function _logger_rrd_parse_exported_lines($lines, $offset) {
 
   $data = array();
 
