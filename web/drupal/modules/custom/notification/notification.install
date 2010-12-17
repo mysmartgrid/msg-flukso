@@ -5,17 +5,53 @@ function notification_install() {
 
   global $user;
 
+  //event
   $sql = "INSERT INTO {event} (id, name) VALUE (1, 'No Heartbeat')";
-  db_query($sql, $user->uid);
+  db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUE (2, 'Corrupted Heartbeat')";
-  db_query($sql, $user->uid);
+  db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUE (3, 'Any Heartbeat Failure')";
-  db_query($sql, $user->uid);
+  db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUE (4, 'Peak Consumption')";
-  db_query($sql, $user->uid);
+  db_query($sql);
+
+  //unit
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (1, 'minute', 'min', 60)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (2, 'hour', 'h', 3600)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (3, 'watt per minute', 'watt / min', 1)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.16667)";
+  db_query($sql);
+
+  //event_unit
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (1, 1)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (1, 2)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (2, 0)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (3, 1)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (3, 2)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (4, 3)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (4, 4)";
+  db_query($sql);
 }
 
 function notification_uninstall() {
@@ -40,6 +76,55 @@ function notification_schema() {
     ),
     'primary key' => array(
       'id'
+    ),
+  );
+
+  $schema['unit'] = array(
+    'description' => t('Stores units'),
+    'fields' => array(
+      'id' => array(
+        'type'      => 'int',
+        'not null'  => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length'   => '16',
+        'not null' => TRUE,
+      ),
+      'symbol' => array(
+        'type' => 'varchar',
+        'length'   => '10',
+        'not null' => TRUE,
+      ),
+      'factor' => array(
+        'type'      => 'float',
+        'size'      => 'normal',
+        'not null'  => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'id'
+    ),
+  );
+
+  $schema['event_unit'] = array(
+    'description' => t('Stores units associated with Flukso events'),
+    'fields' => array(
+      'event_id' => array(
+        'type'      => 'int',
+        'not null'  => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'unit_id' => array(
+        'type'      => 'int',
+        'not null'  => TRUE,
+        'unasigned' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'event_id',
+      'unit_id',
     ),
   );
 
@@ -83,11 +168,16 @@ function notification_schema() {
         'disp-width' => '10',
       ),
       'limit_up' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
+        'type'       => 'float',
+        'size'       => 'normal',
         'not null'   => TRUE,
         'default'    => 0,
         'disp-width' => '10',
+      ),
+      'unit_id' => array(
+        'type'       => 'int',
+        'not null'   => TRUE,
+        'unasigned'  => TRUE,
       ),
       'last_sent' => array(
         'type'       => 'int',
@@ -125,6 +215,41 @@ function logger_update_6008() {
     case 'mysql':
     case 'mysqli':
       $items[] = update_sql("ALTER TABLE {notification} CHANGE COLUMN latest_checkup base_time int unsigned NOT NULL AFTER base_value");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6018() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("CREATE TABLE {unit}(id int unsigned NOT NULL, name varchar(16) NOT NULL, symbol varchar(10) NOT NULL, factor float NOT NULL, PRIMARY KEY (id))");
+      $items[1]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (0, 'none', 'none', 1)");
+      $items[2]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (1, 'minute', 'min', 60)");
+      $items[3]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (2, 'hour', 'h', 3600)");
+      $items[4]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (3, 'watt per minute', 'watt / min', 1)");
+      $items[5]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.16667)");
+
+      $items[6]  = update_sql("CREATE TABLE {event_unit}(event_id int unsigned NOT NULL, unit_id int unsigned NOT NULL, PRIMARY KEY (event_id, unit_id))");
+      $items[7]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (1, 1)");
+      $items[8]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (1, 2)");
+      $items[9]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (2, 0)");
+      $items[10] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (3, 1)");
+      $items[11] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (3, 2)");
+      $items[12] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (4, 3)");
+      $items[13] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (4, 4)");
+
+      $items[14] = update_sql("ALTER TABLE {notification} MODIFY COLUMN limit_up float NOT NULL");
+      $items[15] = update_sql("ALTER TABLE {notification} ADD COLUMN unit_id int unsigned NOT NULL AFTER limit_up");
+      $items[16] = update_sql("UPDATE {notification} SET unit_id = 1 WHERE event_id IN (1, 3)");
+      $items[17] = update_sql("UPDATE {notification} SET unit_id = 0 WHERE event_id = 2");
+      $items[18] = update_sql("UPDATE {notification} SET unit_id = 3 WHERE event_id = 4");
+
+      $items[19] = update_sql("UPDATE {notification} SET min_interval = (min_interval * 60)");
       break;
     case 'pgsql':
       break;
