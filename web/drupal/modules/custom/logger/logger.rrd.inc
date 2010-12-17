@@ -241,7 +241,7 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
 function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = time() - 30 * MINUTE;
+  $end_time = time() - 15 * MINUTE;
   $def = "";
   $variables = "";
 
@@ -255,7 +255,7 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
 
-      //Do not consider latest 30 minutes
+      //Do not consider latest minutes
       "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
 
     $variables .= ($i > 1 ? ',' : '') . "filtered$i";
@@ -335,7 +335,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   $steps = array(
     'hour'  =>  1 * SECOND,
-    'day'   => 15 * MINUTE,
+    'day'   =>  1 * MINUTE,
     'month' =>  1 * DAY,
     'night' =>  1 * DAY,
     'year'  =>  1 * WEEK
@@ -363,18 +363,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   exec($command, $lines);
 
-  $data = _logger_rrd_parse_exported_lines($lines);
-
-  //TODO: remove this part 1 day after deployment, and increase steps for interval 'day' to 1 MINUTE
-  if ($interval == 'day') {
-
-    $hourly = _logger_rrd_export('hour', $def, $exported_cdef, $latest, $offset, $include_nan);
-    foreach($hourly as $timestamp => $value) {
-      $data[$timestamp] = $value;
-    }
-  }
-
-  return $data;
+  return _logger_rrd_parse_exported_lines($lines);
 }
 
 /**
