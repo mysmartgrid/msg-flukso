@@ -28,7 +28,7 @@ function notification_install() {
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (3, 'watt per minute', 'watt / min', 1)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.16667)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.016667)";
   db_query($sql);
 
   //event_unit
@@ -250,6 +250,19 @@ function logger_update_6018() {
       $items[18] = update_sql("UPDATE {notification} SET unit_id = 3 WHERE event_id = 4");
 
       $items[19] = update_sql("UPDATE {notification} SET min_interval = (min_interval * 60)");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6019() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("UPDATE unit SET factor = 0.016667 WHERE id = 4");
       break;
     case 'pgsql':
       break;

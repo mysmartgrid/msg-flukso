@@ -1002,7 +1002,7 @@ function _notification_send_peak_consumption_emails($now) {
     "an electricity consumption above the limit of %limit_up watt per hour.<br><br> " .
 
     "The device's latest measurements are listed in the following.<br><br> " .
-    "!latest_measurements");
+    "!latest_measurements <br><br>");
 
   $notified = _notification_send_emails($message, $sql, $args);
 
