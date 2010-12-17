@@ -864,7 +864,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = 1) {
       n.email AS email,
       d.serial AS serial,
       FROM_UNIXTIME(d.access + u.timezone) AS event_time,
-      (n.limit_up * un.factor / 60) AS limit_up
+      ROUND((n.limit_up * un.factor / 60), 2) AS limit_up
     FROM
       {users} u,
       {logger_devices} d,
@@ -970,7 +970,7 @@ function _notification_send_peak_consumption_emails($now) {
       u.timezone AS timezone,
       n.event_id AS event_id,
       n.email AS email,
-      (n.limit_up * un.factor * 60) AS limit_up,
+      ROUND((n.limit_up * un.factor * 60), 2) AS limit_up,
       FROM_UNIXTIME(MAX(m.access) + u.timezone) AS event_time,
       (n.base_time + u.timezone) AS start_time,
       (SUM(m.value) - n.base_value) AS consumption,
