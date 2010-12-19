@@ -269,3 +269,40 @@ function logger_update_6019() {
   }
   return $items;
 }
+
+function logger_update_6020() {
+  $now = time();
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("
+        UPDATE
+          notification
+        SET
+          base_time = (
+            SELECT
+              MAX(m.access)
+            FROM
+              logger_meters m
+            WHERE
+              m.type = 'electricity' AND
+              m.device = notification.device
+          ),
+          base_value = (
+            SELECT
+              SUM(m.value)
+            FROM
+              logger_meters m
+            WHERE
+              m.type = 'electricity' AND
+              m.device = notification.device
+          )
+        WHERE
+          base_time > $now AND event_id = 4");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
