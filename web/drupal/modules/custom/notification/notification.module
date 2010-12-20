@@ -251,7 +251,7 @@ function notification_registration_form() {
     '#type'           => 'select',
     '#title'          => t('Serial Number'),
     '#description'    => t('Select the serial number of the monitored device.'),
-    '#options'        => _notification_get_devices_options()
+    '#options'        => logger_get_devices_options()
   );
 
   $form['events'] = array(
@@ -662,26 +662,6 @@ function _notification_get_event_name($event_id) {
   $name = db_result(db_query($sql, $event_id));
 
   return t($name);
-}
-
-/**
- * Returns an array of user devices' serial numbers indexed by their respective
- * hash codes.
- *
- * @return the array of devices.
- */
-function _notification_get_devices_options() {
-
-  global $user;
-  $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
-  $result = db_query($sql, $user->uid);
-
-  $devices = array();
-  while ($row = db_fetch_array($result)) {
-    $devices[$row['device']] = $row['serial'];
-  }
-
-  return $devices;
 }
 
 /**

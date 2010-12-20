@@ -672,6 +672,29 @@ function _logger_get_active_sensors($type) {
 }
 
 /**
+ * Returns an array of user devices' serial numbers indexed by their respective
+ * hash codes.
+ *
+ * @return the array of devices.
+ */
+function logger_get_devices_options() {
+
+  global $user;
+
+  $devices = array();
+  if ($user) {
+
+    $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
+    $result = db_query($sql, $user->uid);
+
+    while ($row = db_fetch_array($result)) {
+      $devices[$row['device']] = $row['serial'];
+    }
+  }
+  return $devices;
+}
+
+/**
  * Returns the user timezone offset.
  *
  * @return the user timezone offset.
@@ -1095,7 +1118,7 @@ function _logger_create_recent_blogs_block() {
 }
 
 /**
- * Implementing a simple non-bulleted list for the logger_block
+ * Builds a simple non-bulleted list of items.
  */
 function theme_logger_item_list($items, $title = NULL) {
   $output = '';
@@ -1103,6 +1126,36 @@ function theme_logger_item_list($items, $title = NULL) {
     $output .= $item . '<br/>';
   }
   return $output;
+}
+
+function logger_form_contact_mail_page_alter(&$form, $form_state) {
+
+  $devices = logger_get_devices_options();
+  $options = array_flip($devices);
+
+  $form['devices'] = array(
+    '#type'          => 'select',
+    '#required'      => TRUE,
+    '#options'       => $options,
+    '#default_value' => array_keys($options),
+    '#multiple'      => TRUE,
+    '#size'          => 1,
+    '#attributes'    => array('style' => 'visibility:hidden;'),
+  );
+}
+
+function logger_mail_alter(&$message) {
+
+  switch($message['id']) {
+
+    case 'contact_page_mail':
+      $devices = $message['params']['devices'];
+
+      if (count($devices) > 0) {
+        $message['body'][] = t("User Devices: ") . implode(', ', $devices);
+      }
+    break;
+  }
 }
 
 function logger_control_form() {
