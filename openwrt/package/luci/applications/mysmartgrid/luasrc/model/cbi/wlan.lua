@@ -13,7 +13,16 @@ You may obtain a copy of the License at
 $Id: network.lua 4171 2009-01-27 20:50:28Z Cyrus $
 ]]--
 
+
+scan = luci.sys.wifi.iwscan("ath0")
 local uci = require "luci.model.uci".cursor()
+local ifaces = {}
+local wlcursor = luci.model.uci.cursor_state()
+local wireless = wlcursor:get_all("wireless")
+wlcursor:foreach("wireless", "wifi-iface",
+	function(section)
+		table.insert(ifaces, section[".name"])
+	end)
 
 m = Map("wireless", translate("wifi"), translate("a_w_devices1"))
 m:chain("network")
@@ -22,16 +31,65 @@ s = m:section(TypedSection, "wifi-iface", "")
 s.anonymous = true
 s.addremove = false
 
-s:option(Value, "ssid", translate("a_w_netid"))
+-- Wifi-Scan-Table --
+ssid = s:option(Value, "ssid", translate("a_w_netid"))
+for _, v in pairs(scan) do
+	local tmp = v["ESSID"]
+	ssid:value(tmp, tmp)
+end
+
+
+autoencr_desc = 'Automatically determine encryption method'
+--autoencr = s:option(Flag, "autoencr", translate("autoencr"))
+autoencr = s:option(Flag, "autoencr", "Auto-Encryption")
+autoencr.default=1
+--autoencr.description = translate('autoencr_desc')
+autoencr.description = 'Automatically set encryption'
+function autoencr.formvalue(self, section)
+	local essid = ssid:formvalue(section)
+	scan = luci.sys.wifi.iwscan("ath0")
+	for k, v in pairs(scan) do
+		if v["ESSID"] == essid then
+			value=k
+			break
+		end
+	end
+	if scan[value] == nil then
+		return nil
+	end
+	if scan[value]["Encryption key"] == "off" then
+		enc="none"
+	else
+		if scan[value]["IE"] == "IEEE 802.11i/WPA2 Version 1" then
+			enc="psk2"
+		elseif scan[value]["IE"] == "WPA Version 1" then
+			enc="psk"
+		else
+			enc="wep"
+		end
+	end
+	return enc
+end
+function autoencr.write(self, section, value)
+	value = autoencr:formvalue(section)
+	uci:set(section, "encryption", value)
+	uci:save(section)
+	uci:commit(section)
+end
 
 encr = s:option(ListValue, "encryption", translate("encryption"))
 encr.override_values = true
+encr:depends("autoencr", "")
 encr:value("none", "No Encryption")
 encr:value("wep", "WEP")
 encr:value("psk", "WPA-PSK")
 encr:value("psk2", "WPA2-PSK")
+function encr.formvalue(self, section)
+	return Value.formvalue(self,section) or autoencr:formvalue(section)
+end
 
 key = s:option(Value, "key", translate("key"))
+key:depends("autoencr", 1)
 key:depends("encryption", "wep")
 key:depends("encryption", "psk")
 key:depends("encryption", "psk2")
@@ -49,7 +107,7 @@ function key:validate(value, section)
                 return #(x:match('%x*')) == #x and x
         end
 
-        if encr:formvalue(section) == 'wep' then
+		if encr:formvalue(section) == 'wep' then
                 if #value == 5 or #value == 13 then
                         return value:tohex()
                 elseif #value == 10 or #value == 26 then
@@ -78,7 +136,17 @@ ip = w:option(Value, "ipaddr", translate("ipaddress"))
 ip:depends("proto", "")
 
 function ip:validate(value)
-	if uci:get("network", "lan", "ipaddr") == value then
+	function string:split(sep)
+        local sep, fields = sep or ":", {}
+        local pattern = string.format("([^%s]+)", sep)
+        self:gsub(pattern, function(c) fields[#fields+1] = c end)
+        return fields
+	end
+	lanip = uci:get("network", "lan", "ipaddr")
+	ip1 = lanip:split(".")
+	ip2 = value:split(".")
+	comp = table.concat({ip1[1], ip1[2], ip1[3], ip2[4]}, ".")
+	if  comp == value then
 		return nil
 	end
     return value:match("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+") -- Returns nil if it doesn't match otherwise returns match
