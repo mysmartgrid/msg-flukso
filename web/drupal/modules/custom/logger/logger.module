@@ -698,7 +698,7 @@ function logger_get_devices_options() {
   global $user;
 
   $devices = array();
-  if ($user) {
+  if ($user->uid) {
 
     $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = %d ORDER BY serial";
     $result = db_query($sql, $user->uid);
@@ -1152,7 +1152,6 @@ function logger_form_contact_mail_page_alter(&$form, $form_state) {
 
   $form['devices'] = array(
     '#type'          => 'select',
-    '#required'      => TRUE,
     '#options'       => $options,
     '#default_value' => array_keys($options),
     '#multiple'      => TRUE,
