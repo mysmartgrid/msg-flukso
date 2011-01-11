@@ -47,5 +47,4 @@ flukso_update.exp "scp $SSH_OPT ./tools/firewall.user root@192.168.255.1:/etc/"
 # Use the reset button to return to the default network, wireless and firewall config
 #flukso_update.exp "scp $SSH_OPT ./tools/system.tail root@192.168.255.1:/tmp/"
 flukso_update.exp "scp $SSH_OPT ./tools/net_defaults root@192.168.255.1:/bin"
-#grep="`flukso_update.exp "ssh $SSH_OPT root@192.168.255.1 \"grep -Z button /etc/config/system\""`"
 flukso_update.exp "ssh $SSH_OPT root@192.168.255.1 \"sed -e 's:/etc/init.d/network restart:net_defaults:' < /etc/config/system > /etc/config/system.new && mv /etc/config/system.new /etc/config/system && echo 'Use reset button to return to default settings'\""
