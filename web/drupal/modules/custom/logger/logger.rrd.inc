@@ -328,6 +328,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
   $windows = array(
     'hour'  =>  1 * HOUR,
     'day'   =>  1 * DAY,
+    'week'  =>  1 * WEEK,
     'month' => 60 * DAY,
     'night' => 60 * DAY,
     'year'  =>  1 * YEAR
@@ -336,6 +337,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
   $steps = array(
     'hour'  =>  1 * SECOND,
     'day'   =>  1 * MINUTE,
+    'week'  => 15 * MINUTE,
     'month' =>  1 * DAY,
     'night' =>  1 * DAY,
     'year'  =>  1 * WEEK
@@ -352,6 +354,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   $end = $latest - ($latest % $step);
   $maxrows = 1 + ($end - $start) / $step;
+  $maxrows = $maxrows < 10? 10: $maxrows; //RRDTool exports at least 8 rows
 
   $command = RRDTOOL . ' xport ' .
     "--start $start " .

@@ -119,6 +119,14 @@ function logger_menu() {
     'type'             => MENU_CALLBACK
   );
 
+  $items['logger/electricity/week'] = array(
+    'title'            => $items['logger']['title'],
+    'page callback'    => '_logger_dashboard',
+    'page arguments'   => array('electricity', 'week'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
   $items['logger/electricity/month'] = array(
     'title'            => $items['logger']['title'],
     'page callback'    => '_logger_dashboard',
@@ -192,6 +200,14 @@ function logger_menu() {
     'title'            => $items['overview']['title'],
     'page callback'    => '_logger_overview',
     'page arguments'   => array('electricity', 'day'),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['overview/electricity/week'] = array(
+    'title'            => $items['overview']['title'],
+    'page callback'    => '_logger_overview',
+    'page arguments'   => array('electricity', 'week'),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
@@ -911,6 +927,7 @@ function _logger_create_interval_menu($context) {
   $items = array(
     l(t('Hour'),  "$context/electricity/hour"),
     l(t('Day'),   "$context/electricity/day"),
+    l(t('Week'),  "$context/electricity/week"),
     l(t('Month'), "$context/electricity/month"),
     l(t('Year'),  "$context/electricity/year"),
     l(t('Night'), "$context/electricity/night")
@@ -1553,7 +1570,7 @@ function logger_query_device_measurements($interval, $device, $offset) {
 
 function logger_cron() {
 
-  $intervals = array('hour', 'day', 'month', 'year', 'night');
+  $intervals = array('hour', 'day', 'week', 'month', 'year', 'night');
 
   //Delete png files older than 30 minutes.
   //This limit prevents chart files from being removed before they are sent to the user.
