@@ -442,7 +442,7 @@ function notification_edition_form(&$form_state, $notification) {
   $form['emails'] = array(
     '#type'              => 'textarea',
     '#title'             => t('E-mails'),
-    '#description'       => t('Enter the e-mails to which the notification will be sent, in multiple lines, or separated by space.'),
+    '#description'       => t('Enter the e-mails to which the notification will be sent. The emails must be specified either in multiple lines or separated by space.'),
     '#rows'              => 3,
     '#resizable'         => FALSE,
     '#required'          => TRUE,
