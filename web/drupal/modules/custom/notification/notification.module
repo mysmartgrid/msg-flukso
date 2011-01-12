@@ -130,7 +130,7 @@ function notification_edition_page($device, $event_id) {
       e.name AS event_name,
       n.device AS device,
       d.serial AS serial,
-      n.email AS email,
+      n.emails AS emails,
       n.min_interval AS min_interval,
       n.limit_up AS limit_up,
       n.unit_id
@@ -160,7 +160,7 @@ function notification_list_page() {
     SELECT
       d.serial AS serial,
       e.name AS event_name,
-      n.email AS email,
+      n.emails AS emails,
       IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone)) AS last_sent,
       n.limit_up AS limit_up,
       un.id AS unit_id,
@@ -181,10 +181,10 @@ function notification_list_page() {
       n.unit_id = un.id";
 
   $header = array(
-    array('data' => t('Device'),        'field' => 'serial',     'sort' => 'ASC'),
-    array('data' => t('Event'),         'field' => 'event_name', 'sort' => 'ASC'),
-    array('data' => t('Target e-mail'), 'field' => 'email'),
-    array('data' => t('Sent'),          'field' => 'last_sent'),
+    array('data' => t('Device'),         'field' => 'serial',     'sort' => 'ASC'),
+    array('data' => t('Event'),          'field' => 'event_name', 'sort' => 'ASC'),
+    array('data' => t('Target e-mails'), 'field' => 'emails'),
+    array('data' => t('Sent'),           'field' => 'last_sent'),
     array('data' => t('Operation'))
   );
 
@@ -197,10 +197,12 @@ function notification_list_page() {
     $event_name = t($object['event_name']) . ($object['unit_id'] == 0? '' :
       '<br>(' . $object['limit_up'] . ' ' . t($object['unit']) . ')');
 
+    $emails = implode("<br>", _notification_tokenize_emails($object['emails']));
+
     $row = array();
     $row['serial'] = $object['serial'];
     $row['event_name'] = $event_name;
-    $row['email'] = $object['email'];
+    $row['emails'] = $emails;
     $row['last_sent'] = $object['last_sent'];
     $row[] = l(t('Remove'), 'notification/delete/' . $object['device'] . '/' . $object['event_id']) . '<br>' .
              l(t('Edit'),   'notification/edit/'   . $object['device'] . '/' . $object['event_id']);
@@ -237,21 +239,21 @@ function notification_registration_form() {
 
   global $user;
 
-  $form['email'] = array(
-    '#type'           => 'textfield',
-    '#title'          => t('E-mail'),
-    '#description'    => t('Enter the e-mail to which the notification will be sent.'),
-    '#maxlength'      => 64,
-    '#size'           => 20,
-    '#default_value'  => $user->mail,
-    '#element_validate'  => array('notification_email_validate'),
-  );
-
   $form['device'] = array(
     '#type'           => 'select',
     '#title'          => t('Serial Number'),
     '#description'    => t('Select the serial number of the monitored device.'),
     '#options'        => logger_get_devices_options()
+  );
+
+  $form['emails'] = array(
+    '#type'              => 'textarea',
+    '#title'             => t('E-mails'),
+    '#description'       => t('Enter the e-mails to which the notification will be sent. The emails must be specified either in multiple lines or separated by space.'),
+    '#rows'              => 3,
+    '#resizable'         => FALSE,
+    '#default_value'     => $user->mail,
+    '#element_validate'  => array('notification_emails_validate')
   );
 
   $form['events'] = array(
@@ -437,15 +439,15 @@ function notification_edition_form(&$form_state, $notification) {
     '#attributes'        => array('readOnly' => 'true')
   );
 
-  $form['email'] = array(
-    '#type'              => 'textfield',
-    '#title'             => t('E-mail'),
-    '#description'       => t('Enter the e-mail to which the notification will be sent.'),
+  $form['emails'] = array(
+    '#type'              => 'textarea',
+    '#title'             => t('E-mails'),
+    '#description'       => t('Enter the e-mails to which the notification will be sent, in multiple lines, or separated by space.'),
+    '#rows'              => 3,
+    '#resizable'         => FALSE,
     '#required'          => TRUE,
-    '#maxlength'         => 64,
-    '#size'              => 20,
-    '#default_value'     => $notification->email,
-    '#element_validate'  => array('notification_email_validate'),
+    '#default_value'     => $notification->emails,
+    '#element_validate'  => array('notification_emails_validate')
   );
 
   switch ($notification->event_id) {
@@ -550,7 +552,25 @@ function notification_newsletter_form() {
 
 function notification_email_validate($field, $form_state) {
   if (!valid_email_address($form_state['values']['email'])) {
-    form_error($field, t('Invalid e-mail.'));
+    form_error($field, t('Invalid e-mail address.'));
+  }
+}
+
+function notification_emails_validate($field, $form_state) {
+
+  $emails = _notification_tokenize_emails($form_state['values']['emails']);
+
+  if (count($emails) > 10) {
+    form_error($field, t('Inform at most 10 e-mails.'));
+  }
+
+  foreach($emails as $email) {
+
+    if (!valid_email_address($email)) {
+
+      form_error($field, t('Invalid e-mail address.'));
+      return;
+    }
   }
 }
 
@@ -609,11 +629,11 @@ function _notification_register_event($form, $form_state, $id = '') {
     $unit_id  = $form_state['values']["unit_id$id"];
 
     $device       = $form_state['values']['device'];
-    $email        = $form_state['values']['email'];
+    $emails       = $form_state['values']['emails'];
     $min_interval = $form_state['values']['min_interval'];
 
     _notification_delete($device, $event_id);
-    _notification_insert($device, $event_id, $email, $min_interval, $limit_up, $unit_id);
+    _notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
   }
 }
 
@@ -648,6 +668,28 @@ function notification_newsletter_form_submit($form, &$form_state) {
   }
 
   return $output;
+}
+
+/**
+ * Converts a string containing a list of emails into an array.
+ *
+ * @param $str  The string containing emails separated by space, new line char, or tab char.
+ * @return an array of emails.
+ */
+function _notification_tokenize_emails($str) {
+
+  $sep = " \n\r";
+  $tokens = array();
+
+  $token = strtok($str, $sep);
+
+  while ($token !== FALSE) {
+
+    $tokens[] = trim($token, $sep);
+    $token = strtok($sep);
+  }
+
+  return $tokens;
 }
 
 /**
@@ -734,12 +776,12 @@ function _notification_delete($device, $event_id) {
  *
  * @param $device        The monitored device.
  * @param $event_id      The event id.
- * @param $email         The notification e-mail.
+ * @param $emails        The notification e-mail.
  * @param $min_interval  The minimum time interval between consecutive notifications of the same event.
  * @param $limit_up      An event-related maximum value.
  * @param $unit_id       The unit id.
  */
-function _notification_insert($device, $event_id, $email, $min_interval, $limit_up, $unit_id) {
+function _notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id) {
 
   $base_value = 0;
 
@@ -761,11 +803,11 @@ function _notification_insert($device, $event_id, $email, $min_interval, $limit_
 
   $sql = "
     INSERT INTO
-      {notification} (device, event_id, email, min_interval, base_value, base_time, limit_up, unit_id, last_sent)
+      {notification} (device, event_id, emails, min_interval, base_value, base_time, limit_up, unit_id, last_sent)
     VALUES
       ('%s', %d, '%s', %d, %d, %d, %f, %d, %d)";
 
-  db_query($sql, $device, $event_id, $email, $min_interval, $base_value, time(), $limit_up, $unit_id, 0);
+  db_query($sql, $device, $event_id, $emails, $min_interval, $base_value, time(), $limit_up, $unit_id, 0);
 }
 
 /**
@@ -813,7 +855,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = NO_HEARTBEAT_E
       d.device AS device,
       n.event_id AS event_id,
       u.name AS user_name,
-      n.email AS email,
+      n.emails AS emails,
       d.serial AS serial,
       FROM_UNIXTIME(d.access + u.timezone) AS event_time,
       ROUND((n.limit_up * un.factor / 60), 2) AS limit_up
@@ -868,7 +910,7 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
       d.device AS device,
       n.event_id AS event_id,
       u.name AS user_name,
-      n.email AS email,
+      n.emails AS emails,
       d.serial AS serial,
       FROM_UNIXTIME(m.corrupted + u.timezone) AS event_time
     FROM
@@ -921,7 +963,7 @@ function _notification_send_peak_consumption_emails($now) {
       u.name AS user_name,
       u.timezone AS timezone,
       n.event_id AS event_id,
-      n.email AS email,
+      n.emails AS emails,
       ROUND((n.limit_up * un.factor * 60), 2) AS limit_up,
       FROM_UNIXTIME(MAX(m.access) + u.timezone) AS event_time,
       (n.base_time + u.timezone) AS start_time,
@@ -1125,7 +1167,11 @@ function _notification_send_emails($message, $sql, $args = array()) {
     $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
     $body = t($message, $variables) . $logo;
 
-    _notification_send_email($object['email'], $subject, $body);
+    $emails = $object['emails'];
+    foreach (_notification_tokenize_emails($emails) as $email) {
+
+      _notification_send_email($email, $subject, $body);
+    }
 
     _notification_update($object['device'], $object['event_id'], time());
   }

@@ -141,9 +141,8 @@ function notification_schema() {
         'not null'   => TRUE,
         'unasigned'  => TRUE,
       ),
-      'email' => array(
-        'type'       => 'varchar',
-        'length'     => '64',
+      'emails' => array(
+        'type'       => 'text',
         'not null'   => TRUE,
       ),
       'min_interval' => array(
@@ -300,6 +299,23 @@ function logger_update_6020() {
           )
         WHERE
           base_time > $now AND event_id = 4");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6021() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0] = update_sql("ALTER TABLE {notification} ADD COLUMN emails text AFTER email");
+      $items[1] = update_sql("UPDATE {notification} SET emails = email");
+      $items[2] = update_sql("ALTER TABLE {notification} MODIFY COLUMN emails text NOT NULL");
+      $items[3] = update_sql("ALTER TABLE {notification} DROP COLUMN email");
+
       break;
     case 'pgsql':
       break;
