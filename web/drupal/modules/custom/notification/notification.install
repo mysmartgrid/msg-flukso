@@ -187,7 +187,7 @@ function notification_schema() {
       ),
     ),
     'primary key' => array(
-      'device', 'event_id'
+      'device', 'event_id, limit_up, unit_id'
     ),
   );
 
@@ -315,6 +315,21 @@ function logger_update_6021() {
       $items[1] = update_sql("UPDATE {notification} SET emails = email");
       $items[2] = update_sql("ALTER TABLE {notification} MODIFY COLUMN emails text NOT NULL");
       $items[3] = update_sql("ALTER TABLE {notification} DROP COLUMN email");
+
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6022() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0] = update_sql("ALTER TABLE {notification} DROP PRIMARY KEY");
+      $items[1] = update_sql("ALTER TABLE {notification} ADD PRIMARY KEY (device, event_id, limit_up, unit_id)");
 
       break;
     case 'pgsql':

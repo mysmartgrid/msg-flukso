@@ -63,7 +63,7 @@ function notification_menu() {
   $items['notification/delete'] = array(
     'title'             => $items['notification/list']['title'],
     'page callback'     => 'notification_delete',
-    'page arguments'    => array(2, 3),
+    'page arguments'    => array(2, 3, 4, 5),
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_CALLBACK
   );
@@ -78,7 +78,7 @@ function notification_menu() {
   $items['notification/edit'] = array(
     'title'             => 'Event Notification Edition',
     'page callback'     => 'notification_edition_page',
-    'page arguments'    => array(2, 3),
+    'page arguments'    => array(2, 3, 4, 5),
     'access arguments'  => array('manage notifications'),
     'type'              => MENU_CALLBACK
   );
@@ -98,11 +98,13 @@ function notification_menu() {
  *
  * @param $device    The monitored device.
  * @param $event_id  The event id.
+ * @param $limit_up  The event's threshold.
+ * @param $unit_id   The unit id.
  * @return the events list page.
  */
-function notification_delete($device, $event_id) {
+function notification_delete($device, $event_id, $limit_up, $unit_id) {
 
-  _notification_delete($device, $event_id);
+  _notification_delete($device, $event_id, $limit_up, $unit_id);
   return notification_list_page();
 }
 
@@ -120,9 +122,11 @@ function notification_registration_page() {
  *
  * @param $device    The monitored device.
  * @param $event_id  The event id.
+ * @param $limit_up  The event's threshold.
+ * @param $unit_id   The unit id.
  * @return the event notification edition page.
  */
-function notification_edition_page($device, $event_id) {
+function notification_edition_page($device, $event_id, $limit_up, $unit_id) {
 
   $sql = "
     SELECT
@@ -142,9 +146,11 @@ function notification_edition_page($device, $event_id) {
       d.device = '%s' AND
       d.device = n.device AND
       n.event_id = e.id AND
-      e.id = %d";
+      e.id = %d AND
+      n.limit_up = %f AND
+      n.unit_id = %d";
 
-  $notification = db_fetch_object(db_query($sql, $device, $event_id));
+  $notification = db_fetch_object(db_query($sql, $device, $event_id, $limit_up, $unit_id));
 
   return drupal_get_form('notification_edition_form', $notification);
 }
@@ -197,6 +203,8 @@ function notification_list_page() {
     $event_name = t($object['event_name']) . ($object['unit_id'] == 0? '' :
       '<br>(' . $object['limit_up'] . ' ' . t($object['unit']) . ')');
 
+    $id = $object['device'] . '/' . $object['event_id'] . '/' . $object['limit_up'] . '/' . $object['unit_id'];
+
     $emails = implode("<br>", _notification_tokenize_emails($object['emails']));
 
     $row = array();
@@ -204,8 +212,8 @@ function notification_list_page() {
     $row['event_name'] = $event_name;
     $row['emails'] = $emails;
     $row['last_sent'] = $object['last_sent'];
-    $row[] = l(t('Remove'), 'notification/delete/' . $object['device'] . '/' . $object['event_id']) . '<br>' .
-             l(t('Edit'),   'notification/edit/'   . $object['device'] . '/' . $object['event_id']);
+    $row[] = l(t('Remove'), "notification/delete/$id") . '<br>' .
+             l(t('Edit'),   "notification/edit/$id");
 
     $rows[] = $row;
   }
@@ -423,6 +431,16 @@ function notification_edition_form(&$form_state, $notification) {
     '#default_value'     => $notification->event_id,
   );
 
+  $form['old_limit_up'] = array(
+    '#type'              => 'hidden',
+    '#default_value'     => $notification->limit_up,
+  );
+
+  $form['old_unit_id'] = array(
+    '#type'              => 'hidden',
+    '#default_value'     => $notification->unit_id,
+  );
+
   $form['event_name'] = array(
     '#type'              => 'textfield',
     '#title'             => t('Event'),
@@ -613,28 +631,9 @@ function notification_registration_form_submit($form, &$form_state) {
 
 function notification_edition_form_submit($form, &$form_state) {
 
-  _notification_register_event($form, $form_state);
+  _notification_edit_event($form, $form_state);
 
   $form_state['redirect'] = 'notification/list';
-}
-
-function _notification_register_event($form, $form_state, $id = '') {
-
-  $selected = $form_state['values']["event_id$id"];
-
-  if ($selected) {
-
-    $event_id = $id == ''? $selected : $id;
-    $limit_up = $form_state['values']["limit_up$id"];
-    $unit_id  = $form_state['values']["unit_id$id"];
-
-    $device       = $form_state['values']['device'];
-    $emails       = $form_state['values']['emails'];
-    $min_interval = $form_state['values']['min_interval'];
-
-    _notification_delete($device, $event_id);
-    _notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
-  }
 }
 
 function notification_newsletter_form_submit($form, &$form_state) {
@@ -668,6 +667,41 @@ function notification_newsletter_form_submit($form, &$form_state) {
   }
 
   return $output;
+}
+
+function _notification_register_event($form, $form_state, $event_id) {
+
+  $selected = $form_state['values']["event_id$event_id"];
+
+  if ($selected) {
+
+    $device       = $form_state['values']['device'];
+    $limit_up = $form_state['values']["limit_up$event_id"];
+    $unit_id  = $form_state['values']["unit_id$event_id"];
+
+    $emails       = $form_state['values']['emails'];
+    $min_interval = $form_state['values']['min_interval'];
+
+    _notification_delete($device, $event_id, $limit_up, $unit_id);
+    _notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
+  }
+}
+
+function _notification_edit_event($form, $form_state) {
+
+  $device   = $form_state['values']['device'];
+  $event_id = $form_state['values']["event_id"];
+  $old_limit_up = $form_state['values']["old_limit_up"];
+  $old_unit_id  = $form_state['values']["old_unit_id"];
+
+  $limit_up = $form_state['values']["limit_up"];
+  $unit_id  = $form_state['values']["unit_id"];
+  $emails       = $form_state['values']['emails'];
+  $min_interval = $form_state['values']['min_interval'];
+
+  _notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
+  _notification_delete($device, $event_id, $limit_up, $unit_id);
+  _notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
 }
 
 /**
@@ -758,17 +792,21 @@ function _notification_get_frequency_options() {
  *
  * @param $device    The monitored device.
  * @param $event_id  The event id.
+ * @param $limit_up  The event's threshold.
+ * @param $unit_id   The unit id.
  */
-function _notification_delete($device, $event_id) {
+function _notification_delete($device, $event_id, $limit_up, $unit_id) {
 
   $sql = "
     DELETE FROM
       {notification}
     WHERE
       device = '%s' AND
-      event_id = %d";
+      event_id = %d AND
+      limit_up = %f AND
+      unit_id = %d";
 
-  db_query($sql, $device, $event_id);
+  db_query($sql, $device, $event_id, $limit_up, $unit_id);
 }
 
 /**
