@@ -1,0 +1,29 @@
+<profile>
+	<widget_instances>
+		<widget_instance id="1">
+			<name>Msg Test</name>
+			<widget>
+				<name>Msg Test</name>
+				<description>This is the msg test widget</description>
+				<version>1.0</version>
+				<mode time="30" mode="timeout"/>
+				<access sendable="false" deleteable="false" access="private" virtualable="false"/>
+				<user username="myusername"/>
+				<thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png"/>
+				<movie href="file:////mnt/storage/usr/widgets/currentpower/currentpower.swf" contenttype="application/x-shockwave-flash"/>
+			</widget>
+			<access access="private"/>
+			<mode time="30" mode="timeout"/>
+			<widget_parameters>
+				<widget_parameter>
+					<name>zipcode</name>
+					<value>90210</value>
+				</widget_parameter>
+				<widget_parameter>
+					<name>phonenumber</name>
+					<value>867-5309</value>
+				</widget_parameter>
+			</widget_parameters>
+		</widget_instance>
+	</widget_instances>
+</profile>

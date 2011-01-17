@@ -1,0 +1,174 @@
+<?php
+// $Id$
+
+function chumby_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#chumby":
+      $output = '<p>'.t("This module provides personalized images to update the chumby.").'</p>';
+      break;
+  }
+  return $output;
+} //chumby_help
+
+function chumby_perm() {
+  return array('chumby image');
+}
+
+function chumby_menu() {
+  $item = array();
+  $items['chumby'] = array(
+    'title' => "Download chumby image",
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('chumby_form'),
+    'access arguments' => array('chumby'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function chumby_cron() {
+  exec('rm /home/flukso/www/public/files/chumby/*.zip');
+}
+
+function chumby_form() {
+  global $user;
+  $result = db_query('SELECT meter,function FROM {logger_meters} WHERE uid=%d AND function<>"NULL"', $user->uid);
+  $sensors = array();
+  while($flukso = db_fetch_object($result)) {
+    $sensors[$flukso->meter] = $flukso->function;
+  }
+  $result = array();
+  $result['visualization'] = array(
+    '#type' => 'checkboxes',
+    '#options' => array(
+       'text' => t('currentpower'),
+       'tacho' => t('energietacho'),
+       'lightbulb' => t('Gluehlampe'),
+       'graph' => t('EnergyGraph'),
+      ),
+    '#title' => t('Visualizations'),
+    '#description' => t('Visualizations that should be available'),
+    );
+  $result['sensor'] = array(
+    '#type' => 'select',
+    '#options' => $sensors,
+    '#title' => t('Sensor'),
+    '#description' => t('Sensors from which values should be displayed.'),
+  );
+  $result['ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('ip address'),
+    '#description' => t('The local ip address of the flukso.'),
+  );
+  $result['consumption'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('consumption'),
+    '#description' => t('average borders for high, normal and low energy consumption in Watt'),
+    '#collapsable' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $result['consumption']['low'] = array(
+    '#type' => 'textfield',
+    '#title' => t('low'),
+    '#default_value' => '200',
+  );
+  $result['consumption']['normal'] = array(
+    '#type' => 'textfield',
+    '#title' => t('normal'),
+    '#default_value' => '500',
+  );
+  $result['consumption']['high'] = array(
+    '#type' => 'textfield',
+    '#title' => t('high'),
+    '#default_value' => '1500',
+  );
+  $result['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Submit"),
+  );
+  return $result;
+}
+
+function theme_chumby_form($form) {
+  $header = array('', '', '');
+  $output = theme('table', $header, $form['visualization']);
+  return $output;
+}
+
+function chumby_form_validate($form, &$form_state) {
+  // check if any visualization is selected.
+  $temp = TRUE;
+  foreach ( $form_state['values']['visualization'] as $value )
+    $temp &= ($value == '0');
+  if ( $temp )
+    form_set_error('visualization', t('Please choose at least one visualization.'));
+
+  // check if a valid ip address was entered.
+  if ( filter_var($form_state['values']['ip'], FILTER_VALIDATE_IP) == FALSE )
+    form_set_error('ip', t('Please enter a valid IP address.'));
+
+  // check if a valid number was entered as low value.
+  if ( $form_state['values']['low'] == "" || filter_var($form_state['values']['low']) == FALSE )
+    form_set_error('low', t('Please enter a number value.'));
+
+  // check if a valid number was entered as normal value and if the normal value is larger than the low value.
+  if ( $form_state['values']['normal'] == "" || filter_var($form_state['values']['normal']) == FALSE )
+    form_set_error('normal', t('Please enter a number value.'));
+  else if ( $form_state['values']['normal'] < $form_state['values']['low'] )
+    form_set_error('normal', t('The normal value should be higher than the low value.'));
+
+  // check if a valid number was entered as high value and if the high value is larger than the normal value.
+  if ( $form_state['values']['high'] == "" || filter_var($form_state['values']['high']) == FALSE )
+    form_set_error('high', t('Please enter a number value.'));
+  else if ( $form_state['values']['high'] < $form_state['values']['normal'] )
+    form_set_error('normal', t('The high value should be higher than the normal value.'));
+}
+
+function chumby_form_submit($form, &$form_state) {
+  $ip = $form_state['values']['ip'];
+  $sensor = $form_state['values']['sensor'];
+  $token = db_result(db_query("SELECT token FROM {logger_tokens} WHERE meter='%s'", $sensor));
+  $low = $form_state['values']['low'];
+  $mid = $form_state['values']['normal'];
+  $high = $form_state['values']['high'];
+  require('daemonconfig.php');
+  $rootpath = '/tmp/chumby/';
+  if ( ! file_exists($rootpath) )
+    mkdir($rootpath);
+  $dirname = md5(uniqid(rand(), TRUE));
+  $path = $rootpath . $dirname;
+  if ( ! file_exists($path) ) {
+    mkdir($path);
+    exec("cp -R /home/flukso/www/public/sites/all/modules/chumby/template/usr/ " . $path);
+    exec("cp -R /home/flukso/www/public/sites/all/modules/chumby/template/debugchumby " . $path);
+    $daemonconfig = fopen($path . '/daemonconfig.lua', 'w');
+    if ( $daemonconfig == FALSE )
+     drupal_set_message(t('Could not create file!'));
+    else {
+      fwrite($daemonconfig, $config);
+      fclose($daemonconfig);
+      $profile = fopen($path . '/profile.xml', 'w');
+      require('profile-head.php');
+      fwrite($profile, $profile_head);
+      foreach ($form_state['values']['visualization'] as $key => $value) {
+        if ( $value != '0' ) {
+          require($key . '_widget.php');
+          fwrite($profile, $widget);
+        }
+      }
+      require('profile-tail.php');
+      fwrite($profile, $profile_tail);
+      fclose($profile);
+    }
+    $file_path = '/home/flukso/www/public/files/chumby/';
+    if ( ! file_exists($file_path) )
+      mkdir($file_path);
+    $zipfile = $file_path . $dirname . '.zip';
+    exec('cd ' . $path .'; zip -r ' . $zipfile . ' .');
+    drupal_set_message(t('<a href="/files/chumby/' . $dirname . '.zip">Image</a> created.'));
+    exec("rm -rf " . $rootpath . $dirname);
+  } else {
+    drupal_set_message(t("Operation failed! Please try again later!"));
+  }
+}
