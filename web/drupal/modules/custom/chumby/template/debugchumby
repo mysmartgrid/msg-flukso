@@ -12,13 +12,15 @@ DEST_PATH=/mnt/storage
 if [[ -x /psp/rfs1/userhook1 ]];
 then
 	echo "userhook1 found"
-	if [[ $(grep -c "$DEST_PATH/usr/etc/environment.sh" /psp/rfs1/userhook1) == 0 ]]; then
-		echo "execute $DEST_PATH/usr/etc/environment.sh in /psp/rfs1/userhook1"
-		echo ". $DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
-	fi
+	#if [[ $(grep -c "$DEST_PATH/usr/etc/environment.sh" /psp/rfs1/userhook1) == 0 ]]; then
+	#	echo "execute $DEST_PATH/usr/etc/environment.sh in /psp/rfs1/userhook1"
+	#	echo ". $DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
+	#fi
 	if [[ $(grep -c "$DEST_PATH/usr/etc/msg-init.rc" /psp/rfs1/userhook1) == 0 ]]; then
 		echo "execute $DEST_PATH/usr/etc/msg-init.rc in /psp/rfs1/userhook1"
+		echo "if [[ ! -f /tmp/flukso/last_reading ]]; then" >> /psp/rfs1/userhook1
 		echo "$DEST_PATH/usr/etc/msg-init.rc" >> /psp/rfs1/userhook1
+		echo "fi" >> /psp/rfs1/userhook1
 	fi
 	if [[ $(grep -c "mkdir /tmp/www" /psp/rfs1/userhook1) == 0 ]]; then
 		echo "create /tmp/www in /psp/rfs1/userhook1"
@@ -29,8 +31,11 @@ else
 	if [[ ! -d /psp/rfs1/ ]]; then
 		mkdir -p /psp/rfs1
 	fi
-	echo "$DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
-	echo "$DEST_PATH/usr/etc/msg-init.rc" >> /psp/rfs1/userhook1
+	#echo "$DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
+	echo "if [[ ! -f /tmp/flukso/last_reading ]]; then" >> /psp/rfs1/userhook1
+	echo "	$DEST_PATH/usr/etc/msg-init.rc" >> /psp/rfs1/userhook1
+	echo "fi" >> /psp/rfs1/userhook1
+	echo "mkdir /tmp/www" >> /psp/rfs1/userhook1
 	chmod u+x /psp/rfs1/userhook1
 fi
 
@@ -59,6 +64,4 @@ else
 	cp $SRC_PATH/daemonconfig.lua $DEST_PATH/usr/etc/
 fi
 
-if [[ ! -f /tmp/flukso/last_reading ]]; then
-	/psp/rfs1/userhook1
-fi
+/psp/rfs1/userhook1
