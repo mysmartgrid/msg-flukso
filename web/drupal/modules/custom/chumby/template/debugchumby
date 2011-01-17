@@ -1,13 +1,10 @@
 #!/bin/sh
 
-VERSION=20110116 			#current version
+VERSION=20110117 			#current version
 COPYUSR=0				#copy /mnt/storage/usr
 
 SRC_PATH=/mnt/usb
 DEST_PATH=/mnt/storage
-
-#make shure all dependencies are installed
-#TODO
 
 if [[ -x /psp/rfs1/userhook1 ]];
 then
@@ -55,6 +52,7 @@ echo $COPYUSR
 if [[ $COPYUSR -gt 0 ]]; then
 	echo "updating $DEST_PATH/usr"
 	cp -R $SRC_PATH/usr $DEST_PATH/
+	echo $VERSION > $DEST_PATH/usr/version
 fi
 
 if [[ -f $DEST_PATH/usr/etc/daemonconfig.lua ]]; then
