@@ -1,0 +1,4 @@
+; $Id$
+name = Chumby Image
+description = Provides an image for updating the chumby
+core = 6.x

@@ -1,0 +1,11 @@
+module("luarocks.config")
+LUAROCKS_PREFIX=[[/mnt/storage/usr]]
+LUA_INCDIR=[[/mnt/storage/usr/include]]
+LUA_LIBDIR=[[/mnt/storage/usr/lib]]
+LUA_BINDIR=[[/mnt/storage/usr/bin]]
+LUAROCKS_SYSCONFIG=[[/mnt/storage/usr/etc/luarocks/config.lua]]
+LUAROCKS_ROCKS_TREE=[[/mnt/storage/usr]]
+LUAROCKS_UNAME_S=[[Linux]]
+LUAROCKS_UNAME_M=[[arm]]
+LUAROCKS_DOWNLOADER=[[wget]]
+LUAROCKS_MD5CHECKER=[[md5sum]]
