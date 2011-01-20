@@ -6,51 +6,54 @@ function notification_install() {
   global $user;
 
   //event
-  $sql = "INSERT INTO {event} (id, name) VALUE (1, 'No Heartbeat')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Heartbeat')";
   db_query($sql);
 
-  $sql = "INSERT INTO {event} (id, name) VALUE (2, 'Corrupted Heartbeat')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Heartbeat')";
   db_query($sql);
 
-  $sql = "INSERT INTO {event} (id, name) VALUE (3, 'Any Heartbeat Failure')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (3, 'Any Heartbeat Failure')";
   db_query($sql);
 
-  $sql = "INSERT INTO {event} (id, name) VALUE (4, 'Peak Consumption')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (4, 'Peak Consumption')";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event} (id, name) VALUES (5, 'Brownout')";
   db_query($sql);
 
   //unit
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (1, 'minute', 'min', 60)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (1, 'minute', 'min', 60)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (2, 'hour', 'h', 3600)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (2, 'hour', 'h', 3600)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (3, 'watt per minute', 'watt / min', 1)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (3, 'watt per minute', 'watt / min', 1)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.016667)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (4, 'watt per hour', 'watt / h', 0.016667)";
   db_query($sql);
 
   //event_unit
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (1, 1)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (1, 1)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (1, 2)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (1, 2)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (2, 0)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (2, 0)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (3, 1)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 1)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (3, 2)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 2)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (4, 3)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (4, 3)";
   db_query($sql);
 
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUE (4, 4)";
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (4, 4)";
   db_query($sql);
 }
 
@@ -191,10 +194,36 @@ function notification_schema() {
     ),
   );
 
+  $schema['event_log'] = array(
+    'description' => t('Stores device events'),
+    'fields' => array(
+      'device'       => array(
+        'type'       => 'varchar',
+        'length'     => '32',
+        'not null'   => TRUE,
+      ),
+      'event_id' => array(
+        'type'       => 'int',
+        'not null'   => TRUE,
+        'unasigned'  => TRUE,
+      ),
+      'time' => array(
+        'type'       => 'int',
+        'unsigned'   => TRUE,
+        'not null'   => TRUE,
+        'default'    => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'device', 'event_id, time'
+    ),
+  );
+
   return $schema;
 }
 
-function logger_update_6007() {
+function notification_update_6007() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
@@ -208,7 +237,7 @@ function logger_update_6007() {
   return $items;
 }
 
-function logger_update_6008() {
+function notification_update_6008() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
@@ -221,26 +250,26 @@ function logger_update_6008() {
   return $items;
 }
 
-function logger_update_6018() {
+function notification_update_6018() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
       $items[0]  = update_sql("CREATE TABLE {unit}(id int unsigned NOT NULL, name varchar(16) NOT NULL, symbol varchar(10) NOT NULL, factor float NOT NULL, PRIMARY KEY (id))");
-      $items[1]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (0, 'none', 'none', 1)");
-      $items[2]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (1, 'minute', 'min', 60)");
-      $items[3]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (2, 'hour', 'h', 3600)");
-      $items[4]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (3, 'watt per minute', 'watt / min', 1)");
-      $items[5]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUE (4, 'watt per hour', 'watt / h', 0.16667)");
+      $items[1]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUES (0, 'none', 'none', 1)");
+      $items[2]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUES (1, 'minute', 'min', 60)");
+      $items[3]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUES (2, 'hour', 'h', 3600)");
+      $items[4]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUES (3, 'watt per minute', 'watt / min', 1)");
+      $items[5]  = update_sql("INSERT INTO unit (id, name, symbol, factor) VALUES (4, 'watt per hour', 'watt / h', 0.16667)");
 
       $items[6]  = update_sql("CREATE TABLE {event_unit}(event_id int unsigned NOT NULL, unit_id int unsigned NOT NULL, PRIMARY KEY (event_id, unit_id))");
-      $items[7]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (1, 1)");
-      $items[8]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (1, 2)");
-      $items[9]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (2, 0)");
-      $items[10] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (3, 1)");
-      $items[11] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (3, 2)");
-      $items[12] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (4, 3)");
-      $items[13] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUE (4, 4)");
+      $items[7]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (1, 1)");
+      $items[8]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (1, 2)");
+      $items[9]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (2, 0)");
+      $items[10] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (3, 1)");
+      $items[11] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (3, 2)");
+      $items[12] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (4, 3)");
+      $items[13] = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (4, 4)");
 
       $items[14] = update_sql("ALTER TABLE {notification} MODIFY COLUMN limit_up float NOT NULL");
       $items[15] = update_sql("ALTER TABLE {notification} ADD COLUMN unit_id int unsigned NOT NULL AFTER limit_up");
@@ -256,7 +285,7 @@ function logger_update_6018() {
   return $items;
 }
 
-function logger_update_6019() {
+function notification_update_6019() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
@@ -269,7 +298,7 @@ function logger_update_6019() {
   return $items;
 }
 
-function logger_update_6020() {
+function notification_update_6020() {
   $now = time();
   $items = array();
   switch ($GLOBALS['db_type']) {
@@ -306,7 +335,7 @@ function logger_update_6020() {
   return $items;
 }
 
-function logger_update_6021() {
+function notification_update_6021() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
@@ -323,13 +352,29 @@ function logger_update_6021() {
   return $items;
 }
 
-function logger_update_6022() {
+function notification_update_6022() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
       $items[0] = update_sql("ALTER TABLE {notification} DROP PRIMARY KEY");
       $items[1] = update_sql("ALTER TABLE {notification} ADD PRIMARY KEY (device, event_id, limit_up, unit_id)");
+
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6024() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("INSERT INTO {event} (id, name) VALUES (5, 'Brownout')");
+      $items[1]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (5, 0)");
+      $items[2]  = update_sql("CREATE TABLE {event_log}(device varchar(32) NOT NULL, event_id int unsigned NOT NULL, time int unsigned NOT NULL, PRIMARY KEY (device, event_id, time))");
 
       break;
     case 'pgsql':

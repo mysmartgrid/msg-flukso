@@ -30,24 +30,31 @@
 function logger_xmlrpc() {
   return array(
     array(
-      'logger.auth', // External method name.
-      '_logger_auth', // Drupal callback function to run + api version 1
+      'logger.auth',            // External method name.
+      '_logger_auth',           // Drupal callback function to run + api version 1
       array('string', 'array'), // Return value's type, then any parameter types (accept, auth)
-      'Authenticate a device' // Description.
+      'Authenticate a device'   // Description.
     ),
 
     array(
-      'logger.heartbeat', // External method name.
-      '_logger_heartbeat', // Drupal callback function to run  + api version 1
+      'logger.heartbeat',               // External method name.
+      '_logger_heartbeat',              // Drupal callback function to run  + api version 1
       array('array', 'array', 'array'), // Return value's type, then any parameter types (return, auth, monitor)
       'Send a heartbeat to the logger.' // Description.
     ),
 
     array(
-      'logger.measurementAdd', // External method name.
-      '_logger_measurement_add', // Drupal callback function to run + api version 1
-      array('string', 'array', 'array'), // Return value's type, then any parameter types (action, auth, logs)
+      'logger.measurementAdd',             // External method name.
+      '_logger_measurement_add',           // Drupal callback function to run + api version 1
+      array('string', 'array', 'array'),   // Return value's type, then any parameter types (return, auth, logs)
       'Submit measurements to the logger.' // Description.
+    ),
+
+    array(
+      'logger.brownout',                       // External method name.
+      '_logger_brownout',                      // Drupal callback function to run  + api version 1
+      array('string', 'array', 'string'),      // Return value's type, then any parameter types (return, auth, device)
+      'Send a brownout message to the logger.' // Description.
     ),
   );
 }
@@ -188,6 +195,20 @@ function _logger_measurement_add($auth, $logs) {
     }
 
     return $info;
+
+  } else {
+
+    return xmlrpc_error(-31000, t('Authentication failed.'));
+  }
+}
+
+function _logger_brownout($auth, $device) {
+
+  if (_logger_authenticate_hmac_sha1($auth, $device)) {
+
+    notification_log_brownout($device);
+
+    return 'Brownout message has been received.';
 
   } else {
 

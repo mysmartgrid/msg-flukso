@@ -23,6 +23,7 @@ define('NO_HEARTBEAT_EVENT_ID',          1);
 define('CORRUPTED_HEARTBEAT_EVENT_ID',   2);
 define('ANY_HEARTBEAT_FAILURE_EVENT_ID', 3);
 define('PEAK_CONSUMPTION_EVENT_ID',      4);
+define('BROWNOUT_EVENT_ID',              5);
 
 define('HOUR_UNIT_ID',      2);
 define('WATT_HOUR_UNIT_ID', 4);
@@ -1048,7 +1049,7 @@ function _notification_send_peak_consumption_emails($now) {
 function _notification_register_power_consumption() {
 
   $now = time();
-  //Note: the values are stored in unit 'watt' 
+  //Note: the values are stored in unit 'watt'
 
   $sql = "
     UPDATE
@@ -1067,6 +1068,28 @@ function _notification_register_power_consumption() {
       event_id = %d";
 
   db_query($sql, $now, 'electricity', PEAK_CONSUMPTION_EVENT_ID);
+}
+
+/**
+ * Logs the brownout event.
+ *
+ * @param $device  The device where the event occurred.
+ */
+function notification_log_brownout($device) {
+
+  notification_log_event(BROWNOUT_EVENT_ID, $device);
+}
+
+/**
+ * Logs an event.
+ *
+ * @param $event_id  The event id.
+ * @param $device    The device where the event occurred.
+ */
+function notification_log_event($event_id, $device) {
+
+  $sql = "INSERT INTO {event_log} (device, event_id, time) VALUES ('%s', %d, %d)";
+  db_query($sql, $device, $event_id, time());
 }
 
 /**
