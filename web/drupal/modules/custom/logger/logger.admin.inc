@@ -169,13 +169,26 @@ function theme_logger_account_devices($form) {
     return sprintf('%d days %d hours', $days, $hours);
   }
 
+  function get_device_links($serial) {
+
+    $links = l(t('Remove'),  "device/deactivate/$serial");
+
+    //TODO: improve this test
+    global $user;
+    if ($user->uid == 1) {
+      $links .= '<br>' . l(t('History'), "event/log/list/$serial");
+    }
+    return $links;
+  }
+
   while ($device = db_fetch_object($result)) {
+
     $row = array();
     $row[] = $device->serial;
     $row[] = $device->resets;
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
-    $row[] = l(t('Remove'), 'device/deactivate/' . $device->serial);
+    $row[] = get_device_links($device->serial);
 
     $rows[] = $row;
   }

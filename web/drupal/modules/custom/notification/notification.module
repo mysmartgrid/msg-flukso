@@ -84,6 +84,21 @@ function notification_menu() {
     'type'              => MENU_CALLBACK
   );
 
+  $items['event/log/list'] = array(
+    'title'             => 'Device History',
+    'page callback'     => 'notification_eventlog_page',
+    'page arguments'    => array(3),
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
+  );
+
+  $items['event/log/clear'] = array(
+    'page callback'     => '_notification_eventlog_clear',
+    'page arguments'    => array(3),
+    'access arguments'  => array('manage notifications'),
+    'type'              => MENU_CALLBACK
+  );
+
   $items['newsletter'] = array(
     'title'             => 'Newsletter',
     'page callback'     => 'notification_newsletter_page',
@@ -222,6 +237,48 @@ function notification_list_page() {
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '</p>';
 
   return theme('table', $header, $rows, array(), $caption);
+}
+
+function notification_eventlog_page($serial) {
+
+  $sql = "
+    SELECT
+      FROM_UNIXTIME(l.time + u.timezone) AS time,
+      e.name AS event_name
+    FROM
+      {users} u,
+      {logger_devices} d,
+      {event} e,
+      {event_log} l
+    WHERE
+      l.event_id = e.id AND
+      l.device = d.device AND
+      d.serial = '%s' AND
+      d.uid = u.uid";
+
+  $header = array(
+    array('data' => t('Time'),  'field' => 'time',       'sort' => 'DESC'),
+    array('data' => t('Event'), 'field' => 'event_name', 'sort' => 'ASC'),
+  );
+
+  $result = db_query($sql, $serial, tablesort_sql($header));
+
+  $rows = array();
+  while ($row = db_fetch_array($result)) {
+    $rows[] = $row;
+  }
+
+  $caption = '<p>' . t('Serial Number:') . ' ' . $serial . '</p>' . '<p>' .
+    l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
+
+  return theme('table', $header, $rows, array(), $caption);
+}
+
+function _notification_eventlog_clear($serial) {
+  $sql = "DELETE FROM event_log WHERE device = (SELECT d.device FROM {logger_devices} d WHERE d.serial = '%s')";
+  db_query($sql, $serial);
+
+  return notification_eventlog_page($serial);
 }
 
 /**

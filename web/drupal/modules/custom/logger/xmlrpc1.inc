@@ -53,7 +53,7 @@ function logger_xmlrpc() {
     array(
       'logger.brownout',                       // External method name.
       '_logger_brownout',                      // Drupal callback function to run  + api version 1
-      array('string', 'array', 'string'),      // Return value's type, then any parameter types (return, auth, device)
+      array('string', 'array', 'array'),       // Return value's type, then any parameter types (return, auth, message)
       'Send a brownout message to the logger.' // Description.
     ),
   );
@@ -202,11 +202,13 @@ function _logger_measurement_add($auth, $logs) {
   }
 }
 
-function _logger_brownout($auth, $device) {
+function _logger_brownout($auth, $message) {
 
-  if (_logger_authenticate_hmac_sha1($auth, $device)) {
+  require_once(XMLRPC_PATH . "/notification/notification.module");
 
-    notification_log_brownout($device);
+  if (_logger_authenticate_hmac_sha1($auth, $message)) {
+
+    notification_log_brownout($auth['device']);
 
     return 'Brownout message has been received.';
 
