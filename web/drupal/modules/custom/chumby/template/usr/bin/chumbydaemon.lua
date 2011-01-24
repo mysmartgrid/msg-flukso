@@ -1,4 +1,4 @@
-#!/usr/bin/env lua 
+#!/usr/bin/env lua
 -- This file is part of libflukso.
 --
 -- (c) Mathias Dalheimer <md@gonium.net>, 2010
@@ -54,36 +54,45 @@ end
 
 log("starting flukso data provider daemon")
 
-log("Using " .. config.IP)
+function updateCommand()
+	if config.IP == "" then
+		io.input('/tmp/flukso/ip')
+		ip = io.read()
+	else
+		ip = config.IP
+	end
 
-local command = {
-  last_reading = {
-        cmd = config.BINPATH .. config.CMD .. 
-              " -l " .. config.IP .. 
-              " -s " .. config.SENSOR ..
-              " -n " .. config.DATADIR .. "/last_reading" ..
-              " -f chumby-current -o file",
-        interval = 2
-      },
-  last_minute = {
-        cmd = config.BINPATH .. config.CMD .. 
-              " -l " .. config.IP .. 
-              " -s " .. config.SENSOR ..
-              " -n " .. config.DATADIR .. "/last_minute" ..
-              " -f chumby-lastminute -o file",
-        interval = 10
-      },
-  last_hour = {
-        cmd = config.BINPATH .. config.CMD .. 
-              " -l " .. config.IP .. 
-              " -s " .. config.SENSOR ..
-              " -t " .. config.TOKEN ..
-              " -n " .. config.DATADIR .. "/last_hour" ..
-              " -f chumby-lasthour -o file -i hour",
-        interval = 11
-      },
+	log("Using " .. ip)
 
-}
+	command = {}
+	command['last_reading'] = {
+					cmd = config.BINPATH .. config.CMD .. 
+								" -l " .. ip .. 
+								" -s " .. config.SENSOR ..
+								" -n " .. config.DATADIR .. "/last_reading" ..
+								" -f chumby-current -o file",
+					interval = 2
+				}
+	command['last_minute'] = {
+					cmd = config.BINPATH .. config.CMD .. 
+								" -l " .. ip .. 
+								" -s " .. config.SENSOR ..
+								" -n " .. config.DATADIR .. "/last_minute" ..
+								" -f chumby-lastminute -o file",
+					interval = 10
+				}
+	command['last_hour'] = {
+					cmd = config.BINPATH .. config.CMD .. 
+								" -l " .. ip .. 
+								" -s " .. config.SENSOR ..
+								" -t " .. config.TOKEN ..
+								" -n " .. config.DATADIR .. "/last_hour" ..
+								" -f chumby-lasthour -o file -i hour",
+					interval = 11
+				}
+end
+
+updateCommand();
 ox.mkdir(config.DATADIR);
 
 -- write the xml boundaries to a file
@@ -109,20 +118,25 @@ function ticker()
   )
 end
 
-function timeactor(tupstream, command)
+function timeactor(tupstream, com)
   return coroutine.create(function()
-    local i=command.interval;
-    log("using interval " .. i .. " for command " .. command.cmd)
+    local i=command[com].interval;
+    log("using interval " .. i .. " for command " .. command[com].cmd)
     while true do
       if (i > 0) then
         i = i - 1;
       else
-        retval = os.execute(command.cmd)
-        if not retval==0 then
-          log("Error while running " .. command .. 
-              " -> return code " .. retval)
-        end
-        i=command.interval;
+				updateCommand()
+				if ip ~= nil and ip ~= "" then
+					retval = os.execute(command[com].cmd)
+					if not retval==0 then
+						log("Error while running " .. command .. 
+								" -> return code " .. retval)
+					end
+				else
+					log("No flukso found.")
+				end
+        i=command[com].interval;
       end
       coroutine.resume(tupstream)
       coroutine.yield()
@@ -143,8 +157,8 @@ end
 local chain = 
 controller(
   timeactor(
-    timeactor(ticker(), command.last_reading)
-  , command.last_minute)
+    timeactor(ticker(), 'last_reading')
+  , 'last_minute')
 )
 
 coroutine.resume(chain);

@@ -28,7 +28,7 @@ function chumby_menu() {
 }
 
 function chumby_cron() {
-  exec('rm /home/flukso/www/public/files/chumby/*.zip');
+  exec('rm ' . drupal_get_path('module', 'chumby') . '/files/*.zip');
 }
 
 function chumby_form() {
@@ -56,10 +56,18 @@ function chumby_form() {
     '#title' => t('Sensor'),
     '#description' => t('Sensors from which values should be displayed.'),
   );
+  $result['auto'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Autoconfigure IP'),
+    '#description' => t('Automatically find the flukso in the local network. Normally this is the way you want to go.'),
+    '#default_value' => '1',
+    '#attributes' => array('onChange' => 'document.getElementById("edit-ip").disabled = document.getElementById("edit-auto").checked'),
+  );
   $result['ip'] = array(
     '#type' => 'textfield',
     '#title' => t('ip address'),
     '#description' => t('The local ip address of the flukso.'),
+    '#disabled' => true,
   );
   $result['consumption'] = array(
     '#type' => 'fieldset',
@@ -104,9 +112,11 @@ function chumby_form_validate($form, &$form_state) {
   if ( $temp )
     form_set_error('visualization', t('Please choose at least one visualization.'));
 
-  // check if a valid ip address was entered.
-  if ( filter_var($form_state['values']['ip'], FILTER_VALIDATE_IP) == FALSE )
-    form_set_error('ip', t('Please enter a valid IP address.'));
+  if ( !$form_state['values']['auto'] ) {
+    // check if a valid ip address was entered.
+    if ( filter_var($form_state['values']['ip'], FILTER_VALIDATE_IP) == FALSE )
+      form_set_error('ip', t('Please enter a valid IP address.'));
+  };
 
   // check if a valid number was entered as low value.
   if ( $form_state['values']['low'] == "" || filter_var($form_state['values']['low']) == FALSE )
@@ -126,7 +136,10 @@ function chumby_form_validate($form, &$form_state) {
 }
 
 function chumby_form_submit($form, &$form_state) {
-  $ip = $form_state['values']['ip'];
+  if ( $form_state['values']['auto'] )
+    $ip = "";
+  else
+    $ip = $form_state['values']['ip'];
   $sensor = $form_state['values']['sensor'];
   $token = db_result(db_query("SELECT token FROM {logger_tokens} WHERE meter='%s'", $sensor));
   $low = $form_state['values']['low'];
@@ -140,8 +153,8 @@ function chumby_form_submit($form, &$form_state) {
   $path = $rootpath . $dirname;
   if ( ! file_exists($path) ) {
     mkdir($path);
-    exec("cp -R /home/flukso/www/public/sites/all/modules/chumby/template/usr/ " . $path);
-    exec("cp -R /home/flukso/www/public/sites/all/modules/chumby/template/debugchumby " . $path);
+    exec("cp -R " . drupal_get_path('module', 'chumby') . "/template/usr/ " . $path);
+    exec("cp -R " . drupal_get_path('module', 'chumby') . "/template/debugchumby " . $path);
     $daemonconfig = fopen($path . '/daemonconfig.lua', 'w');
     if ( $daemonconfig == FALSE )
      drupal_set_message(t('Could not create file!'));
@@ -161,12 +174,12 @@ function chumby_form_submit($form, &$form_state) {
       fwrite($profile, $profile_tail);
       fclose($profile);
     }
-    $file_path = '/home/flukso/www/public/files/chumby/';
+    $file_path = drupal_get_path('module', 'chumby') . '/files/';
     if ( ! file_exists($file_path) )
       mkdir($file_path);
     $zipfile = $file_path . $dirname . '.zip';
-    exec('cd ' . $path .'; zip -r ' . $zipfile . ' .');
-    drupal_set_message(t('<a href="/files/chumby/' . $dirname . '.zip">Image</a> created.'));
+    exec('pushd ' . $path .'; zip -r ' . $dirname . '.zip .; popd; cp ' . $path . '/' . $dirname . '.zip ' . $zipfile);
+    drupal_set_message('<a href="' . drupal_get_path('module', 'chumby') . '/files/' . $dirname . '.zip">' . t('Download Image') . '</a>');
     exec("rm -rf " . $rootpath . $dirname);
   } else {
     drupal_set_message(t("Operation failed! Please try again later!"));

@@ -1,29 +1,72 @@
 <profile>
-	<widget_instances>
-		<widget_instance id="1">
-			<name>Msg Test</name>
-			<widget>
-				<name>Msg Test</name>
-				<description>This is the msg test widget</description>
-				<version>1.0</version>
-				<mode time="30" mode="timeout"/>
-				<access sendable="false" deleteable="false" access="private" virtualable="false"/>
-				<user username="myusername"/>
-				<thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png"/>
-				<movie href="file:////mnt/storage/usr/widgets/currentpower/currentpower.swf" contenttype="application/x-shockwave-flash"/>
-			</widget>
-			<access access="private"/>
-			<mode time="30" mode="timeout"/>
-			<widget_parameters>
-				<widget_parameter>
-					<name>zipcode</name>
-					<value>90210</value>
-				</widget_parameter>
-				<widget_parameter>
-					<name>phonenumber</name>
-					<value>867-5309</value>
-				</widget_parameter>
-			</widget_parameters>
-		</widget_instance>
-	</widget_instances>
+  <widget_instances>
+  <widget_instance id="">
+    <name>Current Power</name>
+    <widget>
+      <name>Current Power</name>
+      <description>Zeigt den aktuellen Verbrauch als Zahl an.</description>
+      <version>1.0</version>
+      <mode time="30" mode="timeout" />
+      <access sendable="false" deleteable="false" access="private" virtualable="false" />
+      <user username="" />
+      <thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png" />
+      <movie href="file:////mnt/storage/usr/widgets/currentpower/currentpower.swf" contenttype="application/x-shockwave-flash" />
+    </widget>
+    <access access="private" />
+    <mode time="30" mode="timeout" />
+    <widget_parameters>
+    </widget_parameters>
+  </widget_instance>
+  <widget_instance id="">
+    <name>Energietacho</name>
+    <widget>
+      <name>Energietacho</name>
+      <description>Zeigt den aktuellen Verbrauch als Tachonadel an.</description>
+      <version>1.0</version>
+      <mode time="30" mode="timeout" />
+      <access sendable="false" deleteable="false" access="private" virtualable="false" />
+      <user username="" />
+      <thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png" />
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/energietacho.swf" contenttype="application/x-shockwave-flash" />
+    </widget>
+    <access access="private" />
+    <mode time="30" mode="timeout" />
+    <widget_parameters>
+    </widget_parameters>
+  </widget_instance>
+  <widget_instance id="">
+    <name>Gluehlampe</name>
+    <widget>
+      <name>Glühlampe</name>
+      <description>Zeigt eine Glühlampe, die heller leuchtet, wenn mehr Strom verbraucht wird.</description>
+      <version>1.0</version>
+      <mode time="30" mode="timeout" />
+      <access sendable="false" deleteable="false" access="private" virtualable="false" />
+      <user username="" />
+      <thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png" />
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/Gluehlampe.swf" contenttype="application/x-shockwave-flash" />
+    </widget>
+    <access access="private" />
+    <mode time="30" mode="timeout" />
+    <widget_parameters>
+    </widget_parameters>
+  </widget_instance>
+  <widget_instance id="">
+    <name>Energie Graph</name>
+    <widget>
+      <name>Energie Graph</name>
+      <description>Zeigt den Verbrauch der letzten Stunde als Graph an.</description>
+      <version>1.0</version>
+      <mode time="30" mode="timeout" />
+      <access sendable="false" deleteable="false" access="private" virtualable="false" />
+      <user username="" />
+      <thumbnail href="https://www.mysmartgrid.de/sites/all/themes/mysmartgrid/logo.png" contenttype="image/png" />
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/EnergyGraph.swf" contenttype="application/x-shockwave-flash" />
+    </widget>
+    <access access="private" />
+    <mode time="30" mode="timeout" />
+    <widget_parameters>
+    </widget_parameters>
+  </widget_instance>
+  </widget_instances>
 </profile>
