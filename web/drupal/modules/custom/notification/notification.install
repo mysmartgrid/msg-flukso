@@ -22,7 +22,7 @@ function notification_install() {
   db_query($sql);
 
   //unit
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 0)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 1)";
   db_query($sql);
 
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (1, 'minute', 'min', 60)";
@@ -57,6 +57,9 @@ function notification_install() {
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (4, 4)";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 0)";
   db_query($sql);
 }
 
@@ -363,7 +366,7 @@ function notification_update_6022() {
       $items[0] = update_sql("ALTER TABLE {notification} DROP PRIMARY KEY");
       $items[1] = update_sql("ALTER TABLE {notification} ADD PRIMARY KEY (device, event_id, limit_up, unit_id)");
 
-      break;
+        break;
     case 'pgsql':
       break;
   }
@@ -391,7 +394,76 @@ function notification_update_6025() {
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
-      $items[]  = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 0)");
+      $items[]  = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 1)");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6026() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+
+      $items[0]  = update_sql("
+        INSERT
+          INTO {notification} (
+            device,
+            event_id,
+            emails,
+            min_interval,
+            base_value,
+            base_time,
+            limit_up,
+            unit_id,
+            last_sent)
+          SELECT
+            device,
+            1,
+            emails,
+            min_interval,
+            base_value,
+            base_time,
+            limit_up,
+            unit_id,
+            last_sent
+          FROM
+            {notification}
+          WHERE
+            event_id = 3");
+
+      $items[1]  = update_sql("
+        INSERT
+          INTO {notification} (
+            device,
+            event_id,
+            emails,
+            min_interval,
+            base_value,
+            base_time,
+            limit_up,
+            unit_id,
+            last_sent)
+          SELECT
+            device,
+            2,
+            emails,
+            min_interval,
+            0,
+            0,
+            0,
+            0,
+            0
+          FROM
+            {notification}
+          WHERE
+            event_id = 3");
+
+
+      $items[2]  = update_sql("DELETE FROM {notification} WHERE event_id = 3;");
       break;
     case 'pgsql':
       break;

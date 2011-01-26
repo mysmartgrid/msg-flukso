@@ -21,7 +21,6 @@
 
 define('NO_HEARTBEAT_EVENT_ID',          1);
 define('CORRUPTED_HEARTBEAT_EVENT_ID',   2);
-define('ANY_HEARTBEAT_FAILURE_EVENT_ID', 3);
 define('PEAK_CONSUMPTION_EVENT_ID',      4);
 define('BROWNOUT_EVENT_ID',              5);
 
@@ -370,47 +369,6 @@ function notification_registration_form() {
     '#options'        => _notification_get_units_options(NO_HEARTBEAT_EVENT_ID),
   );
 
-  $form['events']['event_id3'] = array(
-    '#title'          => _notification_get_event_name(ANY_HEARTBEAT_FAILURE_EVENT_ID),
-    '#type'           => 'checkbox',
-    '#default_value'  => FALSE,
-    '#prefix'         => '<tr><td>',
-    '#suffix'         => '</td>',
-    '#attributes'     => array(
-      'onchange' => '
-        limit_up3 = document.getElementById("limit_up3");
-        limit_up3.readOnly = !this.checked;
-        limit_up3.value = this.checked ? 2 : "";
-        unit_id3 = document.getElementById("unit_id3");
-        unit_id3.value = ' . HOUR_UNIT_ID . ';',
-    ),
-  );
-
-  $form['events']['limit_up3'] = array(
-    '#type'              => 'textfield',
-    '#description'       => $form['events']['limit_up1']['#description'],
-    '#maxlength'         => 9,
-    '#size'              => 12,
-    '#prefix'            => '<td>',
-    '#suffix'            => '</td>',
-    '#related_event_id'  => ANY_HEARTBEAT_FAILURE_EVENT_ID,
-    '#element_validate'  => array('notification_limit_up_validate'),
-    '#attributes'        => array(
-      'onfocus' => '
-        event_id3 = document.getElementById("event_id3");
-        this.readOnly = !event_id3.checked;',
-    ),
-  );
-
-  $form['events']['unit_id3'] = array(
-    '#type'           => 'select',
-    '#prefix'         => '<td width="200">',
-    '#suffix'         => '</td></tr>',
-    '#default_value'  => HOUR_UNIT_ID,
-    '#required'       => TRUE,
-    '#options'        => _notification_get_units_options(ANY_HEARTBEAT_FAILURE_EVENT_ID),
-  );
-
   $form['events']['event_id4'] = array(
     '#title'          => _notification_get_event_name(PEAK_CONSUMPTION_EVENT_ID),
     '#type'           => 'checkbox',
@@ -529,7 +487,6 @@ function notification_edition_form(&$form_state, $notification) {
 
   switch ($notification->event_id) {
     case NO_HEARTBEAT_EVENT_ID:
-    case ANY_HEARTBEAT_FAILURE_EVENT_ID:
       $form['limit_up'] = array(
         '#type'              => 'textfield',
         '#title'             => t('Maximum Delay'),
@@ -666,8 +623,7 @@ function notification_limit_up_validate($field, $form_state) {
     $factor = db_result(db_query("SELECT factor FROM {unit} un WHERE id = %d", $unit_id));
     $converted_limit = $limit_up * $factor;
 
-    if (($related_event_id == NO_HEARTBEAT_EVENT_ID || $related_event_id == ANY_HEARTBEAT_FAILURE_EVENT_ID) &&
-        $converted_limit < 30 * MINUTE) {
+    if ($related_event_id == NO_HEARTBEAT_EVENT_ID && $converted_limit < 30 * MINUTE) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
 
@@ -682,7 +638,6 @@ function notification_registration_form_submit($form, &$form_state) {
 
   _notification_register_event($form, $form_state, NO_HEARTBEAT_EVENT_ID);
   _notification_register_event($form, $form_state, CORRUPTED_HEARTBEAT_EVENT_ID);
-  _notification_register_event($form, $form_state, ANY_HEARTBEAT_FAILURE_EVENT_ID);
   _notification_register_event($form, $form_state, PEAK_CONSUMPTION_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
@@ -934,7 +889,6 @@ function notification_cron() {
 
   _notification_send_no_heartbeat_emails($now);
   _notification_send_corrupted_heartbeat_emails($now);
-  _notification_send_any_heartbeat_failure_emails($now);
   _notification_send_peak_consumption_emails($now);
 }
 
@@ -942,10 +896,8 @@ function notification_cron() {
  * Sends e-mails notifying users of "No Heartbeat" events.
  *
  * @param $now       The event checkup time.
- * @param $event_id  The actual event that is causing the notification to be sent.
- *                   It can be either "No Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_no_heartbeat_emails($now, $event_id = NO_HEARTBEAT_EVENT_ID) {
+function _notification_send_no_heartbeat_emails($now) {
 
   $sql = "
     SELECT
@@ -979,7 +931,7 @@ function _notification_send_no_heartbeat_emails($now, $event_id = NO_HEARTBEAT_E
           m.corrupted <> 0
       )";
 
-  $args = array($event_id, $now, $now, $now);
+  $args = array(NO_HEARTBEAT_EVENT_ID, $now, $now, $now);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
@@ -997,10 +949,8 @@ function _notification_send_no_heartbeat_emails($now, $event_id = NO_HEARTBEAT_E
  * Sends e-mails notifying users of "Corrupted Heartbeat" events.
  *
  * @param $now       The event checkup time.
- * @param $event_id  The actual event that is causing the notification to be sent.
- *                   It can be either "Corrupted Heartbeat" or "Any Heartbeat Failure".
  */
-function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPTED_HEARTBEAT_EVENT_ID) {
+function _notification_send_corrupted_heartbeat_emails($now) {
 
   $sql = "
     SELECT
@@ -1023,7 +973,7 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
       m.device = d.device AND
       m.corrupted <> 0";
 
-  $args = array($event_id, $now);
+  $args = array(CORRUPTED_HEARTBEAT_EVENT_ID, $now);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
@@ -1031,17 +981,6 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
     "corrupted data at %event_time.");
 
   _notification_send_emails($message, $sql, $args);
-}
-
-/**
- * Sends e-mails notifying users of "Any Heartbeat Failure" events.
- *
- * @param $now  The event checkup time.
- */
-function _notification_send_any_heartbeat_failure_emails($now) {
-
-  _notification_send_no_heartbeat_emails($now, ANY_HEARTBEAT_FAILURE_EVENT_ID);
-  _notification_send_corrupted_heartbeat_emails($now, ANY_HEARTBEAT_FAILURE_EVENT_ID);
 }
 
 /**
