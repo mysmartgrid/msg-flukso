@@ -1014,13 +1014,11 @@ function _notification_send_corrupted_heartbeat_emails($now, $event_id = CORRUPT
       {users} u,
       {logger_devices} d,
       {logger_meters} m,
-      {notification} n,
-      {unit} un
+      {notification} n
     WHERE
       d.uid = u.uid AND
       d.device = n.device AND
       n.event_id = %d AND
-      n.unit_id = un.id AND
       %d > (n.last_sent + n.min_interval) AND
       m.device = d.device AND
       m.corrupted <> 0";

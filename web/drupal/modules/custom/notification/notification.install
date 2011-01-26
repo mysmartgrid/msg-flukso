@@ -22,6 +22,9 @@ function notification_install() {
   db_query($sql);
 
   //unit
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 0)";
+  db_query($sql);
+
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (1, 'minute', 'min', 60)";
   db_query($sql);
 
@@ -376,6 +379,19 @@ function notification_update_6024() {
       $items[1]  = update_sql("INSERT INTO event_unit (event_id, unit_id) VALUES (5, 0)");
       $items[2]  = update_sql("CREATE TABLE {event_log}(device varchar(32) NOT NULL, event_id int unsigned NOT NULL, time int unsigned NOT NULL, PRIMARY KEY (device, event_id, time))");
 
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6025() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[]  = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 0)");
       break;
     case 'pgsql':
       break;
