@@ -325,14 +325,15 @@ function notification_registration_form() {
   $form['events'] = array(
     '#type'           => 'fieldset',
     '#title'          => t('Events'),
-    '#prefix'         => '<br>'
+    '#prefix'         => '<br><table width="100%">',
+    '#suffix'         => '</table>'
   );
 
   $form['events']['event_id1'] = array(
     '#title'          => _notification_get_event_name(NO_HEARTBEAT_EVENT_ID),
     '#type'           => 'checkbox',
     '#default_value'  => FALSE,
-    '#prefix'         => '<br><table width="100%"><tr><td>',
+    '#prefix'         => '<tr><td>',
     '#suffix'         => '</td>',
     '#attributes'     => array(
       'onchange' => '
@@ -455,8 +456,8 @@ function notification_registration_form() {
     '#title'          => _notification_get_event_name(CORRUPTED_HEARTBEAT_EVENT_ID),
     '#type'           => 'checkbox',
     '#default_value'  => FALSE,
-    '#prefix'         => '<tr><td>',
-    '#suffix'         => '</td><td></td></tr></table>'
+    '#prefix'         => '<tr><td colspan="3"/>',
+    '#suffix'         => '</tr>'
   );
 
   $form['min_interval'] = array(
