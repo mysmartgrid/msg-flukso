@@ -3,12 +3,18 @@
 BASEPATH=/mnt/storage/usr
 DAEMON_BIN=$BASEPATH/bin/chumbydaemon.lua
 DAEMON_CONFIG=$BASEPATH/etc/daemonconfig.lua
+FLUKSO_BIN=$BASEPATH/bin/findFlukso
 FLASHPLAYER_BIN=/usr/bin/chumbyflashplayer.x
 WIDGET_SWF=$BASEPATH/widgets/currentpower.swf
 
 if [ -e $DAEMON_BIN ]; then
 	if [ -e $DAEMON_CONFIG ]; then
 		echo "Starting msg-chumby-daemon"
+		if [ -e $FLUKSO_BIN ]; then
+			$FLUKSO_BIN _realtime-flukso._tcp /tmp/flukso/ip &
+		else
+			echo "Autoconfiguration disabled."
+		fi
 		$BASEPATH/bin/lua $DAEMON_BIN $DAEMON_CONFIG &
 		sleep 1
 		/usr/sbin/httpd -p 3000 -h /tmp/flukso
