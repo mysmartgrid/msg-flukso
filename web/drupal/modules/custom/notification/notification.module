@@ -20,7 +20,7 @@
  */
 
 define('NO_HEARTBEAT_EVENT_ID',          1);
-define('CORRUPTED_HEARTBEAT_EVENT_ID',   2);
+define('CORRUPTED_MEASUREMENT_EVENT_ID', 2);
 define('PEAK_CONSUMPTION_EVENT_ID',      4);
 define('BROWNOUT_EVENT_ID',              5);
 
@@ -411,7 +411,7 @@ function notification_registration_form() {
   );
 
   $form['events']['event_id2'] = array(
-    '#title'          => _notification_get_event_name(CORRUPTED_HEARTBEAT_EVENT_ID),
+    '#title'          => _notification_get_event_name(CORRUPTED_MEASUREMENT_EVENT_ID),
     '#type'           => 'checkbox',
     '#default_value'  => FALSE,
     '#prefix'         => '<tr><td colspan="3"/>',
@@ -517,7 +517,7 @@ function notification_edition_form(&$form_state, $notification) {
       break;
   }
 
-  if ($notification->event_id <> CORRUPTED_HEARTBEAT_EVENT_ID) {
+  if ($notification->event_id <> CORRUPTED_MEASUREMENT_EVENT_ID) {
 
     $form['unit_id'] = array(
       '#type'           => 'select',
@@ -637,7 +637,7 @@ function notification_limit_up_validate($field, $form_state) {
 function notification_registration_form_submit($form, &$form_state) {
 
   _notification_register_event($form, $form_state, NO_HEARTBEAT_EVENT_ID);
-  _notification_register_event($form, $form_state, CORRUPTED_HEARTBEAT_EVENT_ID);
+  _notification_register_event($form, $form_state, CORRUPTED_MEASUREMENT_EVENT_ID);
   _notification_register_event($form, $form_state, PEAK_CONSUMPTION_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
@@ -888,7 +888,7 @@ function notification_cron() {
   $now = time();
 
   _notification_send_no_heartbeat_emails($now);
-  _notification_send_corrupted_heartbeat_emails($now);
+  _notification_send_corrupted_measurement_emails($now);
   _notification_send_peak_consumption_emails($now);
 }
 
@@ -946,11 +946,11 @@ function _notification_send_no_heartbeat_emails($now) {
 }
 
 /**
- * Sends e-mails notifying users of "Corrupted Heartbeat" events.
+ * Sends e-mails notifying users of "Corrupted Measurement" events.
  *
  * @param $now       The event checkup time.
  */
-function _notification_send_corrupted_heartbeat_emails($now) {
+function _notification_send_corrupted_measurement_emails($now) {
 
   $sql = "
     SELECT
@@ -973,11 +973,11 @@ function _notification_send_corrupted_heartbeat_emails($now) {
       m.device = d.device AND
       m.corrupted <> 0";
 
-  $args = array(CORRUPTED_HEARTBEAT_EVENT_ID, $now);
+  $args = array(CORRUPTED_MEASUREMENT_EVENT_ID, $now);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
-    "Your Flukso device (serial number: %serial) has sent a heartbeat with " .
+    "Your Flukso device (serial number: %serial) has sent a measurement with " .
     "corrupted data at %event_time.");
 
   _notification_send_emails($message, $sql, $args);

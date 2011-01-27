@@ -9,7 +9,7 @@ function notification_install() {
   $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Heartbeat')";
   db_query($sql);
 
-  $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Heartbeat')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Measurement')";
   db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUES (3, 'Any Heartbeat Failure')";
@@ -464,6 +464,19 @@ function notification_update_6026() {
 
 
       $items[2]  = update_sql("DELETE FROM {notification} WHERE event_id = 3;");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6027() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[]  = update_sql("UPDATE {event} SET name = 'Corrupted Measurement' WHERE id = 2");
       break;
     case 'pgsql':
       break;
