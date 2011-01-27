@@ -15,15 +15,22 @@ function chumby_perm() {
   return array('chumby image');
 }
 
+function chumby_settings_access($permission, $account) {
+  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
+}
+
 function chumby_menu() {
+  
   $item = array();
+
   $items['chumby'] = array(
-    'title' => "Download chumby image",
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('chumby_form'),
-    'access arguments' => array('chumby'),
-    'type' => MENU_NORMAL_ITEM,
+    'title'            => "Download chumby image",
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('chumby_form'),
+    'access arguments' => array('chumby image'),
+    'type'             => MENU_NORMAL_ITEM,
   );
+
   return $items;
 }
 
