@@ -6,13 +6,10 @@ function notification_install() {
   global $user;
 
   //event
-  $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Heartbeat')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Communication')";
   db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Measurement')";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event} (id, name) VALUES (3, 'Any Heartbeat Failure')";
   db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUES (4, 'Peak Consumption')";
@@ -45,12 +42,6 @@ function notification_install() {
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (2, 0)";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 1)";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 2)";
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (4, 3)";
@@ -477,6 +468,21 @@ function notification_update_6027() {
     case 'mysql':
     case 'mysqli':
       $items[]  = update_sql("UPDATE {event} SET name = 'Corrupted Measurement' WHERE id = 2");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6028() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("UPDATE {event} SET name = 'No Communication' WHERE id = 1");
+      $items[1]  = update_sql("DELETE FROM {event_unit} WHERE event_id = 3");
+      $items[2]  = update_sql("DELETE FROM {event} WHERE id = 3");
       break;
     case 'pgsql':
       break;

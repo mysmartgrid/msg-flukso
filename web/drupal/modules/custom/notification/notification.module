@@ -19,13 +19,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('NO_HEARTBEAT_EVENT_ID',          1);
+define('NO_COMMUNICATION_EVENT_ID',      1);
 define('CORRUPTED_MEASUREMENT_EVENT_ID', 2);
 define('PEAK_CONSUMPTION_EVENT_ID',      4);
 define('BROWNOUT_EVENT_ID',              5);
 
 define('HOUR_UNIT_ID',      2);
 define('WATT_HOUR_UNIT_ID', 4);
+define('TIMESTAMP_FORMAT', '%d-%m-%Y %H:%i:%s');
 
 
 function notification_help($path, $arg) {
@@ -182,7 +183,7 @@ function notification_list_page() {
       d.serial AS serial,
       e.name AS event_name,
       n.emails AS emails,
-      IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone)) AS last_sent,
+      IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone, '%s')) AS last_sent,
       n.limit_up AS limit_up,
       un.id AS unit_id,
       un.symbol AS unit,
@@ -210,7 +211,7 @@ function notification_list_page() {
   );
 
   global $user;
-  $result = db_query($sql, $user->uid, tablesort_sql($header));
+  $result = db_query($sql, TIMESTAMP_FORMAT, $user->uid, tablesort_sql($header));
 
   $rows = array();
   while ($object = db_fetch_array($result)) {
@@ -242,7 +243,7 @@ function notification_eventlog_page($serial) {
 
   $sql = "
     SELECT
-      FROM_UNIXTIME(l.time + u.timezone) AS time,
+      FROM_UNIXTIME(l.time + u.timezone, '%s') AS time,
       e.name AS event_name
     FROM
       {users} u,
@@ -260,7 +261,7 @@ function notification_eventlog_page($serial) {
     array('data' => t('Event'), 'field' => 'event_name', 'sort' => 'ASC'),
   );
 
-  $result = db_query($sql, $serial, tablesort_sql($header));
+  $result = db_query($sql, TIMESTAMP_FORMAT, $serial, tablesort_sql($header));
 
   $rows = array();
   while ($row = db_fetch_array($result)) {
@@ -329,7 +330,7 @@ function notification_registration_form() {
   );
 
   $form['events']['event_id1'] = array(
-    '#title'          => _notification_get_event_name(NO_HEARTBEAT_EVENT_ID),
+    '#title'          => _notification_get_event_name(NO_COMMUNICATION_EVENT_ID),
     '#type'           => 'checkbox',
     '#default_value'  => FALSE,
     '#prefix'         => '<tr><td>',
@@ -351,7 +352,7 @@ function notification_registration_form() {
     '#size'              => 12,
     '#prefix'            => '<td>',
     '#suffix'            => '</td>',
-    '#related_event_id'  => NO_HEARTBEAT_EVENT_ID,
+    '#related_event_id'  => NO_COMMUNICATION_EVENT_ID,
     '#element_validate'  => array('notification_limit_up_validate'),
     '#attributes'        => array(
       'onfocus' => '
@@ -366,7 +367,7 @@ function notification_registration_form() {
     '#suffix'         => '</td></tr>',
     '#default_value'  => HOUR_UNIT_ID,
     '#required'       => TRUE,
-    '#options'        => _notification_get_units_options(NO_HEARTBEAT_EVENT_ID),
+    '#options'        => _notification_get_units_options(NO_COMMUNICATION_EVENT_ID),
   );
 
   $form['events']['event_id4'] = array(
@@ -486,7 +487,7 @@ function notification_edition_form(&$form_state, $notification) {
   );
 
   switch ($notification->event_id) {
-    case NO_HEARTBEAT_EVENT_ID:
+    case NO_COMMUNICATION_EVENT_ID:
       $form['limit_up'] = array(
         '#type'              => 'textfield',
         '#title'             => t('Maximum Delay'),
@@ -623,7 +624,7 @@ function notification_limit_up_validate($field, $form_state) {
     $factor = db_result(db_query("SELECT factor FROM {unit} un WHERE id = %d", $unit_id));
     $converted_limit = $limit_up * $factor;
 
-    if ($related_event_id == NO_HEARTBEAT_EVENT_ID && $converted_limit < 30 * MINUTE) {
+    if ($related_event_id == NO_COMMUNICATION_EVENT_ID && $converted_limit < 30 * MINUTE) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
 
@@ -636,7 +637,7 @@ function notification_limit_up_validate($field, $form_state) {
 
 function notification_registration_form_submit($form, &$form_state) {
 
-  _notification_register_event($form, $form_state, NO_HEARTBEAT_EVENT_ID);
+  _notification_register_event($form, $form_state, NO_COMMUNICATION_EVENT_ID);
   _notification_register_event($form, $form_state, CORRUPTED_MEASUREMENT_EVENT_ID);
   _notification_register_event($form, $form_state, PEAK_CONSUMPTION_EVENT_ID);
 
@@ -837,8 +838,7 @@ function _notification_insert($device, $event_id, $emails, $min_interval, $limit
 
   $base_value = 0;
 
-  //If event = Peak Consumption
-  if ($event_id == 4) {
+  if ($event_id == PEAK_CONSUMPTION_EVENT_ID) {
 
     $sql = "
       SELECT
@@ -887,56 +887,68 @@ function notification_cron() {
 
   $now = time();
 
-  _notification_send_no_heartbeat_emails($now);
+  _notification_send_no_communication_emails($now);
   _notification_send_corrupted_measurement_emails($now);
   _notification_send_peak_consumption_emails($now);
 }
 
 /**
- * Sends e-mails notifying users of "No Heartbeat" events.
+ * Sends e-mails notifying users of "No Communication" events.
  *
  * @param $now       The event checkup time.
  */
-function _notification_send_no_heartbeat_emails($now) {
+function _notification_send_no_communication_emails($now) {
 
   $sql = "
     SELECT
-      d.device AS device,
-      n.event_id AS event_id,
-      u.name AS user_name,
+      %d AS event_id,
+      n.device AS device,
+      n.serial AS serial,
       n.emails AS emails,
-      d.serial AS serial,
-      FROM_UNIXTIME(d.access + u.timezone) AS event_time,
-      ROUND((n.limit_up * un.factor / 60), 2) AS limit_up
+      FROM_UNIXTIME(n.access + n.timezone, '%s') AS event_time,
+      ROUND((n.limit_up / 60), 2) AS limit_up
     FROM
-      {users} u,
-      {logger_devices} d,
-      {notification} n,
-      {unit} un
-    WHERE
-      d.uid = u.uid AND
-      d.device = n.device AND
-      n.event_id = %d AND
-      n.unit_id = un.id AND
-      %d > (d.access + n.limit_up * un.factor) AND
-      %d > (n.last_sent + n.limit_up * un.factor) AND
-      %d > (n.last_sent + n.min_interval) AND
-      NOT EXISTS(
+      (
         SELECT
-          1
+          d.device AS device,
+          d.serial AS serial,
+          n.emails AS emails,
+          (n.limit_up * un.factor) AS limit_up,
+          n.last_sent AS last_sent,
+          n.min_interval AS min_interval,
+          IF(d.access > MAX(m.access), d.access, MAX(m.access)) AS access,
+          u.timezone AS timezone
         FROM
-          {logger_meters} m
+          {logger_meters} m,
+          {logger_devices} d,
+          {notification} n,
+          {unit} un,
+          {users} u
         WHERE
           m.device = d.device AND
-          m.corrupted <> 0
-      )";
+          d.device = n.device AND
+          n.event_id = %d AND
+          n.unit_id = un.id AND
+          d.uid = u.uid
+        GROUP BY
+          d.device,
+          n.limit_up,
+          n.unit_id
+        HAVING
+          SUM(m.corrupted) = 0
+      ) n
+    WHERE
+      %d > (n.access + n.limit_up) AND
+      %d > (n.last_sent + n.limit_up) AND
+      %d > (n.last_sent + n.min_interval)";
 
-  $args = array(NO_HEARTBEAT_EVENT_ID, $now, $now, $now);
+  $event_id = NO_COMMUNICATION_EVENT_ID;
+  $args = array($event_id, TIMESTAMP_FORMAT, $event_id, $now, $now, $now);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
     "Your Flukso device (serial number: %serial) has not been sending " .
-    "heartbeats for more than %limit_up minutes, since %event_time.",
+    "data for more than %limit_up minutes, since %event_time.",
 
     "Check your WLAN configuration and make sure that it remains active for " .
     "at least 1 hour per day. The device might be working fine, but it is " .
@@ -954,12 +966,11 @@ function _notification_send_corrupted_measurement_emails($now) {
 
   $sql = "
     SELECT
+      %d AS event_id,
       d.device AS device,
-      n.event_id AS event_id,
-      u.name AS user_name,
-      n.emails AS emails,
       d.serial AS serial,
-      FROM_UNIXTIME(m.corrupted + u.timezone) AS event_time
+      n.emails AS emails,
+      FROM_UNIXTIME(m.corrupted + u.timezone, '%s') AS event_time
     FROM
       {users} u,
       {logger_devices} d,
@@ -973,7 +984,8 @@ function _notification_send_corrupted_measurement_emails($now) {
       m.device = d.device AND
       m.corrupted <> 0";
 
-  $args = array(CORRUPTED_MEASUREMENT_EVENT_ID, $now);
+  $event_id = CORRUPTED_MEASUREMENT_EVENT_ID;
+  $args = array($event_id, TIMESTAMP_FORMAT, $event_id, $now);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
@@ -992,17 +1004,16 @@ function _notification_send_peak_consumption_emails($now) {
 
   $sql = "
     SELECT DISTINCT
+      %d AS event_id,
       d.device AS device,
       d.serial AS serial,
-      u.name AS user_name,
-      u.timezone AS timezone,
-      n.event_id AS event_id,
       n.emails AS emails,
+      FROM_UNIXTIME(MAX(m.access) + u.timezone, '%s') AS event_time,
       ROUND((n.limit_up * un.factor * 60), 2) AS limit_up,
-      FROM_UNIXTIME(MAX(m.access) + u.timezone) AS event_time,
       (n.base_time + u.timezone) AS start_time,
       (SUM(m.value) - n.base_value) AS consumption,
-      ((MAX(m.access) - n.base_time) / " . HOUR . ") AS elapsed_time
+      ((MAX(m.access) - n.base_time) / " . HOUR . ") AS elapsed_time,
+      u.timezone AS timezone
     FROM
       {users} u,
       {logger_devices} d,
@@ -1022,7 +1033,8 @@ function _notification_send_peak_consumption_emails($now) {
     HAVING
       consumption / elapsed_time > limit_up";
 
-  $args = array(PEAK_CONSUMPTION_EVENT_ID, $now, 'electricity');
+  $event_id = PEAK_CONSUMPTION_EVENT_ID;
+  $args = array($event_id, TIMESTAMP_FORMAT, $event_id, $now, 'electricity');
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_email(
@@ -1144,7 +1156,7 @@ function _notification_compose_email($description, $complement = NULL) {
   $complement = $complement == NULL? "" : "<p>$complement</p> ";
 
   return
-    "<p>Dear user %user_name " .
+    "<p>Dear user " .
     "<br> &nbsp;<br></p> " .
 
     "<p>$description</p> " .

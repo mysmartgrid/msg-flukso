@@ -20,11 +20,11 @@
  */
 
 //Device states
-define('UNINSTALLED_STATE_NAME',   t('Uninstalled'));
-define('UNREGISTERED_STATE_NAME',  t('Unregistered'));
-define('NO_HEARTBEAT_STATE_NAME',  t('No Heartbeat'));
-define('CORRUPTED_STATE_NAME',     t('Corrupted Heartbeat'));
-define('WORKING_STATE_NAME',       t('Working'));
+define('UNINSTALLED_STATE_NAME',       t('Uninstalled'));
+define('UNREGISTERED_STATE_NAME',      t('Unregistered'));
+define('NO_COMMUNICATION_STATE_NAME',  t('No Communication'));
+define('CORRUPTED_STATE_NAME',         t('Corrupted Measurement'));
+define('WORKING_STATE_NAME',           t('Working'));
 
 function deployment_overview_help($path, $arg) {
 
@@ -112,18 +112,18 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
   $heartbeat_timeout = 7200; //2 hs
   $registration_delay = 3 * 24 * 3600; //3 days
 
-  $uninstalled_id  = 0;
-  $unregistered_id = 1;
-  $no_heartbeat_id = 2;
-  $corrupted_id    = 3;
-  $working_id      = 4;
+  $uninstalled_id      = 0;
+  $unregistered_id     = 1;
+  $no_communication_id = 2;
+  $corrupted_id        = 3;
+  $working_id          = 4;
 
   $states = array(
-    $uninstalled_id  => UNINSTALLED_STATE_NAME,
-    $unregistered_id => UNREGISTERED_STATE_NAME,
-    $no_heartbeat_id => NO_HEARTBEAT_STATE_NAME,
-    $corrupted_id    => CORRUPTED_STATE_NAME,
-    $working_id      => WORKING_STATE_NAME
+    $uninstalled_id      => UNINSTALLED_STATE_NAME,
+    $unregistered_id     => UNREGISTERED_STATE_NAME,
+    $no_communication_id => NO_COMMUNICATION_STATE_NAME,
+    $corrupted_id        => CORRUPTED_STATE_NAME,
+    $working_id          => WORKING_STATE_NAME
   );
 
    $sql = "
@@ -138,7 +138,7 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
         IF(d.uid = 0,
           IF(($now - d.access) > $registration_delay,  $uninstalled_id,  $unregistered_id),
           IF(d.corrupted > 0, $corrupted_id,
-            IF($now > (d.access + $heartbeat_timeout), $no_heartbeat_id, $working_id)
+            IF($now > (d.access + $heartbeat_timeout), $no_communication_id, $working_id)
           )
         ) AS state
 
@@ -151,9 +151,9 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
           d.access AS access,
           MAX(m.corrupted) AS corrupted
         FROM
-          logger_meters m,
-          logger_devices d
-          LEFT OUTER JOIN users u ON u.uid = d.uid
+          {logger_meters} m,
+          {logger_devices} d
+          LEFT OUTER JOIN {users} u ON u.uid = d.uid
         WHERE
           m.device = d.device
         GROUP BY
@@ -247,14 +247,14 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
       if ($state == UNREGISTERED_STATE_NAME) {
         drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
 
-      } else if ($state == NO_HEARTBEAT_STATE_NAME) {
-        drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
+      } else if ($state == NO_COMMUNICATION_STATE_NAME) {
+        drupal_set_message(t('No message has been received from this device since %latest.', $latest));
 
       } else if ($state == CORRUPTED_STATE_NAME) {
         drupal_set_message(t('This device has sent an invalid measurement at %latest.', $latest));
 
       } else if ($state == WORKING_STATE_NAME) {
-        drupal_set_message(t('This device is working fine. Latest heartbeat received at %latest.', $latest));
+        drupal_set_message(t('This device is working fine. Latest message received at %latest.', $latest));
       }
     }
   }
