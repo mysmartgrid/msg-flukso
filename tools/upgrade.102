@@ -1,0 +1,56 @@
+#!/bin/sh
+# Stephan Platz <stephan.platz@itwm.fraunhofer.de>
+
+VERSION="0.1"
+URL="http://dev1-logger.mysmartgrid.de/"
+TMPDIR=$(mktemp -d)
+FLUKSO_HOME="flukso"
+LUCI_HOME=""
+
+pushd $TMPDIR;
+wget "$URL"files/upgrade/upgrade.$VERSION.tar.gz;
+tar xf upgrade.$VERSION.tar.gz;
+grep "xmlrpcaddress = \'"$URL"xmlrpc\'" < "$FLUKSO_HOME/flukso.lua" > /dev/null
+if [ $? != 0 ]; then
+	echo "flukso.lua contains the wrong xmlrpcaddress"
+	exit 1
+fi
+
+grep "xmlrpcaddress = \'"$URL"xmlrpc\'" < "$FLUKSO_HOME/heartbeat.lua" > /dev/null
+if [ $? != 0 ]; then
+	echo "heartbeat.lua contains the wrong xmlrpcaddress"
+	exit 1
+fi
+popd
+
+# Copy the new Flukso scripts on the Flukso
+echo "Copying the Flukso scripts..."
+cp $FLUKSO_HOME/* /usr/share/lua/flukso/
+cp $FLUKSO_HOME/flukso.init /etc/init.d/flukso
+ln -s /tmp/sensor /www && echo "Create sensor symlink..."
+
+# Copy the msg_wizard on the Flukso
+echo "Copying the msg_wizard..."
+MODEL="$LUCI_HOME/model/cbi"
+CONT="$LUCI_HOME/controller"
+cp "$MODEL"/msg_wizard.lua "$MODEL"/wlan.lua "$MODEL"/lan.lua "$MODEL"/tryit.lua /usr/lib/lua/luci/model/cbi/mini/
+cp "$CONT"/msg_wizard.lua "$CONT"/wlan.lua "$CONT"/lan.lua "$CONT"/tryit.lua /usr/lib/lua/luci/controller/mini/
+cp "$LUCI_HOME"/index.html /www/
+
+# Install the avahi daemon and copy the configuration file
+echo "Install and configure the avahi daemon"
+route add default gw "$IP" && echo "Add default route to $IP"
+echo 'nameserver 8.8.8.8' > /etc/resolv.conf && echo 'Use 8.8.8.8 as temporary nameserver'
+((opkg update > /dev/null 2>1 && opkg -V 0 install avahi-daemon > /dev/null 2>1 && echo 'Installation erfolgreich') || echo 'Installation fehlgeschlagen')
+ln -s /etc/init.d/avahi-daemon /etc/rc.d/S96avahi-daemon
+cp ./tools/flukso.service /etc/avahi/services/
+
+# Copy the firewall.user file to disable the firewall for port 22 and 80 on the wireless interface
+cp ./tools/firewall.user /etc/
+
+# Use the reset button to return to the default network, wireless and firewall config
+#flukso_update.exp "scp $SSH_OPT ./tools/system.tail root@192.168.255.1:/tmp/"
+cp ./tools/net_defaults /bin
+sed -e 's:/etc/init.d/network restart:net_defaults:' < /etc/config/system > /etc/config/system.new && mv /etc/config/system.new /etc/config/system && echo 'Use reset button to return to default settings'
+
+rm -rf $TMPDIR
