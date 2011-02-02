@@ -23,6 +23,8 @@ define('NO_COMMUNICATION_EVENT_ID',      1);
 define('CORRUPTED_MEASUREMENT_EVENT_ID', 2);
 define('PEAK_CONSUMPTION_EVENT_ID',      4);
 define('BROWNOUT_EVENT_ID',              5);
+define('HEARTBEAT_RECEIVED_EVENT_ID',    6);
+define('MEASUREMENT_RECEIVED_EVENT_ID',  7);
 
 define('HOUR_UNIT_ID',      2);
 define('WATT_HOUR_UNIT_ID', 4);
@@ -93,6 +95,7 @@ function notification_menu() {
   );
 
   $items['event/log/clear'] = array(
+    'title'             => $items['event/log/list']['title'],
     'page callback'     => '_notification_eventlog_clear',
     'page arguments'    => array(3),
     'access arguments'  => array('manage notifications'),
@@ -265,7 +268,7 @@ function notification_eventlog_page($serial) {
 
   $rows = array();
   while ($row = db_fetch_array($result)) {
-    $rows[] = $row;
+    $rows[] = array($row['time'], t($row['event_name']));
   }
 
   $caption = '<p>' . t('Serial Number:') . ' ' . $serial . '</p>' . '<p>' .
@@ -275,10 +278,74 @@ function notification_eventlog_page($serial) {
 }
 
 function _notification_eventlog_clear($serial) {
-  $sql = "DELETE FROM event_log WHERE device = (SELECT d.device FROM {logger_devices} d WHERE d.serial = '%s')";
+
+  $sql = "DELETE FROM {event_log} WHERE device = (SELECT d.device FROM {logger_devices} d WHERE d.serial = '%s')";
   db_query($sql, $serial);
 
   return notification_eventlog_page($serial);
+}
+
+/**
+ * Removes log entries older than 1 week.
+ *
+ * @param $now The event checkup time.
+ */
+function _notification_eventlog_clear_old($now) {
+
+  $sql = "DELETE FROM {event_log} WHERE time < %d";
+  db_query($sql, $now - WEEK);
+}
+
+/**
+ * Logs the "brownout" event.
+ *
+ * @param $device  The device where the event occurred.
+ */
+function notification_log_brownout($device) {
+
+  _notification_log_event(BROWNOUT_EVENT_ID, $device);
+}
+
+/**
+ * Logs the "heartbeat received" event.
+ *
+ * @param $device  The device where the event occurred.
+ */
+function notification_log_heartbeat_received($device) {
+
+  _notification_log_event(HEARTBEAT_RECEIVED_EVENT_ID, $device);
+}
+
+/**
+ * Logs the "measurement received" event.
+ *
+ * @param $device  The device where the event occurred.
+ */
+function notification_log_measurement_received($device) {
+
+  _notification_log_event(MEASUREMENT_RECEIVED_EVENT_ID, $device);
+}
+
+/**
+ * Logs the "corrupted measurement" event.
+ *
+ * @param $device  The device where the event occurred.
+ */
+function notification_log_corrupted_measurement($device) {
+
+  _notification_log_event(CORRUPTED_MEASUREMENT_EVENT_ID, $device);
+}
+
+/**
+ * Logs an event.
+ *
+ * @param $event_id  The event id.
+ * @param $device    The device where the event occurred.
+ */
+function _notification_log_event($event_id, $device) {
+
+  $sql = "INSERT INTO {event_log} (device, event_id, time) VALUES ('%s', %d, %d)";
+  db_query($sql, $device, $event_id, time());
 }
 
 /**
@@ -890,12 +957,14 @@ function notification_cron() {
   _notification_send_no_communication_emails($now);
   _notification_send_corrupted_measurement_emails($now);
   _notification_send_peak_consumption_emails($now);
+
+  _notification_eventlog_clear_old($now);
 }
 
 /**
  * Sends e-mails notifying users of "No Communication" events.
  *
- * @param $now       The event checkup time.
+ * @param $now The event checkup time.
  */
 function _notification_send_no_communication_emails($now) {
 
@@ -960,7 +1029,7 @@ function _notification_send_no_communication_emails($now) {
 /**
  * Sends e-mails notifying users of "Corrupted Measurement" events.
  *
- * @param $now       The event checkup time.
+ * @param $now The event checkup time.
  */
 function _notification_send_corrupted_measurement_emails($now) {
 
@@ -998,7 +1067,7 @@ function _notification_send_corrupted_measurement_emails($now) {
 /**
  * Sends em-mails notifying users of the occurrence of Peak Consumption events.
  *
- * @param $now  The event checkup time.
+ * @param $now The event checkup time.
  */
 function _notification_send_peak_consumption_emails($now) {
 
@@ -1075,28 +1144,6 @@ function _notification_register_power_consumption() {
       event_id = %d";
 
   db_query($sql, $now, 'electricity', PEAK_CONSUMPTION_EVENT_ID);
-}
-
-/**
- * Logs the brownout event.
- *
- * @param $device  The device where the event occurred.
- */
-function notification_log_brownout($device) {
-
-  notification_log_event(BROWNOUT_EVENT_ID, $device);
-}
-
-/**
- * Logs an event.
- *
- * @param $event_id  The event id.
- * @param $device    The device where the event occurred.
- */
-function notification_log_event($event_id, $device) {
-
-  $sql = "INSERT INTO {event_log} (device, event_id, time) VALUES ('%s', %d, %d)";
-  db_query($sql, $device, $event_id, time());
 }
 
 /**
