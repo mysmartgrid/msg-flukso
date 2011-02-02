@@ -328,6 +328,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
   $windows = array(
     'hour'  =>  1 * HOUR,
     'day'   =>  1 * DAY,
+    'days'  =>  3 * DAY,
     'week'  =>  1 * WEEK,
     'month' => 60 * DAY,
     'night' => 60 * DAY,
@@ -337,6 +338,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
   $steps = array(
     'hour'  =>  1 * SECOND,
     'day'   =>  1 * MINUTE,
+    'days'  => 15 * MINUTE,
     'week'  => 15 * MINUTE,
     'month' =>  1 * DAY,
     'night' =>  1 * DAY,
