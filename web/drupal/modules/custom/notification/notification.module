@@ -205,7 +205,7 @@ function notification_list_page() {
       n.event_id = e.id AND
       n.unit_id = un.id";
 
-  $header = array(
+  $headers = array(
     array('data' => t('Device'),         'field' => 'serial',     'sort' => 'ASC'),
     array('data' => t('Event'),          'field' => 'event_name', 'sort' => 'ASC'),
     array('data' => t('Target e-mails'), 'field' => 'emails'),
@@ -213,8 +213,10 @@ function notification_list_page() {
     array('data' => t('Operation'))
   );
 
+  $sql .= tablesort_sql($headers);
+
   global $user;
-  $result = db_query($sql, TIMESTAMP_FORMAT, $user->uid, tablesort_sql($header));
+  $result = db_query($sql, TIMESTAMP_FORMAT, $user->uid);
 
   $rows = array();
   while ($object = db_fetch_array($result)) {
@@ -239,7 +241,7 @@ function notification_list_page() {
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '</p>';
 
-  return theme('table', $header, $rows, array(), $caption);
+  return theme('table', $headers, $rows, array(), $caption);
 }
 
 function notification_eventlog_page($serial) {
@@ -247,7 +249,7 @@ function notification_eventlog_page($serial) {
   $sql = "
     SELECT
       FROM_UNIXTIME(l.time + u.timezone, '%s') AS time,
-      e.name AS event_name
+      e.name AS name
     FROM
       {users} u,
       {logger_devices} d,
@@ -259,22 +261,24 @@ function notification_eventlog_page($serial) {
       d.serial = '%s' AND
       d.uid = u.uid";
 
-  $header = array(
-    array('data' => t('Time'),  'field' => 'time',       'sort' => 'DESC'),
-    array('data' => t('Event'), 'field' => 'event_name', 'sort' => 'ASC'),
+  $headers = array(
+    array('data' => t('Time'),  'field' => 'time', 'sort' => 'DESC'),
+    array('data' => t('Event'), 'field' => 'name', 'sort' => 'ASC'),
   );
 
-  $result = db_query($sql, TIMESTAMP_FORMAT, $serial, tablesort_sql($header));
+  $sql .= tablesort_sql($headers);
+
+  $result = db_query($sql, TIMESTAMP_FORMAT, $serial);
 
   $rows = array();
   while ($row = db_fetch_array($result)) {
-    $rows[] = array($row['time'], t($row['event_name']));
+    $rows[] = array($row['time'], t($row['name']));
   }
 
-  $caption = '<p>' . t('Serial Number:') . ' ' . $serial . '</p>' . '<p>' .
+  $caption = '<p>' . t('Serial Number') . ': ' . $serial . '</p>' . '<p>' .
     l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
 
-  return theme('table', $header, $rows, array(), $caption);
+  return theme('table', $headers, $rows, array(), $caption);
 }
 
 function _notification_eventlog_clear($serial) {
