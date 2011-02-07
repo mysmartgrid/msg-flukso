@@ -261,24 +261,43 @@ function notification_eventlog_page($serial) {
       d.serial = '%s' AND
       d.uid = u.uid";
 
+  $args = array(TIMESTAMP_FORMAT, $serial);
+
   $headers = array(
     array('data' => t('Time'),  'field' => 'time', 'sort' => 'DESC'),
     array('data' => t('Event'), 'field' => 'name', 'sort' => 'ASC'),
   );
 
+  $sql_count = "
+    SELECT
+      COUNT(*)
+    FROM
+      {logger_devices} d,
+      {event_log} l
+    WHERE
+      l.device = d.device AND
+      d.serial = '$serial'";
+
   $sql .= tablesort_sql($headers);
 
-  $result = db_query($sql, TIMESTAMP_FORMAT, $serial);
-
+  $limit = 20;
+  $result = pager_query($sql, $limit, 0, $sql_count, $args);
   $rows = array();
-  while ($row = db_fetch_array($result)) {
-    $rows[] = array($row['time'], t($row['name']));
+
+  while ($entry = db_fetch_array($result)) {
+    $rows[] = array(
+      'time' => $entry['time'],
+      'name' => t($entry['name'])
+    );
   }
 
   $caption = '<p>' . t('Serial Number') . ': ' . $serial . '</p>' . '<p>' .
     l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
 
-  return theme('table', $headers, $rows, array(), $caption);
+  $output = theme('table', $headers, $rows, array(), $caption);
+  $output .= theme('pager', NULL, $limit, 0);
+
+  return $output;
 }
 
 function _notification_eventlog_clear($serial) {

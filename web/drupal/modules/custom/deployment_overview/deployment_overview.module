@@ -171,7 +171,6 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
 
   } else {
     $sql_count = "SELECT COUNT(*) FROM {logger_devices}";
-    $sql_count = db_rewrite_sql($sql_count);
   }
 
   if ($headers) {
