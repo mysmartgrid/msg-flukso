@@ -47,16 +47,34 @@ function logger_init() {
   }
 
   drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
+  drupal_add_js(ROOT_PATH . '/js/dashboard.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
-    drupal_add_js(ROOT_PATH . '/js/excanvas.js');
+    drupal_add_js(ROOT_PATH . '/js/dygraph/excanvas.js');
   }
 
-  drupal_add_js(ROOT_PATH . '/js/strftime-min.js');
-  drupal_add_js(ROOT_PATH . '/js/rgbcolor.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph-canvas.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/strftime-min.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/rgbcolor.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph-canvas.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph.js');
+
+  jquery_ui_add(array('ui.datepicker'));
+  drupal_add_css(drupal_get_path('module', 'jquery_ui') . '/jquery.ui/themes/default/ui.datepicker.css');
+
+  $picker_properties = "{
+      dateFormat: 'dd/mm/yy',
+      clearText: '" . "',
+      closeText: '" . t('Close') . "',
+      currentText: '" . t('Today') . "',
+      nextText: '" . t('Next Month') . "',
+      prevText: '" . t('Previous Month') . "',
+      dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "],
+      monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
+    }";
+
+  drupal_add_js('$(document).ready(function(){$("#edit-xvalue1date").datepicker('. $picker_properties .');});', 'inline');
+  drupal_add_js('$(document).ready(function(){$("#edit-xvalue2date").datepicker('. $picker_properties .');});', 'inline');
 }
 
 function logger_perm() {
@@ -790,6 +808,16 @@ function logger_theme() {
       'arguments' => array(
         'element' => NULL),
     ),
+
+    'logger_value_range' => array(
+      'arguments' => array(
+        'element' => NULL),
+    ),
+
+    'logger_time_period' => array(
+      'arguments' => array(
+        'element' => NULL),
+    ),
   );
 }
 
@@ -817,6 +845,22 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
 }
 
 /**
+ * Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
+ *
+ * @param $formatted The datetime string formatted as dd/mm/yyyy hh:mm.
+ * @return the Unix timestamp value.
+ */
+function _logger_strtotime($formatted) {
+
+  $str = $formatted . ":00";
+  $d = strtok($str, '/');
+  $m = strtok('/');
+  $r = strtok('/');
+
+  return strtotime("$m/$d/$r");
+}
+
+/**
  * Theming the DyGraph chart.
  *
  * @param $chart   The chart parameters.
@@ -828,6 +872,20 @@ function theme_logger_dygraph($chart) {
   $colors = _logger_get_series_colors();
   $smoothing_level = _logger_get_smoothing_level();
   $step_plot = _logger_get_step_plot()? 'true' : 'false';
+
+  $yvalue1 = _logger_get_yvalue(1);
+  $yvalue2 = _logger_get_yvalue(2);
+  if ($yvalue1 >= 0 && $yvalue2 > 0) {
+    $value_range = ',
+      valueRange: [' . $yvalue1 . ', ' . $yvalue2 . ']';
+  }
+
+  $xvalue1 = _logger_strtotime( _logger_get_xvalue(1)) * 1000;
+  $xvalue2 = _logger_strtotime( _logger_get_xvalue(2)) * 1000;
+  if ($xvalue1 > 0 && $xvalue2 > 0) {
+    $date_window = ',
+      dateWindow: [' . $xvalue1 . ', ' . $xvalue2 . ']';
+  }
 
   $output = _logger_create_interval_menu($chart->context);
 
@@ -850,7 +908,10 @@ function theme_logger_dygraph($chart) {
           includeZero: true,
           showRoller: false,
           stepPlot: ' . $step_plot . ',
-          rollPeriod: ' . $smoothing_level . '
+          rollPeriod: ' . $smoothing_level . ',
+          drawCallback: function(dygraph, is_initial){updateControlForm(dygraph)}' .
+          $value_range .
+          $date_window . '
         }
       );
     </script>';
@@ -939,7 +1000,7 @@ function _logger_get_all_timestamps($data) {
  * @return the list of intervals' menus.
  */
 function _logger_create_interval_menu($context) {
-  
+
   $items = array(
     l(t('Hour'),   "$context/electricity/hour"),
     l(t('Day'),    "$context/electricity/day"),
@@ -1236,9 +1297,28 @@ function logger_control_form() {
     '#description'    => t("Increase this number to smooth the series' lines and make the chart more readable."),
     '#maxlength'      => 5,
     '#size'           => 5,
+    '#text-align'     => 'center',
     '#default_value'  => _logger_get_smoothing_level(),
     '#required'       => TRUE,
     '#attributes'     => $attributes
+  );
+
+  $form['yvalue'] = array(
+    '#type'           => 'textfield',
+    '#theme'          => 'logger_value_range',
+    '#title'          => t('Value Range'),
+    '#description'    => t("Enter the value range shown on the Y axis, and click the Refresh button."),
+    '#maxlength'      => 12,
+    '#size'           => 12,
+    '#text-align'     => 'right'
+  );
+
+  $form['xvalue'] = array(
+    '#type'           => 'textfield',
+    '#theme'          => 'logger_time_period',
+    '#title'          => t('Time Period'),
+    '#description'    => t("Enter the time period shown on the X axis, and click the Refresh button."),
+    '#text-align'     => 'center'
   );
 
   $form['submit'] = array(
@@ -1262,27 +1342,94 @@ function theme_logger_smoothing_level($element) {
     return '<input type="button" value="' . $caption . '" onclick="' . $onclick . '"/>';
   }
 
-  _form_set_class($element, array('form-text'));
-
   $id = $element['#id'];
+  $value = check_plain($element['#value']);
 
   $output =
     _operation_button($id, '<<', -10) .
     _operation_button($id, '<',  -1) .
 
-    '<input type="text" ' .
-    'name="'      . $element['#name']               . '" ' .
-    'id="'        . $id                             . '" ' .
-    'maxlength="' . $element['#maxlength']          . '" ' .
-    'size="'      . $element['#size']               . '" ' .
-    'value="'     . check_plain($element['#value']) . '" ' .
-    'style="text-align: center;" ' .
-    drupal_attributes($element['#attributes']) . ' />' .
+    _logger_create_custom_field($element, '', $value, $attributes) .
 
     _operation_button($id, '>',   1) .
     _operation_button($id, '>>',  10);
 
   return theme('form_element', $element, $output);
+}
+
+function theme_logger_value_range($element) {
+
+  $field1 = _logger_create_custom_field($element, 1, $values[0]);
+  $field2 = _logger_create_custom_field($element, 2, $values[1]);
+
+  return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+function theme_logger_time_period($element) {
+
+  $field1 = _logger_create_time_fields($element, 1, $values[0]);
+  $field2 = _logger_create_time_fields($element, 2, $values[1]);
+
+  return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+/**
+ * Creates two fields to represent a timestamp: one for date and another for time.
+ *
+ * @param $element  The Drupal form field element.
+ * @param $sufix    A sufix for the field id and name.
+ * @param $value    The field value.
+ * @return the fields HTML code.
+ */
+function _logger_create_time_fields($element, $sufix, $value) {
+  return
+    _logger_create_custom_field($element, $sufix . 'date', $value, 10, 10) .
+    _logger_create_custom_field($element, $sufix . 'time', $value, 5, 5);
+}
+
+/**
+ * Arrange fields to represent a range.
+ * 
+ * @param $element  The Drupal form field element.
+ * @param $field1   The field that contains the lowest value.
+ * @param $field2   The field that contains the highest value.
+ * @return the fields HTML code.
+ */
+function _logger_compose_range_fields($element, $field1, $field2) {
+
+  $output = t('from: ') . $field1 . ' &nbsp;&nbsp;&nbsp;' . t('to: ') . $field2;
+  return theme('form_element', $element, $output);
+}
+
+/**
+ * Create a customized form field.
+ * 
+ * @param $element     The Drupal form field element.
+ * @param $sufix       A sufix for the field id and name.
+ * @param $value       The field value.
+ * @param $size        The field size.
+ * @param $maxlength   The field maximum length.
+ * @return the field HTML code.
+ */
+function _logger_create_custom_field($element, $sufix, $value, $size = 0, $maxlength = 0) {
+
+  $name      = $element['#name'] . $sufix;
+  $id        = $element['#id']   . $sufix;
+  $align     = $element['#text-align'] . ';';
+  $size      = $size > 0 ? $size : $element['#size'];
+  $maxlength = $maxlength > 0 ? $maxlength : $element['#maxlength'];
+
+  $attributes = isset($element['#attributes']) ? drupal_attributes($element['#attributes']) : '';
+
+  return
+    '<input type="text" ' .
+    'name="'              . $name      . '" ' .
+    'id="'                . $id        . '" ' .
+    'maxlength="'         . $maxlength . '" ' .
+    'size="'              . $size      . '" ' .
+    'value="'             . $value     . '" ' .
+    'style="text-align: ' . $align     . '" ' .
+    $attributes . ' />';
 }
 
 function logger_control_form_validate($form, &$form_state) {
@@ -1297,6 +1444,22 @@ function logger_control_form_validate($form, &$form_state) {
 
   if ($step_plot != 1 && $step_plot != 0) {
     form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
+  }
+
+  $yvalue1 = _logger_get_yvalue(1);
+  $yvalue2 = _logger_get_yvalue(2);
+
+  if (!($yvalue1 >= 0 && $yvalue2 > 0 && $yvalue2 > $yvalue1)) {
+
+    form_set_error('yvalue', t('The value range is invalid.'));
+  }
+
+  $xvalue1 = _logger_strtotime( _logger_get_xvalue(1));
+  $xvalue2 = _logger_strtotime( _logger_get_xvalue(2));
+
+  if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
+
+    form_set_error('xvalue', t('Time period is invalid.'));
   }
 }
 
@@ -1317,7 +1480,7 @@ function logger_control_form_submit($form, &$form_state) {
   _logger_set_step_plot($step_plot);
   _logger_set_smoothing_level($smoothing_level);
 
-  $form_state['redirect'] = $_REQUEST['destination'];
+  $form_state['redirect'] = array($_GET['q'], $_REQUEST);
 }
 
 /**
@@ -1441,6 +1604,28 @@ function _logger_set_step_plot($step_plot) {
 }
 
 /**
+ * Returns either the lowest or the highest value shown on the Y axis.
+ *
+ * @param $index Inform 1 for the lowest, 2 for the highest.
+ *
+ * @return the value.
+ */
+function _logger_get_yvalue($index) {
+  return $_REQUEST['yvalue' . $index];
+}
+
+/**
+ * Returns either the lowest or the highest value shown on the X axis.
+ *
+ * @param $index Inform 1 for the lowest, 2 for the highest.
+ *
+ * @return the value.
+ */
+function _logger_get_xvalue($index) {
+  return $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
+}
+
+/**
  * Returns an array of fluksonian users indexed by their respective user id.
  * Only users not yet plotted on the chart are returned.
  *
@@ -1487,6 +1672,11 @@ function _logger_get_users_options() {
   return $options;
 }
 
+/**
+ * Adds an user to the chart.
+ *
+ * @param $uid  The id of the user to be added.
+ */
 function _logger_add_user($uid) {
 
   global $user;
@@ -1501,6 +1691,11 @@ function _logger_add_user($uid) {
   }
 }
 
+/**
+ * Removes an user from the chart.
+ *
+ * @param $requestee_id  The id of the user to be removed.
+ */
 function _logger_remove_user($requestee_id) {
 
   global $_REQUEST;
