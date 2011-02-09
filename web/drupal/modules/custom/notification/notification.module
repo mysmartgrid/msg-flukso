@@ -1095,35 +1095,51 @@ function _notification_send_corrupted_measurement_emails($now) {
 function _notification_send_peak_consumption_emails($now) {
 
   $sql = "
-    SELECT DISTINCT
+    SELECT
       %d AS event_id,
-      d.device AS device,
-      d.serial AS serial,
+      n.device AS device,
+      n.serial AS serial,
       n.emails AS emails,
-      FROM_UNIXTIME(MAX(m.access) + u.timezone, '%s') AS event_time,
-      ROUND((n.limit_up * un.factor * 60), 2) AS limit_up,
-      (n.base_time + u.timezone) AS start_time,
-      (SUM(m.value) - n.base_value) AS consumption,
-      ((MAX(m.access) - n.base_time) / " . HOUR . ") AS elapsed_time,
-      u.timezone AS timezone
+      FROM_UNIXTIME(latest_access + n.timezone, '%s') AS event_time,
+      ROUND(n.limit_up, 2) AS limit_up,
+      (n.base_time + n.timezone) AS start_time,
+      n.consumption AS consumption,
+      n.elapsed_time AS elapsed_time,
+      n.timezone AS timezone
     FROM
-      {users} u,
-      {logger_devices} d,
-      {logger_meters} m,
-      {notification} n,
-      {unit} un
+      (
+        SELECT DISTINCT
+          d.device AS device,
+          d.serial AS serial,
+          n.emails AS emails,
+          (n.limit_up * un.factor * 60) AS limit_up,
+          (SUM(m.value) - n.base_value) AS consumption,
+          MAX(m.access) AS latest_access,
+          n.base_time AS base_time,
+          ((MAX(m.access) - n.base_time) / 3600) AS elapsed_time,
+          u.timezone AS timezone
+        FROM
+          {users} u,
+          {logger_devices} d,
+          {logger_meters} m,
+          {notification} n,
+          {unit} un
+        WHERE
+          d.uid = u.uid AND
+          d.device = n.device AND
+          n.event_id = %d AND
+          n.unit_id = un.id AND
+          %d > (n.last_sent + n.min_interval) AND
+          m.device = d.device AND
+          m.type = '%s'
+        GROUP BY
+          d.device
+        HAVING
+          latest_access > base_time AND
+          consumption > 0
+      ) n
     WHERE
-      d.uid = u.uid AND
-      d.device = n.device AND
-      n.event_id = %d AND
-      n.unit_id = un.id AND
-      %d > (n.last_sent + n.min_interval) AND
-      m.device = d.device AND
-      m.type = '%s'
-    GROUP BY
-      d.device
-    HAVING
-      consumption / elapsed_time > limit_up";
+      (n.consumption / n.elapsed_time) > n.limit_up";
 
   $event_id = PEAK_CONSUMPTION_EVENT_ID;
   $args = array($event_id, TIMESTAMP_FORMAT, $event_id, $now, 'electricity');
@@ -1142,19 +1158,25 @@ function _notification_send_peak_consumption_emails($now) {
 }
 
 /**
- * Registers the power consumption of monitored devices every hours and after
+ * Registers the power consumption of monitored devices every hour and after
  * notifications are sent.
  */
 function _notification_register_power_consumption() {
 
-  $now = time();
   //Note: the values are stored in unit 'watt'
 
   $sql = "
     UPDATE
       {notification}
     SET
-      base_time = %d,
+      base_time = (
+        SELECT
+          MAX(m.access)
+        FROM
+          {logger_meters} m
+        WHERE
+          m.type = '%s' AND
+          m.device = notification.device),
       base_value = (
         SELECT
           SUM(m.value)
@@ -1166,7 +1188,7 @@ function _notification_register_power_consumption() {
     WHERE
       event_id = %d";
 
-  db_query($sql, $now, 'electricity', PEAK_CONSUMPTION_EVENT_ID);
+  db_query($sql, 'electricity', 'electricity', PEAK_CONSUMPTION_EVENT_ID);
 }
 
 /**
