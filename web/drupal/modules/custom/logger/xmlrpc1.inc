@@ -192,7 +192,7 @@ function _logger_measurement_add($auth, $logs) {
           }
 
           $sql = "UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'";
-          db_query($sql, time(), $meterdata->night, $value, $meter);
+          db_query($sql, time(), $meterdata->night, $value, $meter);//Gets the latest value stored in $value
           //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
         } else {
@@ -238,7 +238,7 @@ function _logger_update_meter_integrity($device, $meter, $corruption_time) {
   require_once(XMLRPC_PATH . "/notification/notification.module");
 
   if ($corruption_time > 0) {
-    notification_log_corrupted_measurement($device);
+    notification_log_corrupted_message($device);
   }
 
   $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";

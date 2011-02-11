@@ -23,7 +23,7 @@
 define('UNINSTALLED_STATE_NAME',       t('Uninstalled'));
 define('UNREGISTERED_STATE_NAME',      t('Unregistered'));
 define('NO_COMMUNICATION_STATE_NAME',  t('No Communication'));
-define('CORRUPTED_STATE_NAME',         t('Corrupted Measurement'));
+define('CORRUPTED_STATE_NAME',         t('Corrupted Message'));
 define('WORKING_STATE_NAME',           t('Working'));
 
 function deployment_overview_help($path, $arg) {
@@ -250,7 +250,7 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
         drupal_set_message(t('No message has been received from this device since %latest.', $latest));
 
       } else if ($state == CORRUPTED_STATE_NAME) {
-        drupal_set_message(t('This device has sent an invalid measurement at %latest.', $latest));
+        drupal_set_message(t('This device has sent a message with corrupted data at %latest.', $latest));
 
       } else if ($state == WORKING_STATE_NAME) {
         drupal_set_message(t('This device is working fine. Latest message received at %latest.', $latest));

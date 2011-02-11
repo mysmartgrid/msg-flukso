@@ -273,14 +273,6 @@ function logger_menu() {
 
   //Chart operations
 
-  $items['logger/remove'] = array(
-    'title'            => 'Remove this user from the chart',
-    'page callback'    => '_logger_remove_user',
-    'page arguments'   => array(2),
-    'access arguments' => array('logger'),
-    'type'             => MENU_CALLBACK
-  );
-
   $items['logger/color'] = array(
     'title'            => 'Change the series color',
     'page callback'    => '_logger_series_color',
@@ -852,12 +844,15 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
  */
 function _logger_strtotime($formatted) {
 
-  $str = $formatted . ":00";
+  $str = "$formatted:00 GMT+00:00";
   $d = strtok($str, '/');
   $m = strtok('/');
   $r = strtok('/');
 
-  return strtotime("$m/$d/$r");
+  $timestamp = strtotime("$m/$d/$r");
+  $timestamp -= _logger_get_timezone_offset();
+
+  return $timestamp;
 }
 
 /**
@@ -876,15 +871,13 @@ function theme_logger_dygraph($chart) {
   $yvalue1 = _logger_get_yvalue(1);
   $yvalue2 = _logger_get_yvalue(2);
   if ($yvalue1 >= 0 && $yvalue2 > 0) {
-    $value_range = ',
-      valueRange: [' . $yvalue1 . ', ' . $yvalue2 . ']';
+    $value_range = ", valueRange: [$yvalue1, $yvalue2]";
   }
 
   $xvalue1 = _logger_strtotime( _logger_get_xvalue(1)) * 1000;
   $xvalue2 = _logger_strtotime( _logger_get_xvalue(2)) * 1000;
   if ($xvalue1 > 0 && $xvalue2 > 0) {
-    $date_window = ',
-      dateWindow: [' . $xvalue1 . ', ' . $xvalue2 . ']';
+    $date_window = ", dateWindow: [$xvalue1, $xvalue2]";
   }
 
   $output = _logger_create_interval_menu($chart->context);
@@ -1061,8 +1054,7 @@ function _logger_create_graph_legend($data, $colors) {
           onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-        '<a href="' . "/logger/remove/$uid?" . urldecode(drupal_get_destination()) . '">' . t('Remove') . '</a>' : '';
-        //TODO: make it work: l(t('Remove'), "logger/remove/$uid?" . drupal_get_destination(), array('html' => TRUE)) : '';
+          '<a href="" OnClick="javascript:removeChartSeries(' . $uid . ');return false;">' . t('Remove') . '</a>' : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -1270,6 +1262,11 @@ function logger_control_form() {
     '#attributes'     => $attributes
   );
 
+  $form['removed_user'] = array(
+    '#type'           => 'hidden',
+    '#default_value'  => 0
+  );
+
   $form['unit'] = array(
     '#type'           => 'select',
     '#title'          => t('Chart Unit'),
@@ -1468,12 +1465,17 @@ function logger_control_form_submit($form, &$form_state) {
   global $_REQUEST;
   
   $new_user        = $form_state['values']['new_user'];
+  $removed_user    = $form_state['values']['removed_user'];
   $unit            = $form_state['values']['unit'];
   $step_plot       = $form_state['values']['step_plot'];
   $smoothing_level = $form_state['values']['smoothing_level'];
 
   if ($new_user > 0) {
     _logger_add_user($new_user);
+  }
+
+  if ($removed_user > 0) {
+    _logger_remove_user($removed_user);
   }
 
   _logger_set_unit($unit);
@@ -1709,8 +1711,6 @@ function _logger_remove_user($requestee_id) {
       requestee_id = %d";
 
   db_query($sql, $user->uid, $requestee_id);
-
-  drupal_goto($_REQUEST['destination']);
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
