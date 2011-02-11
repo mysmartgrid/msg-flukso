@@ -60,12 +60,12 @@ function logger_init() {
   drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph.js');
 
   jquery_ui_add(array('ui.datepicker'));
-  drupal_add_css(drupal_get_path('module', 'jquery_ui') . '/jquery.ui/themes/default/ui.datepicker.css');
+  drupal_add_css(ROOT_PATH . '/style/ui.datepicker.css');
 
   $picker_properties = "{
+      yearRange: '-1:+0',
+      showAnim: 'fadeIn',
       dateFormat: 'dd/mm/yy',
-      clearText: '" . "',
-      closeText: '" . t('Close') . "',
       currentText: '" . t('Today') . "',
       nextText: '" . t('Next Month') . "',
       prevText: '" . t('Previous Month') . "',
