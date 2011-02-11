@@ -91,15 +91,6 @@ function logger_menu() {
     'title'            => 'Your power consumption',
     'description'      => 'Show the dashboard.',
     'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/%meter_type/%interval'] = array(
-    'title'            => $items['logger']['title'],
-    'description'      => $items['logger']['description'],
-    'page callback'    => $items['logger']['page callback'],
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
@@ -109,15 +100,6 @@ function logger_menu() {
     'title'            => 'Overall View',
     'description'      => 'Show the project overall view.',
     'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/%meter_type/%interval'] = array(
-    'title'            => $items['overview']['title'],
-    'description'      => $items['overview']['description'],
-    'page callback'    => $items['overview']['page callback'],
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
@@ -301,6 +283,9 @@ function _logger_dashboard($type, $interval) {
 
     drupal_set_title(t('Your power consumption'));
 
+    $type = $type ? $type : 'electricity';
+    $interval = $interval ? $interval : 'hour';
+
     $sensors = _logger_get_user_sensors($type);
 
     return _logger_create_user_dygraph($sensors, $type, $interval);
@@ -321,6 +306,9 @@ function _logger_dashboard($type, $interval) {
 function _logger_overview($type, $interval) {
 
   drupal_set_title(t('Overall View'));
+
+  $type = $type ? $type : 'electricity';
+  $interval = $interval ? $interval : 'hour';
 
   //General explanation
   $output .= theme('logger_overview_topic', NULL,
@@ -410,9 +398,14 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
   $chart = _logger_create_chart_object($interval, $type, 'logger');
   $offset = _logger_get_timezone_offset();
 
+  $period = array(
+    'start' => _logger_get_xvalue(1),
+    'end'   => _logger_get_xvalue(2)
+  );
+
   foreach ($sensors as &$sensor) {
 
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset);
+    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset, $period);
   }
 
   return theme('logger_dygraph', $chart);
@@ -687,25 +680,6 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
 }
 
 /**
- * Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
- *
- * @param $formatted The datetime string formatted as dd/mm/yyyy hh:mm.
- * @return the Unix timestamp value.
- */
-function _logger_strtotime($formatted) {
-
-  $str = "$formatted:00 GMT+00:00";
-  $d = strtok($str, '/');
-  $m = strtok('/');
-  $r = strtok('/');
-
-  $timestamp = strtotime("$m/$d/$r");
-  $timestamp -= _logger_get_timezone_offset();
-
-  return $timestamp;
-}
-
-/**
  * Theming the DyGraph chart.
  *
  * @param $chart   The chart parameters.
@@ -724,8 +698,8 @@ function theme_logger_dygraph($chart) {
     $value_range = ", valueRange: [$yvalue1, $yvalue2]";
   }
 
-  $xvalue1 = _logger_strtotime( _logger_get_xvalue(1)) * 1000;
-  $xvalue2 = _logger_strtotime( _logger_get_xvalue(2)) * 1000;
+  $xvalue1 = _logger_get_xvalue(1) * 1000;
+  $xvalue2 = _logger_get_xvalue(2) * 1000;
   if ($xvalue1 > 0 && $xvalue2 > 0) {
     $date_window = ", dateWindow: [$xvalue1, $xvalue2]";
   }
@@ -844,14 +818,16 @@ function _logger_get_all_timestamps($data) {
  */
 function _logger_create_interval_menu($context) {
 
+  $path = "$context/electricity";
+
   $items = array(
-    l(t('Hour'),   "$context/electricity/hour"),
-    l(t('Day'),    "$context/electricity/day"),
-    l(t('3 Days'), "$context/electricity/days"),
-    l(t('Week'),   "$context/electricity/week"),
-    l(t('Month'),  "$context/electricity/month"),
-    l(t('Year'),   "$context/electricity/year"),
-    l(t('Night'),  "$context/electricity/night")
+    l(t('Hour'),   "$path/hour"),
+    l(t('Day'),    "$path/day"),
+    l(t('3 Days'), "$path/days"),
+    l(t('Week'),   "$path/week"),
+    l(t('Month'),  "$path/month"),
+    l(t('Year'),   "$path/year"),
+    l(t('Night'),  "$path/night")
   );
 
   return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
@@ -1117,16 +1093,6 @@ function logger_control_form() {
     '#default_value'  => 0
   );
 
-  $form['interval'] = array(
-    '#type'           => 'hidden',
-    '#default_value'  => 0
-  );
-
-  $form['meter_type'] = array(
-    '#type'           => 'hidden',
-    '#default_value'  => 'electricity'
-  );
-
   $form['unit'] = array(
     '#type'           => 'select',
     '#title'          => t('Chart Unit'),
@@ -1216,16 +1182,16 @@ function theme_logger_smoothing_level($element) {
 
 function theme_logger_value_range($element) {
 
-  $field1 = _logger_create_custom_field($element, 1, $values[0]);
-  $field2 = _logger_create_custom_field($element, 2, $values[1]);
+  $field1 = _logger_create_custom_field($element, 1, '');
+  $field2 = _logger_create_custom_field($element, 2, '');
 
   return _logger_compose_range_fields($element, $field1, $field2);
 }
 
 function theme_logger_time_period($element) {
 
-  $field1 = _logger_create_time_fields($element, 1, $values[0]);
-  $field2 = _logger_create_time_fields($element, 2, $values[1]);
+  $field1 = _logger_create_time_fields($element, 1);
+  $field2 = _logger_create_time_fields($element, 2);
 
   return _logger_compose_range_fields($element, $field1, $field2);
 }
@@ -1235,13 +1201,12 @@ function theme_logger_time_period($element) {
  *
  * @param $element  The Drupal form field element.
  * @param $sufix    A sufix for the field id and name.
- * @param $value    The field value.
  * @return the fields HTML code.
  */
-function _logger_create_time_fields($element, $sufix, $value) {
+function _logger_create_time_fields($element, $sufix) {
   return
-    _logger_create_custom_field($element, $sufix . 'date', $value, 10, 10) .
-    _logger_create_custom_field($element, $sufix . 'time', $value, 5, 5);
+    _logger_create_custom_field($element, $sufix . 'date', '', 10, 10) .
+    _logger_create_custom_field($element, $sufix . 'time', '', 5, 5);
 }
 
 /**
@@ -1311,8 +1276,8 @@ function logger_control_form_validate($form, &$form_state) {
     form_set_error('yvalue', t('The value range is invalid.'));
   }
 
-  $xvalue1 = _logger_strtotime( _logger_get_xvalue(1));
-  $xvalue2 = _logger_strtotime( _logger_get_xvalue(2));
+  $xvalue1 = _logger_get_xvalue(1);
+  $xvalue2 = _logger_get_xvalue(2);
 
   if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
 
@@ -1484,7 +1449,20 @@ function _logger_get_yvalue($index) {
  * @return the value.
  */
 function _logger_get_xvalue($index) {
-  return $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
+  
+  $formatted = $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
+
+  //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
+  
+  $str = "$formatted:00 GMT+00:00";
+  $d = strtok($str, '/');
+  $m = strtok('/');
+  $r = strtok('/');
+
+  $timestamp = strtotime("$m/$d/$r");
+  $timestamp -= _logger_get_timezone_offset();
+  
+  return $timestamp > 0 ? $timestamp : 0;
 }
 
 /**

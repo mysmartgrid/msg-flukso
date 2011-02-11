@@ -196,20 +196,23 @@ function logger_rrd_update($meter, $values, $subdir = NULL) {
 /**
  * Queries the RRDs for sensor's measurements.
  *
- * @param $interval       The time interval.
- * @param $sensor         The sensor.
- * @param $factor         The unit conversion factor.
- * @param $offset         The user timezone offset.
+ * @param $interval  The time interval. This argument is used to select the RRA.
+ * @param $sensor    The sensor.
+ * @param $factor    The unit conversion factor.
+ * @param $offset    The user timezone offset.
+ * @param $period    An array containing a period of time to be queried.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $factor, $offset) {
+function logger_rrd_query_sensor($interval, $sensor, $factor, $offset, $period = NULL) {
+
+  //TODO: merge arguments $interval and $period
 
   $series_id = METER;
   $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $factor);
 
-  $end = _logger_rrd_latest_timestamp($interval, $sensor);
+  $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $end, $offset);
+  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, true, $period);
 }
 
 /**
@@ -269,7 +272,7 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false);
+  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, NULL);
 }
 
 /**
@@ -319,21 +322,11 @@ function _logger_rrd_file($meter, $interval) {
  * @param $include_nan    Whether NaN values should be included in the result.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan = true) {
+function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period) {
 
   if (!$def) {
     return array();
   }
-
-  $windows = array(
-    'hour'  =>  1 * HOUR,
-    'day'   =>  1 * DAY,
-    'days'  =>  3 * DAY,
-    'week'  =>  1 * WEEK,
-    'month' => 60 * DAY,
-    'night' => 60 * DAY,
-    'year'  =>  1 * YEAR
-  );
 
   $steps = array(
     'hour'  =>  1 * SECOND,
@@ -345,16 +338,34 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
     'year'  =>  1 * WEEK
   );
 
-  //time period MUST be within the RRA and both $start and $end must be multiples of $step
-
   $step = $steps[$interval];
-  $now = time();
-  $now = $now - ($now % $step);
 
-  $start = $now - $windows[$interval];
+  $start = $period['start'];
+  $end = $period['end'];
+
+  if (!($start > 0 && $end > 0)) {
+
+    $windows = array(
+      'hour'  =>  1 * HOUR,
+      'day'   =>  1 * DAY,
+      'days'  =>  3 * DAY,
+      'week'  =>  1 * WEEK,
+      'month' => 60 * DAY,
+      'night' => 60 * DAY,
+      'year'  =>  1 * YEAR
+    );
+
+    $now = time();
+    $now = $now - ($now % $step);
+    $start = $now - $windows[$interval];
+
+    $end = $latest;
+  }
+
+  //time period MUST be within the RRA and both $start and $end must be multiples of $step
   $start = $start - ($start % $step);
+  $end = $end - ($end % $step);
 
-  $end = $latest - ($latest % $step);
   $maxrows = 1 + ($end - $start) / $step;
   $maxrows = $maxrows < 10? 10: $maxrows; //RRDTool exports at least 8 rows
 
