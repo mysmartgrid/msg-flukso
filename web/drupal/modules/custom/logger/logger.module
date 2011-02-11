@@ -96,89 +96,14 @@ function logger_menu() {
     'type'             => MENU_CALLBACK
   );
 
-  $items['logger/electricity'] = array(
+  $items['logger/%meter_type/%interval'] = array(
     'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
+    'description'      => $items['logger']['description'],
+    'page callback'    => $items['logger']['page callback'],
+    'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
-
-  /*
-  $items['logger/water'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('water', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/gas'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('gas', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );*/
-
-  $items['logger/electricity/hour'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/day'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/days'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'days'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/week'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'week'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/month'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/year'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/night'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-
-  // Overview operations
 
   $items['overview'] = array(
     'title'            => 'Overall View',
@@ -189,89 +114,14 @@ function logger_menu() {
     'type'             => MENU_CALLBACK
   );
 
-  $items['overview/electricity'] = array(
+  $items['overview/%meter_type/%interval'] = array(
     'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
+    'description'      => $items['overview']['description'],
+    'page callback'    => $items['overview']['page callback'],
+    'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
-
-  /*
-  $items['overview/water'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('water', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  $items['overview/gas'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('gas', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );*/
-
-  $items['overview/electricity/hour'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/day'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/days'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'days'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/week'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'week'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/month'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/year'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/night'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-
-  //Chart operations
 
   $items['logger/color'] = array(
     'title'            => 'Change the series color',
@@ -1265,6 +1115,16 @@ function logger_control_form() {
   $form['removed_user'] = array(
     '#type'           => 'hidden',
     '#default_value'  => 0
+  );
+
+  $form['interval'] = array(
+    '#type'           => 'hidden',
+    '#default_value'  => 0
+  );
+
+  $form['meter_type'] = array(
+    '#type'           => 'hidden',
+    '#default_value'  => 'electricity'
   );
 
   $form['unit'] = array(
