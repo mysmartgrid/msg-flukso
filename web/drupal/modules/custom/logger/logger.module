@@ -700,7 +700,6 @@ function theme_logger_dygraph($chart) {
     $slider_output = _logger_create_dygraph_components('slider', $file_path, $colors, array(
         'height'           => SLIDER_HEIGHT,
         'gridLineColor'    => '"transparent"',
-        'includeZero'      => 'true',
         'yValueFormatter'  => 'function(value) {return "";}',
         'drawCallback'     => 'function(chart, initial){updateMainChart(chart, initial)}',
         'clickCallback'    => 'function(event, date){jumpToDate(date)}',
@@ -732,6 +731,7 @@ function _logger_create_dygraph_components($id, $file_path, $colors, $properties
     'width'             => 600,
     'yAxisLabelWidth'   => 50,
     'axisLabelFontSize' => 12,
+    'includeZero'       => 'true',
     'stepPlot'          => _logger_get_step_plot(),
     'rollPeriod'        => _logger_get_smoothing_level()
   ));
