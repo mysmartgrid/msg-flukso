@@ -41,13 +41,6 @@ define('STEP_PLOT_ID', 'logger_step_plot');
 
 function logger_init() {
   
-  global $user;
-
-  // Workaround for collapse.js not being loaded within _logger_fluksonians_form when block caching is on.
-  if ($user->uid > 0) {
-    drupal_add_js('misc/collapse.js');
-  }
-
   drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
   drupal_add_js(ROOT_PATH . '/js/dashboard.js');
 
@@ -63,20 +56,6 @@ function logger_init() {
 
   jquery_ui_add(array('ui.datepicker'));
   drupal_add_css(ROOT_PATH . '/style/ui.datepicker.css');
-
-  $picker_properties = "{
-      yearRange: '-1:+0',
-      showAnim: 'fadeIn',
-      dateFormat: 'dd/mm/yy',
-      currentText: '" . t('Today') . "',
-      nextText: '" . t('Next Month') . "',
-      prevText: '" . t('Previous Month') . "',
-      dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "],
-      monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
-    }";
-
-  drupal_add_js('$(document).ready(function(){$("#edit-xvalue1date").datepicker('. $picker_properties .');});', 'inline');
-  drupal_add_js('$(document).ready(function(){$("#edit-xvalue2date").datepicker('. $picker_properties .');});', 'inline');
 }
 
 function logger_perm() {
@@ -1231,11 +1210,25 @@ function theme_logger_time_period($element) {
 /**
  * Creates two fields to represent a timestamp: one for date and another for time.
  *
- * @param $element  The Drupal form field element.
- * @param $sufix    A sufix for the field id and name.
+ * @param $element            The Drupal form field element.
+ * @param $sufix              A sufix for the field id and name.
  * @return the fields HTML code.
  */
 function _logger_create_time_fields($element, $sufix) {
+
+  $picker_properties = "{
+      yearRange: '-1:+0',
+      showAnim: 'fadeIn',
+      dateFormat: 'dd/mm/yy',
+      currentText: '" . t('Today') . "',
+      nextText: '" . t('Next Month') . "',
+      prevText: '" . t('Previous Month') . "',
+      dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "],
+      monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
+    }";
+
+  drupal_add_js('$(document).ready(function(){$("#edit-xvalue' . $sufix . 'date").datepicker('. $picker_properties .');});', 'inline');
+
   return
     _logger_create_custom_field($element, $sufix . 'date', '', 10, 10) .
     _logger_create_custom_field($element, $sufix . 'time', '', 5, 5);
