@@ -31,6 +31,22 @@ function formatTime(d) {
     (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 }
 
+function parseDate(datestr, timestr) {
+
+  var dateParts = datestr.split('/');
+  var timeParts = timestr.split(':');
+
+  return new Date(
+      dateParts[2],
+      dateParts[1] - 1,
+      dateParts[0],
+      timeParts[0],
+      timeParts[1],
+      0,
+      0
+    );
+}
+
 function updateControlForm(dygraph) {
 
   var form = document.getElementById('logger-control-form');
@@ -50,9 +66,49 @@ function updateControlForm(dygraph) {
   form.elements['xvalue2time'].value = formatTime(value);
 }
 
+function updateMainChart(dygraph, initial) {
+
+  if (!initial) {
+    
+     updateControlForm(dygraph);
+
+    var form = document.getElementById('logger-control-form');
+    form.submit();
+  }
+}
+
+function jumpToDate(xvalue) {
+
+  var form = document.getElementById('logger-control-form');
+
+  var xvalue1 = parseDate(form.elements['xvalue1date'].value, form.elements['xvalue1time'].value);
+  var xvalue2 = parseDate(form.elements['xvalue2date'].value, form.elements['xvalue2time'].value);
+  var drift = (xvalue2.getTime() - xvalue1.getTime()) / 2;
+
+  var date = new Date(xvalue - drift);
+  form.elements['xvalue1date'].value = formatDate(date);
+  form.elements['xvalue1time'].value = formatTime(date);
+
+  date = new Date(xvalue + drift);
+  form.elements['xvalue2date'].value = formatDate(date);
+  form.elements['xvalue2time'].value = formatTime(date);
+
+  form.submit();
+}
+
 function removeChartSeries(uid) {
 
   var form = document.getElementById('logger-control-form');
   form.elements['removed_user'].value = uid;
   form.submit();
+}
+
+function highlightChartArea(canvas, area, dygraph, xvalue1, xvalue2) {
+
+  var point1 = dygraph.toDomCoords(xvalue1, 0)[0];
+  var point2 = dygraph.toDomCoords(xvalue2, 0)[0];
+  var width = area.w + area.x - point1;
+
+  canvas.fillStyle = "#a5d2d9";
+  canvas.fillRect(point1, 0, width, point2);
 }

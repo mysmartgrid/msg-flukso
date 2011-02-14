@@ -32,6 +32,8 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('YEAR',   52 * WEEK);
 
+define('CHART_HEIGHT', 350);
+define('SLIDER_HEIGHT', 50);
 define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_id');
@@ -377,8 +379,10 @@ function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
 
   $chart = _logger_create_chart_object($interval, $type, 'overview');
   $offset = _logger_get_timezone_offset();
+  $period = _logger_get_period($interval);
+  $step = _logger_get_step($interval);
 
-  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $offset);
+  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $offset, $period, $step);
 
   return theme('logger_dygraph', $chart);
 }
@@ -398,14 +402,14 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
   $chart = _logger_create_chart_object($interval, $type, 'logger');
   $offset = _logger_get_timezone_offset();
 
-  $period = array(
-    'start' => _logger_get_xvalue(1),
-    'end'   => _logger_get_xvalue(2)
-  );
+  $start = _logger_get_xvalue(1);
+  $end = _logger_get_xvalue(2);
+  $period = _logger_get_period($interval, $start, $end);
+  $step = _logger_get_step($interval);
 
   foreach ($sensors as &$sensor) {
 
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset, $period);
+    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset, $period, $step);
   }
 
   return theme('logger_dygraph', $chart);
@@ -687,61 +691,89 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
  */
 function theme_logger_dygraph($chart) {
 
-  $file_path = _logger_save_chart_file($chart);
   $colors = _logger_get_series_colors();
-  $smoothing_level = _logger_get_smoothing_level();
-  $step_plot = _logger_get_step_plot()? 'true' : 'false';
-
-  $yvalue1 = _logger_get_yvalue(1);
-  $yvalue2 = _logger_get_yvalue(2);
-  if ($yvalue1 >= 0 && $yvalue2 > 0) {
-    $value_range = ", valueRange: [$yvalue1, $yvalue2]";
-  }
+  $file_path = _logger_save_chart_file($chart);
 
   $xvalue1 = _logger_get_xvalue(1) * 1000;
   $xvalue2 = _logger_get_xvalue(2) * 1000;
-  if ($xvalue1 > 0 && $xvalue2 > 0) {
-    $date_window = ", dateWindow: [$xvalue1, $xvalue2]";
+
+  if (!($xvalue1 > 0 && $xvalue2 > 0)) {
+    $xvalue2 = time() * 1000;
+    $xvalue1 = $xvalue2 - _logger_get_default_time_window($chart->interval) * 1000;
   }
 
-  $output = _logger_create_interval_menu($chart->context);
-
-  $output .= '
-    <div>' . $chart->unit . '</div>
-    <div id="dygraphdiv"></div>
-    <div id="dygraphstatus" style="min-height:20px; width=450px; padding-top:10px; padding-bottom:5px;"></div>
-
-    <script type="text/javascript">
-
-      new Dygraph(
-        document.getElementById("dygraphdiv"),
-        "/' . $file_path . '",
-        {
-          labelsDiv: document.getElementById("dygraphstatus"),
-          colors: ["' . implode('","', $colors) . '"],
-          width: 600,
-          height: 350,
-          yAxisLabelWidth: 50,
-          includeZero: true,
-          showRoller: false,
-          stepPlot: ' . $step_plot . ',
-          rollPeriod: ' . $smoothing_level . ',
-          drawCallback: function(dygraph, is_initial){updateControlForm(dygraph)}' .
-          $value_range .
-          $date_window . '
-        }
-      );
-    </script>';
-
-  $output .= _logger_create_graph_legend($chart->data, $colors);
+  $chart_properties = array(
+    'height'     => CHART_HEIGHT,
+    'dateWindow' => "[$xvalue1, $xvalue2]"
+  );
 
   if ($chart->context == 'logger') {
-    $output .= drupal_get_form('logger_control_form');
+
+    $chart_properties['drawCallback'] = 'function(chart, initial){updateControlForm(chart)}';
+
+    $yvalue1 = _logger_get_yvalue(1) + 0;
+    $yvalue2 = _logger_get_yvalue(2) + 0;
+
+    if ($yvalue1 >= 0 && $yvalue2 > 0) {
+      $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
+    }
+
+    $slider_output = _logger_create_dygraph_components('slider', $file_path, $colors, array(
+        'height'           => SLIDER_HEIGHT,
+        'gridLineColor'    => '"transparent"',
+        'includeZero'      => 'true',
+        'yValueFormatter'  => 'function(value) {return "";}',
+        'drawCallback'     => 'function(chart, initial){updateMainChart(chart, initial)}',
+        'clickCallback'    => 'function(event, date){jumpToDate(date)}',
+        'underlayCallback' => 'function(canvas, area, dygraph) {highlightChartArea(canvas, area, dygraph, ' . $xvalue1 . ', ' . $xvalue2 . ')}'
+      )
+    );
+
+    $form_output = drupal_get_form('logger_control_form');
   }
 
-  $output .= l(t('Save Data'), $file_path);
+  return
+    _logger_create_interval_menu($chart->context) .
+    '<div>' . $chart->unit . '</div>' .
 
-  return $output;
+    _logger_create_dygraph_components('chart', $file_path, $colors, $chart_properties, true) .
+    $slider_output .
+          
+    _logger_create_graph_legend($chart->data, $colors) .
+
+    $form_output .
+    l(t('Save Data'), $file_path);
+}
+
+function _logger_create_dygraph_components($id, $file_path, $colors, $properties, $create_labels_div = false) {
+
+  $properties = array_merge($properties, array(
+    'labelsDiv'         => '"labelsdiv"',
+    'colors'            => '["' . implode('","', $colors) . '"]',
+    'width'             => 600,
+    'yAxisLabelWidth'   => 50,
+    'axisLabelFontSize' => 12,
+    'stepPlot'          => _logger_get_step_plot(),
+    'rollPeriod'        => _logger_get_smoothing_level()
+  ));
+
+  if ($create_labels_div) {
+    $labels_output = '<div id=' . $properties['labelsDiv'] . ' style="min-height: 20px; padding-bottom: 10px;"></div>';
+  }
+
+  foreach ($properties as $key => $value) {
+    $pairs[] = "$key: $value";
+  }
+
+  return '<div id="' . $id . '"></div><br>' .
+    $labels_output .
+    '<script type="text/javascript">
+      new Dygraph(
+        document.getElementById("' . $id . '"),
+          "/' . $file_path . '", {' .
+          implode(', ', $pairs) . ' }
+      );
+    </script> ';
 }
 
 /**
@@ -1465,6 +1497,56 @@ function _logger_get_xvalue($index) {
   return $timestamp > 0 ? $timestamp : 0;
 }
 
+function _logger_get_step($interval) {
+
+  $steps = array(
+    'hour'  =>  1 * MINUTE,
+    'day'   =>  1 * MINUTE,
+    'days'  => 15 * MINUTE,
+    'week'  => 15 * MINUTE,
+    'month' =>  1 * DAY,
+    'night' =>  1 * DAY,
+    'year'  =>  1 * WEEK
+  );
+  return $steps[$interval];
+}
+
+function _logger_get_default_time_window($interval) {
+
+  $windows = array(
+    'hour'  =>  1 * HOUR,
+    'day'   =>  1 * DAY,
+    'days'  =>  3 * DAY,
+    'week'  =>  1 * WEEK,
+    'month' => 60 * DAY,
+    'night' => 60 * DAY,
+    'year'  =>  1 * YEAR
+  );
+  return $windows[$interval];
+}
+
+function _logger_get_period($interval, $start = 0, $end = 0) {
+
+  if (!($start > 0 && $end > 0)) {
+
+    $step = _logger_get_step($interval);
+    $window = _logger_get_default_time_window($interval);
+
+    $end = time();
+    $end = $end - ($end % $step);
+
+  } else {
+    $window = $end - $start;
+  }
+
+  $start = $end - ($window * (CHART_HEIGHT / SLIDER_HEIGHT));
+
+  return array(
+    'start' => $start,
+    'end'   => $end
+  );
+}
+
 /**
  * Returns an array of fluksonian users indexed by their respective user id.
  * Only users not yet plotted on the chart are returned.
@@ -1610,9 +1692,12 @@ function logger_query_device_measurements($interval, $device, $offset) {
   $sensors = db_query($sql, $device);
   $measurements = array();
 
+  $period = _logger_get_period($interval);
+  $step = _logger_get_step($interval);
+
   while($sensor = db_fetch_object($sensors)) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset, $period, $step);
   }
   return $measurements;
 }

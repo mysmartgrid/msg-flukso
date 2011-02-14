@@ -201,18 +201,17 @@ function logger_rrd_update($meter, $values, $subdir = NULL) {
  * @param $factor    The unit conversion factor.
  * @param $offset    The user timezone offset.
  * @param $period    An array containing a period of time to be queried.
+ * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $factor, $offset, $period = NULL) {
-
-  //TODO: merge arguments $interval and $period
+function logger_rrd_query_sensor($interval, $sensor, $factor, $offset, $period, $step) {
 
   $series_id = METER;
   $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $factor);
 
   $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, true, $period);
+  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, true, $period, $step);
 }
 
 /**
@@ -235,13 +234,15 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
 /**
  * Queries the RRDs for sensors' aggregated measurements.
  *
- * @param $interval       The time interval.
- * @param $sensors        The array of sensors.
- * @param $factor         The unit conversion factor.
- * @param $offset         The user timezone offset.
+ * @param $interval  The time interval.
+ * @param $sensors   The array of sensors.
+ * @param $factor    The unit conversion factor.
+ * @param $offset    The user timezone offset.
+ * @param $period    An array containing a period of time to be queried.
+ * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
+function logger_rrd_query_agg($interval, $sensors, $factor, $offset, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = time() - 15 * MINUTE;
@@ -272,7 +273,7 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, NULL);
+  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, $period, $step);
 }
 
 /**
@@ -314,53 +315,23 @@ function _logger_rrd_file($meter, $interval) {
 /**
  * Exports the sensors' measurements from the RRDs to an array.
  *
- * @param $interval       The time interval.
- * @param $def            The rrd def tag.
- * @param $exported_cdef  The exported cdef.
- * @param $latest         The latest update time.
- * @param $offset         The user timezone offset.
- * @param $include_nan    Whether NaN values should be included in the result.
+ * @param $def           The rrd def tag.
+ * @param $exported_cdef The exported cdef.
+ * @param $latest        The latest update time.
+ * @param $offset        The user timezone offset.
+ * @param $include_nan   Whether NaN values should be included in the result.
+ * @param $period        An array containing a period of time to be queried.
+ * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period) {
+function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();
   }
 
-  $steps = array(
-    'hour'  =>  1 * SECOND,
-    'day'   =>  1 * MINUTE,
-    'days'  => 15 * MINUTE,
-    'week'  => 15 * MINUTE,
-    'month' =>  1 * DAY,
-    'night' =>  1 * DAY,
-    'year'  =>  1 * WEEK
-  );
-
-  $step = $steps[$interval];
-
   $start = $period['start'];
   $end = $period['end'];
-
-  if (!($start > 0 && $end > 0)) {
-
-    $windows = array(
-      'hour'  =>  1 * HOUR,
-      'day'   =>  1 * DAY,
-      'days'  =>  3 * DAY,
-      'week'  =>  1 * WEEK,
-      'month' => 60 * DAY,
-      'night' => 60 * DAY,
-      'year'  =>  1 * YEAR
-    );
-
-    $now = time();
-    $now = $now - ($now % $step);
-    $start = $now - $windows[$interval];
-
-    $end = $latest;
-  }
 
   //time period MUST be within the RRA and both $start and $end must be multiples of $step
   $start = $start - ($start % $step);
