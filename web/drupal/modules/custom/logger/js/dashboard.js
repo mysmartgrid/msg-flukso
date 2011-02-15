@@ -123,3 +123,7 @@ function highlightChartArea(canvas, area, sliderChart) {
   canvas.fillStyle = "#a5d2d9";
   canvas.fillRect(point1, area.y, width, height);
 }
+
+function hideZeroY(value) {
+  return value == 0 ? "" : value;
+}

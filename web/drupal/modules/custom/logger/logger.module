@@ -668,17 +668,17 @@ function theme_logger_dashboard_area($chart) {
   $colors = _logger_get_series_colors();
   $file_path = _logger_save_chart_file($chart);
 
-  $xvalue1 = _logger_get_xvalue(1) * 1000;
-  $xvalue2 = _logger_get_xvalue(2) * 1000;
+  $xvalue1 = _logger_get_xvalue(1);
+  $xvalue2 = _logger_get_xvalue(2);
 
   if (!($xvalue1 > 0 && $xvalue2 > 0)) {
-    $xvalue2 = time() * 1000;
-    $xvalue1 = $xvalue2 - _logger_get_default_time_window($chart->interval) * 1000;
+    $xvalue2 = time();
+    $xvalue1 = $xvalue2 - _logger_get_default_time_window($chart->interval);
   }
 
   $chart_properties = array(
     'height'       => CHART_HEIGHT,
-    'dateWindow'   => "[$xvalue1, $xvalue2]",
+    'dateWindow'   => "[$xvalue1 * 1000, $xvalue2 * 1000]",
     'zoomCallback' => 'updateSliderChart'
   );
 
@@ -696,7 +696,7 @@ function theme_logger_dashboard_area($chart) {
     $slider_output = _logger_create_dygraph('sliderChart', $file_path, $colors, false, array(
         'height'           => SLIDER_HEIGHT,
         'gridLineColor'    => '"transparent"',
-        'yValueFormatter'  => 'function(value) {return "";}',
+        'yValueFormatter'  => 'hideZeroY',
         'zoomCallback'     => 'updateMainChart',
         'clickCallback'    => 'jumpToDate',
         'underlayCallback' => 'highlightChartArea'
@@ -713,7 +713,7 @@ function theme_logger_dashboard_area($chart) {
     _logger_create_dygraph('mainChart', $file_path, $colors, true, $chart_properties) .
     $slider_output .
 
-    _logger_create_graph_legend($chart->data, $colors) .
+    _logger_create_graph_legend($chart->data, $colors, $xvalue1, $xvalue2) .
 
     $form_output .
     l(t('Save Data'), $file_path);
@@ -787,11 +787,11 @@ function _logger_create_interval_menu($context) {
 /**
  * Creates the chart legend.
  *
- * @param $data   The series data.
+ * @param $data  The chart data.
  * @param $colors The series colors.
  * @return the chart legend as a table.
  */
-function _logger_create_graph_legend($data, $colors) {
+function _logger_create_graph_legend($data, $colors, $xvalue1, $xvalue2) {
 
   global $user;
 
@@ -812,7 +812,7 @@ function _logger_create_graph_legend($data, $colors) {
         $avg = 0;
 
         foreach($measurements as $timestamp => $value) {
-          if ($value) {
+          if ($value && $timestamp >= $xvalue1 && $timestamp <= $xvalue2) {
             $total++;
             $last = $value;
             $max = $value > $max? $value: $max;
