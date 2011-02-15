@@ -1352,8 +1352,6 @@ function logger_control_form_submit($form, &$form_state) {
   _logger_set_unit($unit);
   _logger_set_step_plot($step_plot);
   _logger_set_smoothing_level($smoothing_level);
-
-  $form_state['redirect'] = array($_GET['q'], $_REQUEST);
 }
 
 /**
