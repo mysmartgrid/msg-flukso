@@ -1543,12 +1543,12 @@ function _logger_get_resolution($interval) {
 function _logger_get_resolutions_options() {
 
   return array(
-     1 * MINUTE =>  1 . t('Minute'),
-    15 * MINUTE => 15 . t('Minutes'),
-     1 * HOUR   =>  1 . t('Hour'),
-     1 * DAY    =>  1 . t('Day'),
-     1 * WEEK   =>  1 . t('Week'),
-     1 * MONTH  =>  1 . t('Month'),
+     1 * MINUTE =>  1 . ' ' . t('Minute'),
+    15 * MINUTE => 15 . ' ' . t('Minutes'),
+     1 * HOUR   =>  1 . ' ' . t('Hour'),
+     1 * DAY    =>  1 . ' ' . t('Day'),
+     1 * WEEK   =>  1 . ' ' . t('Week'),
+     1 * MONTH  =>  1 . ' ' . t('Month'),
   );
 }
 
