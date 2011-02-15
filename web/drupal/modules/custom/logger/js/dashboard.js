@@ -18,6 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+var mainChart;
+var sliderChart;
+
 function formatDate(d) {
   return '' +
     (d.getDate()  < 10 ? '0' : '') + d.getDate() + '/' +
@@ -47,53 +50,26 @@ function parseDate(datestr, timestr) {
     );
 }
 
-function updateControlForm(dygraph) {
+function updateControlForm(chart, initial) {
 
   var form = document.getElementById('logger-control-form');
 
-  var value = Math.round(dygraph.yAxisRange(0)[0]);
+  var value = Math.round(chart.yAxisRange(0)[0]);
   form.elements['yvalue1'].value = value;
 
-  value = Math.round(dygraph.yAxisRange(0)[1]);
+  value = Math.round(chart.yAxisRange(0)[1]);
   form.elements['yvalue2'].value = value;
 
-  value = new Date(Math.round(dygraph.xAxisRange(0)[0]));
+  value = new Date(Math.round(chart.xAxisRange(0)[0]));
   form.elements['xvalue1date'].value = formatDate(value);
   form.elements['xvalue1time'].value = formatTime(value);
 
-  value = new Date(Math.round(dygraph.xAxisRange(0)[1]));
+  value = new Date(Math.round(chart.xAxisRange(0)[1]));
   form.elements['xvalue2date'].value = formatDate(value);
   form.elements['xvalue2time'].value = formatTime(value);
-}
 
-function updateMainChart(dygraph, initial) {
-
-  if (!initial) {
-    
-     updateControlForm(dygraph);
-
-    var form = document.getElementById('logger-control-form');
-    form.submit();
-  }
-}
-
-function jumpToDate(xvalue) {
-
-  var form = document.getElementById('logger-control-form');
-
-  var xvalue1 = parseDate(form.elements['xvalue1date'].value, form.elements['xvalue1time'].value);
-  var xvalue2 = parseDate(form.elements['xvalue2date'].value, form.elements['xvalue2time'].value);
-  var drift = (xvalue2.getTime() - xvalue1.getTime()) / 2;
-
-  var date = new Date(xvalue - drift);
-  form.elements['xvalue1date'].value = formatDate(date);
-  form.elements['xvalue1time'].value = formatTime(date);
-
-  date = new Date(xvalue + drift);
-  form.elements['xvalue2date'].value = formatDate(date);
-  form.elements['xvalue2time'].value = formatTime(date);
-
-  form.submit();
+  value = (chart.getValue(1, 0) - chart.getValue(0, 0)) / 1000;
+  form.elements['resolution'].value = value;
 }
 
 function removeChartSeries(uid) {
@@ -103,12 +79,47 @@ function removeChartSeries(uid) {
   form.submit();
 }
 
-function highlightChartArea(canvas, area, dygraph, xvalue1, xvalue2) {
+function updateMainChart(xvalue1, xvalue2, yvalues) {
 
-  var point1 = dygraph.toDomCoords(xvalue1, 0)[0];
-  var point2 = dygraph.toDomCoords(xvalue2, 0)[0];
-  var width = area.w + area.x - point1;
+  mainChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  sliderChart.updateOptions({dateWindow: null});
+
+  updateControlForm(mainChart);
+}
+
+function updateSliderChart(xvalue1, xvalue2, yvalues) {
+
+  sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
+  updateControlForm(mainChart);
+}
+
+function jumpToDate(event, center) {
+
+  var xvalue1 = mainChart.xAxisRange(0)[0];
+  var xvalue2 = mainChart.xAxisRange(0)[1];
+  var drift = (xvalue2 - xvalue1) / 2;
+  
+  xvalue1 = center - drift;
+  xvalue2 = center + drift;
+
+  mainChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
+
+  updateControlForm(mainChart);
+}
+
+function highlightChartArea(canvas, area, sliderChart) {
+
+  var xvalue1 = mainChart.xAxisRange(0)[0];
+  var xvalue2 = mainChart.xAxisRange(0)[1];
+  var yvalue1 = sliderChart.yAxisRange(0)[0];
+  var yvalue2 = sliderChart.yAxisRange(0)[1];
+
+  var point1 = sliderChart.toDomCoords(xvalue1, 0)[0];
+  var point2 = sliderChart.toDomCoords(xvalue2, 0)[0];
+  var width = point2 - point1;
+  var height = yvalue2 - yvalue1;
 
   canvas.fillStyle = "#a5d2d9";
-  canvas.fillRect(point1, 0, width, point2);
+  canvas.fillRect(point1, area.y, width, height);
 }
