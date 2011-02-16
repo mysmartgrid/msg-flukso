@@ -50,26 +50,30 @@ function parseDate(datestr, timestr) {
     );
 }
 
-function updateControlForm(chart, initial) {
+function updateControlForm(chart) {
 
   var form = document.getElementById('logger-control-form');
 
-  var value = Math.round(chart.yAxisRange(0)[0]);
-  form.elements['yvalue1'].value = value;
+  if (form) {
+    var value = Math.round(chart.yAxisRange(0)[0]);
+    form.elements['yvalue1'].value = value;
 
-  value = Math.round(chart.yAxisRange(0)[1]);
-  form.elements['yvalue2'].value = value;
+    value = Math.round(chart.yAxisRange(0)[1]);
+    form.elements['yvalue2'].value = value;
 
-  value = new Date(Math.round(chart.xAxisRange(0)[0]));
-  form.elements['xvalue1date'].value = formatDate(value);
-  form.elements['xvalue1time'].value = formatTime(value);
+    value = new Date(Math.round(chart.xAxisRange(0)[0]));
+    form.elements['xvalue1date'].value = formatDate(value);
+    form.elements['xvalue1time'].value = formatTime(value);
 
-  value = new Date(Math.round(chart.xAxisRange(0)[1]));
-  form.elements['xvalue2date'].value = formatDate(value);
-  form.elements['xvalue2time'].value = formatTime(value);
+    value = new Date(Math.round(chart.xAxisRange(0)[1]));
+    form.elements['xvalue2date'].value = formatDate(value);
+    form.elements['xvalue2time'].value = formatTime(value);
 
-  value = (chart.getValue(1, 0) - chart.getValue(0, 0)) / 1000;
-  form.elements['resolution'].value = value;
+    value = (chart.getValue(1, 0) - chart.getValue(0, 0)) / 1000;
+    form.elements['resolution'].value = value;
+  }
+
+  updateLegend(chart);
 }
 
 function removeChartSeries(uid) {
@@ -126,4 +130,60 @@ function highlightChartArea(canvas, area, sliderChart) {
 
 function hideZeroY(value) {
   return value == 0 ? "" : value;
+}
+
+function updateLegend(chart) {
+
+  var minVisibleDate = chart.xAxisRange(0)[0];
+  var maxVisibleDate = chart.xAxisRange(0)[1];
+  var avg;
+  var value;
+
+  //sensors
+  for (var s = 1; s < chart.numColumns(); s++) {
+
+    var max = Number.MIN_VALUE;
+    var min = Number.MAX_VALUE;
+    var sum = 0;
+    var total = 0;
+
+    //sensor's values
+    for(var v = 0; v < chart.numRows(); v++) {
+      
+      var timestamp = chart.getValue(v, 0);
+
+      if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
+
+        value = chart.getValue(v, s);
+
+        if (value > 0) {
+          max = value > max ? value : max;
+          min = value < min ? value : min;
+          sum += value;
+          total++;
+        }
+      }
+    }
+
+    if(total > 0) {
+      avg = sum / total;
+
+    } else {
+      max = null;
+      min = null;
+      avg = null;
+      value = null;
+    }
+
+    updateLegendValue("max", s, max);
+    updateLegendValue("min", s, min);
+    updateLegendValue("avg", s, avg);
+    updateLegendValue("last", s, value);
+  }
+}
+
+function updateLegendValue(name, i, value) {
+
+  var div = document.getElementById(name + --i);
+  div.innerHTML = value > 0 ? Math.round(value * 10) / 10 : '';
 }

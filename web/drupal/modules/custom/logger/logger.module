@@ -679,12 +679,11 @@ function theme_logger_dashboard_area($chart) {
   $chart_properties = array(
     'height'       => CHART_HEIGHT,
     'dateWindow'   => "[$xvalue1 * 1000, $xvalue2 * 1000]",
+    'drawCallback' => 'updateControlForm',
     'zoomCallback' => 'updateSliderChart'
   );
 
   if ($chart->context == 'logger') {
-
-    $chart_properties['drawCallback'] = 'updateControlForm';
 
     $yvalue1 = _logger_get_yvalue(1) + 0;
     $yvalue2 = _logger_get_yvalue(2) + 0;
@@ -795,32 +794,10 @@ function _logger_create_graph_legend($data, $colors, $xvalue1, $xvalue2) {
 
   global $user;
 
-  function _format($value) {
-    return $value > 0? number_format($value, 2) : '';
-  }
-
   $i = 0;
   foreach($data as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $meter => $measurements) {
-
-        $total = 0;
-        $last = 0;
-        $max = 0;
-        $min = null;
-        $sum = 0;
-        $avg = 0;
-
-        foreach($measurements as $timestamp => $value) {
-          if ($value && $timestamp >= $xvalue1 && $timestamp <= $xvalue2) {
-            $total++;
-            $last = $value;
-            $max = $value > $max? $value: $max;
-            $min = !$min || $value < $min? $value: $min;
-            $sum += $value;
-          }
-        }
-        $avg = $total > 0? $sum / $total : 0;
 
         $color = $colors[$i % count($colors)];
 
@@ -831,16 +808,16 @@ function _logger_create_graph_legend($data, $colors, $xvalue1, $xvalue2) {
           onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          '<a href="" OnClick="javascript:removeChartSeries(' . $uid . ');return false;">' . t('Remove') . '</a>' : '';
+          '<a href="" OnClick="javascript:removeChartSeries(' . $uid . ');">' . t('Remove') . '</a>' : '';
 
         $lines[] = array(
             'mark'      => $mark,
             'user'      => $username,
             'sensor'    => $meter,
-            'max'       => _format($max),
-            'min'       => _format($min),
-            'avg'       => _format($avg),
-            'last'      => _format($last),
+            'max'       => "<div id='max$i'/>",
+            'min'       => "<div id='min$i'/>",
+            'avg'       => "<div id='avg$i'/>",
+            'last'      => "<div id='last$i'/>",
             'operation' => $operations
         );
         $i++;
@@ -1352,6 +1329,8 @@ function logger_control_form_submit($form, &$form_state) {
   _logger_set_unit($unit);
   _logger_set_step_plot($step_plot);
   _logger_set_smoothing_level($smoothing_level);
+
+  $form_state['redirect'] = array($_GET['q'], $_REQUEST);
 }
 
 /**
