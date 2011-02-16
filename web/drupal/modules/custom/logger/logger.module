@@ -776,8 +776,7 @@ function _logger_create_interval_menu($context) {
     l(t('3 Days'), "$path/days"),
     l(t('Week'),   "$path/week"),
     l(t('Month'),  "$path/month"),
-    l(t('Year'),   "$path/year"),
-    l(t('Night'),  "$path/night")
+    l(t('Year'),   "$path/year")
   );
 
   return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
