@@ -47,14 +47,23 @@ define('METER', 'meter');
 function logger_rrd_base_create($meter) {
 
   $step = 1 * MINUTE;
-  $archives = array(
+  $archives = logger_get_storage_periods();
+
+  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
+}
+
+/**
+ * Returns an array of measurement storage periods, indexed by time resolution.
+ *
+ * @return the array of storage periods.
+ */
+function logger_get_storage_periods() {
+  return array(
      //resolution   storage period
      1 * MINUTE =>  1 * WEEK,
     15 * MINUTE =>  1 * MONTH,
      1 * DAY    =>  6 * MONTH,
      1 * WEEK   => 10 * YEAR);
-
-  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
 }
 
 /**

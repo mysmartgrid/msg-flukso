@@ -264,12 +264,14 @@ function _logger_dashboard($type, $interval) {
 
     drupal_set_title(t('Your power consumption'));
 
-    $type = $type ? $type : 'electricity';
-    $interval = $interval ? $interval : 'hour';
+    $xvalue1 = _logger_get_xvalue(1);
+    $xvalue2 = _logger_get_xvalue(2);
+    $yvalue1 = _logger_get_yvalue(1);
+    $yvalue2 = _logger_get_yvalue(2);
 
-    $sensors = _logger_get_user_sensors($type);
+    $chart = _logger_create_chart_object($interval, $type, 'logger', array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
-    return _logger_create_user_dygraph($sensors, $type, $interval);
+    return theme('logger_dashboard_area', $chart);
 
   } else {
 
@@ -287,9 +289,6 @@ function _logger_dashboard($type, $interval) {
 function _logger_overview($type, $interval) {
 
   drupal_set_title(t('Overall View'));
-
-  $type = $type ? $type : 'electricity';
-  $interval = $interval ? $interval : 'hour';
 
   //General explanation
   $output .= theme('logger_overview_topic', NULL,
@@ -337,62 +336,11 @@ function _logger_overview($type, $interval) {
         '@devcounter'  => $devcounter,
         '@usercounter' => $usercounter))) . '<br>';
 
-  $sensors = _logger_get_active_sensors($type);
-
-  $output .= _logger_create_dygraph_agg_chart($sensors, $type, $interval) . '<br>';
-
-  return $output;
-}
-
-/**
- * Creates an Aggregated Consumption Chart using DyGraphs.
- *
- * @param $sensors  The array of sensors to be aggregated.
- * @param $type     The sensor type.
- * @param $interval The time interval.
- * @return the chart output.
- */
-function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $period = _logger_get_period($interval);
-  $resolution = _logger_get_resolution($interval);
-  $offset = _logger_get_timezone_offset();
-
   $chart = _logger_create_chart_object($interval, $type, 'overview');
 
-  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $offset, $period, $resolution);
+  $output .= theme('logger_dashboard_area', $chart) . '<br>';
 
-  return theme('logger_dashboard_area', $chart);
-}
-
-/**
- * Creates an User Dashboard Chart using DyGraphs.
- *
- * @param $sensors  The array of sensors to be plotted.
- * @param $type     The sensor type.
- * @param $interval The time interval.
- * @return the chart output.
- */
-function _logger_create_user_dygraph($sensors, $type, $interval) {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $start = _logger_get_xvalue(1);
-  $end = _logger_get_xvalue(2);
-  $period = _logger_get_period($interval, $start, $end);
-  $resolution = _logger_get_resolution($interval);
-  $offset = _logger_get_timezone_offset();
-
-  $chart = _logger_create_chart_object($interval, $type, 'logger');
-
-  foreach ($sensors as &$sensor) {
-
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset, $period, $resolution);
-  }
-
-  return theme('logger_dashboard_area', $chart);
+  return $output;
 }
 
 /**
@@ -401,46 +349,79 @@ function _logger_create_user_dygraph($sensors, $type, $interval) {
  * @param $interval   The time interval.
  * @param $type       The sensor type.
  * @param $context    The page where the chart is going to be placed (overview or logger).
- * @return the chart parameters.
+ * @param $xaxis      An array containing the minimum and maximum timestamps of the x axis.
+ * @param $yaxis      An array containing the minimum and maximum values of the y axis.
+ * @return the chart object.
  */
-function _logger_create_chart_object($interval, $type, $context) {
+function _logger_create_chart_object($interval, $type, $context, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
-  $params = new stdClass();
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $chart = new stdClass();
+
+  $chart->type = $type ? $type : 'electricity';
+  $chart->interval = $interval ? $interval : 'hour';
+  $chart->context = $context;
+
+  if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
+    $xaxis[1] = time();
+    $xaxis[0] = $xaxis[1] - _logger_get_default_time_window($chart->interval);
+  }
+
+  $chart->yaxis = $yaxis;
+  $chart->xaxis = $xaxis;
+
+  $chart->resolution = _logger_get_resolution($chart->interval);
+  $chart->period = _logger_get_period($chart->interval, $chart->resolution, $xaxis[0], $xaxis[1]);
+  $chart->offset = _logger_get_timezone_offset();
 
   //Default
-  $params->unit = 'watt';
-  $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data = array();
-  $params->interval = $interval;
-  $params->context = $context;
+  $chart->unit = 'watt';
+  $chart->factor = 3600; // 1Wh/s = 3600 W
 
   $unformatted_unit = _logger_get_unit();
 
-  switch ($type) {
+  switch ($chart->type) {
     case 'electricity':
       switch ($unformatted_unit) {
         case 'kw':
-          $params->unit = 'kW';
-          $params->factor = 0.001;
+          $chart->unit = 'kW';
+          $chart->factor = 0.001;
           break;
 
         case 'kwh':
-          $params->unit = 'kWh/year';
-          $params->factor = 31536;
+          $chart->unit = 'kWh/year';
+          $chart->factor = 31536;
           break;
 
         case 'eur':
-          $params->unit = 'euro/year';
-          $params->factor = 5676; // 18 EURcent/kWh
+          $chart->unit = 'euro/year';
+          $chart->factor = 5676; // 18 EURcent/kWh
           break;
 
         case 'aud':
-          $params->unit = 'aud/year';
-          $params->factor = 5991; // 19 AUDcent/kWh
+          $chart->unit = 'aud/year';
+          $chart->factor = 5991; // 19 AUDcent/kWh
           break;
       }
   }
-  return $params;
+
+  if ($context == 'logger') {
+
+    $sensors = _logger_get_user_sensors($chart->type);
+
+    foreach ($sensors as &$sensor) {
+      $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($chart->interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
+    }
+
+  } else {
+    $sensors = _logger_get_active_sensors($chart->type);
+    $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($chart->interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
+  }
+
+  $chart->file_path = _logger_save_chart_file($chart);
+
+  return $chart;
 }
 
 /**
@@ -666,15 +647,9 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
 function theme_logger_dashboard_area($chart) {
 
   $colors = _logger_get_series_colors();
-  $file_path = _logger_save_chart_file($chart);
 
-  $xvalue1 = _logger_get_xvalue(1);
-  $xvalue2 = _logger_get_xvalue(2);
-
-  if (!($xvalue1 > 0 && $xvalue2 > 0)) {
-    $xvalue2 = time();
-    $xvalue1 = $xvalue2 - _logger_get_default_time_window($chart->interval);
-  }
+  $xvalue1 = $chart->xaxis[0];
+  $xvalue2 = $chart->xaxis[1];
 
   $chart_properties = array(
     'height'       => CHART_HEIGHT,
@@ -685,14 +660,14 @@ function theme_logger_dashboard_area($chart) {
 
   if ($chart->context == 'logger') {
 
-    $yvalue1 = _logger_get_yvalue(1) + 0;
-    $yvalue2 = _logger_get_yvalue(2) + 0;
+    $yvalue1 = $chart->yaxis[0] + 0;
+    $yvalue2 = $chart->yaxis[1] + 0;
 
     if ($yvalue1 >= 0 && $yvalue2 > 0) {
       $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
     }
 
-    $slider_output = _logger_create_dygraph('sliderChart', $file_path, $colors, false, array(
+    $slider_output = _logger_create_dygraph('sliderChart', $chart->file_path, $colors, false, array(
         'height'           => SLIDER_HEIGHT,
         'gridLineColor'    => '"transparent"',
         'yValueFormatter'  => 'hideZeroY',
@@ -709,13 +684,13 @@ function theme_logger_dashboard_area($chart) {
     _logger_create_interval_menu($chart->context) .
     '<div>' . $chart->unit . '</div>' .
 
-    _logger_create_dygraph('mainChart', $file_path, $colors, true, $chart_properties) .
+    _logger_create_dygraph('mainChart', $chart->file_path, $colors, true, $chart_properties) .
     $slider_output .
 
     _logger_create_graph_legend($chart->data, $colors, $xvalue1, $xvalue2) .
 
     $form_output .
-    l(t('Save Data'), $file_path);
+    l(t('Save Data'), $chart->file_path);
 }
 
 /**
@@ -813,10 +788,10 @@ function _logger_create_graph_legend($data, $colors, $xvalue1, $xvalue2) {
             'mark'      => $mark,
             'user'      => $username,
             'sensor'    => $meter,
-            'max'       => "<div id='max$i'/>",
-            'min'       => "<div id='min$i'/>",
-            'avg'       => "<div id='avg$i'/>",
-            'last'      => "<div id='last$i'/>",
+            'max'       => "<div id='max$i'  align='right'/>",
+            'min'       => "<div id='min$i'  align='right'/>",
+            'avg'       => "<div id='avg$i'  align='right'/>",
+            'last'      => "<div id='last$i' align='right'/>",
             'operation' => $operations
         );
         $i++;
@@ -1506,7 +1481,6 @@ function _logger_get_resolution($interval) {
     'days'  => 15 * MINUTE,
     'week'  => 15 * MINUTE,
     'month' =>  1 * DAY,
-    'night' =>  1 * DAY,
     'year'  =>  1 * WEEK
   );
 
@@ -1523,7 +1497,6 @@ function _logger_get_resolutions_options() {
   return array(
      1 * MINUTE =>  1 . ' ' . t('Minute'),
     15 * MINUTE => 15 . ' ' . t('Minutes'),
-     1 * HOUR   =>  1 . ' ' . t('Hour'),
      1 * DAY    =>  1 . ' ' . t('Day'),
      1 * WEEK   =>  1 . ' ' . t('Week')
   );
@@ -1543,7 +1516,6 @@ function _logger_get_default_time_window($interval) {
     'days'  =>  3 * DAY,
     'week'  =>  1 * WEEK,
     'month' => 60 * DAY,
-    'night' => 60 * DAY,
     'year'  =>  1 * YEAR
   );
   return $windows[$interval];
@@ -1552,26 +1524,31 @@ function _logger_get_default_time_window($interval) {
 /**
  * Returns an array containing two timestamps representing a period of time.
  *
- * @param $interval  The time interval menu option.
- * @param $start     The initial timestamp, if known.
- * @param $end       The final timestamp, if known.
+ * @param $interval    The time interval menu option.
+ * @param $resolution  The time resolution.
+ * @param $start       The initial timestamp, if known.
+ * @param $end         The final timestamp, if known.
  * @return the period of time as an array.
  */
-function _logger_get_period($interval, $start = 0, $end = 0) {
+function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 
-  if (!($start > 0 && $end > 0)) {
+  module_load_include('inc', 'logger', 'logger.rrd');
 
-    $resolution = _logger_get_resolution($interval);
-    $window = _logger_get_default_time_window($interval);
-
-    $end = time();
-    $end = $end - ($end % $resolution);
+  if ($start > 0 && $end > 0) {
+    $window = $end - $start;
 
   } else {
-    $window = $end - $start;
+    $window = _logger_get_default_time_window($interval);
+    $end = time();
   }
 
-  $start = $end - ($window * (CHART_HEIGHT / SLIDER_HEIGHT));
+  $storage_periods = logger_get_storage_periods();
+  $max_window = $storage_periods[$resolution];
+
+  $window *= (CHART_HEIGHT / SLIDER_HEIGHT);
+  $window = $window > $max_window ? $max_window : $window;
+
+  $start = $end - $window;
 
   return array(
     'start' => $start,
@@ -1724,8 +1701,8 @@ function logger_query_device_measurements($interval, $device, $offset) {
   $sensors = db_query($sql, $device);
   $measurements = array();
 
-  $period = _logger_get_period($interval);
   $resolution = _logger_get_resolution($interval);
+  $period = _logger_get_period($interval, $resolution);
 
   while($sensor = db_fetch_object($sensors)) {
 

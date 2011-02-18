@@ -136,16 +136,21 @@ function updateLegend(chart) {
 
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
-  var avg;
   var value;
+  var total;
+  var sum;
+  var max;
+  var min;
+  var avg;
+  var last;
 
   //sensors
   for (var s = 1; s < chart.numColumns(); s++) {
 
-    var max = Number.MIN_VALUE;
-    var min = Number.MAX_VALUE;
-    var sum = 0;
-    var total = 0;
+    max = Number.MIN_VALUE;
+    min = Number.MAX_VALUE;
+    sum = 0;
+    total = 0;
 
     //sensor's values
     for(var v = 0; v < chart.numRows(); v++) {
@@ -157,6 +162,7 @@ function updateLegend(chart) {
         value = chart.getValue(v, s);
 
         if (value > 0) {
+          last = value;
           max = value > max ? value : max;
           min = value < min ? value : min;
           sum += value;
@@ -172,18 +178,18 @@ function updateLegend(chart) {
       max = null;
       min = null;
       avg = null;
-      value = null;
+      last = null;
     }
 
     updateLegendValue("max", s, max);
     updateLegendValue("min", s, min);
     updateLegendValue("avg", s, avg);
-    updateLegendValue("last", s, value);
+    updateLegendValue("last", s, last);
   }
 }
 
 function updateLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
-  div.innerHTML = value > 0 ? Math.round(value * 10) / 10 : '';
+  div.innerHTML = value > 0 ? value.toFixed(2) : '';
 }
