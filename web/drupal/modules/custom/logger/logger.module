@@ -375,15 +375,9 @@ function _logger_create_chart_object($interval, $type, $context, $xaxis = array(
   $chart->period = _logger_get_period($chart->interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->offset = _logger_get_timezone_offset();
 
-  //Default
-  $chart->unit = 'watt';
-  $chart->factor = 3600; // 1Wh/s = 3600 W
-
-  $unformatted_unit = _logger_get_unit();
-
   switch ($chart->type) {
     case 'electricity':
-      switch ($unformatted_unit) {
+      switch ($chart->unit) {
         case 'kw':
           $chart->unit = 'kW';
           $chart->factor = 0.001;
@@ -403,6 +397,10 @@ function _logger_create_chart_object($interval, $type, $context, $xaxis = array(
           $chart->unit = 'aud/year';
           $chart->factor = 5991; // 19 AUDcent/kWh
           break;
+
+        default:
+          $chart->unit = 'watt';
+          $chart->factor = 3600; // 1Wh/s = 3600 W
       }
   }
 
@@ -1533,17 +1531,19 @@ function _logger_get_default_time_window($interval) {
 function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
+  $now = time();
 
   if ($start > 0 && $end > 0) {
     $window = $end - $start;
 
   } else {
     $window = _logger_get_default_time_window($interval);
-    $end = time();
+    $end = $now;
   }
 
   $storage_periods = logger_get_storage_periods();
-  $max_window = $storage_periods[$resolution];
+  $elapsed_time = $now - $end;
+  $max_window = $storage_periods[$resolution] - $elapsed_time;
 
   $window *= (CHART_HEIGHT / SLIDER_HEIGHT);
   $window = $window > $max_window ? $max_window : $window;
