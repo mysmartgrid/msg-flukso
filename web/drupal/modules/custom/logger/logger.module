@@ -377,7 +377,7 @@ function _logger_create_chart_object($interval, $type, $context, $xaxis = array(
 
   switch ($chart->type) {
     case 'electricity':
-      switch ($chart->unit) {
+      switch (_logger_get_unit()) {
         case 'kw':
           $chart->unit = 'kW';
           $chart->factor = 0.001;
