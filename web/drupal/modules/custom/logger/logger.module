@@ -299,51 +299,62 @@ function _logger_overview($type, $interval) {
 
   drupal_set_title(t('Overall View'));
 
-  //General explanation
-  $output .= theme('logger_overview_topic', NULL,
-    t('<b>mySmartGrid</b> is the smart device control for your home. ' .
-    'It enables you to understand your energy consumption and share your ' .
-    'experiences with others.'), 'content/das-projekt');
+  $cache_id = 'logger_overview';
+  $cache = cache_get($cache_id, 'cache_page');
 
-  //Latest blogpost
-  $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
-  $result = db_fetch_object(db_query($sql, "blogpost"));
+  if ($cache) {
+    $output = $cache->data;
 
-  if ($result) {
+  } else {
 
-    $blog = node_load(array('nid' => $result->nid));
+    //General explanation
+    $output = theme('logger_overview_topic', NULL,
+      t('<b>mySmartGrid</b> is the smart device control for your home. ' .
+      'It enables you to understand your energy consumption and share your ' .
+      'experiences with others.'), 'content/das-projekt');
 
-    $output .= theme('logger_overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+    //Latest blogpost
+    $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
+    $result = db_fetch_object(db_query($sql, "blogpost"));
+
+    if ($result) {
+
+      $blog = node_load(array('nid' => $result->nid));
+
+      $output .= theme('logger_overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+    }
+
+    //Counters
+    $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
+    $devcounter = db_result( db_query($sql, 0));
+
+    $sql = "
+      SELECT
+        count(*)
+      FROM
+        {users} u
+      WHERE
+        EXISTS(
+          SELECT
+            1
+          FROM
+            {logger_devices} d
+          WHERE
+            d.uid = u.uid
+        )";
+
+    $usercounter = db_result( db_query($sql));
+
+    $output .= theme('logger_overview_topic', t('Total Consumption of All Participants'),
+      t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
+        'in <b>@usercounter</b> households. The following chart shows their ' .
+        'aggregate electricity consumption.',
+        array(
+          '@devcounter'  => $devcounter,
+          '@usercounter' => $usercounter))) . '<br>';
+
+    cache_set($cache_id, $output, 'cache_page', time() + 1 * DAY);
   }
-
-  //Counters
-  $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
-  $devcounter = db_result( db_query($sql, 0));
-
-  $sql = "
-    SELECT
-      count(*)
-    FROM
-      {users} u
-    WHERE
-      EXISTS(
-        SELECT
-          1
-        FROM
-          {logger_devices} d
-        WHERE
-          d.uid = u.uid
-      )";
-
-  $usercounter = db_result( db_query($sql));
-
-  $output .= theme('logger_overview_topic', t('Total Consumption of All Participants'),
-    t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
-      'in <b>@usercounter</b> households. The following chart shows their ' .
-      'aggregate electricity consumption.',
-      array(
-        '@devcounter'  => $devcounter,
-        '@usercounter' => $usercounter))) . '<br>';
 
   $sensors = _logger_get_active_sensors($type);
 
@@ -448,22 +459,10 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
  */
 function _logger_compose_chart_file_path($chart) {
 
-  global $user;
-
   $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
   $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
 
-  $unique_id = $user->uid . ' ' .
-    $chart->context       . ' ' .
-    $chart->type          . ' ' .
-    $chart->interval      . ' ' .
-    $chart->resolution    . ' ' .
-    $chart->unit          . ' ' .
-    $chart->yaxis[0]      . ' ' .
-    $chart->yaxis[1]      . ' ' .
-    $t1                   . ' ' .
-    $t2                   . ' ' .
-    $chart->timezone;
+  $unique_id = "$chart->context $chart->type $chart->unit $chart->resolution $t1 $t2";
 
   foreach ($sensors as $sensor) {
     $unique_id .= ' ' . $sensor->meter;
@@ -771,7 +770,7 @@ function theme_logger_dashboard_area($chart) {
     _logger_create_dygraph('mainChart', $chart, true, $chart_properties) .
     $slider_output .
 
-    _logger_create_graph_legend($chart) .
+    _logger_create_chart_legend($chart) .
 
     $form_output .
     l(t('Save Data'), $chart->file_path);
@@ -846,7 +845,7 @@ function _logger_create_interval_menu($context) {
  * @param $chart  The chart object.
  * @return the chart legend as a table.
  */
-function _logger_create_graph_legend($chart) {
+function _logger_create_chart_legend($chart) {
 
   global $user;
 
@@ -1766,10 +1765,10 @@ function logger_cron() {
   $intervals = array('hour', 'day', 'days', 'week', 'month', 'year', 'night');
 
   //This limit prevents chart files from being removed before they are sent to the user.
-  $age = 2 * CHART_REFRESH;
+  $age = 2 * CHART_REFRESH / MINUTE;
 
   foreach($intervals as $interval) {
 
-    exec('find ' . GRAPH_PATH . "/$interval/*"  . " -mmin +$age -exec rm {} \;");
+    exec('find ' . GRAPH_PATH . "/$interval/* -mmin +$age -exec rm {} \;");
   }
 }
