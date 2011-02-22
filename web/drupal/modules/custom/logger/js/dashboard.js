@@ -76,11 +76,19 @@ function updateControlForm(chart) {
   updateLegend(chart);
 }
 
-function removeChartSeries(uid) {
+function removeChartSeries(uid, i, username) {
+
+  var table = document.getElementById('logger-legend-table');
+  table.rows[i + 1].style.display = 'none';
+
+  mainChart.setVisibility(i, false);
+  sliderChart.setVisibility(i, false);
 
   var form = document.getElementById('logger-control-form');
-  form.elements['removed_user'].value = uid;
-  form.submit();
+  var field = form.elements['new_user'];
+  field.options[field.length] = new Option(username, uid);
+
+  $.get('/logger/remove/user/' + uid);
 }
 
 function updateMainChart(xvalue1, xvalue2, yvalues) {
@@ -196,13 +204,10 @@ function updateLegendValue(name, i, value) {
 
 function setLineColor(i, color) {
 
-  $.get('/logger/color/' + i + '/' + escape('#' + color));
-
   updateChartColors(mainChart, i, color);
+  updateChartColors(sliderChart, i, color);
 
-  if (sliderChart) {
-    updateChartColors(sliderChart, i, color);
-  }
+  $.get('/logger/color/' + i + '/' + escape('#' + color));
 }
 
 function updateChartColors(chart, i, color) {

@@ -80,7 +80,7 @@ function logger_menu() {
 
   $items['overview'] = array(
     'title'            => 'Overall View',
-    'description'      => 'Show the project overall view.',
+    'description'      => 'Show the project overall view',
     'page callback'    => '_logger_overview',
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
@@ -88,12 +88,21 @@ function logger_menu() {
   );
 
   $items['logger/color'] = array(
-    'title'            => 'Change the series color',
+    'title'            => 'Changes the series color',
     'page callback'    => '_logger_series_color',
     'page arguments'   => array(2, 3),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
+
+  $items['logger/remove/user'] = array(
+    'title'            => 'Removes a chart series',
+    'page callback'    => '_logger_remove_user',
+    'page arguments'   => array(3),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
 
 
   //Devices' operations
@@ -871,7 +880,7 @@ function _logger_create_chart_legend($chart) {
           onchange="javascript: setLineColor(' . $i . ', this.value);"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          '<a href="" OnClick="javascript: removeChartSeries(' . $uid . ');">' . t('Remove') . '</a>' : '';
+          '<a href="javascript: void(0)" OnClick="javascript: removeChartSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -899,7 +908,7 @@ function _logger_create_chart_legend($chart) {
     array('data'  => t('Operation'))
   );
 
-  return '<br>' . theme('table', $headers, $lines);
+  return '<br>' . theme('table', $headers, $lines, array('id' => 'logger-legend-table'));
 }
 
 /**
@@ -1086,11 +1095,6 @@ function logger_control_form(&$form_state, $chart) {
     '#options'        => _logger_get_users_options(),
     '#default_value'  => 0,
     '#attributes'     => $attributes
-  );
-
-  $form['removed_user'] = array(
-    '#type'           => 'hidden',
-    '#default_value'  => 0
   );
 
   $form['unit'] = array(
@@ -1330,17 +1334,12 @@ function logger_control_form_submit($form, &$form_state) {
   global $_REQUEST;
   
   $new_user        = $form_state['values']['new_user'];
-  $removed_user    = $form_state['values']['removed_user'];
   $unit            = $form_state['values']['unit'];
   $step_plot       = $form_state['values']['step_plot'];
   $smoothing_level = $form_state['values']['smoothing_level'];
 
   if ($new_user > 0) {
     _logger_add_user($new_user);
-  }
-
-  if ($removed_user > 0) {
-    _logger_remove_user($removed_user);
   }
 
   _logger_set_unit($unit);
