@@ -134,8 +134,6 @@ function hideZeroY(value) {
 
 function updateLegend(chart) {
 
-  var colors = chart.getColors();
-
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
   var value;

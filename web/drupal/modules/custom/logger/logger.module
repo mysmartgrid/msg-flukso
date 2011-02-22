@@ -775,7 +775,7 @@ function theme_logger_dashboard_area($chart) {
     _logger_create_interval_menu($chart->context) .
     '<div>' . $chart->unit . '</div>' .
 
-    _logger_create_dygraph('mainChart', $chart, true, $chart_properties) .
+    _logger_create_dygraph('mainChart', $chart, TRUE, $chart_properties) .
     $slider_output .
 
     _logger_create_chart_legend($chart) .
