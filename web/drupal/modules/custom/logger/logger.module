@@ -302,7 +302,7 @@ function _logger_overview($type, $interval) {
   $cache_id = 'logger_overview';
   $cache = cache_get($cache_id, 'cache_page');
 
-  if ($cache) {
+  if ($cache->data) {
     $output = $cache->data;
 
   } else {
@@ -431,21 +431,29 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
   $chart->sensors = $sensors;
   $chart->file_path = _logger_compose_chart_file_path($chart);
 
-  if (!file_exists($chart->file_path)) {
+  $cache_id = "logger_chart_data_$chart->file_path";
+  $cache = cache_get($cache_id, 'cache_page');
+
+  if ($cache->data) {
+    $chart->data = $cache->data;
+
+  } else {
 
     if ($context == 'logger') {
 
       foreach ($sensors as &$sensor) {
-        $data = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
-        $chart->data[$sensor->uid][$sensor->username][$sensor->function] = $data;
+        $chart->data[$sensor->uid][$sensor->username][$sensor->function] =
+          logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
       }
 
     } else {
-      $data = logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
-      $chart->data[0][t('All')][t('All')] = $data;
+      $chart->data[0][t('All')][t('All')] =
+        logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
     }
 
     _logger_save_chart_file($chart);
+
+    cache_set($cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
   }
 
   return $chart;
@@ -464,8 +472,8 @@ function _logger_compose_chart_file_path($chart) {
 
   $unique_id = "$chart->context $chart->type $chart->unit $chart->resolution $t1 $t2";
 
-  foreach ($sensors as $sensor) {
-    $unique_id .= ' ' . $sensor->meter;
+  foreach ($chart->sensors as $sensor) {
+    $unique_id .= " $sensor->meter";
   }
 
   $unique_id = md5($unique_id);
@@ -552,7 +560,7 @@ function _logger_get_active_sensors($type) {
 
   $sql = "
     SELECT
-      lm.meter AS meter
+      lm.meter
     FROM
       {logger_meters} lm
     WHERE
@@ -849,12 +857,6 @@ function _logger_create_chart_legend($chart) {
 
   global $user;
 
-  $cache_id = 'logger_chart_legend_' . $chart->file_path;
-  $cache = cache_get($cache_id, 'cache_page');
-  if ($cache) {
-    return $cache->data;
-  }
-
   $i = 0;
   foreach($chart->data as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
@@ -864,12 +866,12 @@ function _logger_create_chart_legend($chart) {
 
         $id = SERIES_COLOR_ID . $i;
         $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
-          style="width: 10px; height: 10px;"/>
+          style="width: 10px; height: 10px; color: transparent;"/>
           <input id="' . $id . '" type="hidden" value="' . $color . '"
-          onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
+          onchange="javascript: setLineColor(' . $i . ', this.value);"/>';
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          '<a href="" OnClick="javascript:removeChartSeries(' . $uid . ');">' . t('Remove') . '</a>' : '';
+          '<a href="" OnClick="javascript: removeChartSeries(' . $uid . ');">' . t('Remove') . '</a>' : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -897,11 +899,7 @@ function _logger_create_chart_legend($chart) {
     array('data'  => t('Operation'))
   );
 
-  $output = '<br>' . theme('table', $headers, $lines);
-
-  cache_set($cache_id, $output, 'cache_page', time() + 2 * CHART_REFRESH);
-
-  return $output;
+  return '<br>' . theme('table', $headers, $lines);
 }
 
 /**
@@ -939,14 +937,12 @@ function _logger_series_color($i, $color) {
   $id = SERIES_COLOR_ID . $i;
 
   if ($user) {
-    $id .= $user->uid;
+    $id .= '_' . $user->uid;
     variable_set($id, $color);
 
   } else {
     setcookie($id, $unit, time() + WEEK, '/');
   }
-
-  drupal_goto($_REQUEST['destination']);
 }
 
 /**
@@ -962,7 +958,7 @@ function _logger_get_series_colors() {
     $id = SERIES_COLOR_ID . $i;
 
     if ($user) {
-      $id .= $user->uid;
+      $id .= '_' . $user->uid;
       $color = variable_get($id, $default);
 
     } else {

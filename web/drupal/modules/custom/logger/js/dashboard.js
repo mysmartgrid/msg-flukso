@@ -134,6 +134,8 @@ function hideZeroY(value) {
 
 function updateLegend(chart) {
 
+  var colors = chart.getColors();
+
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
   var value;
@@ -192,4 +194,22 @@ function updateLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   div.innerHTML = value > 0 ? value.toFixed(2) : '';
+}
+
+function setLineColor(i, color) {
+
+  $.get('/logger/color/' + i + '/' + escape('#' + color));
+
+  updateChartColors(mainChart, i, color);
+
+  if (sliderChart) {
+    updateChartColors(sliderChart, i, color);
+  }
+}
+
+function updateChartColors(chart, i, color) {
+
+  var values = chart.getColors();
+  values[i] = "#" + color;
+  chart.updateOptions({colors: values});
 }
