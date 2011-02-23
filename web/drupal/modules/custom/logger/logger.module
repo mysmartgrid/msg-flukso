@@ -764,7 +764,7 @@ function theme_logger_dashboard_area($chart) {
     'dateWindow'         => "[$xvalue1, $xvalue2]",
     'drawCallback'       => 'updateControlForm',
     'zoomCallback'       => 'updateSliderChart',
-    'pointClickCallback' => 'addAnnotation'
+    'pointClickCallback' => 'addPointAnnotation'
   );
 
   if ($chart->context == 'logger') {

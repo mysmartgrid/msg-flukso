@@ -124,6 +124,8 @@ function updateSmoothingLevel(fieldId, step) {
   level = level < 1 ? 1 : level;
   field.value = level;
 
+  mainChart.setAnnotations(new Array());
+  
   mainChart.updateOptions({rollPeriod: level});
   sliderChart.updateOptions({rollPeriod: level});
 
@@ -258,13 +260,13 @@ function updateChartColors(chart, i, color) {
   chart.updateOptions({colors: values});
 }
 
-function addAnnotation(event, point) {
+function addPointAnnotation(event, point) {
 
   var date = new Date(point.xval);
   var yval = point.yval.toFixed(2);
   var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
 
-  if (!removeAnnotation(mainChart, text)) {
+  if (!removePointAnnotation(mainChart, text)) {
 
     var annotations = mainChart.annotations();
 
@@ -277,7 +279,7 @@ function addAnnotation(event, point) {
       text: text,
       width: width,
       clickHandler: function(annotation, point, chart, event) {
-        removeAnnotation(chart, annotation.text);
+        removePointAnnotation(chart, annotation.text);
       }
     });
 
@@ -285,7 +287,7 @@ function addAnnotation(event, point) {
   }
 }
 
-function removeAnnotation(chart, text) {
+function removePointAnnotation(chart, text) {
 
   var remaining = new Array();
   var annotations = chart.annotations();
