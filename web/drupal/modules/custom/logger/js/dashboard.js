@@ -50,6 +50,15 @@ function parseDate(datestr, timestr) {
     );
 }
 
+function formatCVSTimeStamp(d) {
+  return '' +
+    d.getFullYear() + '-' +
+    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '-' +
+    (d.getDate()  < 10 ? '0' : '') + d.getDate() + ' ' +
+    (d.getHours()   < 10 ? '0' : '') + d.getHours() + ':' +
+    (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+}
+
 function updateControlForm(chart) {
 
   var form = document.getElementById('logger-control-form');
@@ -247,4 +256,51 @@ function updateChartColors(chart, i, color) {
   var values = chart.getColors();
   values[i] = "#" + color;
   chart.updateOptions({colors: values});
+}
+
+function addAnnotation(event, point) {
+
+  var date = new Date(point.xval);
+  var yval = point.yval.toFixed(2);
+  var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
+
+  if (!removeAnnotation(mainChart, text)) {
+
+    var annotations = mainChart.annotations();
+
+    var width = 50 * ('' + yval).length / 6;
+
+    annotations.push({
+      series: point.name,
+      x: formatCVSTimeStamp(date),
+      shortText: yval,
+      text: text,
+      width: width,
+      clickHandler: function(annotation, point, chart, event) {
+        removeAnnotation(chart, annotation.text);
+      }
+    });
+
+    mainChart.setAnnotations(annotations);
+  }
+}
+
+function removeAnnotation(chart, text) {
+
+  var remaining = new Array();
+  var annotations = chart.annotations();
+
+  for (var i = 0; i < annotations.length; i++) {
+    if (annotations[i].text != text) {
+      remaining.push(annotations[i]);
+    }
+  }
+
+  if (remaining.length != annotations.length) {
+    chart.setAnnotations(remaining);
+    return true;
+    
+  } else {
+    return false;
+  }
 }

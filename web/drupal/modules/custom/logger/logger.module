@@ -760,10 +760,11 @@ function theme_logger_dashboard_area($chart) {
   $xvalue2 = $chart->xaxis[1] * 1000;
 
   $chart_properties = array(
-    'height'       => CHART_HEIGHT,
-    'dateWindow'   => "[$xvalue1, $xvalue2]",
-    'drawCallback' => 'updateControlForm',
-    'zoomCallback' => 'updateSliderChart'
+    'height'             => CHART_HEIGHT,
+    'dateWindow'         => "[$xvalue1, $xvalue2]",
+    'drawCallback'       => 'updateControlForm',
+    'zoomCallback'       => 'updateSliderChart',
+    'pointClickCallback' => 'addAnnotation'
   );
 
   if ($chart->context == 'logger') {
