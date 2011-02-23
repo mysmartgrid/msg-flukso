@@ -108,6 +108,21 @@ function removeChartSeries(uid, i, username) {
   }
 }
 
+function updateSmoothingLevel(fieldId, step) {
+
+  var field = document.getElementById(fieldId);
+  var level = field.value * 1 + step;
+  level = level < 1 ? 1 : level;
+  field.value = level;
+
+  mainChart.updateOptions({rollPeriod: level});
+  sliderChart.updateOptions({rollPeriod: level});
+
+  $.get('/logger/smoothinglevel/' + level);
+
+  return true;
+}
+
 function updateMainChart(xvalue1, xvalue2, yvalues) {
 
   mainChart.updateOptions({dateWindow: [xvalue1, xvalue2]});

@@ -95,6 +95,14 @@ function logger_menu() {
     'type'             => MENU_CALLBACK
   );
 
+  $items['logger/smoothinglevel'] = array(
+    'title'            => 'Changes the chart smoothing level',
+    'page callback'    => '_logger_set_smoothing_level',
+    'page arguments'   => array(2),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
   $items['logger/remove/user'] = array(
     'title'            => 'Removes a chart series',
     'page callback'    => '_logger_remove_user',
@@ -1126,8 +1134,7 @@ function logger_control_form(&$form_state, $chart) {
     '#size'           => 5,
     '#text-align'     => 'center',
     '#default_value'  => _logger_get_smoothing_level(),
-    '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#required'       => TRUE
   );
 
   $form['yvalue'] = array(
@@ -1172,15 +1179,9 @@ function logger_control_form(&$form_state, $chart) {
  */
 function theme_logger_smoothing_level($element) {
 
-  function _operation_button($field, $caption, $step) {
-
-    $onclick = "
-      var field = document.getElementById('$field');
-      var level = field.value - (-1 * ($step));
-      field.value = level < 1? 1: level;
-      field.onchange();";
-
-    return '<input type="button" value="' . $caption . '" onclick="' . $onclick . '"/>';
+  function _operation_button($field_id, $caption, $step) {
+    return '<input type="button" value="' . $caption . '" '.
+      'onClick="javascript: return updateSmoothingLevel(' . "'$field_id', " . $step . ');"/>';
   }
 
   $id = $element['#id'];
