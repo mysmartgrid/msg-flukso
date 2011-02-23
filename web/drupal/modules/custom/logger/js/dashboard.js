@@ -180,7 +180,7 @@ function highlightChartArea(canvas, area, sliderChart) {
 }
 
 function hideZeroY(value) {
-  return value == 0 ? "" : value;
+  return value == 0 ? "" : value.toFixed(2);
 }
 
 function updateLegend(chart) {
