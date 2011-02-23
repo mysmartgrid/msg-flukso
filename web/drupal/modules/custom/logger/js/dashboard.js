@@ -86,9 +86,26 @@ function removeChartSeries(uid, i, username) {
 
   var form = document.getElementById('logger-control-form');
   var field = form.elements['new_user'];
-  field.options[field.length] = new Option(username, uid);
+  var found = false;
 
-  $.get('/logger/remove/user/' + uid);
+  for (var p = 0; !found && p < field.options.length; p++) {
+    found = (field.options[p].text == username);
+  }
+
+  if (!found) {
+    field.options[field.length] = new Option(username, uid);
+
+    Array.prototype.sort.call(
+      field.options,
+      function (option1, option2) {
+        var text1 = option1.text.toLowerCase();
+        var text2 = option2.text.toLowerCase();
+        return text1 < text2 ? -1 : text1 > text2 ? 1 : 0;
+      }
+    );
+
+    $.get('/logger/remove/user/' + uid);
+  }
 }
 
 function updateMainChart(xvalue1, xvalue2, yvalues) {
