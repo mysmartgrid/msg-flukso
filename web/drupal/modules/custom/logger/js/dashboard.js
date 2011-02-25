@@ -306,3 +306,65 @@ function removePointAnnotation(chart, text) {
     return false;
   }
 }
+
+function createMonitorChart(id, last, current, intervals, names, colors) {
+
+  var xticks = [names.length];
+  var data1 = [names.length];
+  var data2 = [names.length];
+  var data3 = [names.length];
+
+  for (var i = 0; i < names.length; i++) {
+    
+    var perc  = current[i] / last[i];
+    var remaining = 1 - perc;
+    var exceeded = 0;
+
+    if (perc > 1) {
+      exceeded = perc - 1;
+      perc = 1;
+      remaining = 0;
+    }
+
+    data1[i]  = [i, perc];
+    data2[i]  = [i, remaining];
+    data3[i]  = [i, exceeded];
+    xticks[i] = [i, names[i]];
+  }
+
+  $.plot($('#' + id), [ {data: data1}, {data: data2}, {data: data3} ],
+    {
+      colors: colors,
+      series: {
+        stack: 0,
+        bars: {
+          show: true,
+          barWidth: 0.5,
+          lineWidth: 0,
+          fill: 1,
+          align: 'center'
+        }
+      },
+      xaxis: {
+        min: -0.5,
+        max: (names.length - 0.5),
+        ticks: xticks
+      },
+      yaxis: {
+        tickFormatter: function (value, axis) {
+          return (value * 100).toFixed(0) + ' %';
+        }
+      },
+      grid: {
+        clickable: true
+      }
+    });
+
+  $('#' + id).bind('plotclick', 
+    function (event, pos, item) {
+      if (item) {
+        window.location = '/logger/electricity/' + intervals[item.dataIndex];
+      }
+    }
+  );
+}

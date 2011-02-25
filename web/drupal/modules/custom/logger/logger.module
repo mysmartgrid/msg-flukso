@@ -57,6 +57,9 @@ function logger_init() {
 
   jquery_ui_add(array('ui.datepicker'));
   drupal_add_css(ROOT_PATH . '/style/ui.datepicker.css');
+
+  drupal_add_js(ROOT_PATH . '/js/flot/jquery.flot.js');
+  drupal_add_js(ROOT_PATH . '/js/flot/jquery.flot.stack.js');
 }
 
 function logger_perm() {
@@ -85,6 +88,14 @@ function logger_menu() {
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
+  );
+
+  $items['monitor'] = array(
+    'title'            => 'Power consumption monitor',
+    'description'      => 'Show the power consumption monitor',
+    'page callback'    => '_logger_monitor',
+    'access callback'  => TRUE,
+    'type'             => MENU_NORMAL_ITEM
   );
 
   $items['logger/color'] = array(
@@ -290,7 +301,10 @@ function _logger_dashboard($type, $interval) {
     $yvalue1 = _logger_get_yvalue(1);
     $yvalue2 = _logger_get_yvalue(2);
 
-    $sensors = _logger_get_user_sensors($type);
+    $sensors = array_merge(
+      _logger_get_user_sensors($type),
+      _logger_get_subscribed_sensors($type)
+    );
 
     $chart = _logger_create_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
@@ -383,6 +397,142 @@ function _logger_overview($type, $interval) {
 }
 
 /**
+ * Builds the monitor page.
+ *
+ * @return the monitor page
+ */
+function _logger_monitor() {
+
+  global $user;
+  $cache_id = "logger_monitor_chart_data_$user->uid";
+  $cache = cache_get($cache_id, 'cache_page');
+  $data = $cache->data;
+
+  $intervals = array('hour', 'day', 'week', 'month', 'year');
+  $names = array(t('Hour'), t('Day'), t('Week'), t('Month'), t('Year'));
+  $colors = array('#669999', '#CCCCCC', '#a5d2d9');
+
+  if (!$data) {
+
+    $sensors = _logger_get_user_sensors('electricity');
+    $now = getdate();
+    $extra_days['week']  = 4; //subtract period between 01/01/1970 to 03/01/1970
+    $extra_days['month'] = $now['mday'] - 1;
+    $extra_days['year']  = $now['yday'];
+
+    foreach ($intervals as $interval) {
+
+      $offset = $extra_days[$interval] * DAY +
+        $now[0] % ($interval == 'hour' ? HOUR : DAY);
+
+      $window = _logger_get_default_time_window($interval);
+
+      $time1 = $now[0] - $offset - $window;
+      $time2 = $time1 + $window;
+
+      $data['last'][]    = _logger_sum_power_consumption($sensors, $interval, $time1, $time2);
+      $data['current'][] = _logger_sum_power_consumption($sensors, $interval, $time2, $now[0]);
+    }
+
+    cache_set($cache_id, $data, 'cache_page', $now[0] + 15 * MINUTE);
+  }
+
+  drupal_set_title(t('Your power consumption'));
+
+  $output = t("The following chart compares your current power consumption with
+    previous levels in six different time windows. If you need more information
+    about one of the bars, click it to jump to the dashboard chart.") . '<br><br>';
+
+  $output .= "<div id='monitorchart' style='width: 600px; height: 300px;'></div>
+    <script type='text/javascript'>
+      createMonitorChart('monitorchart',
+        ["  . implode(', '  , $data['last'])    .  "],
+        ["  . implode(', '  , $data['current']) .  "],
+        ['" . implode("', '", $intervals)       . "'],
+        ['" . implode("', '", $names)           . "'],
+        ['" . implode("', '", $colors)          . "']);
+    </script>";
+
+  //colors legend
+  $lines = array(
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $colors[0] . ';"/>',
+      t('How much has been consumed in comparison to the previous time window.')
+    ),
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $colors[1] . ';"/>',
+      t('How much remains to equal the consmuption in the previous time window.')
+    ),
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $colors[2] . ';"/>',
+      t('How much the current consumption has exceeded the previous one.')
+    )
+  );
+
+  $output .= '<br><br>' . theme('table', array(), $lines);
+
+  //values legend
+  $lines = array();
+  
+  for ($i = 0; $i < count($intervals); $i++) {
+
+    $consumed  = $data['current'][$i];
+    $last      = $data['last'][$i];
+    $remaining = $consumed >= $last ? '' : number_format($last - $consumed, 2);
+    $exceeding = $consumed <= $last ? '' : number_format($consumed - $last, 2);
+    $consumed  = $consumed ? number_format($consumed, 2) : '';
+    $last      = $last ? number_format($last, 2) : '';
+
+    $lines[$i] = array(
+      array('data' => $names[$i], 'align' => 'left'),
+      array('data' => $consumed,  'align' => 'right'),
+      array('data' => $last,      'align' => 'right'),
+      array('data' => $remaining, 'align' => 'right'),
+      array('data' => $exceeding, 'align' => 'right')
+    );
+  }
+
+  $header = array(
+    array('data' => t('Interval')),
+    array('data' => t('Consumed')),
+    array('data' => t('Last')),
+    array('data' => t('Remaining')),
+    array('data' => t('Exceeding'))
+  );
+
+  $output .= '<br>' . theme('table', $header, $lines);
+
+  return $output;
+}
+
+/**
+ * Sums the power consumption during the specified time period.
+ *
+ * @param $sensors  The sensors whose measurements are to be summed up.
+ * @param $interval The time interval menu option.
+ * @param $start    The period start timestamp.
+ * @param $end      The period end timestamp.
+ * @return the summed power consumption.
+ */
+function _logger_sum_power_consumption($sensors, $interval, $start, $end) {
+
+  $resolution = _logger_get_resolution($interval);
+  $period = _logger_get_period($interval, $resolution, $start, $end);
+  $offset = _logger_get_timezone_offset();
+  $sum = 0;
+
+  foreach ($sensors as $sensor) {
+    $measurements = logger_rrd_query_sensor($interval, $sensor, 3600, $offset, $period, $resolution);
+
+    foreach($measurements as $timestamp => $value) {
+      $sum += $value;
+    }
+  }
+
+  return $sum;
+}
+
+/**
  * Creates an object to hold all chart parameters.
  *
  * @param $interval The time interval.
@@ -448,7 +598,7 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
   $chart->sensors = $sensors;
   $chart->file_path = _logger_compose_chart_file_path($chart);
 
-  $cache_id = "logger_chart_data_$chart->file_path";
+  $cache_id = "logger_dashboard_chart_data_$chart->file_path";
   $cache = cache_get($cache_id, 'cache_page');
 
   if ($cache->data) {
@@ -499,16 +649,14 @@ function _logger_compose_chart_file_path($chart) {
 }
 
 /**
- * Returns an array containing all sensors either owned by the user or selected
- * by him to be plotted on the chart.
+ * Returns an array containing all sensors owned by the user.
  * 
- * @param $type       The type of sensors to be returned.
+ * @param $type  The type of sensors to be returned.
  * @return the array of user sensors.
  */
 function _logger_get_user_sensors($type) {
 
   global $user;
-  $sensors = array();
 
   $sql = "
     SELECT
@@ -530,9 +678,22 @@ function _logger_get_user_sensors($type) {
 
   $result = db_query($sql, $user->name, $user->uid, $type);
 
+  $sensors = array();
   while ($sensor = db_fetch_object($result)) {
     $sensors[] = $sensor;
   }
+  return $sensors;
+}
+
+/**
+ * Returns an array containing all sensors selected to be plotted on the chart.
+ *
+ * @param $type  The type of sensors to be returned.
+ * @return the array of user sensors.
+ */
+function _logger_get_subscribed_sensors($type) {
+
+  global $user;
 
   if (user_access('logger')) {
 
@@ -560,6 +721,7 @@ function _logger_get_user_sensors($type) {
 
     $result = db_query($sql, $user->uid, 'subscription', $type);
 
+    $sensors = array();
     while($sensor = db_fetch_object($result)) {
       $sensors[] = $sensor;
     }
@@ -1555,12 +1717,12 @@ function _logger_get_resolutions_options() {
 function _logger_get_default_time_window($interval) {
 
   $windows = array(
-    'hour'  =>  1 * HOUR,
-    'day'   =>  1 * DAY,
-    'days'  =>  3 * DAY,
-    'week'  =>  1 * WEEK,
-    'month' => 60 * DAY,
-    'year'  =>  1 * YEAR
+    'hour'  =>   1 * HOUR,
+    'day'   =>   1 * DAY,
+    'days'  =>   3 * DAY,
+    'week'  =>   7 * DAY,
+    'month' =>  30 * DAY,
+    'year'  => 365 * DAY
   );
   return $windows[$interval];
 }
