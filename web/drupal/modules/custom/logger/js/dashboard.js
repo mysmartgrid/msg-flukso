@@ -307,28 +307,25 @@ function removePointAnnotation(chart, text) {
   }
 }
 
-function createMonitorChart(id, last, current, intervals, names, colors) {
+function formatFraction(n, d) {
+  return (n > 0 && d > 0) ? n / d : 0;
+}
+
+function createMonitorChart(id, current, average, intervals, names, colors) {
 
   var xticks = [names.length];
-  var data1 = [names.length];
-  var data2 = [names.length];
-  var data3 = [names.length];
+  var data1  = [names.length];
+  var data2  = [names.length];
+  var data3  = [names.length];
+  var perc;
 
   for (var i = 0; i < names.length; i++) {
-    
-    var perc  = current[i] / last[i];
-    var remaining = 1 - perc;
-    var exceeded = 0;
 
-    if (perc > 1) {
-      exceeded = perc - 1;
-      perc = 1;
-      remaining = 0;
-    }
+    perc = current[i] / average[i];
 
-    data1[i]  = [i, perc];
-    data2[i]  = [i, remaining];
-    data3[i]  = [i, exceeded];
+    data1[i]  = [i, (perc < 1 ? perc     : 1)];
+    data2[i]  = [i, (perc < 1 ? 1 - perc : 0)];
+    data3[i]  = [i, (perc > 1 ? perc - 1 : 0)];
     xticks[i] = [i, names[i]];
   }
 

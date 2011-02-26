@@ -403,24 +403,109 @@ function _logger_overview($type, $interval) {
  */
 function _logger_monitor() {
 
+  $names = array(
+    'hour'  => t('Hour'),
+    'day'   => t('Day'),
+    'week'  => t('Week'),
+    'month' => t('Month'),
+    'year'  => t('Year')
+  );
+
+  $series = _logger_create_monitor_chart_series($names);
+
+  drupal_set_title(t('Your power consumption'));
+
+  $output = t("The following chart compares your current power consumption with
+    your average consumption in six different time windows. If you need more information
+    about one of the bars, click it to jump to the dashboard chart.") . '<br><br>';
+
+  $output .= "<div id='monitorchart' style='width: 600px; height: 300px;'></div>
+    <script type='text/javascript'>
+      createMonitorChart('monitorchart',
+        ["  . implode(', '  , $series['current'])   .  "],
+        ["  . implode(', '  , $series['average'])   .  "],
+        ['" . implode("', '", array_keys($names))   . "'],
+        ['" . implode("', '", $names)               . "'],
+        ['" . implode("', '", $series['colors'])    . "']);
+    </script>";
+
+  //colors legend
+  $lines = array(
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['current'] . ';"/>',
+      t('How much has been consumed in comparison to the average level.')
+    ),
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['remaining'] . ';"/>',
+      t('How much remains to equal the average level.')
+    ),
+    array(
+      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['exceeding'] . ';"/>',
+      t('How much the current consumption has exceeded the average level.')
+    )
+  );
+
+  $output .= '<br><br>' . theme('table', array(), $lines);
+
+  function _format_value($value) {
+    return $value > 0 ? number_format($value, 2) : '';
+  }
+
+  //values legend
+  $lines = array();
+
+  foreach ($names as $i => $name) {
+
+    $lines[] = array(
+      array('data' => $name,                                   'align' => 'left'),
+      array('data' => _format_value($series['current'][$i]),   'align' => 'right'),
+      array('data' => _format_value($series['average'][$i]),   'align' => 'right'),
+      array('data' => _format_value($series['remaining'][$i]), 'align' => 'right'),
+      array('data' => _format_value($series['exceeding'][$i]), 'align' => 'right')
+    );
+  }
+
+  $header = array(
+    array('data' => t('Interval')),
+    array('data' => t('Current')),
+    array('data' => t('Average')),
+    array('data' => t('Remaining')),
+    array('data' => t('Exceeding'))
+  );
+
+  $output .= '<br>' . theme('table', $header, $lines);
+
+  return $output;
+}
+
+/**
+ * Creates an array representing the monitor chart series.
+ *
+ * @param $names  An array of series names indexed by intervals.
+ * @return the array of chart series.
+ */
+function _logger_create_monitor_chart_series($names) {
+
   global $user;
   $cache_id = "logger_monitor_chart_data_$user->uid";
   $cache = cache_get($cache_id, 'cache_page');
-  $data = $cache->data;
+  $series = $cache->data;
 
-  $intervals = array('hour', 'day', 'week', 'month', 'year');
-  $names = array(t('Hour'), t('Day'), t('Week'), t('Month'), t('Year'));
-  $colors = array('#669999', '#CCCCCC', '#a5d2d9');
+  if (!$series) {
 
-  if (!$data) {
+    $series['colors'] = array(
+      'current'   => '#669999',
+      'remaining' => '#CCCCCC',
+      'exceeding' => '#a5d2d9'
+    );
 
     $sensors = _logger_get_user_sensors('electricity');
     $now = getdate();
-    $extra_days['week']  = 4; //subtract period between 01/01/1970 to 03/01/1970
+    $extra_days['week']  = $now['wday'];
     $extra_days['month'] = $now['mday'] - 1;
     $extra_days['year']  = $now['yday'];
 
-    foreach ($intervals as $interval) {
+    foreach ($names as $interval => $name) {
 
       $offset = $extra_days[$interval] * DAY +
         $now[0] % ($interval == 'hour' ? HOUR : DAY);
@@ -430,79 +515,22 @@ function _logger_monitor() {
       $time1 = $now[0] - $offset - $window;
       $time2 = $time1 + $window;
 
-      $data['last'][]    = _logger_sum_power_consumption($sensors, $interval, $time1, $time2);
-      $data['current'][] = _logger_sum_power_consumption($sensors, $interval, $time2, $now[0]);
+      //TODO: consider average, not last consumption
+      $average = _logger_sum_power_consumption($sensors, $interval, $time1, $time2);
+      $current = _logger_sum_power_consumption($sensors, $interval, $time2, $now[0]);
+
+      //FIXME: remove
+      //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
+
+      $series['average'][$interval]   = $average;
+      $series['current'][$interval]   = $current;
+      $series['remaining'][$interval] = $average - $current;
+      $series['exceeding'][$interval] = $current - $average;
     }
 
-    cache_set($cache_id, $data, 'cache_page', $now[0] + 15 * MINUTE);
+    cache_set($cache_id, $series, 'cache_page', $now[0] + 15 * MINUTE);
   }
-
-  drupal_set_title(t('Your power consumption'));
-
-  $output = t("The following chart compares your current power consumption with
-    previous levels in six different time windows. If you need more information
-    about one of the bars, click it to jump to the dashboard chart.") . '<br><br>';
-
-  $output .= "<div id='monitorchart' style='width: 600px; height: 300px;'></div>
-    <script type='text/javascript'>
-      createMonitorChart('monitorchart',
-        ["  . implode(', '  , $data['last'])    .  "],
-        ["  . implode(', '  , $data['current']) .  "],
-        ['" . implode("', '", $intervals)       . "'],
-        ['" . implode("', '", $names)           . "'],
-        ['" . implode("', '", $colors)          . "']);
-    </script>";
-
-  //colors legend
-  $lines = array(
-    array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $colors[0] . ';"/>',
-      t('How much has been consumed in comparison to the previous time window.')
-    ),
-    array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $colors[1] . ';"/>',
-      t('How much remains to equal the consmuption in the previous time window.')
-    ),
-    array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $colors[2] . ';"/>',
-      t('How much the current consumption has exceeded the previous one.')
-    )
-  );
-
-  $output .= '<br><br>' . theme('table', array(), $lines);
-
-  //values legend
-  $lines = array();
-  
-  for ($i = 0; $i < count($intervals); $i++) {
-
-    $consumed  = $data['current'][$i];
-    $last      = $data['last'][$i];
-    $remaining = $consumed >= $last ? '' : number_format($last - $consumed, 2);
-    $exceeding = $consumed <= $last ? '' : number_format($consumed - $last, 2);
-    $consumed  = $consumed ? number_format($consumed, 2) : '';
-    $last      = $last ? number_format($last, 2) : '';
-
-    $lines[$i] = array(
-      array('data' => $names[$i], 'align' => 'left'),
-      array('data' => $consumed,  'align' => 'right'),
-      array('data' => $last,      'align' => 'right'),
-      array('data' => $remaining, 'align' => 'right'),
-      array('data' => $exceeding, 'align' => 'right')
-    );
-  }
-
-  $header = array(
-    array('data' => t('Interval')),
-    array('data' => t('Consumed')),
-    array('data' => t('Last')),
-    array('data' => t('Remaining')),
-    array('data' => t('Exceeding'))
-  );
-
-  $output .= '<br>' . theme('table', $header, $lines);
-
-  return $output;
+  return $series;
 }
 
 /**
@@ -528,7 +556,6 @@ function _logger_sum_power_consumption($sensors, $interval, $start, $end) {
       $sum += $value;
     }
   }
-
   return $sum;
 }
 
