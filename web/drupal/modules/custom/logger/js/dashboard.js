@@ -20,6 +20,7 @@
 
 var mainChart;
 var sliderChart;
+var monitorChart;
 
 function formatDate(d) {
   return '' +
@@ -245,10 +246,18 @@ function updateLegendValue(name, i, value) {
   div.innerHTML = value > 0 ? value.toFixed(2) : '';
 }
 
-function setLineColor(i, color) {
+function setDashboardLineColor(i, color) {
 
   updateChartColors(mainChart, i, color);
   updateChartColors(sliderChart, i, color);
+
+  $.get('/logger/color/' + i + '/' + escape('#' + color));
+}
+
+function setMonitorBarColor(i, color) {
+
+  monitorChart.options['colors'][i] = '#' + color;
+  monitorChart.plot();
 
   $.get('/logger/color/' + i + '/' + escape('#' + color));
 }
@@ -329,8 +338,8 @@ function createMonitorChart(id, current, average, intervals, names, colors) {
     xticks[i] = [i, names[i]];
   }
 
-  $.plot($('#' + id), [ {data: data1}, {data: data2}, {data: data3} ],
-    {
+  var data = [ {data: data1}, {data: data2}, {data: data3} ];
+  var options = {
       colors: colors,
       series: {
         stack: 0,
@@ -355,13 +364,24 @@ function createMonitorChart(id, current, average, intervals, names, colors) {
       grid: {
         clickable: true
       }
-    });
+    };
 
-  $('#' + id).bind('plotclick', 
-    function (event, pos, item) {
-      if (item) {
-        window.location = '/logger/electricity/' + intervals[item.dataIndex];
+  monitorChart = new Object();
+  monitorChart.id = id;
+  monitorChart.data = data;
+  monitorChart.options = options;
+
+  monitorChart.plot = function() {
+    $.plot($('#' + id), data, options);
+
+    $('#' + id).bind('plotclick',
+      function (event, pos, item) {
+        if (item) {
+          window.location = '/logger/electricity/' + intervals[item.dataIndex];
+        }
       }
-    }
-  );
+    );
+  };
+
+  monitorChart.plot();
 }

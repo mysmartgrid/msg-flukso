@@ -412,35 +412,38 @@ function _logger_monitor() {
   );
 
   $series = _logger_create_monitor_chart_series($names);
+  $colors = _logger_get_series_colors();
 
   drupal_set_title(t('Your power consumption'));
 
-  $output = t("The following chart compares your current power consumption with
-    your average consumption in six different time windows. If you need more information
-    about one of the bars, click it to jump to the dashboard chart.") . '<br><br>';
+  $output = t('The following chart compares your current power consumption ' .
+    'with your average consumption in six different time windows. ' .
+    'If you need more information about one of the bars, click it to jump ' .
+    'to the dashboard chart.') . '<br><br>';
 
   $output .= "<div id='monitorchart' style='width: 600px; height: 300px;'></div>
     <script type='text/javascript'>
       createMonitorChart('monitorchart',
-        ["  . implode(', '  , $series['current'])   .  "],
-        ["  . implode(', '  , $series['average'])   .  "],
-        ['" . implode("', '", array_keys($names))   . "'],
-        ['" . implode("', '", $names)               . "'],
-        ['" . implode("', '", $series['colors'])    . "']);
+        ["  . implode(', '  , $series['current']) .  "],
+        ["  . implode(', '  , $series['average']) .  "],
+        ['" . implode("', '", array_keys($names)) . "'],
+        ['" . implode("', '", $names)             . "'],
+        ['" . implode("', '", $colors)            . "']);
     </script>";
+
 
   //colors legend
   $lines = array(
     array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['current'] . ';"/>',
+      theme('logger_color_picker', 0, $colors, "setMonitorBarColor"),
       t('How much has been consumed in comparison to the average level.')
     ),
     array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['remaining'] . ';"/>',
+      theme('logger_color_picker', 1, $colors, "setMonitorBarColor"),
       t('How much remains to equal the average level.')
     ),
     array(
-      '<div style="width: 15px; height: 15px; background-color: ' . $series['colors']['exceeding'] . ';"/>',
+      theme('logger_color_picker', 2, $colors, "setMonitorBarColor"),
       t('How much the current consumption has exceeded the average level.')
     )
   );
@@ -492,12 +495,6 @@ function _logger_create_monitor_chart_series($names) {
   $series = $cache->data;
 
   if (!$series) {
-
-    $series['colors'] = array(
-      'current'   => '#669999',
-      'remaining' => '#CCCCCC',
-      'exceeding' => '#a5d2d9'
-    );
 
     $sensors = _logger_get_user_sensors('electricity');
     $now = getdate();
@@ -911,6 +908,13 @@ function logger_theme() {
       'arguments' => array(
         'element' => NULL),
     ),
+
+    'logger_color_picker' => array(
+      'arguments' => array(
+        'index'    => NULL,
+        'colors'   => NULL,
+        'onchange' => NULL),
+    ),
   );
 }
 
@@ -1069,13 +1073,7 @@ function _logger_create_chart_legend($chart) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $meter => $measurements) {
 
-        $color = $chart->colors[$i % count($chart->colors)];
-
-        $id = SERIES_COLOR_ID . $i;
-        $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
-          style="width: 10px; height: 10px; color: transparent;"/>
-          <input id="' . $id . '" type="hidden" value="' . $color . '"
-          onchange="javascript: setLineColor(' . $i . ', this.value);"/>';
+        $mark = theme('logger_color_picker', $i, $chart->colors, 'setDashboardLineColor');
 
         $operations = ($uid > 0 && $uid != $user->uid)?
           '<a href="javascript: void(0)" OnClick="javascript: removeChartSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
@@ -1415,6 +1413,30 @@ function theme_logger_time_period($element) {
   $field2 = _logger_create_time_fields($element, 2);
 
   return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+/**
+ * Builds a color picker component.
+ * 
+ * @param $i          The color index.
+ * @param $colors     The array of colors.
+ * @param $on_change  The javascript function to execute on color selection.
+ * @return the picker HTML code.
+ */
+function theme_logger_color_picker($i, $colors, $onchange) {
+
+  $id = SERIES_COLOR_ID . $i;
+  return '
+    <input
+      class="color {valueElement:' . "'$id'" . '}
+      type="button"
+      style="width: 10px; height: 10px; color: transparent;"/>
+
+    <input
+      id="' . $id . '"
+      type="hidden"
+      value="' . $colors[$i % count($colors)] . '"
+      onchange="javascript: ' . $onchange . "($i, this.value)" . ';"/>';
 }
 
 /**
