@@ -35,15 +35,16 @@ define('YEAR',   52 * WEEK);
 define('CHART_REFRESH', 15 * MINUTE);
 define('CHART_HEIGHT', 350);
 define('SLIDER_HEIGHT', 50);
-define('CHART_UNIT', 'logger_chart_unit');
-define('SERIES_COLOR_ID', 'logger_series_color_id');
-define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_id');
-define('STEP_PLOT_ID', 'logger_step_plot');
+
+define('CHART_UNIT_ID', 'logger_chart_unit_');
+define('SERIES_COLOR_ID', 'logger_series_color_');
+define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_');
+define('STEP_PLOT_ID', 'logger_step_plot_');
 
 function logger_init() {
   
   drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
-  drupal_add_js(ROOT_PATH . '/js/dashboard.js');
+  drupal_add_js(ROOT_PATH . '/js/charts.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
@@ -101,7 +102,7 @@ function logger_menu() {
   $items['logger/color'] = array(
     'title'            => 'Changes the series color',
     'page callback'    => '_logger_series_color',
-    'page arguments'   => array(2, 3),
+    'page arguments'   => array(2, 3, 4),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
@@ -412,12 +413,12 @@ function _logger_monitor() {
   );
 
   $series = _logger_create_monitor_chart_series($names);
-  $colors = _logger_get_series_colors();
+  $colors = _logger_get_series_colors('monitor');
 
   drupal_set_title(t('Your power consumption'));
 
   $output = t('The following chart compares your current power consumption ' .
-    'with your average consumption in six different time windows. ' .
+    'with your previous consumption in six different time windows. ' .
     'If you need more information about one of the bars, click it to jump ' .
     'to the dashboard chart.') . '<br><br>';
 
@@ -425,7 +426,7 @@ function _logger_monitor() {
     <script type='text/javascript'>
       createMonitorChart('monitorchart',
         ["  . implode(', '  , $series['current']) .  "],
-        ["  . implode(', '  , $series['average']) .  "],
+        ["  . implode(', '  , $series['previous']) .  "],
         ['" . implode("', '", array_keys($names)) . "'],
         ['" . implode("', '", $names)             . "'],
         ['" . implode("', '", $colors)            . "']);
@@ -435,16 +436,16 @@ function _logger_monitor() {
   //colors legend
   $lines = array(
     array(
-      theme('logger_color_picker', 0, $colors, "setMonitorBarColor"),
-      t('How much has been consumed in comparison to the average level.')
+      theme('logger_color_picker', 'monitor', 0, $colors),
+      t('How much has been consumed in comparison to the previous level.')
     ),
     array(
-      theme('logger_color_picker', 1, $colors, "setMonitorBarColor"),
-      t('How much remains to equal the average level.')
+      theme('logger_color_picker', 'monitor', 1, $colors),
+      t('How much remains to equal the previous level.')
     ),
     array(
-      theme('logger_color_picker', 2, $colors, "setMonitorBarColor"),
-      t('How much the current consumption has exceeded the average level.')
+      theme('logger_color_picker', 'monitor', 2, $colors),
+      t('How much the current consumption has exceeded the previous level.')
     )
   );
 
@@ -462,18 +463,20 @@ function _logger_monitor() {
     $lines[] = array(
       array('data' => $name,                                   'align' => 'left'),
       array('data' => _format_value($series['current'][$i]),   'align' => 'right'),
-      array('data' => _format_value($series['average'][$i]),   'align' => 'right'),
+      array('data' => _format_value($series['previous'][$i]),    'align' => 'right'),
       array('data' => _format_value($series['remaining'][$i]), 'align' => 'right'),
       array('data' => _format_value($series['exceeding'][$i]), 'align' => 'right')
     );
   }
 
+  $unit = ' (' . t('Wh') . ')';
+
   $header = array(
     array('data' => t('Interval')),
-    array('data' => t('Current')),
-    array('data' => t('Average')),
-    array('data' => t('Remaining')),
-    array('data' => t('Exceeding'))
+    array('data' => t('Current')   . $unit),
+    array('data' => t('Previous')  . $unit),
+    array('data' => t('Remaining') . $unit),
+    array('data' => t('Exceeding') . $unit)
   );
 
   $output .= '<br>' . theme('table', $header, $lines);
@@ -512,17 +515,15 @@ function _logger_create_monitor_chart_series($names) {
       $time1 = $now[0] - $offset - $window;
       $time2 = $time1 + $window;
 
-      //TODO: consider average, not last consumption
-      $average = _logger_sum_power_consumption($sensors, $interval, $time1, $time2);
-      $current = _logger_sum_power_consumption($sensors, $interval, $time2, $now[0]);
+      $previous = _logger_query_energy_consumption($sensors, $interval, $time1, $time2);
+      $current  = _logger_query_energy_consumption($sensors, $interval, $time2, $now[0]);
 
-      //FIXME: remove
-      //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
-
-      $series['average'][$interval]   = $average;
+      $series['previous'][$interval]  = $previous;
       $series['current'][$interval]   = $current;
-      $series['remaining'][$interval] = $average - $current;
-      $series['exceeding'][$interval] = $current - $average;
+      $series['remaining'][$interval] = $previous - $current;
+      $series['exceeding'][$interval] = $current - $previous;
+
+      //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
     }
 
     cache_set($cache_id, $series, 'cache_page', $now[0] + 15 * MINUTE);
@@ -531,7 +532,7 @@ function _logger_create_monitor_chart_series($names) {
 }
 
 /**
- * Sums the power consumption during the specified time period.
+ * Sums the energy consumption during the specified time period, in watt-hour.
  *
  * @param $sensors  The sensors whose measurements are to be summed up.
  * @param $interval The time interval menu option.
@@ -539,7 +540,7 @@ function _logger_create_monitor_chart_series($names) {
  * @param $end      The period end timestamp.
  * @return the summed power consumption.
  */
-function _logger_sum_power_consumption($sensors, $interval, $start, $end) {
+function _logger_query_energy_consumption($sensors, $interval, $start, $end) {
 
   $resolution = _logger_get_resolution($interval);
   $period = _logger_get_period($interval, $resolution, $start, $end);
@@ -547,10 +548,11 @@ function _logger_sum_power_consumption($sensors, $interval, $start, $end) {
   $sum = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, 3600, $offset, $period, $resolution);
+    //The measurements are stored in (Wh / s)
+    $measurements = logger_rrd_query_sensor($interval, $sensor, 1, $offset, $period, $resolution);
 
     foreach($measurements as $timestamp => $value) {
-      $sum += $value;
+      $sum += $value * $resolution; //TODO: check if this calculation is right.
     }
   }
   return $sum;
@@ -588,7 +590,7 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
   $chart->resolution = _logger_get_resolution($interval);
   $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->offset = _logger_get_timezone_offset();
-  $chart->colors = _logger_get_series_colors();
+  $chart->colors = _logger_get_series_colors($context);
 
   switch ($type) {
     case 'electricity':
@@ -911,9 +913,9 @@ function logger_theme() {
 
     'logger_color_picker' => array(
       'arguments' => array(
+        'chartId'  => NULL,
         'index'    => NULL,
-        'colors'   => NULL,
-        'onchange' => NULL),
+        'colors'   => NULL),
     ),
   );
 }
@@ -1073,7 +1075,7 @@ function _logger_create_chart_legend($chart) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $meter => $measurements) {
 
-        $mark = theme('logger_color_picker', $i, $chart->colors, 'setDashboardLineColor');
+        $mark = theme('logger_color_picker', $chart->context, $i, $chart->colors);
 
         $operations = ($uid > 0 && $uid != $user->uid)?
           '<a href="javascript: void(0)" OnClick="javascript: removeChartSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
@@ -1132,14 +1134,15 @@ function _logger_get_all_timestamps($data) {
 /**
  * Sets the chart series color.
  *
- * @param $i      The chart series' index.
- * @param $color  The new chart series' color.
+ * @param $chart_id  The chart id.
+ * @param $i         The chart series' index.
+ * @param $color     The new chart series' color.
  */
-function _logger_series_color($i, $color) {
+function _logger_series_color($chart_id, $i, $color) {
 
   global $_REQUEST;
   global $user;
-  $id = SERIES_COLOR_ID . $i;
+  $id = SERIES_COLOR_ID . $chart_id . "_$i";
 
   if ($user) {
     $id .= '_' . $user->uid;
@@ -1153,42 +1156,58 @@ function _logger_series_color($i, $color) {
 /**
  * Returns the list of colors used in chart series.
  *
+ * @param $chart_id   The chart id.
  * @return array of colors.
  */
-function _logger_get_series_colors() {
+function _logger_get_series_colors($chart_id) {
 
-  function _get_color($i, $default) {
+  $palettes['monitor'] = array(
+    '#377037', //GREEN
+    '#9ED3C0', //GREEN3
+    '#C0C0C0'  //GRAY2
+  );
+  $palettes['logger'] = array(
+    '#377037', //GREEN
+    '#0000FC', //BLUE
+    '#C11700', //RED
+    '#F37E2B', //ORANGE
+    '#B54FC6', //PINK
+    '#809090', //GREY
+    '#665C00', //BROWN
+    '#050305', //BLACK
+    '#0080FF', //SKYBLUE
+    '#00FF00', //GREEN2
+    '#00ffff', //CYAN
+    '#FBEB0D', //YELLOW
+    '#DED00F', //BROWN2
+    '#C0C0C0'  //GRAY2
+  );
+  $palettes['overview'] = array(
+    '#377037' //GREEN
+  );
+
+  function _get_color($palette, $chart_id, $i) {
 
     global $user;
-    $id = SERIES_COLOR_ID . $i;
+
+    $id = SERIES_COLOR_ID . $chart_id . "_$i";
+    $default = $palette[$i % count($palette)];
 
     if ($user) {
       $id .= '_' . $user->uid;
-      $color = variable_get($id, $default);
+      return variable_get($id, $default);
 
     } else {
-      $color = isset($_COOKIE[$id])? $_COOKIE[$id] : $default;
+      return isset($_COOKIE[$id])? $_COOKIE[$id] : $default;
     }
-
-    return $color;
   }
 
-  return array(
-    _get_color( 0, '#377037'), //GREEN
-    _get_color( 1, '#C11700'), //RED
-    _get_color( 2, '#0000FC'), //BLUE
-    _get_color( 3, '#F37E2B'), //ORANGE
-    _get_color( 4, '#B54FC6'), //PINK
-    _get_color( 5, '#665C00'), //BROWN
-    _get_color( 6, '#050305'), //BLACK
-    _get_color( 7, '#809090'), //GREY
-    _get_color( 8, '#9ED3C0'), //REEN3
-    _get_color( 9, '#00FF00'), //GREEN2
-    _get_color(10, '#0080FF'), //SKYBLUE
-    _get_color(11, '#00ffff'), //CYAN
-    _get_color(12, '#FBEB0D'), //YELLOW
-    _get_color(13, '#DED00F')  //BROWN2
-    );
+  $palette = $palettes[$chart_id];
+
+  for($i = 0; $i < count($palette); $i++) {
+    $user_palette[$i] = _get_color($palette, $chart_id, $i);
+  }
+  return $user_palette;
 }
 
 function logger_block($op = 'list', $delta = 0, $edit = array()) {
@@ -1420,10 +1439,9 @@ function theme_logger_time_period($element) {
  * 
  * @param $i          The color index.
  * @param $colors     The array of colors.
- * @param $on_change  The javascript function to execute on color selection.
  * @return the picker HTML code.
  */
-function theme_logger_color_picker($i, $colors, $onchange) {
+function theme_logger_color_picker($chart_id, $i, $colors) {
 
   $id = SERIES_COLOR_ID . $i;
   return '
@@ -1436,7 +1454,7 @@ function theme_logger_color_picker($i, $colors, $onchange) {
       id="' . $id . '"
       type="hidden"
       value="' . $colors[$i % count($colors)] . '"
-      onchange="javascript: ' . $onchange . "($i, this.value)" . ';"/>';
+      onchange="javascript: ' . "setSeriesColor('$chart_id', $i, this.value)" . ';"/>';
 }
 
 /**
@@ -1585,7 +1603,7 @@ function _logger_get_units_options() {
 function _logger_set_unit($unit) {
 
   global $user;
-  $id = CHART_UNIT;
+  $id = CHART_UNIT_ID;
 
   if ($user) {
     $id .= $user->uid;
@@ -1604,7 +1622,7 @@ function _logger_set_unit($unit) {
 function _logger_get_unit() {
 
   global $user;
-  $id = CHART_UNIT;
+  $id = CHART_UNIT_ID;
 
   if ($user) {
     $id .= $user->uid;

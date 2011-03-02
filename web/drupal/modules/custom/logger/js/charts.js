@@ -246,22 +246,6 @@ function updateLegendValue(name, i, value) {
   div.innerHTML = value > 0 ? value.toFixed(2) : '';
 }
 
-function setDashboardLineColor(i, color) {
-
-  updateChartColors(mainChart, i, color);
-  updateChartColors(sliderChart, i, color);
-
-  $.get('/logger/color/' + i + '/' + escape('#' + color));
-}
-
-function setMonitorBarColor(i, color) {
-
-  monitorChart.options['colors'][i] = '#' + color;
-  monitorChart.plot();
-
-  $.get('/logger/color/' + i + '/' + escape('#' + color));
-}
-
 function updateChartColors(chart, i, color) {
 
   var values = chart.getColors();
@@ -384,4 +368,18 @@ function createMonitorChart(id, current, average, intervals, names, colors) {
   };
 
   monitorChart.plot();
+}
+
+function setSeriesColor(chartId, i, color) {
+
+  if (chartId == 'monitor') {
+    monitorChart.options['colors'][i] = '#' + color;
+    monitorChart.plot();
+
+  } else {
+    updateChartColors(mainChart, i, color);
+    updateChartColors(sliderChart, i, color);
+  }
+
+  $.get('/logger/color/' + chartId + '/' + i + '/' + escape('#' + color));
 }

@@ -264,3 +264,19 @@ function logger_update_6001() {
   }
   return $items;
 }
+
+function logger_update_6002() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_series_color%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_smooting_level%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_step_plot%'");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
