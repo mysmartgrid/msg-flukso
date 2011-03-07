@@ -18,9 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-var mainChart;
+var powerChart;
 var sliderChart;
-var monitorChart;
+var energyChart;
 
 function formatDate(d) {
   return '' +
@@ -60,6 +60,10 @@ function formatCVSTimeStamp(d) {
     (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 }
 
+function hideZero(value) {
+  return value == 0 ? "" : value.toFixed(2);
+}
+
 function updateControlForm(chart) {
 
   var form = document.getElementById('logger-control-form');
@@ -83,15 +87,15 @@ function updateControlForm(chart) {
     form.elements['resolution'].value = value;
   }
 
-  updateLegend(chart);
+  updatePowerLegend(chart);
 }
 
-function removeChartSeries(uid, i, username) {
+function removePowerSeries(uid, i, username) {
 
   var table = document.getElementById('logger-legend-table');
   table.rows[i + 1].style.display = 'none';
 
-  mainChart.setVisibility(i, false);
+  powerChart.setVisibility(i, false);
   sliderChart.setVisibility(i, false);
 
   var form = document.getElementById('logger-control-form');
@@ -125,9 +129,9 @@ function updateSmoothingLevel(fieldId, step) {
   level = level < 1 ? 1 : level;
   field.value = level;
 
-  mainChart.setAnnotations(new Array());
+  powerChart.setAnnotations(new Array());
   
-  mainChart.updateOptions({rollPeriod: level});
+  powerChart.updateOptions({rollPeriod: level});
   sliderChart.updateOptions({rollPeriod: level});
 
   $.get('/logger/smoothinglevel/' + level);
@@ -135,39 +139,39 @@ function updateSmoothingLevel(fieldId, step) {
   return true;
 }
 
-function updateMainChart(xvalue1, xvalue2, yvalues) {
+function updatePowerChart(xvalue1, xvalue2, yvalues) {
 
-  mainChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: null});
 
-  updateControlForm(mainChart);
+  updateControlForm(powerChart);
 }
 
 function updateSliderChart(xvalue1, xvalue2, yvalues) {
 
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
-  updateControlForm(mainChart);
+  updateControlForm(powerChart);
 }
 
-function jumpToDate(event, center) {
+function slidePowerChart(event, center) {
 
-  var xvalue1 = mainChart.xAxisRange(0)[0];
-  var xvalue2 = mainChart.xAxisRange(0)[1];
+  var xvalue1 = powerChart.xAxisRange(0)[0];
+  var xvalue2 = powerChart.xAxisRange(0)[1];
   var drift = (xvalue2 - xvalue1) / 2;
   
   xvalue1 = center - drift;
   xvalue2 = center + drift;
 
-  mainChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
 
-  updateControlForm(mainChart);
+  updateControlForm(powerChart);
 }
 
-function highlightChartArea(canvas, area, sliderChart) {
+function highlightPowerChart(canvas, area, sliderChart) {
 
-  var xvalue1 = mainChart.xAxisRange(0)[0];
-  var xvalue2 = mainChart.xAxisRange(0)[1];
+  var xvalue1 = powerChart.xAxisRange(0)[0];
+  var xvalue2 = powerChart.xAxisRange(0)[1];
   var yvalue1 = sliderChart.yAxisRange(0)[0];
   var yvalue2 = sliderChart.yAxisRange(0)[1];
 
@@ -180,11 +184,7 @@ function highlightChartArea(canvas, area, sliderChart) {
   canvas.fillRect(point1, area.y, width, height);
 }
 
-function hideZeroY(value) {
-  return value == 0 ? "" : value.toFixed(2);
-}
-
-function updateLegend(chart) {
+function updatePowerLegend(chart) {
 
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
@@ -233,35 +233,28 @@ function updateLegend(chart) {
       last = null;
     }
 
-    updateLegendValue("max", s, max);
-    updateLegendValue("min", s, min);
-    updateLegendValue("avg", s, avg);
-    updateLegendValue("last", s, last);
+    updatePowerLegendValue("max", s, max);
+    updatePowerLegendValue("min", s, min);
+    updatePowerLegendValue("avg", s, avg);
+    updatePowerLegendValue("last", s, last);
   }
 }
 
-function updateLegendValue(name, i, value) {
+function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   div.innerHTML = value > 0 ? value.toFixed(2) : '';
 }
 
-function updateChartColors(chart, i, color) {
-
-  var values = chart.getColors();
-  values[i] = "#" + color;
-  chart.updateOptions({colors: values});
-}
-
-function addPointAnnotation(event, point) {
+function addPowerAnnotation(event, point) {
 
   var date = new Date(point.xval);
   var yval = point.yval.toFixed(2);
   var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
 
-  if (!removePointAnnotation(mainChart, text)) {
+  if (!removePowerAnnotation(powerChart, text)) {
 
-    var annotations = mainChart.annotations();
+    var annotations = powerChart.annotations();
 
     var width = 50 * ('' + yval).length / 6;
 
@@ -272,15 +265,15 @@ function addPointAnnotation(event, point) {
       text: text,
       width: width,
       clickHandler: function(annotation, point, chart, event) {
-        removePointAnnotation(chart, annotation.text);
+        removePowerAnnotation(chart, annotation.text);
       }
     });
 
-    mainChart.setAnnotations(annotations);
+    powerChart.setAnnotations(annotations);
   }
 }
 
-function removePointAnnotation(chart, text) {
+function removePowerAnnotation(chart, text) {
 
   var remaining = new Array();
   var annotations = chart.annotations();
@@ -300,11 +293,7 @@ function removePointAnnotation(chart, text) {
   }
 }
 
-function formatFraction(n, d) {
-  return (n > 0 && d > 0) ? n / d : 0;
-}
-
-function createMonitorChart(id, current, average, intervals, names, colors) {
+function createEnergyChart(id, current, average, intervals, names, colors) {
 
   var xticks = [names.length];
   var data1  = [names.length];
@@ -350,12 +339,12 @@ function createMonitorChart(id, current, average, intervals, names, colors) {
       }
     };
 
-  monitorChart = new Object();
-  monitorChart.id = id;
-  monitorChart.data = data;
-  monitorChart.options = options;
+  energyChart = new Object();
+  energyChart.id = id;
+  energyChart.data = data;
+  energyChart.options = options;
 
-  monitorChart.plot = function() {
+  energyChart.plot = function() {
     $.plot($('#' + id), data, options);
 
     $('#' + id).bind('plotclick',
@@ -367,19 +356,26 @@ function createMonitorChart(id, current, average, intervals, names, colors) {
     );
   };
 
-  monitorChart.plot();
+  energyChart.plot();
 }
 
 function setSeriesColor(chartId, i, color) {
 
-  if (chartId == 'monitor') {
-    monitorChart.options['colors'][i] = '#' + color;
-    monitorChart.plot();
+  if (chartId == 'energy') {
+    energyChart.options['colors'][i] = '#' + color;
+    energyChart.plot();
 
   } else {
-    updateChartColors(mainChart, i, color);
-    updateChartColors(sliderChart, i, color);
+    updateDygraphColor(powerChart, i, color);
+    updateDygraphColor(sliderChart, i, color);
   }
 
   $.get('/logger/color/' + chartId + '/' + i + '/' + escape('#' + color));
+}
+
+function updateDygraphColor(chart, i, color) {
+
+  var values = chart.getColors();
+  values[i] = "#" + color;
+  chart.updateOptions({colors: values});
 }

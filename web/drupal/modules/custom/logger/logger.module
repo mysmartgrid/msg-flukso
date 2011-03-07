@@ -75,26 +75,26 @@ function logger_menu() {
 
   $items['logger'] = array(
     'title'            => 'Your power consumption',
-    'description'      => 'Show the dashboard.',
-    'page callback'    => '_logger_dashboard',
+    'description'      => 'Show the power consumption page',
+    'page callback'    => '_logger_power_page',
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
 
   $items['overview'] = array(
-    'title'            => 'Overall View',
-    'description'      => 'Show the project overall view',
-    'page callback'    => '_logger_overview',
+    'title'            => 'Overview',
+    'description'      => 'Show the project overview',
+    'page callback'    => '_logger_overview_page',
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
 
-  $items['monitor'] = array(
-    'title'            => 'Power consumption monitor',
-    'description'      => 'Show the power consumption monitor',
-    'page callback'    => '_logger_monitor',
+  $items['energy'] = array(
+    'title'            => 'Your energy consumption',
+    'description'      => 'Show the energy consumption page',
+    'page callback'    => '_logger_energy_page',
     'access callback'  => TRUE,
     'type'             => MENU_NORMAL_ITEM
   );
@@ -122,7 +122,6 @@ function logger_menu() {
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
-
 
 
   //Devices' operations
@@ -194,14 +193,6 @@ function logger_menu() {
 
   /* Other operations */
 
-  $items['installation'] = array(
-    'title'            => '',
-    'description'      => 'Howto install a Fluksometer',
-    'page callback'    => '_logger_installation',
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
   $items['admin/settings/logger'] = array(
     'title'            => 'Logger settings',
     'description'      => 'Configure settings for logging metering values.',
@@ -223,64 +214,6 @@ function logger_menu() {
   return $items;
 }
 
-function _logger_installation() {
-
-  return
-    '<div class="install">' . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'>
-       <img src='http://www.flukso.net/sites/default/files/images/step1.png'
-       height='120' width='150' alt='step 1'/>
-     </a>" . PHP_EOL .
-
-    "<p><b>STEP 1: CONFIGURING WIFI</b><br/>
-       Power up the Fluksometer. Connect your computer to the Fluksometer's
-       ethernet port. Surf to
-       <a href = 'http://192.168.255.1'>http://192.168.255.1</a>.
-       Configure the wireless interface with the proper name and security key.
-     </p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'>
-       <img src='http://www.flukso.net/sites/default/files/images/step2.png'
-       height='120' width='150' alt='step 2'/>
-     </a>" . PHP_EOL .
-
-    "<p><b>STEP 2: SECURING THE FLUKSOMETER</b><br/>
-       Disconnect all cables from the Fluksometer.
-       Find a suitable location near the fuse box to install the Fluksometer.
-       Secure the Fluksometer with the plastic cable tie.
-     </p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'>
-       <img src='http://www.flukso.net/sites/default/files/images/step3.png'
-       height='120' width='150' alt='step 3'/>
-     </a>" .
-
-    "<p><b>STEP 3: ATTACHING THE CURRENT CLAMP</b><br/>
-       For safety reasons, switch off the main electricity supply.
-       For a single phase supply, attach the current clamp to one of the two
-       cables running from the electricity meter to the fuse box.
-       Close the clamp firmly.
-     </p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'>
-       <img src='http://www.flukso.net/sites/default/files/images/step4.png'
-       height='120' width='150' alt='step 4'/>
-     </a>" . PHP_EOL .
-
-    "<p><b>STEP 4: CONNECTING THE CLAMP'S SENSOR CABLE</b><br/>
-       Connect the cable from the current clamp to the Fluksometer's input port.
-       Take care of connecting the black and red cable as shown in the drawing
-       on the left. Only apply gentle force when fastening the two screws.
-     </p>" . PHP_EOL .
-    "<a class='img' href = 'http://www.flukso.net/installation'>
-       <img src='http://www.flukso.net/sites/default/files/images/step5.png'
-       height='120' width='150' alt='step 4'/>
-     </a>" . PHP_EOL .
-
-    "<p><b>STEP 5: POWERING UP</b><br/>
-       Switch the main electricity supply back on.
-       Activate the Fluksometer by connecting the power plug.
-     </p>"  . PHP_EOL .
-    "</div>". PHP_EOL;
-}
-
 /**
  * Builds the dashboard page.
  * 
@@ -288,7 +221,7 @@ function _logger_installation() {
  * @param $interval The time interval.
  * @return the dashboard page
  */
-function _logger_dashboard($type, $interval) {
+function _logger_power_page($type, $interval) {
 
   $type = $type ? $type : 'electricity';
   $interval = $interval ? $interval : 'hour';
@@ -307,13 +240,13 @@ function _logger_dashboard($type, $interval) {
       _logger_get_subscribed_sensors($type)
     );
 
-    $chart = _logger_create_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+    $chart = _logger_create_power_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
-    return theme('logger_dashboard_area', $chart);
+    return theme('logger_power_chart_area', $chart);
 
   } else {
 
-    return _logger_overview($type, $interval);
+    return _logger_overview_page($type, $interval);
   }
 }
 
@@ -322,9 +255,9 @@ function _logger_dashboard($type, $interval) {
  *
  * @param $type     The sensor type.
  * @param $interval The time interval.
- * @return the overview page
+ * @return the overview page.
  */
-function _logger_overview($type, $interval) {
+function _logger_overview_page($type, $interval) {
 
   $type = $type ? $type : 'electricity';
   $interval = $interval ? $interval : 'hour';
@@ -390,21 +323,47 @@ function _logger_overview($type, $interval) {
 
   $sensors = _logger_get_active_sensors($type);
 
-  $chart = _logger_create_chart_object($interval, $type, 'overview', $sensors);
+  $chart = _logger_create_power_chart_object($interval, $type, 'overview', $sensors);
 
-  $output .= theme('logger_dashboard_area', $chart);
+  $output .= theme('logger_power_chart_area', $chart);
 
   return $output;
 }
 
 /**
- * Builds the monitor page.
+ * Builds the energy consumption page.
  *
- * @return the monitor page
+ * @return the energy consumption page.
  */
-function _logger_monitor() {
+function _logger_energy_page() {
 
-  $names = array(
+  $chart = _logger_create_energy_chart_object();
+
+  drupal_set_title(t('Your energy consumption'));
+
+  $output = t('The following chart compares your current power consumption ' .
+    'with your previous consumption in six different time windows. ' .
+    'If you need more information about one of the bars, click it to jump ' .
+    'to the dashboard chart.') . '<br><br>';
+
+  $output .= theme('logger_energy_chart_area', $chart);
+
+  return $output;
+}
+
+/**
+ * Creates an object to hold all energy consumption chart parameters.
+ *
+ * @return the chart object.
+ */
+function _logger_create_energy_chart_object() {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $chart = new stdClass();
+
+  $chart->colors = _logger_get_series_colors('energy');
+  $chart->names = array(
     'hour'  => t('Hour'),
     'day'   => t('Day'),
     'week'  => t('Week'),
@@ -412,154 +371,54 @@ function _logger_monitor() {
     'year'  => t('Year')
   );
 
-  $series = _logger_create_monitor_chart_series($names);
-  $colors = _logger_get_series_colors('monitor');
-
-  drupal_set_title(t('Your power consumption'));
-
-  $output = t('The following chart compares your current power consumption ' .
-    'with your previous consumption in six different time windows. ' .
-    'If you need more information about one of the bars, click it to jump ' .
-    'to the dashboard chart.') . '<br><br>';
-
-  $output .= "<div id='monitorchart' style='width: 600px; height: 300px;'></div>
-    <script type='text/javascript'>
-      createMonitorChart('monitorchart',
-        ["  . implode(', '  , $series['current']) .  "],
-        ["  . implode(', '  , $series['previous']) .  "],
-        ['" . implode("', '", array_keys($names)) . "'],
-        ['" . implode("', '", $names)             . "'],
-        ['" . implode("', '", $colors)            . "']);
-    </script>";
-
-
-  //colors legend
-  $lines = array(
-    array(
-      theme('logger_color_picker', 'monitor', 0, $colors),
-      t('How much has been consumed in comparison to the previous level.')
-    ),
-    array(
-      theme('logger_color_picker', 'monitor', 1, $colors),
-      t('How much remains to equal the previous level.')
-    ),
-    array(
-      theme('logger_color_picker', 'monitor', 2, $colors),
-      t('How much the current consumption has exceeded the previous level.')
-    )
-  );
-
-  $output .= '<br><br>' . theme('table', array(), $lines);
-
-  function _format_value($value) {
-    return $value > 0 ? number_format($value, 2) : '';
-  }
-
-  //values legend
-  $lines = array();
-
-  foreach ($names as $i => $name) {
-
-    $lines[] = array(
-      array('data' => $name,                                   'align' => 'left'),
-      array('data' => _format_value($series['current'][$i]),   'align' => 'right'),
-      array('data' => _format_value($series['previous'][$i]),    'align' => 'right'),
-      array('data' => _format_value($series['remaining'][$i]), 'align' => 'right'),
-      array('data' => _format_value($series['exceeding'][$i]), 'align' => 'right')
-    );
-  }
-
-  $unit = ' (' . t('Wh') . ')';
-
-  $header = array(
-    array('data' => t('Interval')),
-    array('data' => t('Current')   . $unit),
-    array('data' => t('Previous')  . $unit),
-    array('data' => t('Remaining') . $unit),
-    array('data' => t('Exceeding') . $unit)
-  );
-
-  $output .= '<br>' . theme('table', $header, $lines);
-
-  return $output;
-}
-
-/**
- * Creates an array representing the monitor chart series.
- *
- * @param $names  An array of series names indexed by intervals.
- * @return the array of chart series.
- */
-function _logger_create_monitor_chart_series($names) {
-
   global $user;
-  $cache_id = "logger_monitor_chart_data_$user->uid";
+  $cache_id = "logger_power_chart_data_$user->uid";
   $cache = cache_get($cache_id, 'cache_page');
-  $series = $cache->data;
+  $chart->data = $cache->data;
 
-  if (!$series) {
+  if (!$chart->data) {
 
     $sensors = _logger_get_user_sensors('electricity');
     $now = getdate();
+    $offset = _logger_get_timezone_offset();
+
     $extra_days['week']  = $now['wday'];
     $extra_days['month'] = $now['mday'] - 1;
     $extra_days['year']  = $now['yday'];
 
-    foreach ($names as $interval => $name) {
+    foreach ($chart->names as $interval => $name) {
 
-      $offset = $extra_days[$interval] * DAY +
+      $resolution = _logger_get_resolution($interval);
+
+      $adjustment = $extra_days[$interval] * DAY +
         $now[0] % ($interval == 'hour' ? HOUR : DAY);
 
       $window = _logger_get_default_time_window($interval);
 
-      $time1 = $now[0] - $offset - $window;
+      $time1 = $now[0] - $adjustment - $window;
       $time2 = $time1 + $window;
 
-      $previous = _logger_query_energy_consumption($sensors, $interval, $time1, $time2);
-      $current  = _logger_query_energy_consumption($sensors, $interval, $time2, $now[0]);
+      $period1 = array('start' => $time1, 'end' => $time2);
+      $period2 = array('start' => $time2, 'end' => $now[0]);
 
-      $series['previous'][$interval]  = $previous;
-      $series['current'][$interval]   = $current;
-      $series['remaining'][$interval] = $previous - $current;
-      $series['exceeding'][$interval] = $current - $previous;
+      $previous = logger_rrd_query_energy($sensors, $interval, $offset, $period1, $resolution);
+      $current  = logger_rrd_query_energy($sensors, $interval, $offset, $period2, $resolution);
+
+      $chart->data['previous'][$interval]  = $previous;
+      $chart->data['current'][$interval]   = $current;
+      $chart->data['remaining'][$interval] = $previous - $current;
+      $chart->data['exceeding'][$interval] = $current - $previous;
 
       //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
     }
 
-    cache_set($cache_id, $series, 'cache_page', $now[0] + 15 * MINUTE);
+    cache_set($cache_id, $chart->data, 'cache_page', $now[0] + 15 * MINUTE);
   }
-  return $series;
+  return $chart;
 }
 
 /**
- * Sums the energy consumption during the specified time period, in watt-hour.
- *
- * @param $sensors  The sensors whose measurements are to be summed up.
- * @param $interval The time interval menu option.
- * @param $start    The period start timestamp.
- * @param $end      The period end timestamp.
- * @return the summed power consumption.
- */
-function _logger_query_energy_consumption($sensors, $interval, $start, $end) {
-
-  $resolution = _logger_get_resolution($interval);
-  $period = _logger_get_period($interval, $resolution, $start, $end);
-  $offset = _logger_get_timezone_offset();
-  $sum = 0;
-
-  foreach ($sensors as $sensor) {
-    //The measurements are stored in (Wh / s)
-    $measurements = logger_rrd_query_sensor($interval, $sensor, 1, $offset, $period, $resolution);
-
-    foreach($measurements as $timestamp => $value) {
-      $sum += $value * $resolution; //TODO: check if this calculation is right.
-    }
-  }
-  return $sum;
-}
-
-/**
- * Creates an object to hold all chart parameters.
+ * Creates an object to hold all power consumption chart parameters.
  *
  * @param $interval The time interval.
  * @param $type     The sensor type.
@@ -569,7 +428,7 @@ function _logger_query_energy_consumption($sensors, $interval, $start, $end) {
  * @param $yaxis    An array containing the minimum and maximum values of the y axis.
  * @return the chart object.
  */
-function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
+function _logger_create_power_chart_object($interval, $type, $context, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -622,9 +481,9 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
   }
 
   $chart->sensors = $sensors;
-  $chart->file_path = _logger_compose_chart_file_path($chart);
+  $chart->file_path = _logger_compose_power_chart_file_path($chart);
 
-  $cache_id = "logger_dashboard_chart_data_$chart->file_path";
+  $cache_id = "logger_power_chart_data_$chart->file_path";
   $cache = cache_get($cache_id, 'cache_page');
 
   if ($cache->data) {
@@ -644,7 +503,7 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
         logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
     }
 
-    _logger_save_chart_file($chart);
+    _logger_save_power_chart_file($chart);
 
     cache_set($cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
   }
@@ -653,12 +512,12 @@ function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxi
 }
 
 /**
- * Composes an unique chart file name.
+ * Composes an unique power chart file name.
  *
- * @param $chart The chart object.
- * @return the chart file name.
+ * @param $chart The power chart object.
+ * @return the chart file path.
  */
-function _logger_compose_chart_file_path($chart) {
+function _logger_compose_power_chart_file_path($chart) {
 
   $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
   $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
@@ -784,15 +643,29 @@ function _logger_get_active_sensors($type) {
 }
 
 /**
- * Saves chart to a file.
+ * Saves a power chart to a file.
  *
- * @param $chart The chart parameters.
+ * @param $chart The power chart parameters.
  */
-function _logger_save_chart_file($chart) {
+function _logger_save_power_chart_file($chart) {
 
   $header = t('Time');
   $values = array();
-  $timestamps = _logger_get_all_timestamps($chart->data);
+
+  //TODO: find a better way of iterating timestamps
+  $timestamps = array();
+  foreach($chart->data as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $measurements) {
+        foreach(array_keys($measurements) as $timestamp) {
+          $timestamps[$timestamp] = null;
+        }
+      }
+    }
+  }
+  $timestamps = array_keys($timestamps);
+  sort($timestamps);
+
   $s = 1;
 
   foreach($chart->data as $uid => $userdata) {
@@ -866,7 +739,12 @@ function _logger_get_timezone_offset() {
 function logger_theme() {
 
   return array(
-    'logger_dashboard_area' => array(
+    'logger_power_chart_area' => array(
+      'arguments' => array(
+        'chart' => NULL),
+    ),
+
+    'logger_energy_chart_area' => array(
       'arguments' => array(
         'chart' => NULL),
     ),
@@ -944,12 +822,12 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
 }
 
 /**
- * Builds the dashboard area.
+ * Builds the power chart area.
  *
- * @param $chart   The chart parameters.
- * @return the dashboard area output.
+ * @param $chart   The power chart object.
+ * @return the power chart area output.
  */
-function theme_logger_dashboard_area($chart) {
+function theme_logger_power_chart_area($chart) {
 
   $xvalue1 = $chart->xaxis[0] * 1000;
   $xvalue2 = $chart->xaxis[1] * 1000;
@@ -959,7 +837,7 @@ function theme_logger_dashboard_area($chart) {
     'dateWindow'         => "[$xvalue1, $xvalue2]",
     'drawCallback'       => 'updateControlForm',
     'zoomCallback'       => 'updateSliderChart',
-    'pointClickCallback' => 'addPointAnnotation'
+    'pointClickCallback' => 'addPowerAnnotation'
   );
 
   if ($chart->context == 'logger') {
@@ -974,10 +852,10 @@ function theme_logger_dashboard_area($chart) {
     $slider_output = _logger_create_dygraph('sliderChart', $chart, false, array(
         'height'           => SLIDER_HEIGHT,
         'gridLineColor'    => '"transparent"',
-        'yValueFormatter'  => 'hideZeroY',
-        'zoomCallback'     => 'updateMainChart',
-        'clickCallback'    => 'jumpToDate',
-        'underlayCallback' => 'highlightChartArea'
+        'yValueFormatter'  => 'hideZero',
+        'zoomCallback'     => 'updatePowerChart',
+        'clickCallback'    => 'slidePowerChart',
+        'underlayCallback' => 'highlightPowerChart'
       )
     );
 
@@ -988,13 +866,28 @@ function theme_logger_dashboard_area($chart) {
     _logger_create_interval_menu($chart->context) .
     '<div>' . $chart->unit . '</div>' .
 
-    _logger_create_dygraph('mainChart', $chart, TRUE, $chart_properties) .
+    _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
     $slider_output .
 
-    _logger_create_chart_legend($chart) .
+    _logger_create_power_chart_legend($chart) .
 
     $form_output .
     l(t('Save Data'), $chart->file_path);
+}
+
+/**
+ * Builds the energy chart area.
+ *
+ * @param $chart   The energy chart object.
+ * @return the energy chart area output.
+ */
+function theme_logger_energy_chart_area($chart) {
+
+  $output = _logger_create_flot_chart('energychart', $chart);
+
+  $output .= _logger_create_energy_chart_legend($chart);
+
+  return $output;
 }
 
 /**
@@ -1039,6 +932,27 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
 }
 
 /**
+ * Creates a Flot chart.
+ *
+ * @param $id     the chart div id.
+ * @param $chart  the chart object.
+ * @return the flot output.
+ */
+function _logger_create_flot_chart($id, $chart) {
+
+  return "<div id='$id' style='width: 600px; height: 300px;'></div>
+    <script type='text/javascript'>
+      createEnergyChart('energychart',
+        ["  . implode(', '  , $chart->data['current'])  .  "],
+        ["  . implode(', '  , $chart->data['previous']) .  "],
+        ['" . implode("', '", array_keys($chart->names))  . "'],
+        ['" . implode("', '", $chart->names)              . "'],
+        ['" . implode("', '", $chart->colors)             . "']
+      );
+    </script>";
+}
+
+/**
  * Creates the chart intervals' horizontal menu.
  *
  * @param $context  The page where the menu is going to be placed (overview or logger).
@@ -1061,12 +975,12 @@ function _logger_create_interval_menu($context) {
 }
 
 /**
- * Creates the chart legend.
+ * Creates the power chart legend.
  *
- * @param $chart  The chart object.
+ * @param $chart  The power chart object.
  * @return the chart legend as a table.
  */
-function _logger_create_chart_legend($chart) {
+function _logger_create_power_chart_legend($chart) {
 
   global $user;
 
@@ -1078,7 +992,7 @@ function _logger_create_chart_legend($chart) {
         $mark = theme('logger_color_picker', $chart->context, $i, $chart->colors);
 
         $operations = ($uid > 0 && $uid != $user->uid)?
-          '<a href="javascript: void(0)" OnClick="javascript: removeChartSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
+          '<a href="javascript: void(0)" OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
 
         $lines[] = array(
             'mark'      => $mark,
@@ -1109,26 +1023,57 @@ function _logger_create_chart_legend($chart) {
   return '<br>' . theme('table', $headers, $lines, array('id' => 'logger-legend-table'));
 }
 
-/**
- * Returns a sorted array of measurements' timestamps.
- *
- * @param $data  The chart series data. {user => {sensor => {timestamp => value}}}
- * @return the array of timestamps.
- */
-function _logger_get_all_timestamps($data) {
-  $timestamps = array();
-  foreach($data as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $measurements) {
-        foreach(array_keys($measurements) as $timestamp) {
-          $timestamps[$timestamp] = null;
-        }
-      }
-    }
+function _logger_create_energy_chart_legend($chart) {
+
+  //colors legend
+  $lines = array(
+    array(
+      theme('logger_color_picker', 'energy', 0, $chart->colors),
+      t('How much has been consumed in comparison to the previous level.')
+    ),
+    array(
+      theme('logger_color_picker', 'energy', 1, $chart->colors),
+      t('How much remains to equal the previous level.')
+    ),
+    array(
+      theme('logger_color_picker', 'energy', 2, $chart->colors),
+      t('How much the current consumption has exceeded the previous level.')
+    )
+  );
+
+  $output .= '<br><br>' . theme('table', array(), $lines);
+
+  function _format_value($value) {
+    return $value > 0 ? number_format($value, 2) : '';
   }
-  $timestamps = array_keys($timestamps);
-  sort($timestamps);
-  return $timestamps;
+
+  //values legend
+  $lines = array();
+
+  foreach ($chart->names as $i => $name) {
+
+    $lines[] = array(
+      array('data' => $name,                                        'align' => 'left'),
+      array('data' => _format_value($chart->data['current'][$i]),   'align' => 'right'),
+      array('data' => _format_value($chart->data['previous'][$i]),  'align' => 'right'),
+      array('data' => _format_value($chart->data['remaining'][$i]), 'align' => 'right'),
+      array('data' => _format_value($chart->data['exceeding'][$i]), 'align' => 'right')
+    );
+  }
+
+  $unit = ' (' . t('Wh') . ')';
+
+  $header = array(
+    array('data' => t('Interval')),
+    array('data' => t('Current')   . $unit),
+    array('data' => t('Previous')  . $unit),
+    array('data' => t('Remaining') . $unit),
+    array('data' => t('Exceeding') . $unit)
+  );
+
+  $output .= '<br>' . theme('table', $header, $lines);
+
+  return $output;
 }
 
 /**
@@ -1161,9 +1106,9 @@ function _logger_series_color($chart_id, $i, $color) {
  */
 function _logger_get_series_colors($chart_id) {
 
-  $palettes['monitor'] = array(
-    '#377037', //GREEN
-    '#9ED3C0', //GREEN3
+  $palettes['energy'] = array(
+    '#4D7060', //GREEN4
+    '#BFD9D3', //GREEN5
     '#C0C0C0'  //GRAY2
   );
   $palettes['logger'] = array(

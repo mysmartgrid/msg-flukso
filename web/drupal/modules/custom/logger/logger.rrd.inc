@@ -286,6 +286,31 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset, $period, $s
 }
 
 /**
+ * Queries the total energy consumption during the specified time period, in watt-hour.
+ *
+ * @param $sensors  The sensors whose measurements are to be summed up.
+ * @param $interval The time interval menu option.
+ * @param $offset   The user timezone offset.
+ * @param $period   An array containing a period of time to be queried.
+ * @param $step     The amount of time aggregated in a single point.
+ * @return the summed power consumption.
+ */
+function logger_rrd_query_energy($sensors, $interval, $offset, $period, $step) {
+
+  $total = 0;
+
+  foreach ($sensors as $sensor) {
+    //The measurements are stored in (Wh / s)
+    $measurements = logger_rrd_query_sensor($interval, $sensor, 1, $offset, $period, $step);
+
+    foreach($measurements as $timestamp => $value) {
+      $total += $value * $step; //TODO: check if this calculation is right.
+    }
+  }
+  return $total;
+}
+
+/**
  * Creates a DEF tag to represent sensor's measurements plotted in a chart series.
  *
  * @param $interval       The time interval.
