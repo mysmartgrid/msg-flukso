@@ -20,6 +20,7 @@
 
 var powerChart;
 var sliderChart;
+var energyCompChart;
 var energyChart;
 
 function formatDate(d) {
@@ -293,7 +294,7 @@ function removePowerAnnotation(chart, text) {
   }
 }
 
-function createEnergyChart(id, current, average, intervals, names, colors) {
+function createEnergyComparisonChart(id, current, average, intervals, names, colors) {
 
   var xticks = [names.length];
   var data1  = [names.length];
@@ -339,12 +340,12 @@ function createEnergyChart(id, current, average, intervals, names, colors) {
       }
     };
 
-  energyChart = new Object();
-  energyChart.id = id;
-  energyChart.data = data;
-  energyChart.options = options;
+  energyCompChart = new Object();
+  energyCompChart.id = id;
+  energyCompChart.data = data;
+  energyCompChart.options = options;
 
-  energyChart.plot = function() {
+  energyCompChart.plot = function() {
     $.plot($('#' + id), data, options);
 
     $('#' + id).bind('plotclick',
@@ -356,14 +357,83 @@ function createEnergyChart(id, current, average, intervals, names, colors) {
     );
   };
 
-  energyChart.plot();
+  energyCompChart.plot();
+}
+
+function createEnergyChart(id, values, names, colors) {
+
+  var xticks = [names.length];
+  var data1  = [names.length];
+
+  for (var i = 0; i < names.length; i++) {
+
+    data1[i]  = [i, values[i]];
+    xticks[i] = [i, names[i]];
+  }
+
+  var data = [ {data: data1} ];
+  var options = {
+      colors: colors,
+      series: {
+        bars: {
+          show: true,
+          barWidth: 0.5,
+          lineWidth: 0,
+          fill: 1,
+          align: 'center'
+        }
+      },
+      xaxis: {
+        min: -0.5,
+        max: (names.length - 0.5),
+        ticks: xticks
+      },
+      yaxis: {
+        tickFormatter: function (value, axis) {
+          return value.toFixed(0);
+        }
+      }
+    };
+
+  energyChart = new Object();
+  energyChart.id = id;
+  energyChart.data = data;
+  energyChart.options = options;
+
+  energyChart.plot = function() {
+    return $.plot($('#' + id), data, options);
+  };
+
+  showBarDataLabels(energyChart);
+}
+
+function showBarDataLabels(chart) {
+
+  var p = chart.plot();
+
+  $.each(p.getData()[0].data,
+    function(i, point){
+
+      var o = p.pointOffset({x: point[0], y: point[1]});
+
+      if (point[1] > 0) {
+        $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(0) + '</div>').css(
+          {
+            position: 'absolute',
+            left: o.left - 15,
+            top: o.top - 20,
+            display: 'none'
+          }
+        ).appendTo(p.getPlaceholder()).fadeIn('slow');
+      }
+  });
 }
 
 function setSeriesColor(chartId, i, color) {
 
   if (chartId == 'energy') {
-    energyChart.options['colors'][i] = '#' + color;
-    energyChart.plot();
+    energyCompChart.options['colors'][i] = '#' + color;
+    energyCompChart.plot();
 
   } else {
     updateDygraphColor(powerChart, i, color);

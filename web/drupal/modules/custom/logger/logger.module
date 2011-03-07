@@ -74,9 +74,9 @@ function logger_menu() {
   // Dashboard operations
 
   $items['logger'] = array(
-    'title'            => 'Your power consumption',
-    'description'      => 'Show the power consumption page',
-    'page callback'    => '_logger_power_page',
+    'title'            => 'Homepage',
+    'description'      => 'Show the home page',
+    'page callback'    => '_logger_home_page',
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
@@ -96,7 +96,24 @@ function logger_menu() {
     'description'      => 'Show the energy consumption page',
     'page callback'    => '_logger_energy_page',
     'access callback'  => TRUE,
-    'type'             => MENU_NORMAL_ITEM
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['energy/compare'] = array(
+    'title'            => 'Compare',
+    'description'      => 'Show the energy consumption comparison page',
+    'page callback'    => '_logger_energy_comparison_page',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['power'] = array(
+    'title'            => 'Your power consumption',
+    'description'      => 'Show the power consumption page',
+    'page callback'    => '_logger_power_page',
+    'page arguments'   => array(1, 2),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
   );
 
   $items['logger/color'] = array(
@@ -215,39 +232,49 @@ function logger_menu() {
 }
 
 /**
- * Builds the dashboard page.
+ * Forwards request to suitable home page.
+ *
+ * @param $type     The sensor type.
+ * @param $interval The time interval.
+ * @return the home page.
+ */
+function _logger_home_page($type, $interval) {
+
+  if (user_access('logger')) {
+    return _logger_energy_page();
+
+  } else {
+    return _logger_overview_page($type, $interval);
+  }
+}
+
+/**
+ * Builds the power consumption page.
  * 
  * @param $type     The sensor type.
  * @param $interval The time interval.
- * @return the dashboard page
+ * @return the power consumption page.
  */
 function _logger_power_page($type, $interval) {
 
   $type = $type ? $type : 'electricity';
   $interval = $interval ? $interval : 'hour';
 
-  if (user_access('logger')) {
+  drupal_set_title(t('Your power consumption'));
 
-    drupal_set_title(t('Your power consumption'));
+  $xvalue1 = _logger_get_xvalue(1);
+  $xvalue2 = _logger_get_xvalue(2);
+  $yvalue1 = _logger_get_yvalue(1);
+  $yvalue2 = _logger_get_yvalue(2);
 
-    $xvalue1 = _logger_get_xvalue(1);
-    $xvalue2 = _logger_get_xvalue(2);
-    $yvalue1 = _logger_get_yvalue(1);
-    $yvalue2 = _logger_get_yvalue(2);
+  $sensors = array_merge(
+    _logger_get_user_sensors($type),
+    _logger_get_subscribed_sensors($type)
+  );
 
-    $sensors = array_merge(
-      _logger_get_user_sensors($type),
-      _logger_get_subscribed_sensors($type)
-    );
+  $chart = _logger_create_power_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
-    $chart = _logger_create_power_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
-
-    return theme('logger_power_chart_area', $chart);
-
-  } else {
-
-    return _logger_overview_page($type, $interval);
-  }
+  return theme('logger_power_chart_area', $chart);
 }
 
 /**
@@ -331,6 +358,26 @@ function _logger_overview_page($type, $interval) {
 }
 
 /**
+ * Builds the energy consumption comparison page.
+ *
+ * @return the energy consumption comparison page.
+ */
+function _logger_energy_comparison_page() {
+
+  $chart = _logger_create_energy_comparison_chart_object();
+
+  drupal_set_title(t('Compare your energy consumption'));
+
+  $output = t('The following chart compares your current energy consumption ' .
+    'with your previous consumption in six different time windows. ' .
+    'Click one of the bars for more information.') . '<br><br>';
+
+  $output .= theme('logger_energy_comparison_chart_area', $chart);
+
+  return $output;
+}
+
+/**
  * Builds the energy consumption page.
  *
  * @return the energy consumption page.
@@ -341,28 +388,31 @@ function _logger_energy_page() {
 
   drupal_set_title(t('Your energy consumption'));
 
-  $output = t('The following chart compares your current power consumption ' .
-    'with your previous consumption in six different time windows. ' .
-    'If you need more information about one of the bars, click it to jump ' .
-    'to the dashboard chart.') . '<br><br>';
+  $keys = array_keys($chart->data);
+  $today = $keys[count($keys) - 1];
+  $consumed = number_format($chart->data[$today], 2);
 
-  $output .= theme('logger_energy_chart_area', $chart);
+  $output = t('Today you have consumed %consumed Wh so far. ' .
+    'The following chart shows your energy consumption along the week.',
+    array('%consumed' => $consumed));
+
+  $output .= '<br><br>' . theme('logger_energy_chart_area', $chart);
 
   return $output;
 }
 
 /**
- * Creates an object to hold all energy consumption chart parameters.
+ * Creates an object to hold all energy consumption comparison chart parameters.
  *
  * @return the chart object.
  */
-function _logger_create_energy_chart_object() {
+function _logger_create_energy_comparison_chart_object() {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $chart = new stdClass();
 
-  $chart->colors = _logger_get_series_colors('energy');
+  $chart->colors = _logger_get_series_colors('energy_comparison');
   $chart->names = array(
     'hour'  => t('Hour'),
     'day'   => t('Day'),
@@ -372,7 +422,7 @@ function _logger_create_energy_chart_object() {
   );
 
   global $user;
-  $cache_id = "logger_power_chart_data_$user->uid";
+  $cache_id = "logger_energy_comparison_chart_data_$user->uid";
   $cache = cache_get($cache_id, 'cache_page');
   $chart->data = $cache->data;
 
@@ -413,6 +463,46 @@ function _logger_create_energy_chart_object() {
     }
 
     cache_set($cache_id, $chart->data, 'cache_page', $now[0] + 15 * MINUTE);
+  }
+  return $chart;
+}
+
+/**
+ * Creates an object to hold all energy consumption chart parameters.
+ *
+ * @return the chart object.
+ */
+function _logger_create_energy_chart_object() {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $chart = new stdClass();
+  $chart->colors = _logger_get_series_colors('energy');
+
+  global $user;
+  $cache_id = "logger_energy_chart_data_$user->uid";
+  $cache = cache_get($cache_id, 'cache_page');
+  $chart->data = $cache->data;
+
+  if (!$chart->data) {
+
+    $sensors = _logger_get_user_sensors('electricity');
+    $offset = _logger_get_timezone_offset();
+    $resolution = _logger_get_resolution('week');
+    $now = time();
+
+    $time = $now - 6 * DAY - $now % DAY;
+    while($time < $now) {
+
+      $period = array('start' => $time, 'end' => ($time + DAY));
+      $name = date("l", $time) . '<br>' . date("d-M", $time);
+
+      $chart->data[$name] = logger_rrd_query_energy($sensors, 'day', $offset, $period, $resolution);
+
+      $time += DAY;
+    }
+
+    cache_set($cache_id, $chart->data, 'cache_page', $now + 15 * MINUTE);
   }
   return $chart;
 }
@@ -744,6 +834,11 @@ function logger_theme() {
         'chart' => NULL),
     ),
 
+    'logger_energy_comparison_chart_area' => array(
+      'arguments' => array(
+        'chart' => NULL),
+    ),
+
     'logger_energy_chart_area' => array(
       'arguments' => array(
         'chart' => NULL),
@@ -876,16 +971,50 @@ function theme_logger_power_chart_area($chart) {
 }
 
 /**
- * Builds the energy chart area.
+ * Builds the energy consumption comparison chart area.
  *
- * @param $chart   The energy chart object.
- * @return the energy chart area output.
+ * @param $chart   The energy consumption comparison chart object.
+ * @return the chart area output.
+ */
+function theme_logger_energy_comparison_chart_area($chart) {
+
+  $id = 'energycomparisonchart';
+  $output = "
+    <div id='$id' style='width: 600px; height: 300px;'></div>
+    <script type='text/javascript'>
+      createEnergyComparisonChart('$id',
+        ["  . implode(', '  , $chart->data['current'])  .  "],
+        ["  . implode(', '  , $chart->data['previous']) .  "],
+        ['" . implode("', '", array_keys($chart->names))  . "'],
+        ['" . implode("', '", $chart->names)              . "'],
+        ['" . implode("', '", $chart->colors)             . "']
+      );
+    </script>";
+
+  $output .= _logger_create_energy_comparison_chart_legend($chart);
+
+  return $output;
+}
+
+/**
+ * Builds the energy consumption chart area.
+ *
+ * @param $chart   The energy consumption chart object.
+ * @return the chart area output.
  */
 function theme_logger_energy_chart_area($chart) {
 
-  $output = _logger_create_flot_chart('energychart', $chart);
+  $id = 'energychart';
 
-  $output .= _logger_create_energy_chart_legend($chart);
+  $output = "
+    <div id='$id' style='width: 600px; height: 300px;'></div>
+    <script type='text/javascript'>
+      createEnergyChart('$id',
+        ["  . implode(', '  , $chart->data)             .  "],
+        ['" . implode("', '", array_keys($chart->data)) . "'],
+        ['" . implode("', '", $chart->colors)           . "']
+      );
+    </script>";
 
   return $output;
 }
@@ -932,27 +1061,6 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
 }
 
 /**
- * Creates a Flot chart.
- *
- * @param $id     the chart div id.
- * @param $chart  the chart object.
- * @return the flot output.
- */
-function _logger_create_flot_chart($id, $chart) {
-
-  return "<div id='$id' style='width: 600px; height: 300px;'></div>
-    <script type='text/javascript'>
-      createEnergyChart('energychart',
-        ["  . implode(', '  , $chart->data['current'])  .  "],
-        ["  . implode(', '  , $chart->data['previous']) .  "],
-        ['" . implode("', '", array_keys($chart->names))  . "'],
-        ['" . implode("', '", $chart->names)              . "'],
-        ['" . implode("', '", $chart->colors)             . "']
-      );
-    </script>";
-}
-
-/**
  * Creates the chart intervals' horizontal menu.
  *
  * @param $context  The page where the menu is going to be placed (overview or logger).
@@ -975,7 +1083,7 @@ function _logger_create_interval_menu($context) {
 }
 
 /**
- * Creates the power chart legend.
+ * Builds the power chart legend.
  *
  * @param $chart  The power chart object.
  * @return the chart legend as a table.
@@ -1023,7 +1131,13 @@ function _logger_create_power_chart_legend($chart) {
   return '<br>' . theme('table', $headers, $lines, array('id' => 'logger-legend-table'));
 }
 
-function _logger_create_energy_chart_legend($chart) {
+/**
+ * Builds the energy consumption comparison chart legend.
+ *
+ * @param $chart  The energy consumption comparison chart object.
+ * @return the chart legend as tables.
+ */
+function _logger_create_energy_comparison_chart_legend($chart) {
 
   //colors legend
   $lines = array(
@@ -1129,6 +1243,9 @@ function _logger_get_series_colors($chart_id) {
   );
   $palettes['overview'] = array(
     '#377037' //GREEN
+  );
+  $palettes['energy_comparison'] = array(
+    '#4D7060' //GREEN
   );
 
   function _get_color($palette, $chart_id, $i) {
