@@ -349,36 +349,35 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   chart.options = options;
 
   chart.plot = function() {
-    $.plot($('#' + id), data, options);
+    var p = $.plot($('#' + id), data, options);
+
+    if (dataLabels) {
+      showBarDataLabels(p);
+    }
   };
 
   chart.plot();
 
-  if (dataLabels) {
-    showBarDataLabels(chart);
-  }
-
   return chart;
 }
 
-function showBarDataLabels(chart) {
+function showBarDataLabels(plot) {
 
-  var p = chart.plot();
+  $.each(plot.getData()[0].data,
 
-  $.each(p.getData()[0].data,
     function(i, point){
 
-      var o = p.pointOffset({x: point[0], y: point[1]});
-
       if (point[1] > 0) {
+        var offset = plot.pointOffset({x: point[0], y: point[1]});
+
         $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(0) + '</div>').css(
           {
             position: 'absolute',
-            left: o.left - 15,
-            top: o.top - 20,
+            left: offset.left - 15,
+            top: offset.top - 20,
             display: 'none'
           }
-        ).appendTo(p.getPlaceholder()).fadeIn('slow');
+        ).appendTo(plot.getPlaceholder()).fadeIn('slow');
       }
   });
 }
