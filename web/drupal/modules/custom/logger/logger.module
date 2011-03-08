@@ -757,19 +757,9 @@ function _logger_save_power_chart_file($chart) {
   $header = t('Time');
   $values = array();
 
-  //TODO: find a better way of iterating timestamps
-  $timestamps = array();
-  foreach($chart->data['series'] as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $measurements) {
-        foreach(array_keys($measurements) as $timestamp) {
-          $timestamps[$timestamp] = null;
-        }
-      }
-    }
-  }
-  $timestamps = array_keys($timestamps);
-  sort($timestamps);
+  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
+  $start -= ($start % $chart->resolution);
+  $end = $chart->period['end'] + $chart->offset;
 
   $s = 1;
 
@@ -778,7 +768,7 @@ function _logger_save_power_chart_file($chart) {
       foreach($sensors as $sensor => $measurements) {
         $header .= ',S' . $s++;
 
-        foreach($timestamps as $timestamp) {
+        for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
           $value = $measurements[$timestamp];
           $value = $value? number_format($value, 3, '.', '') : '';
           $values[$timestamp] .= ',' . $value;
