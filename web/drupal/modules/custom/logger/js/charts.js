@@ -294,117 +294,71 @@ function removePowerAnnotation(chart, text) {
   }
 }
 
-function createEnergyComparisonChart(id, current, average, intervals, names, colors) {
+function createBarChart(id, values, names, colors, dataLabels, stacked) {
 
   var xticks = [names.length];
-  var data1  = [names.length];
-  var data2  = [names.length];
-  var data3  = [names.length];
-  var perc;
 
   for (var i = 0; i < names.length; i++) {
-
-    perc = current[i] / average[i];
-
-    data1[i]  = [i, (perc < 1 ? perc     : 1)];
-    data2[i]  = [i, (perc < 1 ? 1 - perc : 0)];
-    data3[i]  = [i, (perc > 1 ? perc - 1 : 0)];
     xticks[i] = [i, names[i]];
   }
 
-  var data = [ {data: data1}, {data: data2}, {data: data3} ];
+  var data = [values.length];
+
+  for (var v = 0; v < values.length; v++) {
+    var series = [names.length];
+
+    for (i = 0; i < names.length; i++) {
+      series[i] = [i, values[v][i]];
+    }
+    data[v] = {data: series};
+  }
+
   var options = {
-      colors: colors,
-      series: {
-        stack: 0,
-        bars: {
-          show: true,
-          barWidth: 0.5,
-          lineWidth: 0,
-          fill: 1,
-          align: 'center'
-        }
-      },
-      xaxis: {
-        min: -0.5,
-        max: (names.length - 0.5),
-        ticks: xticks
-      },
-      yaxis: {
-        tickFormatter: function (value, axis) {
-          return (value * 100).toFixed(0) + ' %';
-        }
-      },
-      grid: {
-        clickable: true
+    colors: colors,
+    series: {
+      bars: {
+        show: true,
+        barWidth: 0.5,
+        lineWidth: 0,
+        fill: 1,
+        align: 'center'
       }
-    };
+    },
+    xaxis: {
+      min: -0.5,
+      max: (names.length - 0.5),
+      ticks: xticks
+    },
+    grid: {
+      clickable: true
+    }
+  };
 
-  energyCompChart = new Object();
-  energyCompChart.id = id;
-  energyCompChart.data = data;
-  energyCompChart.options = options;
+  if(stacked) {
+    options.series.stack = 0;
+  }
+  options.yaxis = {
+    tickFormatter: function (value, axis) {
+      return value.toFixed(0) + (stacked ? ' %' : '');
+    }
+  };
 
-  energyCompChart.plot = function() {
+  var chart = new Object();
+  chart.id = id;
+  chart.data = data;
+  chart.options = options;
+
+  chart.plot = function() {
     $.plot($('#' + id), data, options);
-
-    $('#' + id).bind('plotclick',
-      function (event, pos, item) {
-        if (item) {
-          window.location = '/logger/electricity/' + intervals[item.dataIndex];
-        }
-      }
-    );
   };
 
-  energyCompChart.plot();
-}
+  chart.plot();
 
-function createEnergyChart(id, values, names, colors) {
-
-  var xticks = [names.length];
-  var data1  = [names.length];
-
-  for (var i = 0; i < names.length; i++) {
-
-    data1[i]  = [i, values[i]];
-    xticks[i] = [i, names[i]];
+  if (dataLabels) {
+    showBarDataLabels(chart);
   }
 
-  var data = [ {data: data1} ];
-  var options = {
-      colors: colors,
-      series: {
-        bars: {
-          show: true,
-          barWidth: 0.5,
-          lineWidth: 0,
-          fill: 1,
-          align: 'center'
-        }
-      },
-      xaxis: {
-        min: -0.5,
-        max: (names.length - 0.5),
-        ticks: xticks
-      },
-      yaxis: {
-        tickFormatter: function (value, axis) {
-          return value.toFixed(0);
-        }
-      }
-    };
-
-  energyChart = new Object();
-  energyChart.id = id;
-  energyChart.data = data;
-  energyChart.options = options;
-
-  energyChart.plot = function() {
-    return $.plot($('#' + id), data, options);
-  };
-
-  showBarDataLabels(energyChart);
+  return chart;
 }
 
 function showBarDataLabels(chart) {
@@ -431,9 +385,13 @@ function showBarDataLabels(chart) {
 
 function setSeriesColor(chartId, i, color) {
 
-  if (chartId == 'energy') {
+  if (chartId == 'energyComp') {
     energyCompChart.options['colors'][i] = '#' + color;
     energyCompChart.plot();
+
+  } else if (chartId == 'energy') {
+    energyChart.options['colors'][i] = '#' + color;
+    energyChart.plot();
 
   } else {
     updateDygraphColor(powerChart, i, color);

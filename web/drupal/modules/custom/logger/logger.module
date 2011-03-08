@@ -71,7 +71,7 @@ function logger_menu() {
 
   $items = array();
 
-  // Dashboard operations
+  // Main operations
 
   $items['logger'] = array(
     'title'            => 'Homepage',
@@ -272,7 +272,7 @@ function _logger_power_page($type, $interval) {
     _logger_get_subscribed_sensors($type)
   );
 
-  $chart = _logger_create_power_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+  $chart = _logger_create_power_chart_object($interval, $type, 'power', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
   return theme('logger_power_chart_area', $chart);
 }
@@ -372,7 +372,7 @@ function _logger_energy_comparison_page() {
     'with your previous consumption in six different time windows. ' .
     'Click one of the bars for more information.') . '<br><br>';
 
-  $output .= theme('logger_energy_comparison_chart_area', $chart);
+  $output .= theme('logger_energy_chart_area', $chart);
 
   return $output;
 }
@@ -384,13 +384,16 @@ function _logger_energy_comparison_page() {
  */
 function _logger_energy_page() {
 
+  global $user;
+
   $chart = _logger_create_energy_chart_object();
+  $series = $chart->data['series'][$user->uid];
 
   drupal_set_title(t('Your energy consumption'));
 
-  $keys = array_keys($chart->data);
-  $today = $keys[count($keys) - 1];
-  $consumed = number_format($chart->data[$today], 2);
+  $days = array_keys($series);
+  $today = $days[count($days) - 1];
+  $consumed = number_format($series[$today], 2);
 
   $output = t('Today you have consumed %consumed Wh so far. ' .
     'The following chart shows your energy consumption along the week.',
@@ -411,15 +414,10 @@ function _logger_create_energy_comparison_chart_object() {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $chart = new stdClass();
-
-  $chart->colors = _logger_get_series_colors('energy_comparison');
-  $chart->names = array(
-    'hour'  => t('Hour'),
-    'day'   => t('Day'),
-    'week'  => t('Week'),
-    'month' => t('Month'),
-    'year'  => t('Year')
-  );
+  $chart->context = 'energyComp';
+  $chart->data_labels = 0;
+  $chart->stacked = 1;
+  $chart->colors = _logger_get_series_colors($chart->context);
 
   global $user;
   $cache_id = "logger_energy_comparison_chart_data_$user->uid";
@@ -436,7 +434,15 @@ function _logger_create_energy_comparison_chart_object() {
     $extra_days['month'] = $now['mday'] - 1;
     $extra_days['year']  = $now['yday'];
 
-    foreach ($chart->names as $interval => $name) {
+    $intervals = array(
+      'hour'  => t('Hour'),
+      'day'   => t('Day'),
+      'week'  => t('Week'),
+      'month' => t('Month'),
+      'year'  => t('Year')
+    );
+
+    foreach ($intervals as $interval => $name) {
 
       $resolution = _logger_get_resolution($interval);
 
@@ -454,10 +460,15 @@ function _logger_create_energy_comparison_chart_object() {
       $previous = logger_rrd_query_energy($sensors, $interval, $offset, $period1, $resolution);
       $current  = logger_rrd_query_energy($sensors, $interval, $offset, $period2, $resolution);
 
-      $chart->data['previous'][$interval]  = $previous;
-      $chart->data['current'][$interval]   = $current;
-      $chart->data['remaining'][$interval] = $previous - $current;
-      $chart->data['exceeding'][$interval] = $current - $previous;
+      $perc = ($current / $previous) * 100;
+      $chart->data['series']['current'][$name]   = $perc < 100 ? $perc       : 100;
+      $chart->data['series']['remaining'][$name] = $perc < 100?  100 - $perc :   0;
+      $chart->data['series']['exceeding'][$name] = $perc > 100?  $perc - 100 :   0;
+
+      $chart->data['legend']['current'][$name]   = $current;
+      $chart->data['legend']['previous'][$name]  = $previous;
+      $chart->data['legend']['remaining'][$name] = $previous - $current;
+      $chart->data['legend']['exceeding'][$name] = $current - $previous;
 
       //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
     }
@@ -477,7 +488,11 @@ function _logger_create_energy_chart_object() {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $chart = new stdClass();
-  $chart->colors = _logger_get_series_colors('energy');
+  $chart->context = 'energy';
+  $chart->data_labels = 1;
+  $chart->stacked = 0;
+
+  $chart->colors = _logger_get_series_colors($chart->context);
 
   global $user;
   $cache_id = "logger_energy_chart_data_$user->uid";
@@ -497,7 +512,7 @@ function _logger_create_energy_chart_object() {
       $period = array('start' => $time, 'end' => ($time + DAY));
       $name = date("l", $time) . '<br>' . date("d-M", $time);
 
-      $chart->data[$name] = logger_rrd_query_energy($sensors, 'day', $offset, $period, $resolution);
+      $chart->data['series'][$user->uid][$name] = logger_rrd_query_energy($sensors, 'day', $offset, $period, $resolution);
 
       $time += DAY;
     }
@@ -581,15 +596,15 @@ function _logger_create_power_chart_object($interval, $type, $context, $sensors,
 
   } else {
 
-    if ($context == 'logger') {
+    if ($context == 'power') {
 
       foreach ($sensors as &$sensor) {
-        $chart->data[$sensor->uid][$sensor->username][$sensor->function] =
+        $chart->data['series'][$sensor->uid][$sensor->username][$sensor->function] =
           logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
       }
 
     } else {
-      $chart->data[0][t('All')][t('All')] =
+      $chart->data['series'][0][t('All')][t('All')] =
         logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
     }
 
@@ -744,7 +759,7 @@ function _logger_save_power_chart_file($chart) {
 
   //TODO: find a better way of iterating timestamps
   $timestamps = array();
-  foreach($chart->data as $uid => $userdata) {
+  foreach($chart->data['series'] as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $sensor => $measurements) {
         foreach(array_keys($measurements) as $timestamp) {
@@ -758,7 +773,7 @@ function _logger_save_power_chart_file($chart) {
 
   $s = 1;
 
-  foreach($chart->data as $uid => $userdata) {
+  foreach($chart->data['series'] as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $sensor => $measurements) {
         $header .= ',S' . $s++;
@@ -830,11 +845,6 @@ function logger_theme() {
 
   return array(
     'logger_power_chart_area' => array(
-      'arguments' => array(
-        'chart' => NULL),
-    ),
-
-    'logger_energy_comparison_chart_area' => array(
       'arguments' => array(
         'chart' => NULL),
     ),
@@ -935,7 +945,7 @@ function theme_logger_power_chart_area($chart) {
     'pointClickCallback' => 'addPowerAnnotation'
   );
 
-  if ($chart->context == 'logger') {
+  if ($chart->context == 'power') {
 
     $yvalue1 = $chart->yaxis[0] + 0;
     $yvalue2 = $chart->yaxis[1] + 0;
@@ -971,32 +981,6 @@ function theme_logger_power_chart_area($chart) {
 }
 
 /**
- * Builds the energy consumption comparison chart area.
- *
- * @param $chart   The energy consumption comparison chart object.
- * @return the chart area output.
- */
-function theme_logger_energy_comparison_chart_area($chart) {
-
-  $id = 'energycomparisonchart';
-  $output = "
-    <div id='$id' style='width: 600px; height: 300px;'></div>
-    <script type='text/javascript'>
-      createEnergyComparisonChart('$id',
-        ["  . implode(', '  , $chart->data['current'])  .  "],
-        ["  . implode(', '  , $chart->data['previous']) .  "],
-        ['" . implode("', '", array_keys($chart->names))  . "'],
-        ['" . implode("', '", $chart->names)              . "'],
-        ['" . implode("', '", $chart->colors)             . "']
-      );
-    </script>";
-
-  $output .= _logger_create_energy_comparison_chart_legend($chart);
-
-  return $output;
-}
-
-/**
  * Builds the energy consumption chart area.
  *
  * @param $chart   The energy consumption chart object.
@@ -1004,17 +988,29 @@ function theme_logger_energy_comparison_chart_area($chart) {
  */
 function theme_logger_energy_chart_area($chart) {
 
-  $id = 'energychart';
+  $id = $chart->context . 'Chart';
+
+  $series = array();
+  foreach ($chart->data['series'] as $values) {
+    $series[] = implode(', ', $values);
+  }
+  $names = array_keys($values);
 
   $output = "
     <div id='$id' style='width: 600px; height: 300px;'></div>
     <script type='text/javascript'>
-      createEnergyChart('$id',
-        ["  . implode(', '  , $chart->data)             .  "],
-        ['" . implode("', '", array_keys($chart->data)) . "'],
-        ['" . implode("', '", $chart->colors)           . "']
+      $id = createBarChart('$id',
+        [ [ " . implode('], [' , $series)        . " ] ],
+        ['"   . implode("', '" , $names)         . "'],
+        ['"   . implode("', '" , $chart->colors) . "'], " .
+        $chart->data_labels . ", " .
+        $chart->stacked . "
       );
     </script>";
+  
+  if (isset($chart->data['legend'])) {
+    $output .= _logger_create_energy_comparison_chart_legend($chart);
+  }
 
   return $output;
 }
@@ -1093,7 +1089,7 @@ function _logger_create_power_chart_legend($chart) {
   global $user;
 
   $i = 0;
-  foreach($chart->data as $uid => $userdata) {
+  foreach($chart->data['series'] as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $meter => $measurements) {
 
@@ -1139,18 +1135,20 @@ function _logger_create_power_chart_legend($chart) {
  */
 function _logger_create_energy_comparison_chart_legend($chart) {
 
+  //TODO: make this method generic
+
   //colors legend
   $lines = array(
     array(
-      theme('logger_color_picker', 'energy', 0, $chart->colors),
+      theme('logger_color_picker', $chart->context, 0, $chart->colors),
       t('How much has been consumed in comparison to the previous level.')
     ),
     array(
-      theme('logger_color_picker', 'energy', 1, $chart->colors),
+      theme('logger_color_picker', $chart->context, 1, $chart->colors),
       t('How much remains to equal the previous level.')
     ),
     array(
-      theme('logger_color_picker', 'energy', 2, $chart->colors),
+      theme('logger_color_picker', $chart->context, 2, $chart->colors),
       t('How much the current consumption has exceeded the previous level.')
     )
   );
@@ -1161,17 +1159,20 @@ function _logger_create_energy_comparison_chart_legend($chart) {
     return $value > 0 ? number_format($value, 2) : '';
   }
 
+  $data =$chart->data['legend'];
+  $names = array_keys($data['current']);
+
   //values legend
   $lines = array();
 
-  foreach ($chart->names as $i => $name) {
+  foreach ($names as $name) {
 
     $lines[] = array(
-      array('data' => $name,                                        'align' => 'left'),
-      array('data' => _format_value($chart->data['current'][$i]),   'align' => 'right'),
-      array('data' => _format_value($chart->data['previous'][$i]),  'align' => 'right'),
-      array('data' => _format_value($chart->data['remaining'][$i]), 'align' => 'right'),
-      array('data' => _format_value($chart->data['exceeding'][$i]), 'align' => 'right')
+      array('data' => $name,                                    'align' => 'left'),
+      array('data' => _format_value($data['current'][$name]),   'align' => 'right'),
+      array('data' => _format_value($data['previous'][$name]),  'align' => 'right'),
+      array('data' => _format_value($data['remaining'][$name]), 'align' => 'right'),
+      array('data' => _format_value($data['exceeding'][$name]), 'align' => 'right')
     );
   }
 
@@ -1221,11 +1222,9 @@ function _logger_series_color($chart_id, $i, $color) {
 function _logger_get_series_colors($chart_id) {
 
   $palettes['energy'] = array(
-    '#4D7060', //GREEN4
-    '#BFD9D3', //GREEN5
-    '#C0C0C0'  //GRAY2
+    '#4D7060' //GREEN
   );
-  $palettes['logger'] = array(
+  $palettes['power'] = array(
     '#377037', //GREEN
     '#0000FC', //BLUE
     '#C11700', //RED
@@ -1244,8 +1243,10 @@ function _logger_get_series_colors($chart_id) {
   $palettes['overview'] = array(
     '#377037' //GREEN
   );
-  $palettes['energy_comparison'] = array(
-    '#4D7060' //GREEN
+  $palettes['energyComp'] = array(
+    '#4D7060', //GREEN4
+    '#BFD9D3', //GREEN5
+    '#C0C0C0'  //GRAY2
   );
 
   function _get_color($palette, $chart_id, $i) {
