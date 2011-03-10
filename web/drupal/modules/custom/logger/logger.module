@@ -502,7 +502,7 @@ function _logger_save_power_chart_file($chart) {
 
         for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
           $value = $measurements[$timestamp];
-          $value = $value? number_format($value, 3, '', '') : '';
+          $value = $value? number_format($value, 3, '.', '') : '';
           $values[$timestamp] .= ',' . $value;
         }
       }
