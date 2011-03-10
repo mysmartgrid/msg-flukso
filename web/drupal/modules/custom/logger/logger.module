@@ -42,7 +42,7 @@ define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_');
 define('STEP_PLOT_ID', 'logger_step_plot_');
 
 function logger_init() {
-  
+
   drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
   drupal_add_js(ROOT_PATH . '/js/charts.js');
 
@@ -232,7 +232,7 @@ function logger_menu() {
 }
 
 /**
- * Forwards request to suitable home page.
+ * Forwards request to a suitable home page.
  *
  * @param $type     The sensor type.
  * @param $interval The time interval.
@@ -250,7 +250,7 @@ function _logger_home_page($type, $interval) {
 
 /**
  * Builds the power consumption page.
- * 
+ *
  * @param $type     The sensor type.
  * @param $interval The time interval.
  * @return the power consumption page.
@@ -266,13 +266,14 @@ function _logger_power_page($type, $interval) {
   $xvalue2 = _logger_get_xvalue(2);
   $yvalue1 = _logger_get_yvalue(1);
   $yvalue2 = _logger_get_yvalue(2);
+  $unit = _logger_get_unit();
 
   $sensors = array_merge(
     _logger_get_user_sensors($type),
     _logger_get_subscribed_sensors($type)
   );
 
-  $chart = _logger_create_power_chart_object($interval, $type, 'power', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+  $chart = _logger_create_chart_object('power', $type, $interval, $unit, 0, 0, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
   return theme('logger_power_chart_area', $chart);
 }
@@ -349,8 +350,9 @@ function _logger_overview_page($type, $interval) {
   }
 
   $sensors = _logger_get_active_sensors($type);
+  $unit = _logger_get_unit();
 
-  $chart = _logger_create_power_chart_object($interval, $type, 'overview', $sensors);
+  $chart = _logger_create_chart_object('overview', $type, $interval, $unit, 0, 0, $sensors);
 
   $output .= theme('logger_power_chart_area', $chart);
 
@@ -364,13 +366,13 @@ function _logger_overview_page($type, $interval) {
  */
 function _logger_energy_comparison_page() {
 
-  $chart = _logger_create_energy_comparison_chart_object();
-
   drupal_set_title(t('Compare your energy consumption'));
 
   $output = t('The following chart compares your current energy consumption ' .
     'with your previous consumption in six different time windows. ' .
     'Click one of the bars for more information.') . '<br><br>';
+
+  $chart = _logger_create_chart_object('energycomp', 'electricity', 'year', 'Wh/s', 0, 1);
 
   $output .= theme('logger_energy_chart_area', $chart);
 
@@ -386,144 +388,29 @@ function _logger_energy_page() {
 
   global $user;
 
-  $chart = _logger_create_energy_chart_object();
-  $series = $chart->data['series'][$user->uid];
+  $now = time();
+  $start = $now - 6 * DAY - $now % DAY;
+  $end = $start + 7 * DAY;
+  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'Wh/s', 1, 0, NULL, array($start, $end));
+
+  $values = $chart->data['series'][$user->uid][$user->name][t('All')];
+  $days = array_keys($values);
+  $today = $days[count($days) - 1];
+  $consumed = number_format($values[$today], 2, '.', ',');
 
   drupal_set_title(t('Your energy consumption'));
 
-  $days = array_keys($series);
-  $today = $days[count($days) - 1];
-  $consumed = number_format($series[$today], 2);
-
   $output = t('Today you have consumed %consumed Wh so far. ' .
     'The following chart shows your energy consumption along the week.',
-    array('%consumed' => $consumed));
+    array('%consumed' => $consumed)) . '<br><br>';
 
-  $output .= '<br><br>' . theme('logger_energy_chart_area', $chart);
+  $output .= theme('logger_energy_chart_area', $chart);
 
   return $output;
 }
 
 /**
- * Creates an object to hold all energy consumption comparison chart parameters.
- *
- * @return the chart object.
- */
-function _logger_create_energy_comparison_chart_object() {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $chart = new stdClass();
-  $chart->context = 'energyComp';
-  $chart->data_labels = 0;
-  $chart->stacked = 1;
-  $chart->colors = _logger_get_series_colors($chart->context);
-
-  global $user;
-  $cache_id = "logger_energy_comparison_chart_data_$user->uid";
-  $cache = cache_get($cache_id, 'cache_page');
-  $chart->data = $cache->data;
-
-  if (!$chart->data) {
-
-    $sensors = _logger_get_user_sensors('electricity');
-    $now = getdate();
-    $offset = _logger_get_timezone_offset();
-
-    $extra_days['week']  = $now['wday'];
-    $extra_days['month'] = $now['mday'] - 1;
-    $extra_days['year']  = $now['yday'];
-
-    $intervals = array(
-      'hour'  => t('Hour'),
-      'day'   => t('Day'),
-      'week'  => t('Week'),
-      'month' => t('Month'),
-      'year'  => t('Year')
-    );
-
-    foreach ($intervals as $interval => $name) {
-
-      $resolution = _logger_get_resolution($interval);
-
-      $adjustment = $extra_days[$interval] * DAY +
-        $now[0] % ($interval == 'hour' ? HOUR : DAY);
-
-      $window = _logger_get_default_time_window($interval);
-
-      $time1 = $now[0] - $adjustment - $window;
-      $time2 = $time1 + $window;
-
-      $period1 = array('start' => $time1, 'end' => $time2);
-      $period2 = array('start' => $time2, 'end' => $now[0]);
-
-      $previous = logger_rrd_query_energy($sensors, $interval, $offset, $period1, $resolution);
-      $current  = logger_rrd_query_energy($sensors, $interval, $offset, $period2, $resolution);
-
-      $perc = ($current / $previous) * 100;
-      $chart->data['series']['current'][$name]   = $perc < 100 ? $perc       : 100;
-      $chart->data['series']['remaining'][$name] = $perc < 100?  100 - $perc :   0;
-      $chart->data['series']['exceeding'][$name] = $perc > 100?  $perc - 100 :   0;
-
-      $chart->data['legend']['current'][$name]   = $current;
-      $chart->data['legend']['previous'][$name]  = $previous;
-      $chart->data['legend']['remaining'][$name] = $previous - $current;
-      $chart->data['legend']['exceeding'][$name] = $current - $previous;
-
-      //system("echo " . substr("$interval-----", 0, 6) . " " . date('D d-M-Y H:i:s', $time1) . " " . date('D d-M-Y H:i:s', $time2) . " >> /tmp/test.txt");
-    }
-
-    cache_set($cache_id, $chart->data, 'cache_page', $now[0] + 15 * MINUTE);
-  }
-  return $chart;
-}
-
-/**
- * Creates an object to hold all energy consumption chart parameters.
- *
- * @return the chart object.
- */
-function _logger_create_energy_chart_object() {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $chart = new stdClass();
-  $chart->context = 'energy';
-  $chart->data_labels = 1;
-  $chart->stacked = 0;
-
-  $chart->colors = _logger_get_series_colors($chart->context);
-
-  global $user;
-  $cache_id = "logger_energy_chart_data_$user->uid";
-  $cache = cache_get($cache_id, 'cache_page');
-  $chart->data = $cache->data;
-
-  if (!$chart->data) {
-
-    $sensors = _logger_get_user_sensors('electricity');
-    $offset = _logger_get_timezone_offset();
-    $resolution = _logger_get_resolution('week');
-    $now = time();
-
-    $time = $now - 6 * DAY - $now % DAY;
-    while($time < $now) {
-
-      $period = array('start' => $time, 'end' => ($time + DAY));
-      $name = date("l", $time) . '<br>' . date("d-M", $time);
-
-      $chart->data['series'][$user->uid][$name] = logger_rrd_query_energy($sensors, 'day', $offset, $period, $resolution);
-
-      $time += DAY;
-    }
-
-    cache_set($cache_id, $chart->data, 'cache_page', $now + 15 * MINUTE);
-  }
-  return $chart;
-}
-
-/**
- * Creates an object to hold all power consumption chart parameters.
+ * Creates an object to hold chart parameters.
  *
  * @param $interval The time interval.
  * @param $type     The sensor type.
@@ -533,114 +420,218 @@ function _logger_create_energy_chart_object() {
  * @param $yaxis    An array containing the minimum and maximum values of the y axis.
  * @return the chart object.
  */
-function _logger_create_power_chart_object($interval, $type, $context, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
+function _logger_create_chart_object($context, $type, $interval, $unit, $data_labels, $stacked, $sensors = NULL, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $chart = new stdClass();
-
-  $chart->type = $type;
-  $chart->interval = $interval;
-  $chart->context = $context;
+  //TODO: simplify this function
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
     $xaxis[1] = time();
     $xaxis[0] = $xaxis[1] - _logger_get_default_time_window($interval);
   }
 
+  if (!$sensors) {
+    $sensors = _logger_get_user_sensors($type);
+  }
+
+  $chart = new stdClass();
+  $chart->context = $context;
+  $chart->type = $type;
+  $chart->interval = $interval;
+  $chart->unit = $unit;
+  $chart->data_labels = $data_labels;
+  $chart->stacked = $stacked;
+  $chart->sensors = $sensors;
   $chart->yaxis = $yaxis;
   $chart->xaxis = $xaxis;
 
   $chart->resolution = _logger_get_resolution($interval);
-  $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->offset = _logger_get_timezone_offset();
   $chart->colors = _logger_get_series_colors($context);
+  $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
 
-  switch ($type) {
-    case 'electricity':
-      switch (_logger_get_unit()) {
-        case 'kw':
-          $chart->unit = 'kW';
-          $chart->factor = 0.001;
-          break;
-
-        case 'kwh':
-          $chart->unit = 'kWh/year';
-          $chart->factor = 31536;
-          break;
-
-        case 'eur':
-          $chart->unit = 'euro/year';
-          $chart->factor = 5676; // 18 EURcent/kWh
-          break;
-
-        case 'aud':
-          $chart->unit = 'aud/year';
-          $chart->factor = 5991; // 19 AUDcent/kWh
-          break;
-
-        default:
-          $chart->unit = 'watt';
-          $chart->factor = 3600; // 1Wh/s = 3600 W
-      }
+  $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
+  $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
+  $unique_id = "$context $type $unit $chart->resolution $t1 $t2";
+  foreach ($sensors as $sensor) {
+    $unique_id .= " $sensor->meter";
   }
+  $chart->unique_id = md5($unique_id);
 
-  $chart->sensors = $sensors;
-  $chart->file_path = _logger_compose_power_chart_file_path($chart);
+  $chart->file_path = GRAPH_PATH . "/$interval/msg-chart-$chart->unique_id.csv";
 
-  $cache_id = "logger_power_chart_data_$chart->file_path";
-  $cache = cache_get($cache_id, 'cache_page');
+  $chart->cache_id = 'logger_' . $interval . '_chart_data_' . $chart->unique_id;
+  $cache = cache_get($chart->cache_id, 'cache_page');
+  $chart->data = $cache->data;
 
-  if ($cache->data) {
-    $chart->data = $cache->data;
+  if (!$chart->data) {
 
-  } else {
+    $get_data = '_logger_get_' . $chart->context . '_chart_data';
+    $chart->data = $get_data($chart);
 
-    if ($context == 'power') {
+    cache_set($chart->cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
 
-      foreach ($sensors as &$sensor) {
-        $chart->data['series'][$sensor->uid][$sensor->username][$sensor->function] =
-          logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
-      }
-
-    } else {
-      $chart->data['series'][0][t('All')][t('All')] =
-        logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
+    //FIXME
+    if ($context == 'power' || $context == 'overview') {
+      _logger_save_power_chart_file($chart);
     }
-
-    _logger_save_power_chart_file($chart);
-
-    cache_set($cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
   }
-
   return $chart;
 }
 
 /**
- * Composes an unique power chart file name.
+ * Saves a power chart to a file.
  *
- * @param $chart The power chart object.
- * @return the chart file path.
+ * @param $chart The power chart parameters.
  */
-function _logger_compose_power_chart_file_path($chart) {
+function _logger_save_power_chart_file($chart) {
 
-  $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
-  $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
+  //TODO: make this method a callback to return file content
 
-  $unique_id = "$chart->context $chart->type $chart->unit $chart->resolution $t1 $t2";
+  $header = t('Time');
+  $values = array();
 
-  foreach ($chart->sensors as $sensor) {
-    $unique_id .= " $sensor->meter";
+  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
+  $start -= ($start % $chart->resolution);
+  $end = $chart->period['end'] + $chart->offset;
+  $s = 1;
+
+  foreach($chart->data['series'] as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $measurements) {
+        $header .= ',S' . $s++;
+
+        for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
+          $value = $measurements[$timestamp];
+          $value = $value? number_format($value, 3, '', '') : '';
+          $values[$timestamp] .= ',' . $value;
+        }
+      }
+    }
   }
 
-  $unique_id = md5($unique_id);
+  $series = $header . PHP_EOL;
+  foreach($values as $timestamp => $values_list) {
+    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
+  }
 
-  return GRAPH_PATH . "/$chart->interval/msg-chart-$unique_id.csv";
+  $fh = fopen($chart->file_path, 'w');
+  fwrite($fh, $series);
+  fclose($fh);
+}
+
+/**
+ * Returns an array containing all energy consumption comparison chart data.
+ *
+ * @return the chart data.
+ */
+function _logger_get_energycomp_chart_data($chart) {
+
+  global $user;
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $now = getdate();
+  $extra_days['week']  = $now['wday'];
+  $extra_days['month'] = $now['mday'] - 1;
+  $extra_days['year']  = $now['yday'];
+
+  $intervals = array(
+    'hour'  => t('Hour'),
+    'day'   => t('Day'),
+    'week'  => t('Week'),
+    'month' => t('Month'),
+    'year'  => t('Year')
+  );
+
+  foreach ($intervals as $interval => $label) {
+
+    $resolution = _logger_get_resolution($interval);
+
+    $adjustment = $extra_days[$interval] * DAY +
+      $now[0] % ($interval == 'hour' ? HOUR : DAY);
+
+    $window = _logger_get_default_time_window($interval);
+
+    $time1 = $now[0] - $adjustment - $window;
+    $time2 = $time1 + $window;
+
+    $period1 = array('start' => $time1, 'end' => $time2);
+    $period2 = array('start' => $time2, 'end' => $now[0]);
+
+    $previous = logger_rrd_query_energy($chart->sensors, $interval, $chart->offset, $period1, $resolution);
+    $current  = logger_rrd_query_energy($chart->sensors, $interval, $chart->offset, $period2, $resolution);
+
+    $perc = ($current / $previous) * 100;
+    $series['current'][$label]   = $perc < 100 ? $perc       : 100;
+    $series['remaining'][$label] = $perc < 100?  100 - $perc :   0;
+    $series['exceeding'][$label] = $perc > 100?  $perc - 100 :   0;
+
+    $legend['current'][$label]   = $current;
+    $legend['previous'][$label]  = $previous;
+    $legend['remaining'][$label] = $previous - $current;
+    $legend['exceeding'][$label] = $current - $previous;
+  }
+  $data['series'][$user->uid][$user->name] = $series;
+  $data['legend'][$user->uid][$user->name] = $legend;
+
+  return $data;
+}
+
+/**
+ * Returns an array containing all energy consumption chart data.
+ *
+ * @return the chart data.
+ */
+function _logger_get_energy_chart_data($chart) {
+
+  global $user;
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  for($time = $chart->xaxis[0]; $time < $chart->xaxis[1]; $time += DAY) {
+
+    $period = array('start' => $time, 'end' => ($time + DAY));
+    $label = date("l", $time) . '<br>' . date("d-M", $time);
+
+    $values[$label] = logger_rrd_query_energy($chart->sensors, 'day', $chart->offset, $period, $chart->resolution);
+  }
+  $data['series'][$user->uid][$user->name][t('All')] = $values;
+
+  return $data;
+}
+
+/**
+ * Returns an array containing all power consumption chart data.
+ * 
+ * @return the chart data.
+ */
+function _logger_get_power_chart_data($chart) {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  foreach ($chart->sensors as &$sensor) {
+    $data['series'][$sensor->uid][$sensor->username][$sensor->function] =
+      logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+  }
+  return $data;
+}
+
+/**
+ * Returns an array containing all overview chart data.
+ *
+ * @return the chart data.
+ */
+function _logger_get_overview_chart_data($chart) {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $data['series'][0][t('All')][t('All')] =
+    logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+
+  return $data;
 }
 
 /**
  * Returns an array containing all sensors owned by the user.
- * 
+ *
  * @param $type  The type of sensors to be returned.
  * @return the array of user sensors.
  */
@@ -745,46 +736,6 @@ function _logger_get_active_sensors($type) {
     $sensors[] = $sensor;
   }
   return $sensors;
-}
-
-/**
- * Saves a power chart to a file.
- *
- * @param $chart The power chart parameters.
- */
-function _logger_save_power_chart_file($chart) {
-
-  $header = t('Time');
-  $values = array();
-
-  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
-  $start -= ($start % $chart->resolution);
-  $end = $chart->period['end'] + $chart->offset;
-
-  $s = 1;
-
-  foreach($chart->data['series'] as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $measurements) {
-        $header .= ',S' . $s++;
-
-        for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
-          $value = $measurements[$timestamp];
-          $value = $value? number_format($value, 3, '.', '') : '';
-          $values[$timestamp] .= ',' . $value;
-        }
-      }
-    }
-  }
-
-  $series = $header . PHP_EOL;
-  foreach($values as $timestamp => $values_list) {
-    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
-  }
-
-  $fh = fopen($chart->file_path, 'w');
-  fwrite($fh, $series);
-  fclose($fh);
 }
 
 /**
@@ -906,13 +857,11 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
   if($title) {
     $output .= '<br><h3 class="node-headline">' . $title . '</h3>';
   }
-
   $output .= "<p> $body </p>";
 
   if($link) {
     $output .= '<p>' . l(t('read more'), $link) . '</p>';
   }
-
   return $output;
 }
 
@@ -959,7 +908,7 @@ function theme_logger_power_chart_area($chart) {
 
   return
     _logger_create_interval_menu($chart->context) .
-    '<div>' . $chart->unit . '</div>' .
+    '<div>' . _logger_get_formatted_unit($chart->unit) . '</div>' .
 
     _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
     $slider_output .
@@ -978,14 +927,16 @@ function theme_logger_power_chart_area($chart) {
  */
 function theme_logger_energy_chart_area($chart) {
 
-  $id = $chart->context . 'Chart';
-
-  $series = array();
-  foreach ($chart->data['series'] as $values) {
-    $series[] = implode(', ', $values);
+  foreach ($chart->data['series'] as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $values) {
+        $series[] = implode(', ', $values);
+      }
+    }
   }
   $names = array_keys($values);
 
+  $id = $chart->context . 'Chart';
   $output = "
     <div id='$id' style='width: 600px; height: 300px;'></div>
     <script type='text/javascript'>
@@ -997,11 +948,10 @@ function theme_logger_energy_chart_area($chart) {
         $chart->stacked . "
       );
     </script>";
-  
+
   if (isset($chart->data['legend'])) {
     $output .= _logger_create_energy_comparison_chart_legend($chart);
   }
-
   return $output;
 }
 
@@ -1125,6 +1075,8 @@ function _logger_create_power_chart_legend($chart) {
  */
 function _logger_create_energy_comparison_chart_legend($chart) {
 
+  global $user;
+
   //TODO: make this method generic
 
   //colors legend
@@ -1149,7 +1101,7 @@ function _logger_create_energy_comparison_chart_legend($chart) {
     return $value > 0 ? number_format($value, 2) : '';
   }
 
-  $data =$chart->data['legend'];
+  $data = $chart->data['legend'][$user->uid][$user->name];
   $names = array_keys($data['current']);
 
   //values legend
@@ -1233,7 +1185,7 @@ function _logger_get_series_colors($chart_id) {
   $palettes['overview'] = array(
     '#377037' //GREEN
   );
-  $palettes['energyComp'] = array(
+  $palettes['energycomp'] = array(
     '#4D7060', //GREEN4
     '#BFD9D3', //GREEN5
     '#C0C0C0'  //GRAY2
@@ -1275,16 +1227,12 @@ function logger_block($op = 'list', $delta = 0, $edit = array()) {
       $blocks['posts']['weight'] = 3;
       $blocks['posts']['pages'] = '<front>\nlogger/\nlogger/*';
       $blocks['posts']['cache'] = BLOCK_CACHE_GLOBAL;
-
       return $blocks;
 
     case 'view':
-
       if ($delta == 'posts' && user_access('access content')) {
-
         $block = _logger_create_recent_blogs_block();
       }
-
       return $block;
   }
 }
@@ -1314,7 +1262,6 @@ function _logger_create_recent_blogs_block() {
     $block['content'] = $node_title_list;
     $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
   }
-
   return $block;
 }
 
@@ -1427,7 +1374,7 @@ function logger_control_form(&$form_state, $chart) {
     '#type'   => 'submit',
     '#value'  => t('Refresh')
   );
-  
+
   return $form;
 }
 
@@ -1489,7 +1436,7 @@ function theme_logger_time_period($element) {
 
 /**
  * Builds a color picker component.
- * 
+ *
  * @param $i          The color index.
  * @param $colors     The array of colors.
  * @return the picker HTML code.
@@ -1539,7 +1486,7 @@ function _logger_create_time_fields($element, $sufix) {
 
 /**
  * Arrange fields to represent a range.
- * 
+ *
  * @param $element  The Drupal form field element.
  * @param $field1   The field that contains the lowest value.
  * @param $field2   The field that contains the highest value.
@@ -1553,7 +1500,7 @@ function _logger_compose_range_fields($element, $field1, $field2) {
 
 /**
  * Create a customized form field.
- * 
+ *
  * @param $element     The Drupal form field element.
  * @param $sufix       A sufix for the field id and name.
  * @param $value       The field value.
@@ -1616,7 +1563,7 @@ function logger_control_form_validate($form, &$form_state) {
 function logger_control_form_submit($form, &$form_state) {
 
   global $_REQUEST;
-  
+
   $new_user        = $form_state['values']['new_user'];
   $unit            = $form_state['values']['unit'];
   $step_plot       = $form_state['values']['step_plot'];
@@ -1643,9 +1590,20 @@ function _logger_get_units_options() {
   return array(
     'watt' => t('watt'),
     'kwh'  => t('kWh/year'),
-    'eur'  => t('euro/year [@ 0.18eur/kWh]'),
-    'aud'  => t('aud/year [@ 0.19aud/kWh]')
+    'eur'  => t('euro/year (0.18eur/kWh)'),
+    'aud'  => t('aud/year (0.19aud/kWh)')
   );
+}
+
+/**
+ * Returns the chart unit formatted for display.
+ *
+ * @param $unit  The unit to be formatted.
+ * @return the formatted unit.
+ */
+function _logger_get_formatted_unit($unit) {
+  $options = _logger_get_units_options();
+  return strtok($options[$unit], ' ');
 }
 
 /**
@@ -1772,11 +1730,11 @@ function _logger_get_yvalue($index) {
  * @return the value.
  */
 function _logger_get_xvalue($index) {
-  
+
   $formatted = $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
 
   //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
-  
+
   $str = "$formatted:00 GMT+00:00";
   $d = strtok($str, '/');
   $m = strtok('/');
@@ -1784,7 +1742,7 @@ function _logger_get_xvalue($index) {
 
   $timestamp = strtotime("$m/$d/$r");
   $timestamp -= _logger_get_timezone_offset();
-  
+
   return $timestamp > 0 ? $timestamp : 0;
 }
 
@@ -2034,7 +1992,7 @@ function logger_query_device_measurements($interval, $device, $offset) {
 
   while($sensor = db_fetch_object($sensors)) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset, $period, $resolution);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $offset, $period, $resolution);
   }
   return $measurements;
 }

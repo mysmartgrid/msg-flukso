@@ -207,16 +207,16 @@ function logger_rrd_update($meter, $values, $subdir = NULL) {
  *
  * @param $interval  The time interval. This argument is used to select the RRA.
  * @param $sensor    The sensor.
- * @param $factor    The unit conversion factor.
+ * @param $unit      The power unit.
  * @param $offset    The user timezone offset.
  * @param $period    An array containing a period of time to be queried.
  * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $factor, $offset, $period, $step) {
+function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step) {
 
   $series_id = METER;
-  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $factor);
+  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
 
   $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
@@ -245,13 +245,13 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
  *
  * @param $interval  The time interval.
  * @param $sensors   The array of sensors.
- * @param $factor    The unit conversion factor.
+ * @param $unit      The power unit.
  * @param $offset    The user timezone offset.
  * @param $period    An array containing a period of time to be queried.
  * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $factor, $offset, $period, $step) {
+function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = time() - 15 * MINUTE;
@@ -263,7 +263,7 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset, $period, $s
 
     $sensor_cdef = METER . $i;
 
-    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $factor) .
+    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
 
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
@@ -300,11 +300,10 @@ function logger_rrd_query_energy($sensors, $interval, $offset, $period, $step) {
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    //The measurements are stored in (Wh / s)
-    $measurements = logger_rrd_query_sensor($interval, $sensor, 1, $offset, $period, $step);
+    $measurements = logger_rrd_query_sensor($interval, $sensor, 'Wh/s', $offset, $period, $step);
 
     foreach($measurements as $timestamp => $value) {
-      $total += $value * $step; //TODO: check if this calculation is right.
+      $total += $value * $step;
     }
   }
   return $total;
@@ -316,12 +315,14 @@ function logger_rrd_query_energy($sensors, $interval, $offset, $period, $step) {
  * @param $interval       The time interval.
  * @param $series_id      The series id.
  * @param $sensor         The sensor.
- * @param $factor         The unit conversion factor.
+ * @param $unit           The unit.
  * @return the DEF tag.
  */
-function _logger_rrd_sensor_def($interval, $series_id, $sensor, $factor) {
+function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
   global $user;
+  $factor = _logger_rrd_get_factor($unit);
+
 
   if($sensor->private > 0 && $sensor->uid != $user->uid) {
     return null;
@@ -422,4 +423,17 @@ function _logger_rrd_parse_exported_lines($lines, $offset) {
     }
   }
   return $data;
+}
+
+function _logger_rrd_get_factor($unit) {
+
+  $factors = array(
+    'kw'   => 0.001,
+    'kwh'  => 31536,
+    'eur'  => 5676, // 18 EURcent/kWh
+    'aud'  => 5991, // 19 AUDcent/kWh
+    'watt' => 3600, // 1Wh/s = 3600 W
+    'Wh/s' => 1
+  );
+  return $factors[$unit];
 }

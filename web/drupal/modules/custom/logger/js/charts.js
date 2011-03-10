@@ -20,7 +20,7 @@
 
 var powerChart;
 var sliderChart;
-var energyCompChart;
+var energycompChart;
 var energyChart;
 
 function formatDate(d) {
@@ -384,9 +384,9 @@ function showBarDataLabels(plot) {
 
 function setSeriesColor(chartId, i, color) {
 
-  if (chartId == 'energyComp') {
-    energyCompChart.options['colors'][i] = '#' + color;
-    energyCompChart.plot();
+  if (chartId == 'energycomp') {
+    energycompChart.options['colors'][i] = '#' + color;
+    energycompChart.plot();
 
   } else if (chartId == 'energy') {
     energyChart.options['colors'][i] = '#' + color;
