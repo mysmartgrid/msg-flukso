@@ -601,20 +601,7 @@ function _logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
-
-    $start = $chart->period['start'] + $chart->resolution + $chart->offset;
-    $start -= ($start % $chart->resolution);
-    $end = $chart->period['end'] + $chart->offset;
-
-    for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
-
-      $key = date('Y-m-d H:i', $timestamp);
-      $value = $measurements[$timestamp];
-
-      $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
-    }
-
-    $data['series'][$sensor->uid][$sensor->username][$sensor->function] = $formatted;
+    $data['series'][$sensor->uid][$sensor->username][$sensor->function] = _logger_format_power_series_data($chart, $measurements);
   }
   return $data;
 }
@@ -628,10 +615,26 @@ function _logger_get_overview_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $data['series'][0][t('All')][t('All')] =
-    logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+  $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+  $data['series'][0][t('All')][t('All')] = _logger_format_power_series_data($chart, $measurements);
 
   return $data;
+}
+
+function _logger_format_power_series_data($chart, $measurements) {
+
+  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
+  $start -= ($start % $chart->resolution);
+  $end = $chart->period['end'] + $chart->offset;
+
+  for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
+
+    $key = date('Y-m-d H:i', $timestamp);
+    $value = $measurements[$timestamp];
+
+    $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
+  }
+  return $formatted;
 }
 
 /**
