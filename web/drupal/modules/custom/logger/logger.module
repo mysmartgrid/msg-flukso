@@ -455,11 +455,11 @@ function _logger_create_chart_object($context, $type, $interval, $unit, $data_la
   foreach ($sensors as $sensor) {
     $unique_id .= " $sensor->meter";
   }
-  $chart->unique_id = md5($unique_id);
+  $unique_id = md5($unique_id);
 
-  $chart->file_path = GRAPH_PATH . "/$interval/msg-chart-$chart->unique_id.csv";
+  $chart->file_path = GRAPH_PATH . "/$interval/msg-chart-$unique_id.csv";
 
-  $chart->cache_id = 'logger_' . $interval . '_chart_data_' . $chart->unique_id;
+  $chart->cache_id = 'logger_' . $interval . '_chart_data_' . $unique_id;
   $cache = cache_get($chart->cache_id, 'cache_page');
   $chart->data = $cache->data;
 
@@ -467,55 +467,46 @@ function _logger_create_chart_object($context, $type, $interval, $unit, $data_la
 
     $get_data = '_logger_get_' . $chart->context . '_chart_data';
     $chart->data = $get_data($chart);
-
+    
     cache_set($chart->cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
 
-    //FIXME
-    if ($context == 'power' || $context == 'overview') {
-      _logger_save_power_chart_file($chart);
-    }
+    _logger_save_chart_file($chart);
   }
   return $chart;
 }
 
 /**
- * Saves a power chart to a file.
+ * Saves a chart to a file.
  *
- * @param $chart The power chart parameters.
+ * @param $chart The chart object.
  */
-function _logger_save_power_chart_file($chart) {
+function _logger_save_chart_file($chart) {
 
-  //TODO: make this method a callback to return file content
+  $cache = cache_get($chart->cache_id, 'cache_page');
+  if ($cache->data) {
+    $header = t('Time');
+    $s = 1;
 
-  $header = t('Time');
-  $values = array();
+    foreach($cache->data['series'] as $uid => $userdata) {
+      foreach($userdata as $username => $sensors) {
+        foreach($sensors as $sensor => $measurements) {
+          $header .= ',S' . $s++;
 
-  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
-  $start -= ($start % $chart->resolution);
-  $end = $chart->period['end'] + $chart->offset;
-  $s = 1;
-
-  foreach($chart->data['series'] as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $measurements) {
-        $header .= ',S' . $s++;
-
-        for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
-          $value = $measurements[$timestamp];
-          $value = $value? number_format($value, 3, '.', '') : '';
-          $values[$timestamp] .= ',' . $value;
+          foreach($measurements as $timestamp => $value) {
+            $values[$timestamp] .= ',' . $value;
+          }
         }
       }
     }
-  }
 
-  $series = $header . PHP_EOL;
-  foreach($values as $timestamp => $values_list) {
-    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
+    $output = $header . PHP_EOL;
+    foreach($values as $timestamp => $values_list) {
+      $output .= $timestamp . $values_list . PHP_EOL;
+    }
   }
 
   $fh = fopen($chart->file_path, 'w');
-  fwrite($fh, $series);
+  fwrite($fh, $output);
   fclose($fh);
 }
 
@@ -608,8 +599,22 @@ function _logger_get_power_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   foreach ($chart->sensors as &$sensor) {
-    $data['series'][$sensor->uid][$sensor->username][$sensor->function] =
-      logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+
+    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+
+    $start = $chart->period['start'] + $chart->resolution + $chart->offset;
+    $start -= ($start % $chart->resolution);
+    $end = $chart->period['end'] + $chart->offset;
+
+    for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
+
+      $key = date('Y-m-d H:i', $timestamp);
+      $value = $measurements[$timestamp];
+
+      $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
+    }
+
+    $data['series'][$sensor->uid][$sensor->username][$sensor->function] = $formatted;
   }
   return $data;
 }
