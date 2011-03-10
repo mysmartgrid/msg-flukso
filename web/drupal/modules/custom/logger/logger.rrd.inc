@@ -289,18 +289,19 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
  * Queries the total energy consumption during the specified time period, in watt-hour.
  *
  * @param $sensors  The sensors whose measurements are to be summed up.
+ * @param $unit     The energy unit.
  * @param $interval The time interval menu option.
  * @param $offset   The user timezone offset.
  * @param $period   An array containing a period of time to be queried.
  * @param $step     The amount of time aggregated in a single point.
  * @return the summed power consumption.
  */
-function logger_rrd_query_energy($sensors, $interval, $offset, $period, $step) {
+function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $step) {
 
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, 'Wh/s', $offset, $period, $step);
+    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step);
 
     foreach($measurements as $timestamp => $value) {
       $total += $value * $step;
@@ -428,12 +429,14 @@ function _logger_rrd_parse_exported_lines($lines, $offset) {
 function _logger_rrd_get_factor($unit) {
 
   $factors = array(
-    'kw'   => 0.001,
-    'kwh'  => 31536,
-    'eur'  => 5676, // 18 EURcent/kWh
-    'aud'  => 5991, // 19 AUDcent/kWh
-    'watt' => 3600, // 1Wh/s = 3600 W
-    'Wh/s' => 1
+    'kw'    => 0.001,
+    'kwh'   => 31536,
+    'eur'   => 5676, // 18 EURcent/kWh
+    'aud'   => 5991, // 19 AUDcent/kWh
+    'watt'  => 3600, // 1Wh/s = 3600 W
+
+    'Wh'    => 1,
+    'kWh'   => 0.001
   );
   return $factors[$unit];
 }

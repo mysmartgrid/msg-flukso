@@ -339,7 +339,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   }
   options.yaxis = {
     tickFormatter: function (value, axis) {
-      return value.toFixed(0) + (stacked ? ' %' : '');
+      return stacked ? value.toFixed(0) + ' %' : value.toFixed(2);
     }
   };
 
@@ -370,7 +370,7 @@ function showBarDataLabels(plot) {
       if (point[1] > 0) {
         var offset = plot.pointOffset({x: point[0], y: point[1]});
 
-        $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(0) + '</div>').css(
+        $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(2) + '</div>').css(
           {
             position: 'absolute',
             left: offset.left - 15,

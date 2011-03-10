@@ -275,7 +275,9 @@ function _logger_power_page($type, $interval) {
 
   $chart = _logger_create_chart_object('power', $type, $interval, $unit, 0, 0, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
-  return theme('logger_power_chart_area', $chart);
+  return theme('logger_power_chart_area', $chart) .
+
+    drupal_get_form('logger_control_form', $chart);
 }
 
 /**
@@ -368,11 +370,10 @@ function _logger_energy_comparison_page() {
 
   drupal_set_title(t('Compare your energy consumption'));
 
-  $output = t('The following chart compares your current energy consumption ' .
-    'with your previous consumption in six different time windows. ' .
-    'Click one of the bars for more information.') . '<br><br>';
+  $output = t('The following chart shows your current energy consumption in six different time frames,
+    in comparison to the previous levels.') . '<br><br>';
 
-  $chart = _logger_create_chart_object('energycomp', 'electricity', 'year', 'Wh/s', 0, 1);
+  $chart = _logger_create_chart_object('energycomp', 'electricity', 'year', 'kWh', 0, 1);
 
   $output .= theme('logger_energy_chart_area', $chart);
 
@@ -391,7 +392,7 @@ function _logger_energy_page() {
   $now = time();
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
-  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'Wh/s', 1, 0, NULL, array($start, $end));
+  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', 1, 0, NULL, array($start, $end));
 
   $values = $chart->data['series'][$user->uid][$user->name][t('All')];
   $days = array_keys($values);
@@ -400,7 +401,7 @@ function _logger_energy_page() {
 
   drupal_set_title(t('Your energy consumption'));
 
-  $output = t('Today you have consumed %consumed Wh so far. ' .
+  $output = t('Today you have consumed %consumed kWh so far. ' .
     'The following chart shows your energy consumption along the week.',
     array('%consumed' => $consumed)) . '<br><br>';
 
@@ -484,7 +485,7 @@ function _logger_save_chart_file($chart) {
 
   $cache = cache_get($chart->cache_id, 'cache_page');
   if ($cache->data) {
-    $header = t('Time');
+    $header = t('Serie');
     $s = 1;
 
     foreach($cache->data['series'] as $uid => $userdata) {
@@ -548,8 +549,8 @@ function _logger_get_energycomp_chart_data($chart) {
     $period1 = array('start' => $time1, 'end' => $time2);
     $period2 = array('start' => $time2, 'end' => $now[0]);
 
-    $previous = logger_rrd_query_energy($chart->sensors, $interval, $chart->offset, $period1, $resolution);
-    $current  = logger_rrd_query_energy($chart->sensors, $interval, $chart->offset, $period2, $resolution);
+    $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
+    $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
 
     $perc = ($current / $previous) * 100;
     $series['current'][$label]   = $perc < 100 ? $perc       : 100;
@@ -557,12 +558,11 @@ function _logger_get_energycomp_chart_data($chart) {
     $series['exceeding'][$label] = $perc > 100?  $perc - 100 :   0;
 
     $legend['current'][$label]   = $current;
-    $legend['previous'][$label]  = $previous;
-    $legend['remaining'][$label] = $previous - $current;
+    $legend['previous'][$label] = $previous;
     $legend['exceeding'][$label] = $current - $previous;
   }
   $data['series'][$user->uid][$user->name] = $series;
-  $data['legend'][$user->uid][$user->name] = $legend;
+  $data['legend'] = $legend;
 
   return $data;
 }
@@ -580,11 +580,16 @@ function _logger_get_energy_chart_data($chart) {
   for($time = $chart->xaxis[0]; $time < $chart->xaxis[1]; $time += DAY) {
 
     $period = array('start' => $time, 'end' => ($time + DAY));
-    $label = date("l", $time) . '<br>' . date("d-M", $time);
+    $value = logger_rrd_query_energy($chart->sensors, 'kWh', 'day', $chart->offset, $period, $chart->resolution);
 
-    $values[$label] = logger_rrd_query_energy($chart->sensors, 'day', $chart->offset, $period, $chart->resolution);
+    $label = date("d-M", $time);
+    $legend[$user->name][$label] = $value;
+
+    $label = date("l", $time) . '<br>' . date("d-M", $time);
+    $series[$label] = $value;
   }
-  $data['series'][$user->uid][$user->name][t('All')] = $values;
+  $data['series'][$user->uid][$user->name][t('All')] = $series;
+  $data['legend'] = $legend;
 
   return $data;
 }
@@ -601,7 +606,9 @@ function _logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
-    $data['series'][$sensor->uid][$sensor->username][$sensor->function] = _logger_format_power_series_data($chart, $measurements);
+    $values = _logger_format_power_series_data($chart, $measurements);
+
+    $data['series'][$sensor->uid][$sensor->username][$sensor->function] = $values;
   }
   return $data;
 }
@@ -883,6 +890,8 @@ function theme_logger_power_chart_area($chart) {
 
   $xvalue1 = $chart->xaxis[0] * 1000;
   $xvalue2 = $chart->xaxis[1] * 1000;
+  $yvalue1 = $chart->yaxis[0] + 0;
+  $yvalue2 = $chart->yaxis[1] + 0;
 
   $chart_properties = array(
     'height'             => CHART_HEIGHT,
@@ -892,39 +901,31 @@ function theme_logger_power_chart_area($chart) {
     'pointClickCallback' => 'addPowerAnnotation'
   );
 
-  if ($chart->context == 'power') {
-
-    $yvalue1 = $chart->yaxis[0] + 0;
-    $yvalue2 = $chart->yaxis[1] + 0;
-
-    if ($yvalue1 >= 0 && $yvalue2 > 0) {
-      $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
-    }
-
-    $slider_output = _logger_create_dygraph('sliderChart', $chart, false, array(
-        'height'           => SLIDER_HEIGHT,
-        'gridLineColor'    => '"transparent"',
-        'yValueFormatter'  => 'hideZero',
-        'zoomCallback'     => 'updatePowerChart',
-        'clickCallback'    => 'slidePowerChart',
-        'underlayCallback' => 'highlightPowerChart'
-      )
-    );
-
-    $form_output = drupal_get_form('logger_control_form', $chart);
+  if ($yvalue1 >= 0 && $yvalue2 > 0) {
+    $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
+
+  $slider_properties = array(
+    'height'           => SLIDER_HEIGHT,
+    'gridLineColor'    => '"transparent"',
+    'yValueFormatter'  => 'hideZero',
+    'zoomCallback'     => 'updatePowerChart',
+    'clickCallback'    => 'slidePowerChart',
+    'underlayCallback' => 'highlightPowerChart'
+  );
+
+  $options = _logger_get_units_options();
+  $unit = strtok($options[$chart->unit], ' ');
 
   return
     _logger_create_interval_menu($chart->context) .
-    '<div>' . _logger_get_formatted_unit($chart->unit) . '</div>' .
+    '<div>' . $unit . '</div>' .
 
     _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
-    $slider_output .
+    _logger_create_dygraph('sliderChart', $chart, false, $slider_properties) .
 
     _logger_create_power_chart_legend($chart) .
-
-    $form_output .
-    l(t('Save Data'), $chart->file_path);
+    '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
 }
 
 /**
@@ -945,7 +946,7 @@ function theme_logger_energy_chart_area($chart) {
   $names = array_keys($values);
 
   $id = $chart->context . 'Chart';
-  $output = "
+  $output .= "
     <div id='$id' style='width: 600px; height: 300px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
@@ -953,13 +954,12 @@ function theme_logger_energy_chart_area($chart) {
         ['"   . implode("', '" , $names)         . "'],
         ['"   . implode("', '" , $chart->colors) . "'], " .
         $chart->data_labels . ", " .
-        $chart->stacked . "
-      );
+        $chart->stacked . ");
     </script>";
 
-  if (isset($chart->data['legend'])) {
-    $output .= _logger_create_energy_comparison_chart_legend($chart);
-  }
+  $output .= '<br><br>' . _logger_create_energy_chart_legend($chart) .
+    '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
+
   return $output;
 }
 
@@ -1076,69 +1076,42 @@ function _logger_create_power_chart_legend($chart) {
 }
 
 /**
- * Builds the energy consumption comparison chart legend.
+ * Builds the energy consumption chart legend.
  *
- * @param $chart  The energy consumption comparison chart object.
- * @return the chart legend as tables.
+ * @param $chart  The energy consumption chart object.
+ * @return the chart legend table.
  */
-function _logger_create_energy_comparison_chart_legend($chart) {
+function _logger_create_energy_chart_legend($chart) {
 
   global $user;
-
-  //TODO: make this method generic
-
-  //colors legend
-  $lines = array(
-    array(
-      theme('logger_color_picker', $chart->context, 0, $chart->colors),
-      t('How much has been consumed in comparison to the previous level.')
-    ),
-    array(
-      theme('logger_color_picker', $chart->context, 1, $chart->colors),
-      t('How much remains to equal the previous level.')
-    ),
-    array(
-      theme('logger_color_picker', $chart->context, 2, $chart->colors),
-      t('How much the current consumption has exceeded the previous level.')
-    )
-  );
-
-  $output .= '<br><br>' . theme('table', array(), $lines);
 
   function _format_value($value) {
     return $value > 0 ? number_format($value, 2) : '';
   }
 
-  $data = $chart->data['legend'][$user->uid][$user->name];
-  $names = array_keys($data['current']);
-
-  //values legend
-  $lines = array();
-
-  foreach ($names as $name) {
-
-    $lines[] = array(
-      array('data' => $name,                                    'align' => 'left'),
-      array('data' => _format_value($data['current'][$name]),   'align' => 'right'),
-      array('data' => _format_value($data['previous'][$name]),  'align' => 'right'),
-      array('data' => _format_value($data['remaining'][$name]), 'align' => 'right'),
-      array('data' => _format_value($data['exceeding'][$name]), 'align' => 'right')
-    );
-  }
-
-  $unit = ' (' . t('Wh') . ')';
+  $data = $chart->data['legend'];
 
   $header = array(
-    array('data' => t('Interval')),
-    array('data' => t('Current')   . $unit),
-    array('data' => t('Previous')  . $unit),
-    array('data' => t('Remaining') . $unit),
-    array('data' => t('Exceeding') . $unit)
+    array('data' => t('Color')),
+    array('data' => t('Series'))
   );
 
-  $output .= '<br>' . theme('table', $header, $lines);
+  $i = 0;
+  foreach ($data as $line_id => $cells) {
 
-  return $output;
+    $mark = theme('logger_color_picker', $chart->context, $i++, $chart->colors);
+
+    $lines[$line_id] = array(
+      array('data' => $mark),
+      array('data' => t($line_id))
+    );
+
+    foreach ($cells as $interval => $value) {
+      $lines[$line_id][] = array('data' => _format_value($value), 'align' => 'right');
+      $header[$interval] = array('data' => t($interval));
+    }
+  }
+  return theme('table', $header, $lines, array('id' => 'logger-legend-table'));
 }
 
 /**
@@ -1307,7 +1280,7 @@ function logger_control_form(&$form_state, $chart) {
   global $base_path;
 
   $attributes = array(
-    'onchange'      => '
+    'onchange' => '
       document.getElementById("logger-control-form").submit();'
   );
 
@@ -1604,17 +1577,6 @@ function _logger_get_units_options() {
 }
 
 /**
- * Returns the chart unit formatted for display.
- *
- * @param $unit  The unit to be formatted.
- * @return the formatted unit.
- */
-function _logger_get_formatted_unit($unit) {
-  $options = _logger_get_units_options();
-  return strtok($options[$unit], ' ');
-}
-
-/**
  * Sets the chart unit.
  *
  * @param $unit  The new unit.
@@ -1682,7 +1644,6 @@ function _logger_get_smoothing_level() {
   } else {
     $level = 1;
   }
-
   return $level;
 }
 
@@ -1702,7 +1663,6 @@ function _logger_get_step_plot() {
   } else {
     $step_plot = 0;
   }
-
   return $step_plot;
 }
 
@@ -1844,10 +1804,7 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 
   $start = $end - $window;
 
-  return array(
-    'start' => $start,
-    'end'   => $end
-  );
+  return array('start' => $start, 'end'   => $end);
 }
 
 /**
@@ -1923,7 +1880,6 @@ function _logger_add_user($uid) {
  */
 function _logger_remove_user($requestee_id) {
 
-  global $_REQUEST;
   global $user;
 
   $sql = "
