@@ -528,11 +528,15 @@ function _logger_get_energycomp_chart_data($chart) {
 
   $intervals = array(
     'hour'  => t('Hour'),
-    'day'   => t('Day'),
+    'day'   => t('Today'),
     'week'  => t('Week'),
     'month' => t('Month'),
     'year'  => t('Year')
   );
+
+  $legend[0]['Serie'] = t('Current');
+  $legend[1]['Serie'] = t('Previous');
+  $legend[2]['Serie'] = t('Exceeding');
 
   foreach ($intervals as $interval => $label) {
 
@@ -557,9 +561,9 @@ function _logger_get_energycomp_chart_data($chart) {
     $series['remaining'][$label] = $perc < 100?  100 - $perc :   0;
     $series['exceeding'][$label] = $perc > 100?  $perc - 100 :   0;
 
-    $legend['current'][$label]   = $current;
-    $legend['previous'][$label] = $previous;
-    $legend['exceeding'][$label] = $current - $previous;
+    $legend[0][$label] = $current;
+    $legend[1][$label] = $previous;
+    $legend[2][$label] = $current - $previous;
   }
   $data['series'][$user->uid][$user->name] = $series;
   $data['legend'] = $legend;
@@ -577,19 +581,23 @@ function _logger_get_energy_chart_data($chart) {
   global $user;
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  $line = array(
+    t('User')   => $user->name,
+    t('Sensor') => 'All');
+
   for($time = $chart->xaxis[0]; $time < $chart->xaxis[1]; $time += DAY) {
 
     $period = array('start' => $time, 'end' => ($time + DAY));
     $value = logger_rrd_query_energy($chart->sensors, 'kWh', 'day', $chart->offset, $period, $chart->resolution);
 
-    $label = date("d-M", $time);
-    $legend[$user->name][$label] = $value;
+    $title = date("d-m", $time);
+    $line[$title] = $value;
 
-    $label = date("l", $time) . '<br>' . date("d-M", $time);
-    $series[$label] = $value;
+    $title = date("l", $time) . '<br>' . date("d-M", $time);
+    $series[$title] = $value;
   }
   $data['series'][$user->uid][$user->name][t('All')] = $series;
-  $data['legend'] = $legend;
+  $data['legend'][] = $line;
 
   return $data;
 }
@@ -603,12 +611,30 @@ function _logger_get_power_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  global $user;
+  $i = 0;
   foreach ($chart->sensors as &$sensor) {
 
     $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
     $values = _logger_format_power_series_data($chart, $measurements);
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->function] = $values;
+
+    $operations = ($sensor->uid > 0 && $sensor->uid != $user->uid)?
+      '<a href="javascript: void(0)" 
+        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username'" . ');">' .
+        t('Remove') . '</a>' : '';
+
+    $line[t('User')] = $sensor->username;
+    $line[t('Sensor')] = $sensor->function;
+    $line[t('Max')]  = "<div id='max$i'/>";
+    $line[t('Min')]  = "<div id='min$i'/>";
+    $line[t('Avg')]  = "<div id='avg$i'/>";
+    $line[t('Last')] = "<div id='last$i'/>";
+    $line[t('Operation')] = $operations;
+    $i++;
+
+    $data['legend'][] = $line;
   }
   return $data;
 }
@@ -924,7 +950,7 @@ function theme_logger_power_chart_area($chart) {
     _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
     _logger_create_dygraph('sliderChart', $chart, false, $slider_properties) .
 
-    _logger_create_power_chart_legend($chart) .
+    _logger_create_chart_legend($chart) .
     '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
 }
 
@@ -957,7 +983,7 @@ function theme_logger_energy_chart_area($chart) {
         $chart->stacked . ");
     </script>";
 
-  $output .= '<br><br>' . _logger_create_energy_chart_legend($chart) .
+  $output .= '<br><br>' . _logger_create_chart_legend($chart) .
     '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
 
   return $output;
@@ -1027,88 +1053,37 @@ function _logger_create_interval_menu($context) {
 }
 
 /**
- * Builds the power chart legend.
+ * Builds the chart legend.
  *
- * @param $chart  The power chart object.
- * @return the chart legend as a table.
- */
-function _logger_create_power_chart_legend($chart) {
-
-  global $user;
-
-  $i = 0;
-  foreach($chart->data['series'] as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $meter => $measurements) {
-
-        $mark = theme('logger_color_picker', $chart->context, $i, $chart->colors);
-
-        $operations = ($uid > 0 && $uid != $user->uid)?
-          '<a href="javascript: void(0)" OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
-
-        $lines[] = array(
-            'mark'      => $mark,
-            'user'      => $username,
-            'sensor'    => $meter,
-            'max'       => "<div id='max$i'  align='right'/>",
-            'min'       => "<div id='min$i'  align='right'/>",
-            'avg'       => "<div id='avg$i'  align='right'/>",
-            'last'      => "<div id='last$i' align='right'/>",
-            'operation' => $operations
-        );
-        $i++;
-      }
-    }
-  }
-
-  $headers = array(
-    array('data'  => t('Color')),
-    array('data'  => t('User')),
-    array('data'  => t('Sensor')),
-    array('data'  => t('Max')),
-    array('data'  => t('Min')),
-    array('data'  => t('Avg')),
-    array('data'  => t('Last')),
-    array('data'  => t('Operation'))
-  );
-
-  return '<br>' . theme('table', $headers, $lines, array('id' => 'logger-legend-table'));
-}
-
-/**
- * Builds the energy consumption chart legend.
- *
- * @param $chart  The energy consumption chart object.
+ * @param $chart  The chart object.
  * @return the chart legend table.
  */
-function _logger_create_energy_chart_legend($chart) {
-
-  global $user;
-
-  function _format_value($value) {
-    return $value > 0 ? number_format($value, 2) : '';
-  }
+function _logger_create_chart_legend($chart) {
 
   $data = $chart->data['legend'];
-
   $header = array(
-    array('data' => t('Color')),
-    array('data' => t('Series'))
+    array('data' => t('Color'))
   );
 
-  $i = 0;
   foreach ($data as $line_id => $cells) {
 
-    $mark = theme('logger_color_picker', $chart->context, $i++, $chart->colors);
+    $mark = theme('logger_color_picker', $chart->context, $line_id, $chart->colors);
 
     $lines[$line_id] = array(
-      array('data' => $mark),
-      array('data' => t($line_id))
+      array('data' => $mark)
     );
 
-    foreach ($cells as $interval => $value) {
-      $lines[$line_id][] = array('data' => _format_value($value), 'align' => 'right');
-      $header[$interval] = array('data' => t($interval));
+    foreach ($cells as $title => $value) {
+
+      if (is_numeric($value)) {
+        $value = $value > 0 ? number_format($value, 2) : '';
+        $align = 'right';
+      } else {
+        $align = 'left';
+      }
+
+      $lines[$line_id][] = array('data' => $value, 'align' => $align);
+      $header[$title] = array('data' => t($title));
     }
   }
   return theme('table', $header, $lines, array('id' => 'logger-legend-table'));
