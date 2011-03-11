@@ -370,8 +370,14 @@ function _logger_energy_comparison_page() {
 
   drupal_set_title(t('Compare your energy consumption'));
 
-  $output = t('The following chart shows your current energy consumption in six different time frames,
-    in comparison to the previous levels.') . '<br><br>';
+  $output = t('The following chart shows your current energy consumption in six different time frames:
+    hour, day, week, month, and year. The bars are explained in the following.') . '<br><br>';
+
+  $output .= theme_item_list(array(
+    t('Current: The bottom bars show how much you have consumed so far in each time frame.'),
+    t('Previous: The second bars show the difference between current and previous consumptions.'),
+    t('Exceeded: When your consumption is higher than the previous one, a third bar shows the excess.')
+  )) . '<br>';
 
   $chart = _logger_create_chart_object('energycomp', 'electricity', 'year', 'kWh', 0, 1);
 
@@ -583,7 +589,7 @@ function _logger_get_energy_chart_data($chart) {
 
   $line = array(
     t('User')   => $user->name,
-    t('Sensor') => 'All');
+    t('Sensor') => t('All'));
 
   for($time = $chart->xaxis[0]; $time < $chart->xaxis[1]; $time += DAY) {
 
