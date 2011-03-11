@@ -70,13 +70,18 @@ function updateControlForm(chart) {
   var form = document.getElementById('logger-control-form');
 
   if (form) {
-    var value = Math.round(chart.yAxisRange(0)[0]);
-    form.elements['yvalue1'].value = value;
+    var yvalue1 = Math.round(chart.yAxisRange(0)[0]);
+    var yvalue2 = Math.round(chart.yAxisRange(0)[1]);
 
-    value = Math.round(chart.yAxisRange(0)[1]);
-    form.elements['yvalue2'].value = value;
+    if (yvalue2 == 0 && yvalue1 == 0) {
+      yvalue1 = '';
+      yvalue2 = '';
+    }
 
-    value = new Date(Math.round(chart.xAxisRange(0)[0]));
+    form.elements['yvalue1'].value = yvalue1;
+    form.elements['yvalue2'].value = yvalue2;
+
+    var value = new Date(Math.round(chart.xAxisRange(0)[0]));
     form.elements['xvalue1date'].value = formatDate(value);
     form.elements['xvalue1time'].value = formatTime(value);
 

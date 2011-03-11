@@ -1502,7 +1502,7 @@ function logger_control_form_validate($form, &$form_state) {
   $yvalue1 = _logger_get_yvalue(1);
   $yvalue2 = _logger_get_yvalue(2);
 
-  if (!($yvalue1 >= 0 && $yvalue2 > 0 && $yvalue2 > $yvalue1)) {
+  if (!($yvalue1 == '' && $yvalue2 == '') && !($yvalue1 >= 0 && $yvalue2 > $yvalue1)) {
 
     form_set_error('yvalue', t('The value range is invalid.'));
   }
