@@ -130,7 +130,7 @@ function _logger_measurement_add($logs) {
         }
 
         $sql = "UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'";
-        db_query($sql, time(), $meterdata->night, $value, $meter);
+        db_query($sql, time(), $meterdata->night, $value, $meter);//Gets the latest value stored in $value
         //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
       } else {

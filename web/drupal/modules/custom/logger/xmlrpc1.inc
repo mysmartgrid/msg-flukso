@@ -74,7 +74,11 @@ function _logger_auth($auth) {
 
 function _logger_heartbeat($auth, $monitor) {
 
+  require_once(XMLRPC_PATH . "/notification/notification.module");
+
   if (_logger_authenticate_hmac_sha1($auth, $monitor)) {
+
+    notification_log_heartbeat_received($auth['device']);
 
     $sql = "
       SELECT
@@ -132,8 +136,11 @@ function _logger_heartbeat($auth, $monitor) {
 function _logger_measurement_add($auth, $logs) {
 
   require_once(XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc");
+  require_once(XMLRPC_PATH . "/notification/notification.module");
 
   if (_logger_authenticate_hmac_sha1($auth, $logs)) {
+
+    notification_log_measurement_received($auth['device']);
 
     $info = 'added 5min interval measurements to the log';
 
@@ -159,7 +166,7 @@ function _logger_measurement_add($auth, $logs) {
           }
         }
 
-        _logger_update_meter_integrity($meter, $corrupted_time);
+        _logger_update_meter_integrity($auth['device'], $meter, $corrupted_time);
 
         $return = logger_rrd_update($meter, $values);
 
@@ -185,7 +192,7 @@ function _logger_measurement_add($auth, $logs) {
           }
 
           $sql = "UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'";
-          db_query($sql, time(), $meterdata->night, $value, $meter);
+          db_query($sql, time(), $meterdata->night, $value, $meter);//Gets the latest value stored in $value
           //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
         } else {
@@ -221,11 +228,18 @@ function _logger_brownout($auth, $message) {
 /**
  * Updates the meter integrity flag.
  *
+ * @param $device           The Flukso device to which the meter belongs.
  * @param $meter            The meter being updated.
  * @param $corruption_time  The time when a corrupted heartbeat was received.
  *                          The value 0 means that the heartbeat was sound.
  */
-function _logger_update_meter_integrity($meter, $corruption_time) {
+function _logger_update_meter_integrity($device, $meter, $corruption_time) {
+
+  require_once(XMLRPC_PATH . "/notification/notification.module");
+
+  if ($corruption_time > 0) {
+    notification_log_corrupted_message($device);
+  }
 
   $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
   db_query($sql, $corruption_time, $meter);

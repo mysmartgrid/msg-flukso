@@ -47,14 +47,23 @@ define('METER', 'meter');
 function logger_rrd_base_create($meter) {
 
   $step = 1 * MINUTE;
-  $archives = array(
+  $archives = logger_get_storage_periods();
+
+  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
+}
+
+/**
+ * Returns an array of measurement storage periods, indexed by time resolution.
+ *
+ * @return the array of storage periods.
+ */
+function logger_get_storage_periods() {
+  return array(
      //resolution   storage period
      1 * MINUTE =>  1 * WEEK,
     15 * MINUTE =>  1 * MONTH,
      1 * DAY    =>  6 * MONTH,
      1 * WEEK   => 10 * YEAR);
-
-  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
 }
 
 /**
@@ -196,20 +205,22 @@ function logger_rrd_update($meter, $values, $subdir = NULL) {
 /**
  * Queries the RRDs for sensor's measurements.
  *
- * @param $interval       The time interval.
- * @param $sensor         The sensor.
- * @param $factor         The unit conversion factor.
- * @param $offset         The user timezone offset.
+ * @param $interval  The time interval. This argument is used to select the RRA.
+ * @param $sensor    The sensor.
+ * @param $factor    The unit conversion factor.
+ * @param $offset    The user timezone offset.
+ * @param $period    An array containing a period of time to be queried.
+ * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $factor, $offset) {
+function logger_rrd_query_sensor($interval, $sensor, $factor, $offset, $period, $step) {
 
   $series_id = METER;
   $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $factor);
 
-  $end = _logger_rrd_latest_timestamp($interval, $sensor);
+  $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $end, $offset);
+  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, true, $period, $step);
 }
 
 /**
@@ -232,13 +243,15 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
 /**
  * Queries the RRDs for sensors' aggregated measurements.
  *
- * @param $interval       The time interval.
- * @param $sensors        The array of sensors.
- * @param $factor         The unit conversion factor.
- * @param $offset         The user timezone offset.
+ * @param $interval  The time interval.
+ * @param $sensors   The array of sensors.
+ * @param $factor    The unit conversion factor.
+ * @param $offset    The user timezone offset.
+ * @param $period    An array containing a period of time to be queried.
+ * @param $step      The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
+function logger_rrd_query_agg($interval, $sensors, $factor, $offset, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = time() - 15 * MINUTE;
@@ -269,7 +282,7 @@ function logger_rrd_query_agg($interval, $sensors, $factor, $offset) {
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false);
+  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, $period, $step);
 }
 
 /**
@@ -311,48 +324,28 @@ function _logger_rrd_file($meter, $interval) {
 /**
  * Exports the sensors' measurements from the RRDs to an array.
  *
- * @param $interval       The time interval.
- * @param $def            The rrd def tag.
- * @param $exported_cdef  The exported cdef.
- * @param $latest         The latest update time.
- * @param $offset         The user timezone offset.
- * @param $include_nan    Whether NaN values should be included in the result.
+ * @param $def           The rrd def tag.
+ * @param $exported_cdef The exported cdef.
+ * @param $latest        The latest update time.
+ * @param $offset        The user timezone offset.
+ * @param $include_nan   Whether NaN values should be included in the result.
+ * @param $period        An array containing a period of time to be queried.
+ * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan = true) {
+function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();
   }
 
-  $windows = array(
-    'hour'  =>  1 * HOUR,
-    'day'   =>  1 * DAY,
-    'week'  =>  1 * WEEK,
-    'month' => 60 * DAY,
-    'night' => 60 * DAY,
-    'year'  =>  1 * YEAR
-  );
-
-  $steps = array(
-    'hour'  =>  1 * SECOND,
-    'day'   =>  1 * MINUTE,
-    'week'  => 15 * MINUTE,
-    'month' =>  1 * DAY,
-    'night' =>  1 * DAY,
-    'year'  =>  1 * WEEK
-  );
+  $start = $period['start'];
+  $end = $period['end'];
 
   //time period MUST be within the RRA and both $start and $end must be multiples of $step
-
-  $step = $steps[$interval];
-  $now = time();
-  $now = $now - ($now % $step);
-
-  $start = $now - $windows[$interval];
   $start = $start - ($start % $step);
+  $end = $end - ($end % $step);
 
-  $end = $latest - ($latest % $step);
   $maxrows = 1 + ($end - $start) / $step;
   $maxrows = $maxrows < 10? 10: $maxrows; //RRDTool exports at least 8 rows
 

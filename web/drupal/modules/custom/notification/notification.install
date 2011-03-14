@@ -6,19 +6,22 @@ function notification_install() {
   global $user;
 
   //event
-  $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Heartbeat')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (1, 'No Communication')";
   db_query($sql);
 
-  $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Heartbeat')";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event} (id, name) VALUES (3, 'Any Heartbeat Failure')";
+  $sql = "INSERT INTO {event} (id, name) VALUES (2, 'Corrupted Message')";
   db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUES (4, 'Peak Consumption')";
   db_query($sql);
 
   $sql = "INSERT INTO {event} (id, name) VALUES (5, 'Brownout')";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event} (id, name) VALUES (6, 'Heartbeat Received')";
+  db_query($sql);
+
+  $sql = "INSERT INTO {event} (id, name) VALUES (7, 'Measurement Received')";
   db_query($sql);
 
   //unit
@@ -31,10 +34,10 @@ function notification_install() {
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (2, 'hour', 'h', 3600)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (3, 'watt per minute', 'watt / min', 1)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (3, 'Watt', 'W', 1)";
   db_query($sql);
 
-  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (4, 'watt per hour', 'watt / h', 0.016667)";
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (4, 'Killowatt', 'kW', 0.001)";
   db_query($sql);
 
   //event_unit
@@ -45,12 +48,6 @@ function notification_install() {
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (2, 0)";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 1)";
-  db_query($sql);
-
-  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 2)";
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (4, 3)";
@@ -161,13 +158,6 @@ function notification_schema() {
         'default'    => 0,
         'disp-width' => '10',
       ),
-      'base_value' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
-        'default'    => 0,
-        'disp-width' => '10',
-      ),
       'base_time' => array(
         'type'       => 'int',
         'unsigned'   => TRUE,
@@ -176,8 +166,8 @@ function notification_schema() {
         'disp-width' => '10',
       ),
       'limit_up' => array(
-        'type'       => 'float',
-        'size'       => 'normal',
+        'type'       => 'int',
+        'unsigned'   => TRUE,
         'not null'   => TRUE,
         'default'    => 0,
         'disp-width' => '10',
@@ -465,6 +455,90 @@ function notification_update_6026() {
 
       $items[2]  = update_sql("DELETE FROM {notification} WHERE event_id = 3;");
       break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6027() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[]  = update_sql("UPDATE {event} SET name = 'Corrupted Measurement' WHERE id = 2");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6028() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("UPDATE {event} SET name = 'No Communication' WHERE id = 1");
+      $items[1]  = update_sql("DELETE FROM {event_unit} WHERE event_id = 3");
+      $items[2]  = update_sql("DELETE FROM {event} WHERE id = 3");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6029() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("INSERT INTO {event} (id, name) VALUES (6, 'Heartbeat Received')");
+      $items[1]  = update_sql("INSERT INTO {event} (id, name) VALUES (7, 'Measurement Received')");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6030() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("UPDATE {unit} SET name = 'Watt', symbol = 'W', factor = 1 WHERE id = 3");
+      $items[1]  = update_sql("UPDATE {unit} SET name = 'Killowatt', symbol = 'kW', factor = 0.001 WHERE id = 4");
+      $items[2]  = update_sql("UPDATE {notification} SET limit_up = 5000, unit_id = 3 WHERE event_id = 4");
+      $items[3]  = update_sql("ALTER TABLE {notification} DROP COLUMN base_value");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6031() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("ALTER TABLE {notification} MODIFY COLUMN limit_up int unsigned NOT NULL default '0' AFTER base_time");
+     break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6032() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("UPDATE {event} SET name = 'Corrupted Message' WHERE id = 2");
+     break;
     case 'pgsql':
       break;
   }

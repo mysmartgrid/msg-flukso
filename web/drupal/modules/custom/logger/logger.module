@@ -32,6 +32,9 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('YEAR',   52 * WEEK);
 
+define('CHART_REFRESH', 15 * MINUTE);
+define('CHART_HEIGHT', 350);
+define('SLIDER_HEIGHT', 50);
 define('CHART_UNIT', 'logger_chart_unit');
 define('SERIES_COLOR_ID', 'logger_series_color_id');
 define('SMOOTHING_LEVEL_ID', 'logger_smooting_level_id');
@@ -39,24 +42,21 @@ define('STEP_PLOT_ID', 'logger_step_plot');
 
 function logger_init() {
   
-  global $user;
-
-  // Workaround for collapse.js not being loaded within _logger_fluksonians_form when block caching is on.
-  if ($user->uid > 0) {
-    drupal_add_js('misc/collapse.js');
-  }
-
   drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
+  drupal_add_js(ROOT_PATH . '/js/dashboard.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
-    drupal_add_js(ROOT_PATH . '/js/excanvas.js');
+    drupal_add_js(ROOT_PATH . '/js/dygraph/excanvas.js');
   }
 
-  drupal_add_js(ROOT_PATH . '/js/strftime-min.js');
-  drupal_add_js(ROOT_PATH . '/js/rgbcolor.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph-canvas.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/strftime-min.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/rgbcolor.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph-canvas.js');
+  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph.js');
+
+  jquery_ui_add(array('ui.datepicker'));
+  drupal_add_css(ROOT_PATH . '/style/ui.datepicker.css');
 }
 
 function logger_perm() {
@@ -73,187 +73,44 @@ function logger_menu() {
     'title'            => 'Your power consumption',
     'description'      => 'Show the dashboard.',
     'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
+    'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
-
-  $items['logger/electricity'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  /*
-  $items['logger/water'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('water', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/gas'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('gas', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );*/
-
-  $items['logger/electricity/hour'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/day'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/week'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'week'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/month'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/year'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['logger/electricity/night'] = array(
-    'title'            => $items['logger']['title'],
-    'page callback'    => '_logger_dashboard',
-    'page arguments'   => array('electricity', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-
-  // Overview operations
 
   $items['overview'] = array(
     'title'            => 'Overall View',
-    'description'      => 'Show the project overall view.',
+    'description'      => 'Show the project overall view',
     'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
+    'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  /*
-  $items['overview/water'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('water', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );
-
-  $items['overview/gas'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('gas', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK,
-  );*/
-
-  $items['overview/electricity/hour'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'hour'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/day'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'day'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/week'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'week'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/month'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'month'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/year'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'year'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-  $items['overview/electricity/night'] = array(
-    'title'            => $items['overview']['title'],
-    'page callback'    => '_logger_overview',
-    'page arguments'   => array('electricity', 'night'),
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
-  );
-
-
-  //Chart operations
-
-  $items['logger/remove'] = array(
-    'title'            => 'Remove this user from the chart',
-    'page callback'    => '_logger_remove_user',
-    'page arguments'   => array(2),
-    'access arguments' => array('logger'),
     'type'             => MENU_CALLBACK
   );
 
   $items['logger/color'] = array(
-    'title'            => 'Change the series color',
+    'title'            => 'Changes the series color',
     'page callback'    => '_logger_series_color',
     'page arguments'   => array(2, 3),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
+
+  $items['logger/smoothinglevel'] = array(
+    'title'            => 'Changes the chart smoothing level',
+    'page callback'    => '_logger_set_smoothing_level',
+    'page arguments'   => array(2),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/remove/user'] = array(
+    'title'            => 'Removes a chart series',
+    'page callback'    => '_logger_remove_user',
+    'page arguments'   => array(3),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
 
 
   //Devices' operations
@@ -421,13 +278,23 @@ function _logger_installation() {
  */
 function _logger_dashboard($type, $interval) {
 
+  $type = $type ? $type : 'electricity';
+  $interval = $interval ? $interval : 'hour';
+
   if (user_access('logger')) {
 
     drupal_set_title(t('Your power consumption'));
 
+    $xvalue1 = _logger_get_xvalue(1);
+    $xvalue2 = _logger_get_xvalue(2);
+    $yvalue1 = _logger_get_yvalue(1);
+    $yvalue2 = _logger_get_yvalue(2);
+
     $sensors = _logger_get_user_sensors($type);
 
-    return _logger_create_user_dygraph($sensors, $type, $interval);
+    $chart = _logger_create_chart_object($interval, $type, 'logger', $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+
+    return theme('logger_dashboard_area', $chart);
 
   } else {
 
@@ -444,150 +311,191 @@ function _logger_dashboard($type, $interval) {
  */
 function _logger_overview($type, $interval) {
 
+  $type = $type ? $type : 'electricity';
+  $interval = $interval ? $interval : 'hour';
+
   drupal_set_title(t('Overall View'));
 
-  //General explanation
-  $output .= theme('logger_overview_topic', NULL,
-    t('<b>mySmartGrid</b> is the smart device control for your home. ' .
-    'It enables you to understand your energy consumption and share your ' .
-    'experiences with others.'), 'content/das-projekt');
+  $cache_id = 'logger_overview';
+  $cache = cache_get($cache_id, 'cache_page');
 
-  //Latest blogpost
-  $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
-  $result = db_fetch_object(db_query($sql, "blogpost"));
+  if ($cache->data) {
+    $output = $cache->data;
 
-  if ($result) {
+  } else {
 
-    $blog = node_load(array('nid' => $result->nid));
+    //General explanation
+    $output = theme('logger_overview_topic', NULL,
+      t('<b>mySmartGrid</b> is the smart device control for your home. ' .
+      'It enables you to understand your energy consumption and share your ' .
+      'experiences with others.'), 'content/das-projekt');
 
-    $output .= theme('logger_overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+    //Latest blogpost
+    $sql = 'SELECT nid FROM {node} WHERE type = "%s" ORDER BY created DESC LIMIT 1';
+    $result = db_fetch_object(db_query($sql, "blogpost"));
+
+    if ($result) {
+
+      $blog = node_load(array('nid' => $result->nid));
+
+      $output .= theme('logger_overview_topic', t('Blog: ') . $blog->title, $blog->teaser, 'blog');
+    }
+
+    //Counters
+    $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
+    $devcounter = db_result( db_query($sql, 0));
+
+    $sql = "
+      SELECT
+        count(*)
+      FROM
+        {users} u
+      WHERE
+        EXISTS(
+          SELECT
+            1
+          FROM
+            {logger_devices} d
+          WHERE
+            d.uid = u.uid
+        )";
+
+    $usercounter = db_result( db_query($sql));
+
+    $output .= theme('logger_overview_topic', t('Total Consumption of All Participants'),
+      t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
+        'in <b>@usercounter</b> households. The following chart shows their ' .
+        'aggregate electricity consumption.',
+        array(
+          '@devcounter'  => $devcounter,
+          '@usercounter' => $usercounter))) . '<br>';
+
+    cache_set($cache_id, $output, 'cache_page', time() + 1 * DAY);
   }
-
-  //Counters
-  $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
-  $devcounter = db_result( db_query($sql, 0));
-
-  $sql = "
-    SELECT
-      count(*)
-    FROM
-      {users} u
-    WHERE
-      EXISTS(
-        SELECT
-          1
-        FROM
-          {logger_devices} d
-        WHERE
-          d.uid = u.uid
-      )";
-
-  $usercounter = db_result( db_query($sql));
-
-  $output .= theme('logger_overview_topic', t('Total Consumption of All Participants'),
-    t('Currently, <b>@devcounter</b> Flukso devices are installed ' .
-      'in <b>@usercounter</b> households. The following chart shows their ' .
-      'aggregate electricity consumption.',
-      array(
-        '@devcounter'  => $devcounter,
-        '@usercounter' => $usercounter))) . '<br>';
 
   $sensors = _logger_get_active_sensors($type);
 
-  $output .= _logger_create_dygraph_agg_chart($sensors, $type, $interval) . '<br>';
+  $chart = _logger_create_chart_object($interval, $type, 'overview', $sensors);
+
+  $output .= theme('logger_dashboard_area', $chart);
 
   return $output;
 }
 
 /**
- * Creates an Aggregated Consumption Chart using DyGraphs.
- *
- * @param $sensors  The array of sensors to be aggregated.
- * @param $type     The sensor type.
- * @param $interval The time interval.
- * @return the chart output.
- */
-function _logger_create_dygraph_agg_chart($sensors, $type, $interval) {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $chart = _logger_create_chart_object($interval, $type, 'overview');
-  $offset = _logger_get_timezone_offset();
-
-  $chart->data[0][t('All')][t('All')] = logger_rrd_query_agg($interval, $sensors, $chart->factor, $offset);
-
-  return theme('logger_dygraph', $chart);
-}
-
-/**
- * Creates an User Dashboard Chart using DyGraphs.
- *
- * @param $sensors  The array of sensors to be plotted.
- * @param $type     The sensor type.
- * @param $interval The time interval.
- * @return the chart output.
- */
-function _logger_create_user_dygraph($sensors, $type, $interval) {
-
-  module_load_include('inc', 'logger', 'logger.rrd');
-
-  $chart = _logger_create_chart_object($interval, $type, 'logger');
-  $offset = _logger_get_timezone_offset();
-
-  foreach ($sensors as &$sensor) {
-
-    $chart->data[$sensor->uid][$sensor->username][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, $chart->factor, $offset);
-  }
-
-  return theme('logger_dygraph', $chart);
-}
-
-/**
  * Creates an object to hold all chart parameters.
  *
- * @param $type      The sensor type.
- * @param $interval  The time interval.
- * @param $context   The page where the chart is going to be placed (overview or logger).
- * @return the chart parameters.
+ * @param $interval The time interval.
+ * @param $type     The sensor type.
+ * @param $context  The page where the chart is going to be placed (overview or logger).
+ * @param $sensors  The sensors whose values are plotted on the chart.
+ * @param $xaxis    An array containing the minimum and maximum timestamps of the x axis.
+ * @param $yaxis    An array containing the minimum and maximum values of the y axis.
+ * @return the chart object.
  */
-function _logger_create_chart_object($interval, $type, $context) {
+function _logger_create_chart_object($interval, $type, $context, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
-  $params = new stdClass();
+  module_load_include('inc', 'logger', 'logger.rrd');
 
-  //Default
-  $params->unit = 'watt';
-  $params->factor = 3600; // 1Wh/s = 3600 W
-  $params->data = array();
-  $params->interval = $interval;
-  $params->context = $context;
+  $chart = new stdClass();
 
-  $unformatted_unit = _logger_get_unit();
+  $chart->type = $type;
+  $chart->interval = $interval;
+  $chart->context = $context;
+
+  if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
+    $xaxis[1] = time();
+    $xaxis[0] = $xaxis[1] - _logger_get_default_time_window($interval);
+  }
+
+  $chart->yaxis = $yaxis;
+  $chart->xaxis = $xaxis;
+
+  $chart->resolution = _logger_get_resolution($interval);
+  $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
+  $chart->offset = _logger_get_timezone_offset();
+  $chart->colors = _logger_get_series_colors();
 
   switch ($type) {
     case 'electricity':
-      switch ($unformatted_unit) {
+      switch (_logger_get_unit()) {
         case 'kw':
-          $params->unit = 'kW';
-          $params->factor = 0.001;
+          $chart->unit = 'kW';
+          $chart->factor = 0.001;
           break;
 
         case 'kwh':
-          $params->unit = 'kWh/year';
-          $params->factor = 31536;
+          $chart->unit = 'kWh/year';
+          $chart->factor = 31536;
           break;
 
         case 'eur':
-          $params->unit = 'euro/year';
-          $params->factor = 5676; // 18 EURcent/kWh
+          $chart->unit = 'euro/year';
+          $chart->factor = 5676; // 18 EURcent/kWh
           break;
 
         case 'aud':
-          $params->unit = 'aud/year';
-          $params->factor = 5991; // 19 AUDcent/kWh
+          $chart->unit = 'aud/year';
+          $chart->factor = 5991; // 19 AUDcent/kWh
           break;
+
+        default:
+          $chart->unit = 'watt';
+          $chart->factor = 3600; // 1Wh/s = 3600 W
       }
   }
-  return $params;
+
+  $chart->sensors = $sensors;
+  $chart->file_path = _logger_compose_chart_file_path($chart);
+
+  $cache_id = "logger_chart_data_$chart->file_path";
+  $cache = cache_get($cache_id, 'cache_page');
+
+  if ($cache->data) {
+    $chart->data = $cache->data;
+
+  } else {
+
+    if ($context == 'logger') {
+
+      foreach ($sensors as &$sensor) {
+        $chart->data[$sensor->uid][$sensor->username][$sensor->function] =
+          logger_rrd_query_sensor($interval, $sensor, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
+      }
+
+    } else {
+      $chart->data[0][t('All')][t('All')] =
+        logger_rrd_query_agg($interval, $sensors, $chart->factor, $chart->offset, $chart->period, $chart->resolution);
+    }
+
+    _logger_save_chart_file($chart);
+
+    cache_set($cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
+  }
+
+  return $chart;
+}
+
+/**
+ * Composes an unique chart file name.
+ *
+ * @param $chart The chart object.
+ * @return the chart file name.
+ */
+function _logger_compose_chart_file_path($chart) {
+
+  $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
+  $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
+
+  $unique_id = "$chart->context $chart->type $chart->unit $chart->resolution $t1 $t2";
+
+  foreach ($chart->sensors as $sensor) {
+    $unique_id .= " $sensor->meter";
+  }
+
+  $unique_id = md5($unique_id);
+
+  return GRAPH_PATH . "/$chart->interval/msg-chart-$unique_id.csv";
 }
 
 /**
@@ -669,7 +577,7 @@ function _logger_get_active_sensors($type) {
 
   $sql = "
     SELECT
-      lm.meter AS meter
+      lm.meter
     FROM
       {logger_meters} lm
     WHERE
@@ -685,6 +593,42 @@ function _logger_get_active_sensors($type) {
     $sensors[] = $sensor;
   }
   return $sensors;
+}
+
+/**
+ * Saves chart to a file.
+ *
+ * @param $chart The chart parameters.
+ */
+function _logger_save_chart_file($chart) {
+
+  $header = t('Time');
+  $values = array();
+  $timestamps = _logger_get_all_timestamps($chart->data);
+  $s = 1;
+
+  foreach($chart->data as $uid => $userdata) {
+    foreach($userdata as $username => $sensors) {
+      foreach($sensors as $sensor => $measurements) {
+        $header .= ',S' . $s++;
+
+        foreach($timestamps as $timestamp) {
+          $value = $measurements[$timestamp];
+          $value = $value? number_format($value, 3, '.', '') : '';
+          $values[$timestamp] .= ',' . $value;
+        }
+      }
+    }
+  }
+
+  $series = $header . PHP_EOL;
+  foreach($values as $timestamp => $values_list) {
+    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
+  }
+
+  $fh = fopen($chart->file_path, 'w');
+  fwrite($fh, $series);
+  fclose($fh);
 }
 
 /**
@@ -734,7 +678,7 @@ function _logger_get_timezone_offset() {
 function logger_theme() {
 
   return array(
-    'logger_dygraph' => array(
+    'logger_dashboard_area' => array(
       'arguments' => array(
         'chart' => NULL),
     ),
@@ -744,12 +688,6 @@ function logger_theme() {
         'title' => NULL,
         'body' => NULL,
         'link' => NULL),
-    ),
-
-    'logger_item_list' => array(
-      'arguments' => array(
-        'items' => NULL,
-        'title' => NULL),
     ),
 
     'logger_account_devices' => array(
@@ -774,11 +712,21 @@ function logger_theme() {
       'arguments' => array(
         'element' => NULL),
     ),
+
+    'logger_value_range' => array(
+      'arguments' => array(
+        'element' => NULL),
+    ),
+
+    'logger_time_period' => array(
+      'arguments' => array(
+        'element' => NULL),
+    ),
   );
 }
 
 /**
- * Theming a topic of the Overview page.
+ * Builds a topic of the Overview page.
  *
  * @param $title  The topic title.
  * @param $body   The topic body.
@@ -801,97 +749,175 @@ function theme_logger_overview_topic($title, $body, $link = NULL) {
 }
 
 /**
- * Theming the DyGraph chart.
+ * Builds the dashboard area.
  *
  * @param $chart   The chart parameters.
- * @return the chart output.
+ * @return the dashboard area output.
  */
-function theme_logger_dygraph($chart) {
+function theme_logger_dashboard_area($chart) {
 
-  $file_path = _logger_save_chart_file($chart);
-  $colors = _logger_get_series_colors();
-  $smoothing_level = _logger_get_smoothing_level();
-  $step_plot = _logger_get_step_plot()? 'true' : 'false';
+  $xvalue1 = $chart->xaxis[0] * 1000;
+  $xvalue2 = $chart->xaxis[1] * 1000;
 
-  $output = _logger_create_interval_menu($chart->context);
-
-  $output .= '
-    <div>' . $chart->unit . '</div>
-    <div id="dygraphdiv"></div>
-    <div id="dygraphstatus" style="min-height:20px; width=450px; padding-top:10px; padding-bottom:5px;"></div>
-
-    <script type="text/javascript">
-
-      new Dygraph(
-        document.getElementById("dygraphdiv"),
-        "/' . $file_path . '",
-        {
-          labelsDiv: document.getElementById("dygraphstatus"),
-          colors: ["' . implode('","', $colors) . '"],
-          width: 600,
-          height: 350,
-          yAxisLabelWidth: 50,
-          includeZero: true,
-          showRoller: false,
-          stepPlot: ' . $step_plot . ',
-          rollPeriod: ' . $smoothing_level . '
-        }
-      );
-    </script>';
-
-  $output .= _logger_create_graph_legend($chart->data, $colors);
+  $chart_properties = array(
+    'height'             => CHART_HEIGHT,
+    'dateWindow'         => "[$xvalue1, $xvalue2]",
+    'drawCallback'       => 'updateControlForm',
+    'zoomCallback'       => 'updateSliderChart',
+    'pointClickCallback' => 'addPointAnnotation'
+  );
 
   if ($chart->context == 'logger') {
-    $output .= drupal_get_form('logger_control_form');
+
+    $yvalue1 = $chart->yaxis[0] + 0;
+    $yvalue2 = $chart->yaxis[1] + 0;
+
+    if ($yvalue1 >= 0 && $yvalue2 > 0) {
+      $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
+    }
+
+    $slider_output = _logger_create_dygraph('sliderChart', $chart, false, array(
+        'height'           => SLIDER_HEIGHT,
+        'gridLineColor'    => '"transparent"',
+        'yValueFormatter'  => 'hideZeroY',
+        'zoomCallback'     => 'updateMainChart',
+        'clickCallback'    => 'jumpToDate',
+        'underlayCallback' => 'highlightChartArea'
+      )
+    );
+
+    $form_output = drupal_get_form('logger_control_form', $chart);
   }
 
-  $output .= l(t('Save Data'), $file_path);
+  return
+    _logger_create_interval_menu($chart->context) .
+    '<div>' . $chart->unit . '</div>' .
 
-  return $output;
+    _logger_create_dygraph('mainChart', $chart, TRUE, $chart_properties) .
+    $slider_output .
+
+    _logger_create_chart_legend($chart) .
+
+    $form_output .
+    l(t('Save Data'), $chart->file_path);
 }
 
 /**
- * Saves chart to a file.
+ * Creates a Dygraph chart.
  *
- * @param $chart   The chart parameters.
- * @return the data file path.
+ * @param $id             The chart div id.
+ * @param $chart          The chart object.
+ * @param $create_labels  If a div needs to be created to show labels.
+ * @param $properties     The Dygraph properties.
+ * @return the Dygraph output.
  */
-function _logger_save_chart_file($chart) {
+function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
 
-  //Generate random number for the png chart so that the browser doesn't use the cached one.
-  //Cron is used to clean up the dir.
-  $unique_id = md5(uniqid());
-  $file_path = GRAPH_PATH . '/' . $chart->interval . "/msg-chart-$unique_id.csv";
+  $properties = array_merge($properties, array(
+    'labelsDiv'         => '"chartLabels"',
+    'colors'            => '["' . implode('","', $chart->colors) . '"]',
+    'width'             => 600,
+    'yAxisLabelWidth'   => 50,
+    'axisLabelFontSize' => 12,
+    'includeZero'       => 'true',
+    'stepPlot'          => _logger_get_step_plot(),
+    'rollPeriod'        => _logger_get_smoothing_level()
+  ));
 
-  $header = t('Time');
-  $values = array();
-  $timestamps = _logger_get_all_timestamps($chart->data);
-  $s = 1;
+  if ($create_labels) {
+    $labels_output = '<div id=' . $properties['labelsDiv'] . ' style="min-height: 20px; padding-bottom: 10px;"></div>';
+  }
 
+  foreach ($properties as $key => $value) {
+    $pairs[] = "$key: $value";
+  }
+
+  return '<div id="' . $id . '"></div><br>' .
+    $labels_output .
+    '<script type="text/javascript">' .
+        $id . ' = new Dygraph(
+          document.getElementById("' . $id . '"),
+          "/' . $chart->file_path . '", {' .
+          implode(', ', $pairs) . ' }
+      );
+    </script> ';
+}
+
+/**
+ * Creates the chart intervals' horizontal menu.
+ *
+ * @param $context  The page where the menu is going to be placed (overview or logger).
+ * @return the list of intervals' menus.
+ */
+function _logger_create_interval_menu($context) {
+
+  $path = "$context/electricity";
+
+  $items = array(
+    l(t('Hour'),   "$path/hour"),
+    l(t('Day'),    "$path/day"),
+    l(t('3 Days'), "$path/days"),
+    l(t('Week'),   "$path/week"),
+    l(t('Month'),  "$path/month"),
+    l(t('Year'),   "$path/year")
+  );
+
+  return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
+}
+
+/**
+ * Creates the chart legend.
+ *
+ * @param $chart  The chart object.
+ * @return the chart legend as a table.
+ */
+function _logger_create_chart_legend($chart) {
+
+  global $user;
+
+  $i = 0;
   foreach($chart->data as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $measurements) {
-        $header .= ',S' . $s++;
+      foreach($sensors as $meter => $measurements) {
 
-        foreach($timestamps as $timestamp) {
-          $value = $measurements[$timestamp];
-          $value = $value? number_format($value, 3, '.', '') : '';
-          $values[$timestamp] .= ',' . $value;
-        }
+        $color = $chart->colors[$i % count($chart->colors)];
+
+        $id = SERIES_COLOR_ID . $i;
+        $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
+          style="width: 10px; height: 10px; color: transparent;"/>
+          <input id="' . $id . '" type="hidden" value="' . $color . '"
+          onchange="javascript: setLineColor(' . $i . ', this.value);"/>';
+
+        $operations = ($uid > 0 && $uid != $user->uid)?
+          '<a href="javascript: void(0)" OnClick="javascript: removeChartSeries(' . "$uid, $i, '$username'" . ');">' . t('Remove') . '</a>' : '';
+
+        $lines[] = array(
+            'mark'      => $mark,
+            'user'      => $username,
+            'sensor'    => $meter,
+            'max'       => "<div id='max$i'  align='right'/>",
+            'min'       => "<div id='min$i'  align='right'/>",
+            'avg'       => "<div id='avg$i'  align='right'/>",
+            'last'      => "<div id='last$i' align='right'/>",
+            'operation' => $operations
+        );
+        $i++;
       }
     }
   }
 
-  $series = $header . PHP_EOL;
-  foreach($values as $timestamp => $values_list) {
-    $series .= date('Y-m-d H:i', $timestamp) . $values_list . PHP_EOL;
-  }
+  $headers = array(
+    array('data'  => t('Color')),
+    array('data'  => t('User')),
+    array('data'  => t('Sensor')),
+    array('data'  => t('Max')),
+    array('data'  => t('Min')),
+    array('data'  => t('Avg')),
+    array('data'  => t('Last')),
+    array('data'  => t('Operation'))
+  );
 
-  $fh = fopen($file_path, 'w');
-  fwrite($fh, $series);
-  fclose($fh);
-
-  return $file_path;
+  return '<br>' . theme('table', $headers, $lines, array('id' => 'logger-legend-table'));
 }
 
 /**
@@ -917,105 +943,6 @@ function _logger_get_all_timestamps($data) {
 }
 
 /**
- * Creates the chart intervals' horizontal menu.
- *
- * @param $context  The page where the menu is going to be placed (overview or logger).
- * @return the list of intervals' menus.
- */
-function _logger_create_interval_menu($context) {
-  
-  $items = array(
-    l(t('Hour'),  "$context/electricity/hour"),
-    l(t('Day'),   "$context/electricity/day"),
-    l(t('Week'),  "$context/electricity/week"),
-    l(t('Month'), "$context/electricity/month"),
-    l(t('Year'),  "$context/electricity/year"),
-    l(t('Night'), "$context/electricity/night")
-  );
-
-  return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
-}
-
-/**
- * Creates the chart legend.
- *
- * @param $data   The series data.
- * @param $colors The series colors.
- * @return the chart legend as a table.
- */
-function _logger_create_graph_legend($data, $colors) {
-
-  global $user;
-
-  function _format($value) {
-    return $value > 0? number_format($value, 2) : '';
-  }
-
-  $i = 0;
-  foreach($data as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $meter => $measurements) {
-
-        $total = 0;
-        $last = 0;
-        $max = 0;
-        $min = null;
-        $sum = 0;
-        $avg = 0;
-
-        foreach($measurements as $timestamp => $value) {
-          if ($value) {
-            $total++;
-            $last = $value;
-            $max = $value > $max? $value: $max;
-            $min = !$min || $value < $min? $value: $min;
-            $sum += $value;
-          }
-        }
-        $avg = $total > 0? $sum / $total : 0;
-
-        $color = $colors[$i % count($colors)];
-
-        $id = SERIES_COLOR_ID . $i;
-        $mark = '<input class="color {valueElement:' . "'$id'" . '} type="button"
-          style="width: 10px; height: 10px;"/>
-          <input id="' . $id . '" type="hidden" value="' . $color . '"
-          onchange="' . "document.location='/logger/color/$i/' + escape('#' + this.value) + '?" . drupal_get_destination() . "';" . '"/>';
-
-        $operations = ($uid > 0 && $uid != $user->uid)?
-        '<a href="' . "/logger/remove/$uid?" . urldecode(drupal_get_destination()) . '">' . t('Remove') . '</a>' : '';
-        //TODO: make it work: l(t('Remove'), "logger/remove/$uid?" . drupal_get_destination(), array('html' => TRUE)) : '';
-
-        $lines[] = array(
-            'mark'      => $mark,
-            'user'      => $username,
-            'sensor'    => $meter,
-            'max'       => _format($max),
-            'min'       => _format($min),
-            'avg'       => _format($avg),
-            'last'      => _format($last),
-            'operation' => $operations
-        );
-        $i++;
-      }
-    }
-  }
-
-  $headers = array(
-    array('data'  => t('Color')),
-    array('data'  => t('User')),
-    array('data'  => t('Sensor')),
-    array('data'  => t('Max')),
-    array('data'  => t('Min')),
-    array('data'  => t('Avg')),
-    array('data'  => t('Last')),
-    array('data'  => t('Operation'))
-  );
-
-  return '<br>' . theme('table', $headers, $lines);
-}
-
-/**
  * Sets the chart series color.
  *
  * @param $i      The chart series' index.
@@ -1028,14 +955,12 @@ function _logger_series_color($i, $color) {
   $id = SERIES_COLOR_ID . $i;
 
   if ($user) {
-    $id .= $user->uid;
+    $id .= '_' . $user->uid;
     variable_set($id, $color);
 
   } else {
     setcookie($id, $unit, time() + WEEK, '/');
   }
-
-  drupal_goto($_REQUEST['destination']);
 }
 
 /**
@@ -1051,7 +976,7 @@ function _logger_get_series_colors() {
     $id = SERIES_COLOR_ID . $i;
 
     if ($user) {
-      $id .= $user->uid;
+      $id .= '_' . $user->uid;
       $color = variable_get($id, $default);
 
     } else {
@@ -1134,17 +1059,6 @@ function _logger_create_recent_blogs_block() {
   return $block;
 }
 
-/**
- * Builds a simple non-bulleted list of items.
- */
-function theme_logger_item_list($items, $title = NULL) {
-  $output = '';
-  foreach ($items as $item) {
-    $output .= $item . '<br/>';
-  }
-  return $output;
-}
-
 function logger_form_contact_mail_page_alter(&$form, $form_state) {
 
   $devices = logger_get_devices_options();
@@ -1174,7 +1088,7 @@ function logger_mail_alter(&$message) {
   }
 }
 
-function logger_control_form() {
+function logger_control_form(&$form_state, $chart) {
 
   global $base_path;
 
@@ -1219,8 +1133,34 @@ function logger_control_form() {
     '#description'    => t("Increase this number to smooth the series' lines and make the chart more readable."),
     '#maxlength'      => 5,
     '#size'           => 5,
+    '#text-align'     => 'center',
     '#default_value'  => _logger_get_smoothing_level(),
-    '#required'       => TRUE,
+    '#required'       => TRUE
+  );
+
+  $form['yvalue'] = array(
+    '#type'           => 'textfield',
+    '#theme'          => 'logger_value_range',
+    '#title'          => t('Value Range'),
+    '#description'    => t("Enter the value range shown on the Y axis, and click the Refresh button."),
+    '#maxlength'      => 12,
+    '#size'           => 12,
+    '#text-align'     => 'right'
+  );
+
+  $form['xvalue'] = array(
+    '#type'           => 'textfield',
+    '#theme'          => 'logger_time_period',
+    '#title'          => t('Time Period'),
+    '#description'    => t("Enter the time period shown on the X axis, and click the Refresh button."),
+    '#text-align'     => 'center'
+  );
+
+  $form['resolution'] = array(
+    '#type'           => 'select',
+    '#title'          => t('Time Resolution'),
+    '#description'    => t('Select the amount of time represented by each point on the chart.'),
+    '#options'        => _logger_get_resolutions_options(),
     '#attributes'     => $attributes
   );
 
@@ -1232,40 +1172,132 @@ function logger_control_form() {
   return $form;
 }
 
+/**
+ * Builds the Smoothing Level field.
+ *
+ * @param $element  The Drupal form field element.
+ * @return the field HTML code.
+ */
 function theme_logger_smoothing_level($element) {
 
-  function _operation_button($field, $caption, $step) {
-
-    $onclick = "
-      var field = document.getElementById('$field');
-      var level = field.value - (-1 * ($step));
-      field.value = level < 1? 1: level;
-      field.onchange();";
-
-    return '<input type="button" value="' . $caption . '" onclick="' . $onclick . '"/>';
+  function _operation_button($field_id, $caption, $step) {
+    return '<input type="button" value="' . $caption . '" '.
+      'onClick="javascript: return updateSmoothingLevel(' . "'$field_id', " . $step . ');"/>';
   }
 
-  _form_set_class($element, array('form-text'));
-
   $id = $element['#id'];
+  $value = check_plain($element['#value']);
 
   $output =
     _operation_button($id, '<<', -10) .
     _operation_button($id, '<',  -1) .
 
-    '<input type="text" ' .
-    'name="'      . $element['#name']               . '" ' .
-    'id="'        . $id                             . '" ' .
-    'maxlength="' . $element['#maxlength']          . '" ' .
-    'size="'      . $element['#size']               . '" ' .
-    'value="'     . check_plain($element['#value']) . '" ' .
-    'style="text-align: center;" ' .
-    drupal_attributes($element['#attributes']) . ' />' .
+    _logger_create_custom_field($element, '', $value, $attributes) .
 
     _operation_button($id, '>',   1) .
     _operation_button($id, '>>',  10);
 
   return theme('form_element', $element, $output);
+}
+
+/**
+ * Builds the group of fields for informing value range.
+ *
+ * @param $element  The Drupal form field element.
+ * @return the field HTML code.
+ */
+function theme_logger_value_range($element) {
+
+  $field1 = _logger_create_custom_field($element, 1, '');
+  $field2 = _logger_create_custom_field($element, 2, '');
+
+  return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+/**
+ * Builds the group of fields for informing a time period.
+ *
+ * @param $element  The Drupal form field element.
+ * @return the field HTML code.
+ */
+function theme_logger_time_period($element) {
+
+  $field1 = _logger_create_time_fields($element, 1);
+  $field2 = _logger_create_time_fields($element, 2);
+
+  return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+/**
+ * Creates two fields to represent a timestamp: one for date and another for time.
+ *
+ * @param $element  The Drupal form field element.
+ * @param $sufix    A sufix for the field id and name.
+ * @return the fields HTML code.
+ */
+function _logger_create_time_fields($element, $sufix) {
+
+  $picker_properties = "{
+      yearRange: '-1:+0',
+      showAnim: 'fadeIn',
+      dateFormat: 'dd/mm/yy',
+      currentText: '" . t('Today') . "',
+      nextText: '" . t('Next Month') . "',
+      prevText: '" . t('Previous Month') . "',
+      dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "],
+      monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
+    }";
+
+  drupal_add_js('$(document).ready(function(){$("#edit-xvalue' . $sufix . 'date").datepicker('. $picker_properties .');});', 'inline');
+
+  return
+    _logger_create_custom_field($element, $sufix . 'date', '', 10, 10) .
+    _logger_create_custom_field($element, $sufix . 'time', '', 5, 5);
+}
+
+/**
+ * Arrange fields to represent a range.
+ * 
+ * @param $element  The Drupal form field element.
+ * @param $field1   The field that contains the lowest value.
+ * @param $field2   The field that contains the highest value.
+ * @return the fields HTML code.
+ */
+function _logger_compose_range_fields($element, $field1, $field2) {
+
+  $output = t('from: ') . $field1 . ' &nbsp;&nbsp;&nbsp;' . t('to: ') . $field2;
+  return theme('form_element', $element, $output);
+}
+
+/**
+ * Create a customized form field.
+ * 
+ * @param $element     The Drupal form field element.
+ * @param $sufix       A sufix for the field id and name.
+ * @param $value       The field value.
+ * @param $size        The field size.
+ * @param $maxlength   The field maximum length.
+ * @return the field HTML code.
+ */
+function _logger_create_custom_field($element, $sufix, $value, $size = 0, $maxlength = 0) {
+
+  $name      = $element['#name'] . $sufix;
+  $id        = $element['#id']   . $sufix;
+  $align     = $element['#text-align'] . ';';
+  $size      = $size > 0 ? $size : $element['#size'];
+  $maxlength = $maxlength > 0 ? $maxlength : $element['#maxlength'];
+
+  $attributes = isset($element['#attributes']) ? drupal_attributes($element['#attributes']) : '';
+
+  return
+    '<input type="text" ' .
+    'name="'              . $name      . '" ' .
+    'id="'                . $id        . '" ' .
+    'maxlength="'         . $maxlength . '" ' .
+    'size="'              . $size      . '" ' .
+    'value="'             . $value     . '" ' .
+    'style="text-align: ' . $align     . '" ' .
+    $attributes . ' />';
 }
 
 function logger_control_form_validate($form, &$form_state) {
@@ -1280,6 +1312,22 @@ function logger_control_form_validate($form, &$form_state) {
 
   if ($step_plot != 1 && $step_plot != 0) {
     form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
+  }
+
+  $yvalue1 = _logger_get_yvalue(1);
+  $yvalue2 = _logger_get_yvalue(2);
+
+  if (!($yvalue1 >= 0 && $yvalue2 > 0 && $yvalue2 > $yvalue1)) {
+
+    form_set_error('yvalue', t('The value range is invalid.'));
+  }
+
+  $xvalue1 = _logger_get_xvalue(1);
+  $xvalue2 = _logger_get_xvalue(2);
+
+  if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
+
+    form_set_error('xvalue', t('Time period is invalid.'));
   }
 }
 
@@ -1300,7 +1348,7 @@ function logger_control_form_submit($form, &$form_state) {
   _logger_set_step_plot($step_plot);
   _logger_set_smoothing_level($smoothing_level);
 
-  $form_state['redirect'] = $_REQUEST['destination'];
+  $form_state['redirect'] = array($_GET['q'], $_REQUEST);
 }
 
 /**
@@ -1310,12 +1358,12 @@ function logger_control_form_submit($form, &$form_state) {
  */
 function _logger_get_units_options() {
 
-  $options['watt'] = t('watt');
-  $options['kwh']  = t('kWh/year');
-  $options['eur']  = t('euro/year [@ 0.18eur/kWh]');
-  $options['aud']  = t('aud/year [@ 0.19aud/kWh]');
-
-  return $options;
+  return array(
+    'watt' => t('watt'),
+    'kwh'  => t('kWh/year'),
+    'eur'  => t('euro/year [@ 0.18eur/kWh]'),
+    'aud'  => t('aud/year [@ 0.19aud/kWh]')
+  );
 }
 
 /**
@@ -1424,6 +1472,137 @@ function _logger_set_step_plot($step_plot) {
 }
 
 /**
+ * Returns either the lowest or the highest value shown on the Y axis.
+ *
+ * @param $index Inform 1 for the lowest, 2 for the highest.
+ *
+ * @return the value.
+ */
+function _logger_get_yvalue($index) {
+  return $_REQUEST['yvalue' . $index];
+}
+
+/**
+ * Returns either the lowest or the highest value shown on the X axis.
+ *
+ * @param $index Inform 1 for the lowest, 2 for the highest.
+ *
+ * @return the value.
+ */
+function _logger_get_xvalue($index) {
+  
+  $formatted = $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
+
+  //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
+  
+  $str = "$formatted:00 GMT+00:00";
+  $d = strtok($str, '/');
+  $m = strtok('/');
+  $r = strtok('/');
+
+  $timestamp = strtotime("$m/$d/$r");
+  $timestamp -= _logger_get_timezone_offset();
+  
+  return $timestamp > 0 ? $timestamp : 0;
+}
+
+/**
+ * Returns the chart resolution of a time interval menu option.
+ *
+ * @param $interval  The time interval menu option.
+ * @return the chart resolution.
+ */
+function _logger_get_resolution($interval) {
+
+  $resolution = $_REQUEST['resolution'];
+  if ($resolution > 0) {
+    return $resolution;
+  }
+
+  $options = array(
+    'hour'  =>  1 * MINUTE,
+    'day'   => 15 * MINUTE,
+    'days'  => 15 * MINUTE,
+    'week'  => 15 * MINUTE,
+    'month' =>  1 * DAY,
+    'year'  =>  1 * WEEK
+  );
+
+  return $options[$interval];
+}
+
+/**
+ * Returns an array of chart resolutions.
+ *
+ * @return the array of chart resolutions.
+ */
+function _logger_get_resolutions_options() {
+
+  return array(
+     1 * MINUTE =>  1 . ' ' . t('Minute'),
+    15 * MINUTE => 15 . ' ' . t('Minutes'),
+     1 * DAY    =>  1 . ' ' . t('Day'),
+     1 * WEEK   =>  1 . ' ' . t('Week')
+  );
+}
+
+/**
+ * Returns the default time window associated with a time interval menu option.
+ *
+ * @param $interval  The time interval menu option.
+ * @return the amount of seconds of the time window.
+ */
+function _logger_get_default_time_window($interval) {
+
+  $windows = array(
+    'hour'  =>  1 * HOUR,
+    'day'   =>  1 * DAY,
+    'days'  =>  3 * DAY,
+    'week'  =>  1 * WEEK,
+    'month' => 60 * DAY,
+    'year'  =>  1 * YEAR
+  );
+  return $windows[$interval];
+}
+
+/**
+ * Returns an array containing two timestamps representing a period of time.
+ *
+ * @param $interval    The time interval menu option.
+ * @param $resolution  The time resolution.
+ * @param $start       The initial timestamp, if known.
+ * @param $end         The final timestamp, if known.
+ * @return the period of time as an array.
+ */
+function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+  $now = time();
+
+  if ($start > 0 && $end > 0) {
+    $window = $end - $start;
+
+  } else {
+    $window = _logger_get_default_time_window($interval);
+    $end = $now;
+  }
+
+  $storage_periods = logger_get_storage_periods();
+  $elapsed_time = $now - $end;
+  $max_window = $storage_periods[$resolution] - $elapsed_time;
+
+  $window *= (CHART_HEIGHT / SLIDER_HEIGHT);
+  $window = $window > $max_window ? $max_window : $window;
+
+  $start = $end - $window;
+
+  return array(
+    'start' => $start,
+    'end'   => $end
+  );
+}
+
+/**
  * Returns an array of fluksonian users indexed by their respective user id.
  * Only users not yet plotted on the chart are returned.
  *
@@ -1470,6 +1649,11 @@ function _logger_get_users_options() {
   return $options;
 }
 
+/**
+ * Adds an user to the chart.
+ *
+ * @param $uid  The id of the user to be added.
+ */
 function _logger_add_user($uid) {
 
   global $user;
@@ -1484,6 +1668,11 @@ function _logger_add_user($uid) {
   }
 }
 
+/**
+ * Removes an user from the chart.
+ *
+ * @param $requestee_id  The id of the user to be removed.
+ */
 function _logger_remove_user($requestee_id) {
 
   global $_REQUEST;
@@ -1497,8 +1686,6 @@ function _logger_remove_user($requestee_id) {
       requestee_id = %d";
 
   db_query($sql, $user->uid, $requestee_id);
-
-  drupal_goto($_REQUEST['destination']);
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
@@ -1560,22 +1747,25 @@ function logger_query_device_measurements($interval, $device, $offset) {
   $sensors = db_query($sql, $device);
   $measurements = array();
 
+  $resolution = _logger_get_resolution($interval);
+  $period = _logger_get_period($interval, $resolution);
+
   while($sensor = db_fetch_object($sensors)) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 3600, $offset, $period, $resolution);
   }
   return $measurements;
 }
 
 function logger_cron() {
 
-  $intervals = array('hour', 'day', 'week', 'month', 'year', 'night');
+  $intervals = array('hour', 'day', 'days', 'week', 'month', 'year', 'night');
 
-  //Delete png files older than 30 minutes.
   //This limit prevents chart files from being removed before they are sent to the user.
+  $age = 2 * CHART_REFRESH / MINUTE;
 
   foreach($intervals as $interval) {
 
-    exec('find ' . GRAPH_PATH . "/$interval/*"  . ' -mmin +30 -exec rm {} \;');
+    exec('find ' . GRAPH_PATH . "/$interval/* -mmin +$age -exec rm {} \;");
   }
 }
