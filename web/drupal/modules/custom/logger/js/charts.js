@@ -20,7 +20,7 @@
 
 var powerChart;
 var sliderChart;
-var energycompChart;
+var relativeChart;
 var energyChart;
 
 function formatDate(d) {
@@ -136,7 +136,7 @@ function updateSmoothingLevel(fieldId, step) {
   field.value = level;
 
   powerChart.setAnnotations(new Array());
-  
+
   powerChart.updateOptions({rollPeriod: level});
   sliderChart.updateOptions({rollPeriod: level});
 
@@ -164,7 +164,7 @@ function slidePowerChart(event, center) {
   var xvalue1 = powerChart.xAxisRange(0)[0];
   var xvalue2 = powerChart.xAxisRange(0)[1];
   var drift = (xvalue2 - xvalue1) / 2;
-  
+
   xvalue1 = center - drift;
   xvalue2 = center + drift;
 
@@ -212,7 +212,7 @@ function updatePowerLegend(chart) {
 
     //sensor's values
     for(var v = 0; v < chart.numRows(); v++) {
-      
+
       var timestamp = chart.getValue(v, 0);
 
       if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
@@ -293,7 +293,7 @@ function removePowerAnnotation(chart, text) {
   if (remaining.length != annotations.length) {
     chart.setAnnotations(remaining);
     return true;
-    
+
   } else {
     return false;
   }
@@ -339,14 +339,15 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
     }
   };
 
-  if(stacked) {
-    options.series.stack = 0;
-  }
   options.yaxis = {
     tickFormatter: function (value, axis) {
       return stacked ? value.toFixed(0) + ' %' : value.toFixed(2);
     }
   };
+
+  if (stacked) {
+    options.series.stack = 0;
+  }
 
   var chart = new Object();
   chart.id = id;
@@ -354,10 +355,10 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   chart.options = options;
 
   chart.plot = function() {
-    var p = $.plot($('#' + id), data, options);
+    var plot = $.plot($('#' + id), data, options);
 
     if (dataLabels) {
-      showBarDataLabels(p);
+      showBarDataLabels(plot, stacked);
     }
   };
 
@@ -366,35 +367,52 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   return chart;
 }
 
-function showBarDataLabels(plot) {
+function showBarDataLabels(plot, stacked) {
 
-  $.each(plot.getData()[0].data,
+  var series = plot.getData();
+  var offset = plot.pointOffset({x: 0, y: 0});
+  var floor = offset.top;
 
-    function(i, point){
+  var extraOffset = [20, 20, 20, 20, 20, 20, 20];
 
-      if (point[1] > 0) {
-        var offset = plot.pointOffset({x: point[0], y: point[1]});
+  for(var d = 0; d < series.length; d++) {
 
-        $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(2) + '</div>').css(
-          {
-            position: 'absolute',
-            left: offset.left - 15,
-            top: offset.top - 20,
-            display: 'none'
+    $.each(series[d].data,
+
+      function(i, point){
+
+        if (point[1] > 0) {
+          var x = point[0];
+          var y = point[1];
+          offset = plot.pointOffset({x: x, y: y});
+
+          $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(2) + '</div>').css(
+            {
+              position: 'absolute',
+              left: offset.left - 15,
+              top: offset.top - extraOffset[x],
+              display: 'none'
+            }
+          ).appendTo(plot.getPlaceholder()).fadeIn('slow');
+
+          if (stacked) {
+            extraOffset[x] += floor - offset.top;
           }
-        ).appendTo(plot.getPlaceholder()).fadeIn('slow');
-      }
-  });
+        }
+    });
+  }
 }
 
 function setSeriesColor(chartId, i, color) {
 
-  if (chartId == 'energycomp') {
-    energycompChart.options['colors'][i] = '#' + color;
-    energycompChart.plot();
+  color = '#' + color;
+
+  if (chartId == 'relative') {
+    relativeChart.options['colors'][i] = color;
+    relativeChart.plot();
 
   } else if (chartId == 'energy') {
-    energyChart.options['colors'][i] = '#' + color;
+    energyChart.options['colors'][i] = color;
     energyChart.plot();
 
   } else {
@@ -402,12 +420,18 @@ function setSeriesColor(chartId, i, color) {
     updateDygraphColor(sliderChart, i, color);
   }
 
-  $.get('/logger/color/' + chartId + '/' + i + '/' + escape('#' + color));
+  //Look for color pickers and update their colors
+  for(var p = 1; p <= 2; p++) {
+    var button = document.getElementById("button_logger_series_color_" + i + "_" + p);
+    button.style.backgroundColor = color;
+  }
+
+  $.get('/logger/color/' + chartId + '/' + i + '/' + color);
 }
 
 function updateDygraphColor(chart, i, color) {
 
   var values = chart.getColors();
-  values[i] = "#" + color;
+  values[i] = color;
   chart.updateOptions({colors: values});
 }

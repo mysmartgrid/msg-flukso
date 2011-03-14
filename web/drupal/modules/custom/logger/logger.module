@@ -99,10 +99,10 @@ function logger_menu() {
     'type'             => MENU_CALLBACK
   );
 
-  $items['energy/compare'] = array(
-    'title'            => 'Compare',
-    'description'      => 'Show the energy consumption comparison page',
-    'page callback'    => '_logger_energy_comparison_page',
+  $items['energy/relative'] = array(
+    'title'            => 'Relative',
+    'description'      => 'Show the relative energy consumption page',
+    'page callback'    => '_logger_relative_energy_consumption_page',
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
@@ -273,7 +273,7 @@ function _logger_power_page($type, $interval) {
     _logger_get_subscribed_sensors($type)
   );
 
-  $chart = _logger_create_chart_object('power', $type, $interval, $unit, 0, 0, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+  $chart = _logger_create_chart_object('power', $type, $interval, $unit, 0, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
   return theme('logger_power_chart_area', $chart) .
 
@@ -354,7 +354,7 @@ function _logger_overview_page($type, $interval) {
   $sensors = _logger_get_active_sensors($type);
   $unit = _logger_get_unit();
 
-  $chart = _logger_create_chart_object('overview', $type, $interval, $unit, 0, 0, $sensors);
+  $chart = _logger_create_chart_object('overview', $type, $interval, $unit, 0, FALSE, $sensors);
 
   $output .= theme('logger_power_chart_area', $chart);
 
@@ -362,24 +362,34 @@ function _logger_overview_page($type, $interval) {
 }
 
 /**
- * Builds the energy consumption comparison page.
+ * Builds the relative energy consumption page.
  *
- * @return the energy consumption comparison page.
+ * @return the relative energy consumption page.
  */
-function _logger_energy_comparison_page() {
+function _logger_relative_energy_consumption_page() {
 
-  drupal_set_title(t('Compare your energy consumption'));
+  drupal_set_title(t('Your relative energy consumption'));
 
-  $output = t('The following chart shows your current energy consumption in six different time frames:
-    hour, day, week, month, and year. The bars are explained in the following.') . '<br><br>';
+  $output = t('The following chart allows you to compare current and previous levels of
+    energy consumption in six different time frames: hour, day, week, month, and year.
+    The bars are explained in the following.') . '<br><br>';
 
-  $output .= theme_item_list(array(
-    t('Current: The bottom bars show how much you have consumed so far in each time frame.'),
-    t('Previous: The second bars show the difference between current and previous consumptions.'),
-    t('Exceeded: When your consumption is higher than the previous one, a third bar shows the excess.')
-  )) . '<br>';
+  $chart = _logger_create_chart_object('relative', 'electricity', 'year', 'kWh', 1, TRUE);
 
-  $chart = _logger_create_chart_object('energycomp', 'electricity', 'year', 'kWh', 0, 1);
+  for($i = 0; $i < 3; $i++) {
+    $lines[$i][] = theme('logger_color_picker', $chart->context, $i, $chart->colors, 2);
+  }
+
+  $lines[0][] = array('data' => t('Current'));
+  $lines[0][] = array('data' => t('How much has been consumed so far in each time frame.'));
+
+  $lines[1][] = array('data' => t('Previous'));
+  $lines[1][] = array('data' => t('How much still remains for the previous consumption to be equaled.'));
+
+  $lines[2][] = array('data' => t('Exceeded'));
+  $lines[2][] = array('data' => t('How much the current consumption has exceeded the previous one.'));
+
+  $output .= theme('table', array(), $lines);
 
   $output .= theme('logger_energy_chart_area', $chart);
 
@@ -398,7 +408,7 @@ function _logger_energy_page() {
   $now = time();
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
-  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', 1, 0, NULL, array($start, $end));
+  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', 1, FALSE, NULL, array($start, $end));
 
   $values = $chart->data['series'][$user->uid][$user->name][t('All')];
   $days = array_keys($values);
@@ -518,11 +528,11 @@ function _logger_save_chart_file($chart) {
 }
 
 /**
- * Returns an array containing all energy consumption comparison chart data.
+ * Returns an array containing all relative energy consumption chart data.
  *
  * @return the chart data.
  */
-function _logger_get_energycomp_chart_data($chart) {
+function _logger_get_relative_chart_data($chart) {
 
   global $user;
   module_load_include('inc', 'logger', 'logger.rrd');
@@ -884,9 +894,10 @@ function logger_theme() {
 
     'logger_color_picker' => array(
       'arguments' => array(
-        'chartId'  => NULL,
-        'index'    => NULL,
-        'colors'   => NULL),
+        'chartId'   => NULL,
+        'index'     => NULL,
+        'colors'    => NULL,
+        'picker_id' => NULL),
     ),
   );
 }
@@ -976,6 +987,7 @@ function theme_logger_energy_chart_area($chart) {
     }
   }
   $names = array_keys($values);
+  $stacked = $chart->stacked ? 'true' : 'false';
 
   $id = $chart->context . 'Chart';
   $output .= "
@@ -986,7 +998,7 @@ function theme_logger_energy_chart_area($chart) {
         ['"   . implode("', '" , $names)         . "'],
         ['"   . implode("', '" , $chart->colors) . "'], " .
         $chart->data_labels . ", " .
-        $chart->stacked . ");
+        $stacked . ");
     </script>";
 
   $output .= '<br><br>' . _logger_create_chart_legend($chart) .
@@ -1147,7 +1159,7 @@ function _logger_get_series_colors($chart_id) {
   $palettes['overview'] = array(
     '#377037' //GREEN
   );
-  $palettes['energycomp'] = array(
+  $palettes['relative'] = array(
     '#4D7060', //GREEN4
     '#BFD9D3', //GREEN5
     '#C0C0C0'  //GRAY2
@@ -1401,22 +1413,32 @@ function theme_logger_time_period($element) {
  *
  * @param $i          The color index.
  * @param $colors     The array of colors.
+ * @param $picker_id  The picker id.
  * @return the picker HTML code.
  */
-function theme_logger_color_picker($chart_id, $i, $colors) {
+function theme_logger_color_picker($chart_id, $i, $colors, $picker_id = 1) {
 
   $id = SERIES_COLOR_ID . $i;
-  return '
+
+  $button_id = "button_$id" . "_$picker_id";
+
+  $output = '
     <input
+      id="' . $button_id . '"
       class="color {valueElement:' . "'$id'" . '}
       type="button"
-      style="width: 10px; height: 10px; color: transparent;"/>
+      style="width: 10px; height: 10px; color: transparent;"/>';
 
-    <input
-      id="' . $id . '"
-      type="hidden"
-      value="' . $colors[$i % count($colors)] . '"
-      onchange="javascript: ' . "setSeriesColor('$chart_id', $i, this.value)" . ';"/>';
+  if ($picker_id == 1) {
+    $output .= '
+      <input
+        id="' . $id . '"
+        type="hidden"
+        value="' . $colors[$i % count($colors)] . '"
+        onchange="javascript: ' . "setSeriesColor('$chart_id', $i, this.value)" . ';"/>';
+  }
+
+  return $output;
 }
 
 /**
