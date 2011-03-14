@@ -356,10 +356,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
 
   chart.plot = function() {
     var plot = $.plot($('#' + id), data, options);
-
-    if (dataLabels) {
-      showBarDataLabels(plot, stacked);
-    }
+    showBarDataLabels(plot, stacked, dataLabels);
   };
 
   chart.plot();
@@ -367,7 +364,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   return chart;
 }
 
-function showBarDataLabels(plot, stacked) {
+function showBarDataLabels(plot, stacked, dataLabels) {
 
   var series = plot.getData();
   var offset = plot.pointOffset({x: 0, y: 0});
@@ -386,7 +383,12 @@ function showBarDataLabels(plot, stacked) {
           var y = point[1];
           offset = plot.pointOffset({x: x, y: y});
 
-          $('<div style="font-size: 10px; font-weight: bold">' + point[1].toFixed(2) + '</div>').css(
+          if (dataLabels.length <= d || dataLabels[d].length <= x) {
+            return;
+          }
+
+          //point[1].toFixed(2)
+          $('<div style="font-size: 10px; font-weight: bold">' + dataLabels[d][x].toFixed(2) + '</div>').css(
             {
               position: 'absolute',
               left: offset.left - 15,
@@ -420,13 +422,7 @@ function setSeriesColor(chartId, i, color) {
     updateDygraphColor(sliderChart, i, color);
   }
 
-  //Look for color pickers and update their colors
-  for(var p = 1; p <= 2; p++) {
-    var button = document.getElementById("button_logger_series_color_" + i + "_" + p);
-    button.style.backgroundColor = color;
-  }
-
-  $.get('/logger/color/' + chartId + '/' + i + '/' + color);
+  $.get('/logger/color/' + chartId + '/' + i + '/' + escape(color));
 }
 
 function updateDygraphColor(chart, i, color) {
