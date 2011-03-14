@@ -567,7 +567,7 @@ function _logger_get_relative_chart_data($chart) {
   $data['legend'] = array(
     array('Serie' => 'Current',  'Description' => t('How much has been consumed so far in the current time frame.')),
     array('Serie' => 'Previous', 'Description' => t('How much was consumed in the previous time frame.')),
-    array('Serie' => 'Exceeded', 'Description' => t('How much the current consumption has exceeded the previous one.'))
+    array('Serie' => 'Excess',   'Description' => t('How much the current consumption has exceeded the previous one.'))
   );
 
   return $data;
@@ -584,24 +584,55 @@ function _logger_get_energy_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $sensor = t('All');
+  $min = 999999999999;
+  $max = 0;
+  $sum = 0;
+  $total = 0;
 
-  $line = array(
-    t('User')   => $user->name,
-    t('Sensor') => $sensor);
-
-  for($time = $chart->xaxis[0]; $time < $chart->xaxis[1]; $time += DAY) {
+  $from = $chart->xaxis[0];
+  $to = $chart->xaxis[1] - DAY;
+  for($time = $from; $time <= $to; $time += DAY) {
 
     $period = array('start' => $time, 'end' => ($time + DAY));
     $value = logger_rrd_query_energy($chart->sensors, 'kWh', 'day', $chart->offset, $period, $chart->resolution);
 
-    $title = date("d-m", $time);
-    $line[$title] = $value;
+    if ($value < $min && $time < $to) {
+      $min = $value;
+      $min_day = $time;
+    }
+
+    if ($value > $max) {
+      $max = $value;
+      $max_day = $time;
+    }
+
+    $sum += $value;
+    $total++;
 
     $title = date("l", $time) . '<br>' . date("d-M", $time);
     $series[$title] = $value;
 
     $data_labels[$title] = $value;
   }
+
+  $avg = $total > 0 ? $sum / $total : '';
+
+  function _format_legend_day($value, $day) {
+    return t('%value on %day', array(
+      '%value' => number_format($value, 2, '.', ''),
+      '%day' => t(date('l', $day))));
+  }
+
+  $line = array(
+    t('User')   => $user->name,
+    t('Sensor') => $sensor,
+    t('Min (Except today)')    => $total > 0 ? _format_legend_day($min, $min_day) : '',
+    t('Max')    => $total > 0 ? _format_legend_day($max, $max_day) : '',
+    t('Avg')    => $total > 0 ? $sum / $total : '',
+    t('Sum')    => $total > 0 ? $sum : ''
+  );
+
+
   $data['series'][$user->uid][$user->name][$sensor] = $series;
   $data['labels'][$sensor] = $data_labels;
   $data['legend'][] = $line;
