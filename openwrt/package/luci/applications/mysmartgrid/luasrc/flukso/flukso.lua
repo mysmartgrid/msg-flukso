@@ -24,6 +24,7 @@
 
 require 'posix'
 require 'xmlrpc.http'
+require 'luci.model.uci'
 
 data = require 'flukso.data'
 auth = require 'flukso.auth'
@@ -38,6 +39,33 @@ local param = {xmlrpcaddress = 'http://dev2-logger.mysmartgrid.de/xmlrpc',
                device        = '/dev/ttyS0',
                interval      = 300,
                dbgenable     = false}
+
+function brownout(address, version, method)
+	local uci = luci.model.uci.cursor()
+	uci:foreach ('system', 'system', 
+	function(section)
+		devicenr = {section.device} -- get device hash
+	end
+	)
+
+      local auth = auth.new()
+      auth:load()
+      auth:hmac(devicenr)
+
+      local status, ret_or_err, res = pcall(xmlrpc.http.call,
+          address..'/'..version,
+          method,
+          auth,
+		  devicenr)
+
+      if status then
+        posix.syslog(30, tostring(res)) 
+        if ret_or_err then  --successful xmlrpc call
+        end
+      else
+        posix.syslog(27, tostring(ret_or_err)..' '..address..' '..tostring(res))
+      end
+end
 
 function dispatch(e_child, p_child, device, pwrenable)
   return coroutine.create(function()
@@ -63,6 +91,9 @@ function dispatch(e_child, p_child, device, pwrenable)
         if pwrenable then coroutine.resume(p_child, meter, os.time(), value) end
 
       elseif line:sub(1, 3) == 'msg' then -- control data
+		if line:find('BROWN') then -- brown-out detected
+			brownout(param.xmlrpcaddress, param.xmlrpcversion, 'logger.brownout')
+		end
         posix.syslog(31, 'received message from '..device..': '..line:sub(5))
 
       else
