@@ -530,7 +530,7 @@ function _logger_get_relative_chart_data($chart) {
 
   $intervals = array(
     'hour'  => t('Hour'),
-    'day'   => t('Today'),
+    'day'   => t('Day'),
     'week'  => t('Week'),
     'month' => t('Month'),
     'year'  => t('Year')
@@ -704,21 +704,17 @@ function _logger_format_power_series_data($chart, $measurements) {
   return $formatted;
 }
 
-function _logger_create_power_legend_line($username, $sensor, $i, $operations = NULL) {
+function _logger_create_power_legend_line($username, $sensor, $i, $operations = '') {
 
-  $line = array(
-      t('User')   => $username,
-      t('Sensor') => $sensor,
-      t('Max')    => "<div id='max$i'/>",
-      t('Min')    => "<div id='min$i'/>",
-      t('Avg')    => "<div id='avg$i'/>",
-      t('Last')   => "<div id='last$i'/>",
+  return array(
+      t('User')       => $username,
+      t('Sensor')     => $sensor,
+      t('Max')        => "<div id='max$i'/>",
+      t('Min')        => "<div id='min$i'/>",
+      t('Avg')        => "<div id='avg$i'/>",
+      t('Last')       => "<div id='last$i'/>",
+      t('Operation')  => $operations
   );
-
-  if ($operations) {
-    $line[t('Operation')] = $operations;
-  }
-  return $line;
 }
 
 /**

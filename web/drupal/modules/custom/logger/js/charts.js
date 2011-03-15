@@ -369,8 +369,9 @@ function showBarDataLabels(plot, stacked, dataLabels) {
   var series = plot.getData();
   var offset = plot.pointOffset({x: 0, y: 0});
   var floor = offset.top;
+  var labelHeight = 15;
 
-  var extraOffset = [20, 20, 20, 20, 20, 20, 20];
+  var extraOffset = [labelHeight, labelHeight, labelHeight, labelHeight, labelHeight, labelHeight, labelHeight];
 
   for (var d = 0; d < series.length; d++) {
 
@@ -380,24 +381,42 @@ function showBarDataLabels(plot, stacked, dataLabels) {
 
         var y = point[1];
 
+        //Do not plot
         if (y <= 0 || dataLabels.length <= d || dataLabels[d].length <= x) {
           return;
         }
+        
         var x = point[0];
         offset = plot.pointOffset({x: x, y: y});
+        var barHeight = floor - offset.top;
 
-        $('<div style="font-size: 10px; font-weight: bold">' + dataLabels[d][x].toFixed(2) + '</div>').css(
-          {
-            position: 'absolute',
-            left: offset.left - 15,
-            top: offset.top - extraOffset[x],
-            display: 'none'
-          }
-        ).appendTo(plot.getPlaceholder()).fadeIn('slow');
+        //If the data labels are too close
+        var top = offset.top - extraOffset[x];
+        if (barHeight < labelHeight) {
+          top += barHeight - labelHeight;
+        }
 
         if (stacked) {
-          extraOffset[x] += floor - offset.top;
+          extraOffset[x] += barHeight;
         }
+
+        //If the value is lower than 0.01
+        var value = dataLabels[d][x].toFixed(2);
+        if (value == 0.00) {
+          value += '...';
+        }
+
+        var div = '<div style="font-size: 10px; font-weight: bold; width: 50px; height: ' +
+            labelHeight + 'px; text-align: center;">' + value + '</div>';
+
+        var options = {
+            position: 'absolute',
+            left: offset.left - 25,
+            top: top,
+            display: 'none'
+          };
+
+        $(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
     });
   }
 }
