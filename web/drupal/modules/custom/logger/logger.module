@@ -664,16 +664,7 @@ function _logger_get_power_chart_data($chart) {
         OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username'" . ');">' .
         t('Remove') . '</a>' : '';
 
-    $line[t('User')] = $sensor->username;
-    $line[t('Sensor')] = $sensor->function;
-    $line[t('Max')]  = "<div id='max$i'/>";
-    $line[t('Min')]  = "<div id='min$i'/>";
-    $line[t('Avg')]  = "<div id='avg$i'/>";
-    $line[t('Last')] = "<div id='last$i'/>";
-    $line[t('Operation')] = $operations;
-    $i++;
-
-    $data['legend'][] = $line;
+    $data['legend'][] = _logger_create_power_legend_line($sensor->username, $sensor->function, $i++, $operations);
   }
   return $data;
 }
@@ -688,7 +679,11 @@ function _logger_get_overview_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
-  $data['series'][0][t('All')][t('All')] = _logger_format_power_series_data($chart, $measurements);
+
+  $values = _logger_format_power_series_data($chart, $measurements);
+  
+  $data['series'][0][t('All')][t('All')] = $values;
+  $data['legend'][] = _logger_create_power_legend_line(t('All'), t('All'), 0);
 
   return $data;
 }
@@ -707,6 +702,23 @@ function _logger_format_power_series_data($chart, $measurements) {
     $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
   }
   return $formatted;
+}
+
+function _logger_create_power_legend_line($username, $sensor, $i, $operations = NULL) {
+
+  $line = array(
+      t('User')   => $username,
+      t('Sensor') => $sensor,
+      t('Max')    => "<div id='max$i'/>",
+      t('Min')    => "<div id='min$i'/>",
+      t('Avg')    => "<div id='avg$i'/>",
+      t('Last')   => "<div id='last$i'/>",
+  );
+
+  if ($operations) {
+    $line[t('Operation')] = $operations;
+  }
+  return $line;
 }
 
 /**
