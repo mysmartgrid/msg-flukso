@@ -372,34 +372,31 @@ function showBarDataLabels(plot, stacked, dataLabels) {
 
   var extraOffset = [20, 20, 20, 20, 20, 20, 20];
 
-  for(var d = 0; d < series.length; d++) {
+  for (var d = 0; d < series.length; d++) {
 
     $.each(series[d].data,
 
-      function(i, point){
+      function(i, point) {
 
-        if (point[1] > 0) {
-          var x = point[0];
-          var y = point[1];
-          offset = plot.pointOffset({x: x, y: y});
+        var y = point[1];
 
-          if (dataLabels.length <= d || dataLabels[d].length <= x) {
-            return;
+        if (y <= 0 || dataLabels.length <= d || dataLabels[d].length <= x) {
+          return;
+        }
+        var x = point[0];
+        offset = plot.pointOffset({x: x, y: y});
+
+        $('<div style="font-size: 10px; font-weight: bold">' + dataLabels[d][x].toFixed(2) + '</div>').css(
+          {
+            position: 'absolute',
+            left: offset.left - 15,
+            top: offset.top - extraOffset[x],
+            display: 'none'
           }
+        ).appendTo(plot.getPlaceholder()).fadeIn('slow');
 
-          //point[1].toFixed(2)
-          $('<div style="font-size: 10px; font-weight: bold">' + dataLabels[d][x].toFixed(2) + '</div>').css(
-            {
-              position: 'absolute',
-              left: offset.left - 15,
-              top: offset.top - extraOffset[x],
-              display: 'none'
-            }
-          ).appendTo(plot.getPlaceholder()).fadeIn('slow');
-
-          if (stacked) {
-            extraOffset[x] += floor - offset.top;
-          }
+        if (stacked) {
+          extraOffset[x] += floor - offset.top;
         }
     });
   }

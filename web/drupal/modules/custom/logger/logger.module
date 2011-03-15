@@ -273,7 +273,7 @@ function _logger_power_page($type, $interval) {
     _logger_get_subscribed_sensors($type)
   );
 
-  $chart = _logger_create_chart_object('power', $type, $interval, $unit, FALSE, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+  $chart = _logger_create_chart_object('power', $type, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
 
   return theme('logger_power_chart_area', $chart) .
 
@@ -354,7 +354,7 @@ function _logger_overview_page($type, $interval) {
   $sensors = _logger_get_active_sensors($type);
   $unit = _logger_get_unit();
 
-  $chart = _logger_create_chart_object('overview', $type, $interval, $unit, FALSE, FALSE, $sensors);
+  $chart = _logger_create_chart_object('overview', $type, $interval, $unit, FALSE, $sensors);
 
   $output .= theme('logger_power_chart_area', $chart);
 
@@ -374,7 +374,7 @@ function _logger_relative_energy_consumption_page() {
     energy consumption in six different time frames: hour, day, week, month, and year.
     The bars are explained in the legend bellow.') . '<br><br>';
 
-  $chart = _logger_create_chart_object('relative', 'electricity', 'year', 'kWh', TRUE, TRUE);
+  $chart = _logger_create_chart_object('relative', 'electricity', 'year', 'kWh', TRUE);
 
   $output .= theme('logger_energy_chart_area', $chart);
 
@@ -393,7 +393,7 @@ function _logger_energy_page() {
   $now = time();
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
-  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', TRUE, FALSE, NULL, array($start, $end));
+  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', FALSE, NULL, array($start, $end));
 
   $values = $chart->data['series'][$user->uid][$user->name][t('All')];
   $days = array_keys($values);
@@ -414,15 +414,17 @@ function _logger_energy_page() {
 /**
  * Creates an object to hold chart parameters.
  *
- * @param $interval The time interval.
- * @param $type     The sensor type.
  * @param $context  The page where the chart is going to be placed (overview or logger).
+ * @param $type     The sensor type.
+ * @param $interval The time interval.
+ * @param $unit     The chart unit.
+ * @param $stacked  Whether the chart has stacked bars or not.
  * @param $sensors  The sensors whose values are plotted on the chart.
  * @param $xaxis    An array containing the minimum and maximum timestamps of the x axis.
  * @param $yaxis    An array containing the minimum and maximum values of the y axis.
  * @return the chart object.
  */
-function _logger_create_chart_object($context, $type, $interval, $unit, $data_labels, $stacked, $sensors = NULL, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
+function _logger_create_chart_object($context, $type, $interval, $unit, $stacked, $sensors = NULL, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
   //TODO: simplify this function
 
@@ -440,7 +442,6 @@ function _logger_create_chart_object($context, $type, $interval, $unit, $data_la
   $chart->type = $type;
   $chart->interval = $interval;
   $chart->unit = $unit;
-  $chart->data_labels = $data_labels;
   $chart->stacked = $stacked;
   $chart->sensors = $sensors;
   $chart->yaxis = $yaxis;
@@ -565,9 +566,9 @@ function _logger_get_relative_chart_data($chart) {
   $data['series'][$user->uid][$user->name] = $series;
   $data['labels'] = $data_labels;
   $data['legend'] = array(
-    array('Serie' => 'Current',  'Description' => t('How much has been consumed so far in the current time frame.')),
-    array('Serie' => 'Previous', 'Description' => t('How much was consumed in the previous time frame.')),
-    array('Serie' => 'Excess',   'Description' => t('How much the current consumption has exceeded the previous one.'))
+    array('Serie' => t('Current'),  'Description' => t('How much has been consumed so far in the current time frame.')),
+    array('Serie' => t('Previous'), 'Description' => t('How much was consumed in the previous time frame.')),
+    array('Serie' => t('Excess'),   'Description' => t('How much the current consumption has exceeded the previous one.'))
   );
 
   return $data;
@@ -609,7 +610,7 @@ function _logger_get_energy_chart_data($chart) {
     $sum += $value;
     $total++;
 
-    $title = date("l", $time) . '<br>' . date("d-M", $time);
+    $title = t(date("l", $time)) . '<br>' . date("d-M", $time);
     $series[$title] = $value;
 
     $data_labels[$title] = $value;
@@ -1008,12 +1009,9 @@ function theme_logger_energy_chart_area($chart) {
     }
   }
   $names = array_keys($values);
-  $stacked = $chart->stacked ? 'true' : 'false';
 
-  if ($chart->data_labels) {
-    foreach ($chart->data['labels'] as $i => $values) {
-      $data_labels[] = implode(', ', $values);
-    }
+  foreach ($chart->data['labels'] as $i => $values) {
+    $data_labels[] = implode(', ', $values);
   }
 
   $id = $chart->context . 'Chart';
@@ -1025,10 +1023,10 @@ function theme_logger_energy_chart_area($chart) {
         ['"   . implode("', '" , $names)         . "'],
         ['"   . implode("', '" , $chart->colors) . "'],
         [ [ " . implode('], [' , $data_labels)   . " ] ], " .
-        $stacked . ");
+        ($chart->stacked ? 'true' : 'false') . ");
     </script>";
 
-  $output .= "<br>Unit: kWh";
+  $output .= '<br>' . t('Unit') . ': kWh';
 
   $output .= '<br><br>' . _logger_create_chart_legend($chart) .
     '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
