@@ -565,7 +565,7 @@ function _logger_get_relative_chart_data($chart) {
 
     $data_labels['current'][$label]  = $previous * $series['current'][$label] / 100;
     $data_labels['previous'][$label] = $previous;
-    $data_labels['excess'][$label]   = $previous * $series['excess'][$label] / 100;
+    $data_labels['excess'][$label]   = $previous * $perc / 100;
 
     $legend[0][$label] = _logger_format_period($interval, $period2, $chart->offset);
     $legend[1][$label] = _logger_format_period($interval, $period1, $chart->offset);
