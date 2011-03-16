@@ -371,7 +371,10 @@ function showBarDataLabels(plot, stacked, dataLabels) {
   var floor = offset.top;
   var labelHeight = 15;
 
-  var extraOffset = [labelHeight, labelHeight, labelHeight, labelHeight, labelHeight, labelHeight, labelHeight];
+  var extraOffset = new Array();
+  for(var i = 0; i < dataLabels[0].length; i++) {
+    extraOffset[i] = labelHeight;
+  }
 
   for (var d = 0; d < series.length; d++) {
 
@@ -381,11 +384,11 @@ function showBarDataLabels(plot, stacked, dataLabels) {
 
         var y = point[1];
 
-        //Do not plot
-        if (y <= 0 || dataLabels.length <= d || dataLabels[d].length <= x) {
+        //Only positive values are shown
+        if (y <= 0) {
           return;
         }
-        
+
         var x = point[0];
         offset = plot.pointOffset({x: x, y: y});
         var barHeight = floor - offset.top;

@@ -524,9 +524,9 @@ function _logger_get_relative_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $now = getdate();
-  $extra_days['week']  = $now['wday'];
-  $extra_days['month'] = $now['mday'] - 1;
-  $extra_days['year']  = $now['yday'];
+  $extra_days['week']  = $now['wday'];     //How many days since last Sunday
+  $extra_days['month'] = $now['mday'] - 1; //How many days since 1st day of the month
+  $extra_days['year']  = $now['yday'];     //How many days since 1st day of the year
 
   $intervals = array(
     'hour'  => t('Hour'),
@@ -536,14 +536,23 @@ function _logger_get_relative_chart_data($chart) {
     'year'  => t('Year')
   );
 
+  $legend = array(
+    array('Serie' => '<b>' . t('Current')  . '</b>' . ' - ' . t('How much has been consumed so far in the current time frame.')),
+    array('Serie' => '<b>' . t('Previous') . '</b>' . ' - ' . t('How much was consumed in the previous time frame.')),
+    array('Serie' => '<b>' . t('Excess')   . '</b>' . ' - ' . t('How much the current consumption has exceeded the previous one.')),
+  );
+
   foreach ($intervals as $interval => $label) {
 
     $resolution = _logger_get_resolution($interval);
+    $adjustment = $extra_days[$interval] * DAY + ($now[0] % ($interval == 'hour' ? HOUR : DAY));
 
-    $adjustment = $extra_days[$interval] * DAY +
-      $now[0] % ($interval == 'hour' ? HOUR : DAY);
-
-    $window = _logger_get_default_time_window($interval);
+    if ($interval == 'month') {
+      $last_day = getdate($now[0] - $adjustment - 12 * HOUR);
+      $window = $last_day['mday'] * DAY; //Consider exactly 1 month, and not simply 30 days
+    } else {
+      $window = _logger_get_default_time_window($interval);
+    }
 
     $time1 = $now[0] - $adjustment - $window;
     $time2 = $time1 + $window;
@@ -555,23 +564,50 @@ function _logger_get_relative_chart_data($chart) {
     $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
 
     $perc = ($current / $previous) * 100;
-    $series['current'][$label]   = $perc < 100 ? $perc       : 100;
-    $series['remaining'][$label] = $perc < 100?  100 - $perc :   0;
-    $series['exceeding'][$label] = $perc > 100?  $perc - 100 :   0;
+    $series['current'][$label]  = $perc < 100 ? $perc       : 100;
+    $series['previous'][$label] = $perc < 100?  100 - $perc :   0;
+    $series['excess'][$label]   = $perc > 100?  $perc - 100 :   0;
 
-    $data_labels['current'][$label]   = $current;
-    $data_labels['remaining'][$label] = $previous;
-    $data_labels['exceeding'][$label] = $current - $previous;
+    $data_labels['current'][$label]  = $current;
+    $data_labels['previous'][$label] = $previous;
+    $data_labels['excess'][$label]   = $current - $previous;
+
+    $legend[0][$label] = _logger_format_period($interval, $period2, $chart->offset);
+    $legend[1][$label] = _logger_format_period($interval, $period1, $chart->offset);
+    $legend[2][$label] = _logger_format_period($interval, $period2, $chart->offset);
   }
   $data['series'][$user->uid][$user->name] = $series;
   $data['labels'] = $data_labels;
-  $data['legend'] = array(
-    array('Serie' => t('Current'),  'Description' => t('How much has been consumed so far in the current time frame.')),
-    array('Serie' => t('Previous'), 'Description' => t('How much was consumed in the previous time frame.')),
-    array('Serie' => t('Excess'),   'Description' => t('How much the current consumption has exceeded the previous one.'))
-  );
+  $data['legend'] = $legend;
 
   return $data;
+}
+
+function _logger_format_period($interval, $period, $offset) {
+
+  $start = $period['start'];
+  $end = $period['end'] - 1;
+
+  switch ($interval) {
+    case 'hour':
+      $start += $offset;
+      $end += $offset;
+      $formatted = t('from: ') . date('H:i', $start) . '<br>' . t('to: ') . date('G:i', $end);
+      break;
+    case 'day':
+      $formatted = date('d/m', $start);
+      break;
+    case 'week':
+      $formatted = t('from: ') . date('d/m', $start) . '<br>' . t('to: ') . date('d/m', $end);
+      break;
+    case 'month':
+      $formatted = t(date('F', $start));
+      break;
+    case 'year':
+      $formatted = t(date('Y', $start)) . '<br>';
+      break;
+  }
+  return $formatted;
 }
 
 /**
