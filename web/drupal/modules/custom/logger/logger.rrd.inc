@@ -220,7 +220,7 @@ function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $s
 
   $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, true, $period, $step);
+  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, TRUE, $period, $step);
 }
 
 /**

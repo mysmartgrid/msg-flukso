@@ -23,16 +23,13 @@
  */
 
 //Constants
-define('ROOT_PATH',  drupal_get_path('module', 'logger'));
-define('GRAPH_PATH', ROOT_PATH . '/graphs');
-
 define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('YEAR',   52 * WEEK);
 
-define('CHART_REFRESH', 15 * MINUTE);
+define('ROOT_PATH',  drupal_get_path('module', 'logger'));
 define('CHART_HEIGHT', 350);
 define('SLIDER_HEIGHT', 50);
 
@@ -136,6 +133,14 @@ function logger_menu() {
     'title'            => 'Removes a chart series',
     'page callback'    => '_logger_remove_user',
     'page arguments'   => array(3),
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['logger/file'] = array(
+    'title'            => 'Downloads a chart file',
+    'page callback'    => '_logger_download_chart_data_file',
+    'page arguments'   => array(2),
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
@@ -426,66 +431,58 @@ function _logger_energy_page() {
  */
 function _logger_create_chart_object($context, $type, $interval, $unit, $stacked, $sensors = NULL, $xaxis = array(0, 0), $yaxis = array(0, 0)) {
 
-  //TODO: simplify this function
-
-  if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
-    $xaxis[1] = time();
-    $xaxis[0] = $xaxis[1] - _logger_get_default_time_window($interval);
-  }
-
-  if (!$sensors) {
-    $sensors = _logger_get_user_sensors($type);
-  }
-
   $chart = new stdClass();
   $chart->context = $context;
   $chart->type = $type;
   $chart->interval = $interval;
   $chart->unit = $unit;
   $chart->stacked = $stacked;
-  $chart->sensors = $sensors;
-  $chart->yaxis = $yaxis;
-  $chart->xaxis = $xaxis;
 
   $chart->resolution = _logger_get_resolution($interval);
   $chart->offset = _logger_get_timezone_offset();
   $chart->colors = _logger_get_series_colors($context);
   $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
+  $chart->sensors = $sensors? $sensors : _logger_get_user_sensors($type);
 
-  $t1 = $chart->period['start'] - ($chart->period['start'] % CHART_REFRESH);
-  $t2 = $chart->period['end']   - ($chart->period['end']   % CHART_REFRESH);
+  if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
+    $xaxis[1] = time();
+    $xaxis[0] = $xaxis[1] - _logger_get_default_time_window($interval);
+  }
+  $chart->yaxis = $yaxis;
+  $chart->xaxis = $xaxis;
+
+  $lifetime = 15 * MINUTE;
+  $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
+  $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
   $unique_id = "$context $type $unit $chart->resolution $t1 $t2";
-  foreach ($sensors as $sensor) {
+  foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter";
   }
-  $unique_id = md5($unique_id);
 
-  $chart->file_path = GRAPH_PATH . "/$interval/msg-chart-$unique_id.csv";
-
-  $chart->cache_id = 'logger_' . $interval . '_chart_data_' . $unique_id;
-  $cache = cache_get($chart->cache_id, 'cache_page');
+  $chart->id = 'logger_' . $interval . '_chart_data_' . md5($unique_id);
+  $cache = cache_get($chart->id, 'cache_page');
   $chart->data = $cache->data;
 
   if (!$chart->data) {
-
     $get_data = '_logger_get_' . $chart->context . '_chart_data';
     $chart->data = $get_data($chart);
     
-    cache_set($chart->cache_id, $chart->data, 'cache_page', time() + CHART_REFRESH);
-
-    _logger_save_chart_file($chart);
+    cache_set($chart->id, $chart->data, 'cache_page', time() + $lifetime);
   }
   return $chart;
 }
 
 /**
- * Saves a chart to a file.
+ * Downloads a chart data file.
  *
- * @param $chart The chart object.
+ * @param $cache_id  The chart cache id.
  */
-function _logger_save_chart_file($chart) {
+function _logger_download_chart_data_file($cache_id) {
 
-  $cache = cache_get($chart->cache_id, 'cache_page');
+  drupal_set_header('Content-Type: text/plain');
+  drupal_set_header('Content-disposition: attachment; filename=chart-data-file.txt');
+
+  $cache = cache_get($cache_id, 'cache_page');
   if ($cache->data) {
     $header = t('Serie');
     $s = 1;
@@ -502,15 +499,13 @@ function _logger_save_chart_file($chart) {
       }
     }
 
-    $output = $header . PHP_EOL;
+    $lines = '';
     foreach($values as $timestamp => $values_list) {
-      $output .= $timestamp . $values_list . PHP_EOL;
+      $lines .= $timestamp . $values_list . PHP_EOL;
     }
   }
-
-  $fh = fopen($chart->file_path, 'w');
-  fwrite($fh, $output);
-  fclose($fh);
+  print $header . PHP_EOL . $lines;
+  exit(0);
 }
 
 /**
@@ -691,6 +686,7 @@ function _logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+
     $values = _logger_format_power_series_data($chart, $measurements);
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->function] = $values;
@@ -717,7 +713,7 @@ function _logger_get_overview_chart_data($chart) {
   $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
 
   $values = _logger_format_power_series_data($chart, $measurements);
-  
+
   $data['series'][0][t('All')][t('All')] = $values;
   $data['legend'][] = _logger_create_power_legend_line(t('All'), t('All'), 0);
 
@@ -726,9 +722,8 @@ function _logger_get_overview_chart_data($chart) {
 
 function _logger_format_power_series_data($chart, $measurements) {
 
-  $start = $chart->period['start'] + $chart->resolution + $chart->offset;
-  $start -= ($start % $chart->resolution);
-  $end = $chart->period['end'] + $chart->offset;
+  $start = $chart->period['start'] + $chart->offset - $chart->period['start'] % $chart->resolution;
+  $end   = $chart->period['end']   + $chart->offset - $chart->period['end'] % $chart->resolution;
 
   for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 
@@ -1033,8 +1028,7 @@ function theme_logger_power_chart_area($chart) {
     _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
     _logger_create_dygraph('sliderChart', $chart, false, $slider_properties) .
 
-    _logger_create_chart_legend($chart) .
-    '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
+    _logger_create_chart_legend($chart);
 }
 
 /**
@@ -1059,7 +1053,8 @@ function theme_logger_energy_chart_area($chart) {
   }
 
   $id = $chart->context . 'Chart';
-  $output .= "
+
+  return "
     <div id='$id' style='width: 600px; height: 300px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
@@ -1068,14 +1063,11 @@ function theme_logger_energy_chart_area($chart) {
         ['"   . implode("', '" , $chart->colors) . "'],
         [ [ " . implode('], [' , $data_labels)   . " ] ], " .
         ($chart->stacked ? 'true' : 'false') . ");
-    </script>";
+    </script>" .
+                
+    '<br>' . t('Unit') . ': kWh' .
 
-  $output .= '<br>' . t('Unit') . ': kWh';
-
-  $output .= '<br><br>' . _logger_create_chart_legend($chart) .
-    '<p align="right">' . l(t('Save Data'), $chart->file_path) . '</p>';
-
-  return $output;
+    '<br><br>' . _logger_create_chart_legend($chart);
 }
 
 /**
@@ -1113,7 +1105,7 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
     '<script type="text/javascript">' .
         $id . ' = new Dygraph(
           document.getElementById("' . $id . '"),
-          "/' . $chart->file_path . '", {' .
+          "/logger/file/' . $chart->id . '", {' .
           implode(', ', $pairs) . ' }
       );
     </script> ';
@@ -1175,7 +1167,8 @@ function _logger_create_chart_legend($chart) {
       $header[$title] = array('data' => t($title));
     }
   }
-  return theme('table', $header, $lines, array('id' => 'logger-legend-table'));
+  return theme('table', $header, $lines, array('id' => 'logger-legend-table')) .
+    '<p align="right">' . l(t('Save Data'), "logger/file/" . $chart->id) . '</p>';
 }
 
 /**
@@ -1768,12 +1761,10 @@ function _logger_get_xvalue($index) {
   $formatted = $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
 
   //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
-
   $str = "$formatted:00 GMT+00:00";
   $d = strtok($str, '/');
   $m = strtok('/');
   $r = strtok('/');
-
   $timestamp = strtotime("$m/$d/$r");
   $timestamp -= _logger_get_timezone_offset();
 
@@ -1983,7 +1974,6 @@ function _logger_account_access($permission, $account) {
 function _logger_sensor_access($permission, $meter) {
 
   $sql = "SELECT uid FROM {logger_meters} WHERE meter = '%s'";
-
   $sensor = db_fetch_object(db_query($sql, $meter));
 
   return ($sensor->uid == $GLOBALS['user']->uid && user_access($permission));
@@ -1995,7 +1985,6 @@ function _logger_sensor_access($permission, $meter) {
 function _logger_device_access($permission, $serial) {
 
   $sql = "SELECT uid FROM {logger_devices} WHERE serial = %d";
-
   $device = db_fetch_object(db_query($sql, $serial));
 
   return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
@@ -2025,17 +2014,4 @@ function logger_query_device_measurements($interval, $device, $offset) {
     $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $offset, $period, $resolution);
   }
   return $measurements;
-}
-
-function logger_cron() {
-
-  $intervals = array('hour', 'day', 'days', 'week', 'month', 'year', 'night');
-
-  //This limit prevents chart files from being removed before they are sent to the user.
-  $age = 2 * CHART_REFRESH / MINUTE;
-
-  foreach($intervals as $interval) {
-
-    exec('find ' . GRAPH_PATH . "/$interval/* -mmin +$age -exec rm {} \;");
-  }
 }
