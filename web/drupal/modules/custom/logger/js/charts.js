@@ -403,9 +403,11 @@ function showBarDataLabels(plot, stacked, dataLabels) {
           extraOffset[x] += barHeight;
         }
 
-        //If the value is lower than 0.01
-        var value = dataLabels[d][x].toFixed(2);
-        if (value == 0.00) {
+	var value = dataLabels[d][x];
+	var precision = value < 0.01 ? 3 : value < 100 ? 2 : 1;
+        value = value.toFixed(precision);
+
+        if (value == 0) {
           value += '...';
         }
 
