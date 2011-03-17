@@ -404,7 +404,7 @@ function showBarDataLabels(plot, stacked, dataLabels) {
         }
 
 	var value = dataLabels[d][x];
-	var precision = value < 0.01 ? 3 : value < 100 ? 2 : 1;
+	var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
         value = value.toFixed(precision);
 
         if (value == 0) {
