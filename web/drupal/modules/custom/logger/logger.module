@@ -519,7 +519,7 @@ function _logger_get_relative_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $now = getdate();
-  $extra_days['week']  = $now['wday'];     //How many days since last Sunday
+  $extra_days['week']  = $now['wday'] - 1; //How many days since last Monday
   $extra_days['month'] = $now['mday'] - 1; //How many days since 1st day of the month
   $extra_days['year']  = $now['yday'];     //How many days since 1st day of the year
 
@@ -663,7 +663,6 @@ function _logger_get_energy_chart_data($chart) {
     t('Avg')    => $total > 0 ? $sum / $total : '',
     t('Sum')    => $total > 0 ? $sum : ''
   );
-
 
   $data['series'][$user->uid][$user->name][$sensor] = $series;
   $data['labels'][$sensor] = $data_labels;
