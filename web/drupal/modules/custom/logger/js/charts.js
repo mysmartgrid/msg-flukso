@@ -96,6 +96,17 @@ function updateControlForm(chart) {
   updatePowerLegend(chart);
 }
 
+function submitControlForm(resetY) {
+
+  var form = document.getElementById('logger-control-form');
+  
+  if (resetY) {
+    form.elements['yvalue1'].value = '';
+    form.elements['yvalue2'].value = '';
+  }
+  form.submit();
+}
+
 function removePowerSeries(uid, i, username) {
 
   var table = document.getElementById('logger-legend-table');

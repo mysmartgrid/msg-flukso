@@ -1336,18 +1336,13 @@ function logger_control_form(&$form_state, $chart) {
 
   global $base_path;
 
-  $attributes = array(
-    'onchange' => '
-      document.getElementById("logger-control-form").submit();'
-  );
-
   $form['new_user'] = array(
     '#type'           => 'select',
     '#title'          => t('Add User'),
     '#description'    => t('Select a user to be added to the chart.'),
     '#options'        => _logger_get_users_options(),
     '#default_value'  => 0,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitControlForm(true)')
   );
 
   $form['unit'] = array(
@@ -1357,7 +1352,7 @@ function logger_control_form(&$form_state, $chart) {
     '#options'        => _logger_get_units_options(),
     '#default_value'  => _logger_get_unit(),
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitControlForm(true)')
   );
 
   $form['step_plot'] = array(
@@ -1367,7 +1362,7 @@ function logger_control_form(&$form_state, $chart) {
     '#default_value'  => _logger_get_step_plot(),
     '#return_value'   => 1,
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitControlForm()')
   );
 
   $form['smoothing_level'] = array(
@@ -1405,7 +1400,7 @@ function logger_control_form(&$form_state, $chart) {
     '#title'          => t('Time Resolution'),
     '#description'    => t('Select the amount of time represented by each point on the chart.'),
     '#options'        => _logger_get_resolutions_options(),
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitControlForm()')
   );
 
   $form['submit'] = array(
