@@ -587,7 +587,7 @@ function _logger_format_period($interval, $period, $offset) {
     case 'hour':
       $start += $offset;
       $end += $offset;
-      $formatted = t('from: ') . '&nbsp;' . date('H:i', $start) . '<br>' . t('to: ') . '&nbsp;&nbsp;' . date('G:i', $end);
+      $formatted = t('from: ') . '&nbsp;' . date('H:i', $start) . '<br>' . t('to: ') . '&nbsp;&nbsp;' . date('H:i', $end);
       break;
     case 'day':
       $formatted = date('d/m', $start);
