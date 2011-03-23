@@ -501,7 +501,8 @@ function _logger_download_chart_data_file($cache_id) {
 
     $lines = '';
     foreach($values as $timestamp => $values_list) {
-      $lines .= $timestamp . $values_list . PHP_EOL;
+      $lines .= str_replace('<br>', ' ', $timestamp); //Removes HTML tags
+      $lines .= $values_list . PHP_EOL;
     }
   }
   print $header . PHP_EOL . $lines;
@@ -552,8 +553,8 @@ function _logger_get_relative_chart_data($chart) {
     $time1 = $now[0] - $adjustment - $window;
     $time2 = $time1 + $window;
 
-    $period1 = array('start' => $time1, 'end' => $time2);
-    $period2 = array('start' => $time2, 'end' => $now[0]);
+    $period1 = array('start' => $time1, 'end' => $time2 - 1); //Until the last second
+    $period2 = array('start' => $time2, 'end' => $now[0] - 1);//Until the last second
 
     $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
     $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
@@ -581,7 +582,7 @@ function _logger_get_relative_chart_data($chart) {
 function _logger_format_period($interval, $period, $offset) {
 
   $start = $period['start'];
-  $end = $period['end'] - 1;
+  $end = $period['end'];
 
   switch ($interval) {
     case 'hour':
@@ -625,7 +626,7 @@ function _logger_get_energy_chart_data($chart) {
   $to = $chart->xaxis[1] - DAY;
   for($time = $from; $time <= $to; $time += DAY) {
 
-    $period = array('start' => $time, 'end' => ($time + DAY));
+    $period = array('start' => $time, 'end' => ($time + DAY - 1)); //from 00:00:00 until 23:59:59
     $value = logger_rrd_query_energy($chart->sensors, 'kWh', 'day', $chart->offset, $period, $chart->resolution);
 
     if ($value < $min && $time < $to) {
