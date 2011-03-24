@@ -415,6 +415,33 @@ function notification_newsletter_page() {
     t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
     '</p></div>';
 
+  $output .= '<div><p><br>' .
+    t('Latest publications:');
+
+  $sql = '
+    SELECT
+      n.nid
+    FROM
+      {node} n,
+      {users} u,
+      {users_roles} ur
+    WHERE
+      n.type = "%s" AND
+      n.title LIKE "%s" AND
+      n.uid = u.uid AND
+      u.uid = ur.uid AND
+      ur.rid = %d
+    ORDER BY
+      n.created DESC LIMIT 3';
+
+  $results = db_query($sql, "blogpost", "Newsletter %/%", 8); //Posted by a Blogger
+  while ($result = db_fetch_object($results)) {
+
+    $blog = node_load(array('nid' => $result->nid));
+    $output .= '&nbsp;&nbsp;&nbsp;' . l($blog->title, 'node/' . $blog->nid);
+  }
+  $output .= '</p></div>';
+
   return $output;
 }
 
