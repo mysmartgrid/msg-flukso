@@ -726,9 +726,12 @@ function _logger_format_power_series_data($chart, $measurements) {
   $start = $chart->period['start'] + $chart->offset - $chart->period['start'] % $chart->resolution;
   $end   = $chart->period['end']   + $chart->offset - $chart->period['end'] % $chart->resolution;
 
+  $diff = $chart->offset / HOUR;
+  $tz = ($diff < 0? '-' : '+') . abs($diff) . ':00';
+
   for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 
-    $key = date('Y-m-d H:i', $timestamp);
+    $key = date('Y-m-d H:i', $timestamp) . " $tz";
     $value = $measurements[$timestamp];
 
     $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
