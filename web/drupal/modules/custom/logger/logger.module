@@ -556,8 +556,9 @@ function _logger_get_relative_chart_data($chart) {
     $period1 = array('start' => $time1, 'end' => $time2 - 1); //Until the last second
     $period2 = array('start' => $time2, 'end' => $now[0] - 1);//Until the last second
 
-    $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
     $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
+    $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
+    $previous = $previous > 0 ? $previous : 0; //FIXME: how absent previous values should be consider?
 
     $perc = ($current / $previous) * 100;
     $series['current'][$label]  = $perc < 100 ? $perc       : 100;
