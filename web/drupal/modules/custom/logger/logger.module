@@ -558,16 +558,18 @@ function _logger_get_relative_chart_data($chart) {
 
     $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
     $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
-    $previous = $previous > 0 ? $previous : 0; //FIXME: how absent previous values should be consider?
 
-    $perc = ($current / $previous) * 100;
-    $series['current'][$label]  = $perc < 100 ? $perc       : 100;
-    $series['previous'][$label] = $perc < 100?  100 - $perc :   0;
-    $series['excess'][$label]   = $perc > 100?  $perc - 100 :   0;
+    $so_far    = min($previous, $current);
+    $remaining = max($previous - $current, 0);
+    $excess    = max($current - $previous, 0);
 
-    $data_labels['current'][$label]  = $previous * $series['current'][$label] / 100;
+    $series['current'][$label]  = @($so_far / $previous) * 100;
+    $series['previous'][$label] = @($remaining / $previous) * 100;
+    $series['excess'][$label]   = @($excess / ($previous? $previous : $excess)) * 100;
+
+    $data_labels['current'][$label]  = $so_far;
     $data_labels['previous'][$label] = $previous;
-    $data_labels['excess'][$label]   = $previous * $perc / 100;
+    $data_labels['excess'][$label]   = $excess ? $previous + $excess : 0;
 
     $legend[0][$label] = _logger_format_period($interval, $period2, $chart->offset);
     $legend[1][$label] = _logger_format_period($interval, $period1, $chart->offset);
