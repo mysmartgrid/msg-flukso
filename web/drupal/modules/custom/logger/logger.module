@@ -502,7 +502,7 @@ function _logger_download_chart_data_file($cache_id) {
     $lines = '';
     foreach($values as $timestamp => $values_list) {
       $lines .= str_replace('<br>', ' ', $timestamp); //Removes HTML tags
-      $lines .= $values_list . PHP_EOL;
+      $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
   print $header . PHP_EOL . $lines;
@@ -727,7 +727,7 @@ function _logger_format_power_series_data($chart, $measurements) {
   $end   = $chart->period['end']   + $chart->offset - $chart->period['end'] % $chart->resolution;
 
   $diff = $chart->offset / HOUR;
-  $tz = ($diff < 0? '-' : '+') . abs($diff) . ':00';
+  $tz = 'GMT' . ($diff < 0? '-' : '+') . (abs($diff) > 9 ? '0' : '') . abs($diff) . '00';
 
   for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 

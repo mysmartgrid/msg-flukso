@@ -124,10 +124,17 @@ function removePowerSeries(uid, i, username) {
   }
 
   if (!found) {
-    field.options[field.length] = new Option(username, uid);
+    $.get('/logger/remove/user/' + uid);
+
+    //IE makes it necessary to use an auxiliary array
+    var sorted = new Array(field.length + 1);
+    for(var s = 0; s < field.length; s++){
+      sorted[s] = field.options[s];
+    }
+    sorted[s] = new Option(username, uid);
 
     Array.prototype.sort.call(
-      field.options,
+      sorted,
       function (option1, option2) {
         var text1 = option1.text.toLowerCase();
         var text2 = option2.text.toLowerCase();
@@ -135,7 +142,10 @@ function removePowerSeries(uid, i, username) {
       }
     );
 
-    $.get('/logger/remove/user/' + uid);
+    field.length = 0;
+    for(s = 0; s < sorted.length; s++){
+      field.options[s] = sorted[s];
+    }
   }
 }
 
