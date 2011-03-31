@@ -65,9 +65,9 @@ function hideZero(value) {
   return value == 0 ? "" : value.toFixed(2);
 }
 
-function updateControlForm(chart) {
+function updatePowerChartForm(chart) {
 
-  var form = document.getElementById('logger-control-form');
+  var form = document.getElementById('logger-powerchart-form');
 
   if (form) {
     var yvalue1 = Math.round(chart.yAxisRange(0)[0]);
@@ -96,14 +96,20 @@ function updateControlForm(chart) {
   updatePowerLegend(chart);
 }
 
-function submitControlForm(resetY) {
+function submitPowerChartForm(resetY) {
 
-  var form = document.getElementById('logger-control-form');
+  var form = document.getElementById('logger-powerchart-form');
   
   if (resetY) {
     form.elements['yvalue1'].value = '';
     form.elements['yvalue2'].value = '';
   }
+  form.submit();
+}
+
+function submitEnergyChartForm() {
+
+  var form = document.getElementById('logger-energychart-form');
   form.submit();
 }
 
@@ -115,7 +121,7 @@ function removePowerSeries(uid, i, username) {
   powerChart.setVisibility(i, false);
   sliderChart.setVisibility(i, false);
 
-  var form = document.getElementById('logger-control-form');
+  var form = document.getElementById('logger-powerchart-form');
   var field = form.elements['new_user'];
   var found = false;
 
@@ -171,13 +177,13 @@ function updatePowerChart(xvalue1, xvalue2, yvalues) {
   powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: null});
 
-  updateControlForm(powerChart);
+  updatePowerChartForm(powerChart);
 }
 
 function updateSliderChart(xvalue1, xvalue2, yvalues) {
 
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
-  updateControlForm(powerChart);
+  updatePowerChartForm(powerChart);
 }
 
 function slidePowerChart(event, center) {
@@ -192,7 +198,7 @@ function slidePowerChart(event, center) {
   powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
 
-  updateControlForm(powerChart);
+  updatePowerChartForm(powerChart);
 }
 
 function highlightPowerChart(canvas, area, sliderChart) {
