@@ -326,23 +326,26 @@ function removePowerAnnotation(chart, text) {
   }
 }
 
-function createBarChart(id, values, names, colors, dataLabels, stacked) {
+function createBarChart(id, series, names, colors, dataLabels, stacked) {
 
-  var xticks = [names.length];
+  var numTicks = names.length;
+  var barWidth = stacked ? 0.5 : (1 / (series.length + 1));
 
-  for (var i = 0; i < names.length; i++) {
+  var xticks = [numTicks];
+  for (var i = 0; i < numTicks; i++) {
     xticks[i] = [i, names[i]];
   }
 
-  var data = [values.length];
+  var data = [series.length];
 
-  for (var v = 0; v < values.length; v++) {
-    var series = [names.length];
+  for (var s = 0; s < series.length; s++) {
+    var values = [numTicks];
 
-    for (i = 0; i < names.length; i++) {
-      series[i] = [i, values[v][i]];
+    for (var v = 0; v < numTicks; v++) {
+      var xpos = stacked ? v : v + barWidth * s;
+      values[v] = [xpos, series[s][v]];
     }
-    data[v] = {data: series};
+    data[s] = {data: values};
   }
 
   var options = {
@@ -350,15 +353,15 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
     series: {
       bars: {
         show: true,
-        barWidth: 0.5,
+        barWidth: barWidth,
         lineWidth: 0,
         fill: 1,
         align: 'center'
       }
     },
     xaxis: {
-      min: -0.5,
-      max: (names.length - 0.5),
+      min: (-1 * barWidth),
+      max: (numTicks - barWidth),
       ticks: xticks
     },
     grid: {
@@ -367,6 +370,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   };
 
   options.yaxis = {
+    autoscaleMargin: 0.05,
     tickFormatter: function (value, axis) {
       return stacked ? value.toFixed(0) + ' %' : value.toFixed(2);
     }
@@ -383,7 +387,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
 
   chart.plot = function() {
     var plot = $.plot($('#' + id), data, options);
-    showBarDataLabels(plot, stacked, dataLabels);
+    showBarDataLabels(plot, stacked, dataLabels, barWidth);
   };
 
   chart.plot();
@@ -391,7 +395,7 @@ function createBarChart(id, values, names, colors, dataLabels, stacked) {
   return chart;
 }
 
-function showBarDataLabels(plot, stacked, dataLabels) {
+function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
 
   var series = plot.getData();
   var offset = plot.pointOffset({x: 0, y: 0});
@@ -417,28 +421,30 @@ function showBarDataLabels(plot, stacked, dataLabels) {
         }
 
         var x = point[0];
+        var v = Math.round(x - (stacked ? 0 : barWidth * d));
+
         offset = plot.pointOffset({x: x, y: y});
         var barHeight = floor - offset.top;
 
         //If the data labels are too close
-        var top = offset.top - extraOffset[x];
+        var top = offset.top - extraOffset[v];
         if (barHeight < labelHeight) {
           top += barHeight - labelHeight;
         }
 
         if (stacked) {
-          extraOffset[x] += barHeight;
+          extraOffset[v] += barHeight;
         }
 
-	var value = dataLabels[d][x];
-	var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
+        var value = dataLabels[d][v];
+        var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
         value = value.toFixed(precision);
 
         if (value == 0) {
           value += '...';
         }
 
-        var div = '<div style="font-size: 10px; font-weight: bold; width: 50px; height: ' +
+        var div = '<div style="font-size: 9px; font-weight: bold; width: 50px; height: ' +
             labelHeight + 'px; text-align: center;">' + value + '</div>';
 
         var options = {
