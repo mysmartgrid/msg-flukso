@@ -1238,29 +1238,28 @@ function _logger_series_color($chart_id, $i, $color) {
 function _logger_get_series_colors($chart_id) {
 
   $palettes['power'] = array(
-    '#4D7060', //GREEN4
     '#0000FC', //BLUE
     '#C11700', //RED
-    '#F37E2B', //ORANGE
+    '#4D7060', //GREEN4
     '#B54FC6', //PINK
+    '#F37E2B', //ORANGE
     '#809090', //GREY
     '#665C00', //BROWN
     '#050305', //BLACK
     '#0080FF', //SKYBLUE
     '#00FF00', //GREEN2
+    '#DED00F', //BROWN2
+    '#377037', //GREEN
+    '#F27D79', //PINK2
     '#00ffff', //CYAN
     '#FBEB0D', //YELLOW
-    '#DED00F', //BROWN2
     '#C0C0C0', //GRAY2
-    '#377037'  //GREEN
-  );
-  $palettes['energy'] = $palettes['power'];
-  $palettes['overview'] = $palettes['power'];
-  $palettes['relative'] = array(
-    '#4D7060', //GREEN4
     '#BFD9D3', //GREEN5
-    '#C0C0C0'  //GRAY2
+    '#4D7060'  //GREEN4
   );
+  $palettes['energy'] = array_reverse($palettes['power']);
+  $palettes['overview'] = $palettes['power'];
+  $palettes['relative'] = $palettes['energy'];
 
   function _get_color($palette, $chart_id, $i) {
 
@@ -1370,7 +1369,7 @@ function logger_energychart_form(&$form_state, $chart) {
   $form['aggregate_sensors'] = array(
     '#type'           => 'checkbox',
     '#title'          => t('Aggregate Sensors'),
-    '#description'    => t('Aggregate user sensors in a single bar?'),
+    '#description'    => t('Do you want to sum up all sensors?'),
     '#default_value'  => _logger_get_aggregate_sensors(),
     '#return_value'   => 1,
     '#required'       => TRUE,

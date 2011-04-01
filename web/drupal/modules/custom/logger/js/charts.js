@@ -330,10 +330,12 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
 
   var numTicks = names.length;
   var barWidth = stacked ? 0.5 : (1 / (series.length + 1));
+  var xpos;
 
   var xticks = [numTicks];
   for (var i = 0; i < numTicks; i++) {
-    xticks[i] = [i, names[i]];
+    xpos = i + (stacked ? 0 : Math.floor((series.length - 1) / 2) * barWidth);
+    xticks[i] = [xpos, names[i]];
   }
 
   var data = [series.length];
@@ -342,7 +344,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
     var values = [numTicks];
 
     for (var v = 0; v < numTicks; v++) {
-      var xpos = stacked ? v : v + barWidth * s;
+      xpos = v + (stacked ? 0 : barWidth * s);
       values[v] = [xpos, series[s][v]];
     }
     data[s] = {data: values};
@@ -444,7 +446,9 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
           value += '...';
         }
 
-        var div = '<div style="font-size: 9px; font-weight: bold; width: 50px; height: ' +
+        var fontSize = barWidth > 0.4 ? 10 : barWidth > 0.3 ? 9 : 8;
+
+        var div = '<div style="font-size: ' + fontSize + 'px; font-weight: bold; width: 50px; height: ' +
             labelHeight + 'px; text-align: center;">' + value + '</div>';
 
         var options = {
