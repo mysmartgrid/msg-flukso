@@ -1368,7 +1368,7 @@ function logger_energychart_form(&$form_state, $chart) {
 
   $form['aggregate_sensors'] = array(
     '#type'           => 'checkbox',
-    '#title'          => t('Aggregate Sensors'),
+    '#title'          => t('Sum of sensor readings'),
     '#description'    => t('Do you want to sum up all sensors?'),
     '#default_value'  => _logger_get_aggregate_sensors(),
     '#return_value'   => 1,

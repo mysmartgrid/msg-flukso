@@ -2795,6 +2795,9 @@ fieldset.collapsible {
   margin: 15px 20px 10px 0;
 }
 
+.form-item label.option {
+  white-space: nowrap;
+}
 
 .node-blogpost {
   padding-bottom: 1em;
