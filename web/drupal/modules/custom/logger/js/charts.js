@@ -113,6 +113,18 @@ function submitEnergyChartForm() {
   form.submit();
 }
 
+function submitRelativeChartForm(clickedField) {
+
+  var form = document.getElementById('logger-relativechart-form');
+  for(var i = 0; i < form.elements.length; i++) {
+    if (form.elements[i].name.indexOf('selected_meters', 0) == 0 && form.elements[i].checked) {
+      form.submit();
+      return;
+    }
+  }
+  clickedField.checked = true;
+}
+
 function removePowerSeries(uid, i, username) {
 
   var table = document.getElementById('logger-legend-table');
