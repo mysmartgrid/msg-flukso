@@ -385,11 +385,17 @@ function _logger_relative_energy_consumption_page() {
 
   $all_sensors = _logger_get_user_sensors($type);
   $meters =  _logger_get_selected_meters();
+  $all_meters = array();
   $sensors = array();
   foreach($all_sensors as $sensor) {
+    $all_meters[] = $sensor->meter;
     if ($meters[$sensor->meter]) {
       $sensors[] = $sensor;
     }
+  }
+  if (empty($sensors)) {
+    $sensors = $all_sensors;
+    _logger_set_selected_meters($all_meters);
   }
 
   $chart = _logger_create_chart_object('relative', $type, 'year', 'kWh', TRUE, $sensors);
