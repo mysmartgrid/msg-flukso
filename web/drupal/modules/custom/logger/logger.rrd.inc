@@ -26,7 +26,6 @@
 //drupal_get_path does not work, because xmlrpc.php is called from xmlrpc.php.
 define('ROOT_PATH',  'sites/all/modules/logger');
 define('RRDTOOL',    ROOT_PATH . '/rrdtool');
-define('DATA_PATH',  ROOT_PATH . '/data');
 
 define('SECOND', 1);
 define('MINUTE', 60);
@@ -67,36 +66,18 @@ function logger_get_storage_periods() {
 }
 
 /**
- * Creates an RRD for storing sensors' night measurements in daily resolution.
- *
- * @param $meter  The sensor's id.
- * @return the creation command execution code.
- */
-function logger_rrd_night_create($meter) {
-
-  $step = 24 * HOUR;
-  $archives = array(
-    //resolution    storage period
-    1 * DAY    =>  2 * MONTH,
-    1 * WEEK   => 10 * YEAR);
-
-  return _logger_rrd_create($meter, $step, 'GAUGE', $archives, 'night');
-}
-
-/**
  * Creates an RRD for storing sensors' measurements.
  *
  * @param $meter     The sensor's id.
  * @param $step      The base interval in seconds with which data will be fed into the RRD.
  * @param $ds_type   The RRD DS type.
  * @param $archives  An array of RRD archives' properties formatted as (resolution => storage period).
- * @param $subdir    The subdirectory where the rrd file should be placed. (NULL means the default location)
  * @return the creation command execution code.
  */
-function _logger_rrd_create($meter, $step, $ds_type, $archives, $subdir) {
+function _logger_rrd_create($meter, $step, $ds_type, $archives) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter, $subdir);
+  $file_path = _logger_rrd_file($meter);
   $start = 1199487600; //Fri, 04 Jan 2008 23:00:00 GMT
 
   $ds = _logger_rrd_meter_ds($ds_type);
@@ -151,43 +132,16 @@ function _logger_rrd_rras($step, $archives) {
 }
 
 /**
- * Feeds the sensors' RRDs with night consumption.
- *
- * @param $meter  The sensor's id.
- * @param $start  The night period start time.
- * @param $end    The night period end time.
- * @return the update command execution code.
- */
-function logger_rrd_night_update($meter, $start, $end) {
-
-  $file_path = _logger_rrd_file($meter);
-  $resolution = 15 * MINUTE;
-
-  $command = RRDTOOL . " fetch $file_path " .
-    "AVERAGE " .
-    "--resolution $resolution " .
-    "--start $start " .
-    "--end $end " .
-
-    "| tail -n 12 | awk -F': ' '{SUM += $2} END {print SUM/12}'";
-
-  $value = (float) shell_exec($command);
-
-  return logger_rrd_update($meter, array($end => $value), 'night');
-}
-
-/**
  * Feeds the sensors' RRDs with measurements.
  *
  * @param $meter   The sensor's id.
  * @param $values  An array of measurements formatted as (timestamp => value).
- * @param $subdir  The subdirectory where the rrd file is placed.
  * @return the update command execution code.
  */
-function logger_rrd_update($meter, $values, $subdir = NULL) {
+function logger_rrd_update($meter, $values) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter, $subdir);
+  $file_path = _logger_rrd_file($meter);
 
   $command = RRDTOOL . " update $file_path ";
 
@@ -232,7 +186,7 @@ function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $s
  */
 function _logger_rrd_latest_timestamp($interval, $sensor) {
 
-  $file_path = _logger_rrd_file($sensor->meter, $interval);
+  $file_path = _logger_rrd_file($sensor->meter);
 
   $command = RRDTOOL . " last $file_path";
   exec($command, $lines);
@@ -329,7 +283,7 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
     return null;
   }
 
-  $file_path = _logger_rrd_file($sensor->meter, $interval);
+  $file_path = _logger_rrd_file($sensor->meter);
 
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
     "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
@@ -337,15 +291,13 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
 /**
  * Composes RRD file path.
- *
+ * 
  * @param $meter     The sensor id.
- * @param $interval  The time interval.
  * @return the RRD file path.
  */
-function _logger_rrd_file($meter, $interval) {
+function _logger_rrd_file($meter) {
 
-  $path = DATA_PATH . ($interval == 'night'? '/night' : '/base');
-  return "$path/$meter.rrd";
+  return ROOT_PATH . "/data/base/$meter.rrd";
 }
 
 /**

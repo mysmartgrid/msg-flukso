@@ -82,7 +82,7 @@ function _logger_measurement_add($logs) {
   foreach ($logs as $meter => $measurements) {
 
     //load the normalisation factor, relative to 1pulse = 1Wh
-    $sql = "SELECT uid, night, factor FROM {logger_meters} WHERE meter = '%s'";
+    $sql = "SELECT uid, factor FROM {logger_meters} WHERE meter = '%s'";
     $meterdata = db_fetch_object(db_query($sql, $meter));
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
@@ -107,30 +107,10 @@ function _logger_measurement_add($logs) {
       $return = logger_rrd_update($meter, $values);
 
       if ($return == 0) {
-          watchdog_xmlrpc('logger.measurementAdd', 'successful update for base rrd: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
+        watchdog_xmlrpc('logger.measurementAdd', 'successful update for base rrd: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
 
-        // update the night rrd every day at 6AM local time
-        if (time() > $meterdata->night) {
-
-          $midnight = _logger_midnight(time(), $auth['device']);
-          $start = $midnight + 7200; // 2AM local time
-          $end = $start + 10800; // 3h time interval
-
-          $return = logger_rrd_night_update($meter, $start, $end);
-
-          if ($return == 0) {
-            watchdog_xmlrpc('logger.measurementAdd', 'successful update for night rrd: %meter | midnight = %midnight', array('%meter' => $meter, '%midnight' => $midnight), WATCHDOG_NOTICE);
-
-          } else {
-            watchdog_xmlrpc('logger.measurementAdd', 'error updating night rrd: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
-          }
-          
-          //add an offset of 30h = 6AM local time
-          $meterdata->night = $midnight + 108000;
-        }
-
-        $sql = "UPDATE {logger_meters} SET access = %d, night = %d, value = %d WHERE meter = '%s'";
-        db_query($sql, time(), $meterdata->night, $value, $meter);//Gets the latest value stored in $value
+        $sql = "UPDATE {logger_meters} SET access = %d, value = %d WHERE meter = '%s'";
+        db_query($sql, time(), $value, $meter);//Gets the latest value stored in $value
         //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
       } else {
@@ -152,29 +132,4 @@ function _logger_update_meter_integrity($meter, $corruption_time) {
 
   $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
   db_query($sql, $corruption_time, $meter);
-}
-
-/**
- * Calculates the most recent midnight for this device based on the user's timezone
- */
-function _logger_midnight($timestamp, $device) {
-
-  $timezone = db_result(db_query("
-    SELECT
-      u.timezone
-    FROM
-      {logger_devices} ld
-      INNER JOIN {users} u ON ld.uid = u.uid
-    WHERE
-      ld.device = '%s'", $device));
-
-  // add one day to make sure $midnight > $timestamp
-  $midnight = floor($timestamp/86400 + 1)*86400 - $timezone;
-
-  // search for first $midnight < $timestamp
-  while ($midnight > $timestamp) {
-    $midnight -= 86400;
-  }
-
-  return $midnight;
 }

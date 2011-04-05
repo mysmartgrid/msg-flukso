@@ -152,13 +152,6 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '10',
       ),
-      'night' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '10',
-      ),
       'corrupted' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -274,6 +267,19 @@ function logger_update_6002() {
       $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
       $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_smooting_level%'");
       $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_step_plot%'");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6003() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN night");
       break;
     case 'pgsql':
       break;

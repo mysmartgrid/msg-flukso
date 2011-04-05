@@ -142,13 +142,6 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
         drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
       }
 
-      // create the meter night rrd
-      $return = logger_rrd_night_create($meter);
-
-      if (!($return == 0)) {
-        drush_set_error('LOGGER_CREATE_RRD_NIGHT_ERROR', dt('Error creating the night @meter rrd.', array('@meter' => $meter)));
-      }
-
       if (!drush_get_error()) {
         drush_log(dt('Successfully created the meter: @meter with token: @token', array('@meter' => $meter, '@token' => $token)), 'ok');
         $pipe[] .= 'SENSOR'.$i.'='.$meter;
