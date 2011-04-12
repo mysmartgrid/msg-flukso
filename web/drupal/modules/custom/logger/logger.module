@@ -63,7 +63,14 @@ function logger_init() {
 }
 
 function logger_perm() {
-  return array('logger', 'register devices');
+  return array(
+    'view logger charts',
+    'set user preferences',
+    'list devices',
+    'manage devices',
+    'list sensors',
+    'manage sensors'
+  );
 }
 
 function logger_menu() {
@@ -94,7 +101,7 @@ function logger_menu() {
     'title'            => 'Your energy consumption',
     'description'      => 'Show the energy consumption page',
     'page callback'    => '_logger_energy_page',
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -102,7 +109,7 @@ function logger_menu() {
     'title'            => 'Relative',
     'description'      => 'Show the relative energy consumption page',
     'page callback'    => '_logger_relative_energy_consumption_page',
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -111,7 +118,7 @@ function logger_menu() {
     'description'      => 'Show the power consumption page',
     'page callback'    => '_logger_power_page',
     'page arguments'   => array(1, 2),
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -119,7 +126,7 @@ function logger_menu() {
     'title'            => 'Changes the series color',
     'page callback'    => '_logger_series_color',
     'page arguments'   => array(2, 3, 4),
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -127,7 +134,7 @@ function logger_menu() {
     'title'            => 'Changes the chart smoothing level',
     'page callback'    => '_logger_set_smoothing_level',
     'page arguments'   => array(2),
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -135,7 +142,7 @@ function logger_menu() {
     'title'            => 'Removes a chart series',
     'page callback'    => '_logger_remove_user',
     'page arguments'   => array(3),
-    'access callback'  => TRUE,
+    'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
 
@@ -155,7 +162,7 @@ function logger_menu() {
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('_logger_account_devices'),
     'access callback'  => '_logger_account_access',
-    'access arguments' => array('register devices', 1),
+    'access arguments' => array('list devices', 1),
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
     'weight'           => 3,
@@ -166,7 +173,7 @@ function logger_menu() {
     'page callback'    => '_logger_device_deactivate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_device_access',
-    'access arguments' => array('logger', 2),
+    'access arguments' => array('manage devices', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
   );
@@ -178,7 +185,7 @@ function logger_menu() {
     'title'            => 'Sensors',
     'page callback'    => '_logger_account_sensors',
     'access callback'  => '_logger_account_access',
-    'access arguments' => array('logger', 1),
+    'access arguments' => array('list sensors', 1),
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
     'weight'           => 3,
@@ -189,7 +196,7 @@ function logger_menu() {
     'page callback'    => '_logger_sensor_edit',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
+    'access arguments' => array('manage sensors', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
   );
@@ -199,7 +206,7 @@ function logger_menu() {
     'page callback'    => '_logger_sensor_deactivate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
+    'access arguments' => array('manage sensors', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
   );
@@ -209,7 +216,7 @@ function logger_menu() {
     'page callback'    => '_logger_sensor_activate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
-    'access arguments' => array('logger', 2),
+    'access arguments' => array('manage sensors', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
   );
@@ -229,7 +236,7 @@ function logger_menu() {
     'title'            => 'Privacy',
     'page callback'    => '_logger_account_privacy',
     'access callback'  => '_logger_account_access',
-    'access arguments' => array('logger', 1),
+    'access arguments' => array('set user preferences', 1),
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
     'weight'           => 2,
@@ -247,7 +254,7 @@ function logger_menu() {
  */
 function _logger_home_page($type, $interval) {
 
-  if (user_access('logger')) {
+  if (user_access('view logger charts')) {
     return _logger_energy_page();
 
   } else {
@@ -849,7 +856,7 @@ function _logger_get_subscribed_sensors($type) {
   global $user;
   $sensors = array();
 
-  if (user_access('logger')) {
+  if (user_access('view logger charts')) {
 
     $sql = "
       SELECT

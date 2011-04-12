@@ -55,6 +55,10 @@ function _logger_account_devices() {
 
 function _logger_account_devices_validate($form, &$form_state) {
 
+  if (!user_access('manage devices')) {
+    form_set_error('', t('Operation not allowed.'));
+  }
+
   $code = $form_state['values']['code'];
   if (strlen($code) == 10) {
 
@@ -92,11 +96,12 @@ function _logger_account_devices_submit($form, &$form_state) {
     db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
   }
 
+  $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (!user_access('logger')) {
+  if (empty($user->roles[$rid])) {
 
-    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
 
     db_query("INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)", $user->uid, $rid);
     db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $user->uid, 0);
