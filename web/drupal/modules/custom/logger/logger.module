@@ -29,6 +29,9 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('YEAR',   52 * WEEK);
 
+define('CONSUMPTION_SENSOR_TYPE', 1);
+define('PRODUCTION_SENSOR_TYPE',  2);
+
 define('ROOT_PATH',  drupal_get_path('module', 'logger'));
 define('CHART_HEIGHT', 350);
 define('SLIDER_HEIGHT', 50);
@@ -271,7 +274,7 @@ function _logger_home_page($type, $interval) {
  */
 function _logger_power_page($type, $interval) {
 
-  $type = $type ? $type : 'electricity';
+  $type = $type ? $type : CONSUMPTION_SENSOR_TYPE;
   $interval = $interval ? $interval : 'hour';
 
   drupal_set_title(t('Your power consumption'));
@@ -303,7 +306,7 @@ function _logger_power_page($type, $interval) {
  */
 function _logger_overview_page($type, $interval) {
 
-  $type = $type ? $type : 'electricity';
+  $type = $type ? $type : CONSUMPTION_SENSOR_TYPE;
   $interval = $interval ? $interval : 'hour';
 
   drupal_set_title(t('Overall View'));
@@ -382,7 +385,7 @@ function _logger_overview_page($type, $interval) {
  */
 function _logger_relative_energy_consumption_page() {
 
-  $type = 'electricity';
+  $type = CONSUMPTION_SENSOR_TYPE;
   
   drupal_set_title(t('Your relative energy consumption'));
 
@@ -424,10 +427,10 @@ function _logger_energy_page() {
   $now = time();
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
-  $sensors = _logger_get_user_sensors('electricity');
+  $sensors = _logger_get_user_sensors(CONSUMPTION_SENSOR_TYPE);
   $aggregate_sensors = _logger_get_aggregate_sensors();
 
-  $chart = _logger_create_chart_object('energy', 'electricity', 'week', 'kWh', FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors);
+  $chart = _logger_create_chart_object('energy', CONSUMPTION_SENSOR_TYPE, 'week', 'kWh', FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors);
   $consumed = number_format($chart->data['last'], 2, '.', '');
 
   drupal_set_title(t('Your energy consumption'));
@@ -830,7 +833,7 @@ function _logger_get_user_sensors($type) {
       INNER JOIN {logger_users} lu ON lm.uid = lu.uid
     WHERE
       lm.uid = %d AND
-      lm.type = '%s' AND
+      lm.type = %d AND
       lm.function IS NOT NULL
     ORDER BY
       lm.function";
@@ -875,7 +878,7 @@ function _logger_get_subscribed_sensors($type) {
       WHERE
         ur.requester_id = %d AND
         urt.name = '%s' AND
-        lm.type = '%s' AND
+        lm.type = %d AND
         lm.function IS NOT NULL
       ORDER BY
         ur.rid";
@@ -904,7 +907,7 @@ function _logger_get_active_sensors($type) {
       {logger_meters} lm
     WHERE
       lm.uid > 0 AND
-      lm.type = '%s' AND
+      lm.type = %d AND
       lm.function IS NOT NULL";
 
   $result = db_query($sql, $type);
@@ -1178,7 +1181,7 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
  */
 function _logger_create_interval_menu($context) {
 
-  $path = "$context/electricity";
+  $path = "$context/" . CONSUMPTION_SENSOR_TYPE;
 
   $items = array(
     l(t('Hour'),   "$path/hour"),

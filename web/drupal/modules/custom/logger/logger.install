@@ -10,7 +10,6 @@ function logger_schema() {
         'not null' => TRUE,
       ),
       'serial' => array(
-        'description' => t('TODO: please describe this field!'),
         'type' => 'int',
         'unsigned' => TRUE,
         'size' => 'big',
@@ -117,6 +116,25 @@ function logger_schema() {
     'primary key' => array('device'),
   );
 
+  $schema['logger_meter_type'] = array(
+    'description' => t('Stores the meter types.'),
+    'fields' => array(
+      'id' => array(
+        'type'      => 'int',
+        'not null'  => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length'   => '30',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'id'
+    ),
+  );
+
   $schema['logger_meters'] = array(
     'description' => t("Contains the Fluksometer meter ID's."),
     'fields' => array(
@@ -160,10 +178,11 @@ function logger_schema() {
         'disp-width' => '10',
       ),
       'type' => array(
-        'type' => 'varchar',
-        'length' => '16',
-        'not null' => TRUE,
-        'default' => 'electricity',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => 1,
+        'disp-width' => '10',
       ),
       'function' => array(
         'type' => 'varchar',
@@ -200,7 +219,13 @@ function logger_schema() {
 
 function logger_install() {
   drupal_install_schema('logger');
-  drupal_set_message(t('Created logger module tables {logger_devices} and {logger_meters}.'));
+  drupal_set_message(t('Created logger module tables.'));
+
+  $sql = "INSERT INTO {logger_meter_type} (id, name) VALUES (1, 'Consumption')";
+  db_query($sql);
+
+  $sql = "INSERT INTO {logger_meter_type} (id, name) VALUES (2, 'Production')";
+  db_query($sql);
 }
 
 function logger_uninstall() {
@@ -280,6 +305,28 @@ function logger_update_6003() {
     case 'mysql':
     case 'mysqli':
       $items[] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN night");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6009() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[0]  = update_sql("CREATE TABLE {logger_meter_type}(id int unsigned NOT NULL, name varchar(30) NOT NULL, PRIMARY KEY (id))");
+      $items[1] = update_sql("INSERT INTO {logger_meter_type} (id, name) VALUES (1, 'Electricity Consumption')");
+      $items[2] = update_sql("INSERT INTO {logger_meter_type} (id, name) VALUES (2, 'Electricity Production')");
+
+      $items[3] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN old_type varchar(16)");
+      $items[4] = update_sql("UPDATE {logger_meters} SET old_type = type");
+      $items[5] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN type");
+      $items[6] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN type int unsigned default 1 AFTER corrupted");
+      $items[7] = update_sql("UPDATE {logger_meters} SET type = NULL WHERE old_type IS NULL");
+      $items[8] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN old_type");
       break;
     case 'pgsql':
       break;

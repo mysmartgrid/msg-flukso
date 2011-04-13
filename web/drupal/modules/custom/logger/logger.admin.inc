@@ -318,14 +318,12 @@ function _logger_sensor_edit($meter) {
 
   $sensor = _get_sensor($meter);
 
-  $output .= drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
-  return $output;
+  return drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
 }
 
 function _logger_sensor_activate($meter) {
 
-  $output .= drupal_get_form('logger_sensor_form', $meter, 'electricity', 'main');
-  return $output;
+  return drupal_get_form('logger_sensor_form', $meter, CONSUMPTION_SENSOR_TYPE, 'main');
 }
 
 function logger_sensor_form(&$form_state, $meter, $type, $function) {
@@ -341,12 +339,11 @@ function logger_sensor_form(&$form_state, $meter, $type, $function) {
   );
 
   $form['type'] = array(
-    '#type'          => 'textfield',
+    '#type'          => 'select',
     '#description'   => t('The sensor type.'),
-    '#maxlength'     => 16,
-    '#size'          => 16,
-    '#required'      => TRUE,
+    '#options'       => _logger_get_sensor_types_options(),
     '#default_value' => $type,
+    '#required'      => TRUE,
     '#attributes'    => array('readonly' => 'readonly')
   );
 
@@ -365,6 +362,18 @@ function logger_sensor_form(&$form_state, $meter, $type, $function) {
   );
 
   return $form;
+}
+
+function _logger_get_sensor_types_options() {
+
+  $sql = "SELECT id, name FROM {logger_meter_type} ORDER BY id";
+  $result = db_query($sql);
+
+  $options = array();
+  while ($type = db_fetch_object($result)) {
+    $options[$type->id] = t($type->name);
+  }
+  return $options;
 }
 
 function logger_sensor_form_validate($form, &$form_state) {
@@ -392,7 +401,7 @@ function logger_sensor_form_submit($form, &$form_state) {
       {logger_meters}
     SET
       function = '%s',
-      type = '%s'
+      type = %d
     WHERE
       meter = '%s'";
 

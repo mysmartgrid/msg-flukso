@@ -1187,9 +1187,9 @@ function _notification_send_peak_consumption_emails($now) {
       n.unit_id = un.id AND
       %d > (n.last_sent + n.min_interval) AND
       m.device = d.device AND
-      m.type = '%s'";
+      m.type = %d";
 
-  $args = array(PEAK_CONSUMPTION_EVENT_ID, $now, 'electricity');
+  $args = array(PEAK_CONSUMPTION_EVENT_ID, $now, CONSUMPTION_SENSOR_TYPE);
 
   $notifiables = array();
   foreach (_notification_query_notifiables($sql, $args) as $notifiable) {

@@ -55,8 +55,8 @@ function logger_drush_command() {
       'meter'     => 'Meter ID.',
       'type'      => 'Meter type.',
       'function'  => 'Meter function.',
-      'phase'     => 'Meter phase. Only applicable in case of type = electricity.',
-      'constant'  => 'Meter constant. Only applicable in case of type = electricity.',
+      'phase'     => 'Meter phase.',
+      'constant'  => 'Meter constant.',
       'unit'      => 'Meter unit.',
     ),
     'options'     => array(
