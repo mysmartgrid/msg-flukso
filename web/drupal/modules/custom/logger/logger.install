@@ -333,3 +333,16 @@ function logger_update_6009() {
   }
   return $items;
 }
+
+function logger_update_6010() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("UPDATE {logger_meters} SET function = NULL WHERE function = ''");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}

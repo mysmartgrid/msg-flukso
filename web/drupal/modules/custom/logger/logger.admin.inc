@@ -93,7 +93,9 @@ function _logger_account_devices_submit($form, &$form_state) {
       $i++;
     }
 
-    db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+    if ($function) {
+      db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+    }
   }
 
   $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
@@ -428,19 +430,22 @@ function _get_sensor($meter) {
 function _logger_function_name_validate($function, $meter) {
 
   global $user;
+  $count = 0;
 
-  $sql = "
-    SELECT
-      count(*)
-    FROM
-      {logger_meters} m
-    WHERE
-      m.function = '%s' AND
-      m.uid = %d AND
-      m.meter <> '%s'";
+  if ($function) {
 
-  $count = db_result(db_query($sql, $function, $user->uid, $meter));
+    $sql = "
+      SELECT
+        count(*)
+      FROM
+        {logger_meters} m
+      WHERE
+        m.function = '%s' AND
+        m.uid = %d AND
+        m.meter <> '%s'";
 
+    $count = db_result(db_query($sql, $function, $user->uid, $meter));
+  }
   return $count == 0;
 }
 
