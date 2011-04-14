@@ -71,7 +71,7 @@ function logger_perm() {
     'view logger charts',
     'set user preferences',
     'list devices',
-    'manage devices',
+    'deactivate devices',
     'list sensors',
     'manage sensors'
   );
@@ -177,7 +177,7 @@ function logger_menu() {
     'page callback'    => '_logger_device_deactivate',
     'page arguments'   => array(2),
     'access callback'  => '_logger_device_access',
-    'access arguments' => array('manage devices', 2),
+    'access arguments' => array('deactivate devices', 2),
     'type'             => MENU_CALLBACK,
     'file'             => 'logger.admin.inc'
   );

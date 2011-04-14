@@ -55,15 +55,11 @@ function _logger_account_devices() {
 
 function _logger_account_devices_validate($form, &$form_state) {
 
-  if (!user_access('manage devices')) {
-    form_set_error('', t('Operation not allowed.'));
-  }
-
   $code = $form_state['values']['code'];
   if (strlen($code) == 10) {
 
     $count = db_result(db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE '%s%' AND uid = %d", $code, 0));
-    
+
     if ($count != 1) {
       form_set_error('code', t('Please specify a valid activation code.'));
     }
