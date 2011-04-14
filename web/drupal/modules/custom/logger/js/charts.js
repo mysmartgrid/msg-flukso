@@ -179,7 +179,7 @@ function updateSmoothingLevel(fieldId, step) {
   powerChart.updateOptions({rollPeriod: level});
   sliderChart.updateOptions({rollPeriod: level});
 
-  $.get('/logger/smoothinglevel/' + level);
+  $.get('/logger/setvariable/smoothing_level/' + level);
 
   return true;
 }
@@ -492,7 +492,7 @@ function setSeriesColor(chartId, i, color) {
     updateDygraphColor(sliderChart, i, color);
   }
 
-  $.get('/logger/color/' + chartId + '/' + i + '/' + escape(color));
+  $.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
 }
 
 function updateDygraphColor(chart, i, color) {

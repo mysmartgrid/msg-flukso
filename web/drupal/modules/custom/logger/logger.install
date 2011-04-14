@@ -346,3 +346,21 @@ function logger_update_6010() {
   }
   return $items;
 }
+
+function logger_update_6011() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_series_color%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_smooting_level%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_step_plot%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_selected_sensor_types_%'");
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_aggregate_sensors_%'");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
