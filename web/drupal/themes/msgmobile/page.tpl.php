@@ -40,7 +40,7 @@
         <!-- Login Form -->
         <?php
           global $user;
-          if ($left && !($user->uid)) {?> <div id="contentboxes"><?php print $left ?></div>
+          if ($left && !($user->uid)) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
         <?php } ?>
 
         <!-- Text content -->
@@ -58,7 +58,7 @@
             <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
 
             <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
-            <?php if ($messages != ""): ?><div id="message"><?php print $messages ?></div><?php endif; ?>
+            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
 
             <!-- start main content --><?php print($content) ?><!-- end main content -->
           </DIV>
@@ -68,7 +68,7 @@
         <!-- Menu -->
         <?php
           global $user;
-          if ($left && $user->uid) {?> <div id="contentboxes"><?php print $left ?></div>
+          if ($left && $user->uid) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
         <?php } ?>
 
 
