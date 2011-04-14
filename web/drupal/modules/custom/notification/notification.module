@@ -794,7 +794,7 @@ function notification_registration_form_validate($form, &$form_state) {
 }
 
 function notification_edition_form_validate($form, &$form_state) {
-  notification_registration_form_validate($form, &$form_state);
+  notification_registration_form_validate($form, $form_state);
 }
 
 function notification_registration_form_submit($form, &$form_state) {
