@@ -1761,16 +1761,7 @@ function logger_relativechart_form_submit($form, &$form_state) {
  */
 function _logger_set_aggregate_sensors($option) {
 
-  global $user;
-  $id = AGG_SENSORS_ID;
-
-  if ($user) {
-    $id .= $user->uid;
-    variable_set($id, $option);
-
-  } else {
-    setcookie($id, $option, time() + WEEK, '/');
-  }
+  _logger_set_variable(AGG_SENSORS_ID, $option);
 }
 
 /**
@@ -1780,17 +1771,7 @@ function _logger_set_aggregate_sensors($option) {
  */
 function _logger_get_aggregate_sensors() {
 
-  global $user;
-  $id = AGG_SENSORS_ID;
-
-  if ($user) {
-    $id .= $user->uid;
-    $option = variable_get($id, 1);
-
-  } else {
-    $option = isset($_COOKIE[$id])? $_COOKIE[$id] : 1;
-  }
-  return $option;
+  return _logger_get_variable(AGG_SENSORS_ID, 1);
 }
 
 /**
@@ -1800,11 +1781,7 @@ function _logger_get_aggregate_sensors() {
  */
 function _logger_get_selected_sensor_types() {
 
-  global $user;
-  $id = SELECTED_SENSOR_TYPES_ID . $user->uid;
-  $types = variable_get($id, 1);
-
-  return count(array_keys($types)) ? $types : array(CONSUMPTION_SENSOR_TYPE);
+  return _logger_get_variable(SELECTED_SENSOR_TYPES_ID, array(CONSUMPTION_SENSOR_TYPE));//FIXME: remove this comment: count(array_keys($types)) ? $types : ;
 }
 
 /**
@@ -1814,9 +1791,7 @@ function _logger_get_selected_sensor_types() {
  */
 function _logger_set_selected_sensor_types($types) {
 
-  global $user;
-  $id = SELECTED_SENSOR_TYPES_ID . $user->uid;
-  variable_set($id, $types);
+  _logger_set_variable(SELECTED_SENSOR_TYPES_ID, $types);
 }
 
 function logger_get_sensor_types_options() {
@@ -1838,9 +1813,7 @@ function logger_get_sensor_types_options() {
  */
 function _logger_get_selected_meters() {
 
-  global $user;
-  $id = SELECTED_METERS_ID . $user->uid;
-  return variable_get($id, 1);
+  return _logger_get_variable(SELECTED_METERS_ID, 1);
 }
 
 /**
@@ -1850,9 +1823,7 @@ function _logger_get_selected_meters() {
  */
 function _logger_set_selected_meters($meters) {
 
-  global $user;
-  $id = SELECTED_METERS_ID . $user->uid;
-  variable_set($id, $meters);
+  _logger_set_variable(SELECTED_METERS_ID, $meters);
 }
 
 /**
@@ -1893,16 +1864,7 @@ function _logger_get_units_options() {
  */
 function _logger_set_unit($unit) {
 
-  global $user;
-  $id = CHART_UNIT_ID;
-
-  if ($user) {
-    $id .= $user->uid;
-    variable_set($id, $unit);
-
-  } else {
-    setcookie($id, $unit, time() + WEEK, '/');
-  }
+  _logger_set_variable(CHART_UNIT_ID, $unit);
 }
 
 /**
@@ -1912,17 +1874,7 @@ function _logger_set_unit($unit) {
  */
 function _logger_get_unit() {
 
-  global $user;
-  $id = CHART_UNIT_ID;
-
-  if ($user) {
-    $id .= $user->uid;
-    $unit = variable_get($id, 'watt');
-
-  } else {
-    $unit = isset($_COOKIE[$id])? $_COOKIE[$id] : 'watt';
-  }
-  return $unit;
+  return _logger_get_variable(CHART_UNIT_ID, 'watt');
 }
 
 /**
@@ -1932,10 +1884,7 @@ function _logger_get_unit() {
  */
 function _logger_set_smoothing_level($level) {
 
-  global $user;
-  $id = SMOOTHING_LEVEL_ID . $user->uid;
-
-  variable_set($id, $level);
+  _logger_set_variable(SMOOTHING_LEVEL_ID, $level);
 }
 
 /**
@@ -1945,16 +1894,7 @@ function _logger_set_smoothing_level($level) {
  */
 function _logger_get_smoothing_level() {
 
-  global $user;
-
-  if ($user) {
-    $id = SMOOTHING_LEVEL_ID . $user->uid;
-    $level = variable_get($id, 1);
-
-  } else {
-    $level = 1;
-  }
-  return $level;
+  return _logger_get_variable(SMOOTHING_LEVEL_ID, 1);
 }
 
 /**
@@ -1964,16 +1904,7 @@ function _logger_get_smoothing_level() {
  */
 function _logger_get_step_plot() {
 
-  global $user;
-
-  if ($user) {
-    $id = STEP_PLOT_ID . $user->uid;
-    $step_plot = variable_get($id, 0);
-
-  } else {
-    $step_plot = 0;
-  }
-  return $step_plot;
+  return _logger_get_variable(STEP_PLOT_ID, 0);
 }
 
 /**
@@ -1983,10 +1914,7 @@ function _logger_get_step_plot() {
  */
 function _logger_set_step_plot($step_plot) {
 
-  global $user;
-  $id = STEP_PLOT_ID . $user->uid;
-
-  variable_set($id, $step_plot);
+  _logger_set_variable(STEP_PLOT_ID, $step_plot);
 }
 
 /**
@@ -2198,6 +2126,33 @@ function _logger_remove_user($requestee_id) {
       requestee_id = %d";
 
   db_query($sql, $user->uid, $requestee_id);
+}
+
+function _logger_get_variable($id, $default_value) {
+
+  global $user;
+
+  if ($user) {
+    $id .= $user->uid;
+    $value = variable_get($id, $default_value);
+
+  } else {
+    $value = isset($_COOKIE[$id])? $_COOKIE[$id] : $default_value;
+  }
+  return $value;
+}
+
+function _logger_set_variable($id, $value) {
+
+  global $user;
+
+  if ($user) {
+    $id .= $user->uid;
+    variable_set($id, $value);
+
+  } else {
+    setcookie($id, $value, time() + WEEK, '/');
+  }
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
