@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Callbacks for accessing RRDs.
  *
@@ -24,17 +25,7 @@
 //Constants
 //Some constants need to be redefined because this file can be called from xmlrpc.php
 //drupal_get_path does not work, because xmlrpc.php is called from xmlrpc.php.
-define('ROOT_PATH',  'sites/all/modules/logger');
-define('RRDTOOL',    ROOT_PATH . '/rrdtool');
-
-define('SECOND', 1);
-define('MINUTE', 60);
-define('HOUR',   60 * MINUTE);
-define('DAY',    24 * HOUR);
-define('WEEK',    7 * DAY);
-define('MONTH',  30 * DAY);
-define('YEAR',   52 * WEEK);
-
+define('RRDTOOL', LOGGER_PATH . '/rrdtool');
 define('METER', 'meter');
 
 /**
@@ -297,7 +288,7 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
  */
 function _logger_rrd_file($meter) {
 
-  return ROOT_PATH . "/data/base/$meter.rrd";
+  return LOGGER_PATH . "/data/base/$meter.rrd";
 }
 
 /**

@@ -23,39 +23,42 @@
  */
 
 //Constants
+define('SECOND', 1);
 define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
 define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
+define('MONTH',  30 * DAY);
 define('YEAR',   52 * WEEK);
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
 
-define('ROOT_PATH',  drupal_get_path('module', 'logger'));
-define('CHART_HEIGHT', 350);
-define('SLIDER_HEIGHT', 50);
+define('LOGGER_PATH', drupal_get_path('module', 'logger'));
+define('LOGGER_CHART_HEIGHT', 350);
+define('LOGGER_SLIDER_HEIGHT', 50);
+
 
 function logger_init() {
 
-  drupal_add_js(ROOT_PATH . '/js/jscolor/jscolor.js');
-  drupal_add_js(ROOT_PATH . '/js/charts.js');
+  drupal_add_js(LOGGER_PATH . '/js/jscolor/jscolor.js');
+  drupal_add_js(LOGGER_PATH . '/js/charts.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
-    drupal_add_js(ROOT_PATH . '/js/dygraph/excanvas.js');
+    drupal_add_js(LOGGER_PATH . '/js/dygraph/excanvas.js');
   }
 
-  drupal_add_js(ROOT_PATH . '/js/dygraph/strftime-min.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph/rgbcolor.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph-canvas.js');
-  drupal_add_js(ROOT_PATH . '/js/dygraph/dygraph.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/strftime-min.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/rgbcolor.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph-canvas.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph.js');
 
   jquery_ui_add(array('ui.datepicker'));
-  drupal_add_css(ROOT_PATH . '/style/ui.datepicker.css');
+  drupal_add_css(LOGGER_PATH . '/style/ui.datepicker.css');
 
-  drupal_add_js(ROOT_PATH . '/js/flot/jquery.flot.js');
-  drupal_add_js(ROOT_PATH . '/js/flot/jquery.flot.stack.js');
+  drupal_add_js(LOGGER_PATH . '/js/flot/jquery.flot.js');
+  drupal_add_js(LOGGER_PATH . '/js/flot/jquery.flot.stack.js');
 }
 
 function logger_perm() {
@@ -70,8 +73,6 @@ function logger_perm() {
 }
 
 function logger_menu() {
-
-  $items = array();
 
   // Main operations
 
@@ -148,7 +149,7 @@ function logger_menu() {
   $items['user/%user_uid_optional/devices'] = array(
     'title'            => 'Devices',
     'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('_logger_account_devices'),
+    'page arguments'   => array('logger_userdevices_form'),
     'access callback'  => '_logger_account_access',
     'access arguments' => array('list devices', 1),
     'type'             => MENU_LOCAL_TASK,
@@ -171,7 +172,7 @@ function logger_menu() {
 
   $items['user/%user_uid_optional/sensors'] = array(
     'title'            => 'Sensors',
-    'page callback'    => '_logger_account_sensors',
+    'page callback'    => '_logger_user_sensors_page',
     'access callback'  => '_logger_account_access',
     'access arguments' => array('list sensors', 1),
     'type'             => MENU_LOCAL_TASK,
@@ -181,7 +182,7 @@ function logger_menu() {
 
   $items['sensor/edit'] = array(
     'title'            => 'Sensor Edition',
-    'page callback'    => '_logger_sensor_edit',
+    'page callback'    => '_logger_sensor_edition_page',
     'page arguments'   => array(2),
     'access callback'  => '_logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
@@ -201,8 +202,8 @@ function logger_menu() {
 
   $items['sensor/activate'] = array(
     'title'            => $items['sensor/edit']['title'],
-    'page callback'    => '_logger_sensor_activate',
-    'page arguments'   => array(2),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('logger_sensor_form', 2),
     'access callback'  => '_logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
     'type'             => MENU_CALLBACK,
@@ -222,8 +223,9 @@ function logger_menu() {
 
   $items['user/%user_uid_optional/privacy'] = array(
     'title'            => 'Privacy',
-    'page callback'    => '_logger_account_privacy',
-    'access callback'  => '_logger_account_access',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('chumby_form'),
+    'access callback'  => 'logger_userprivacy_form',
     'access arguments' => array('set user preferences', 1),
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
@@ -981,19 +983,19 @@ function logger_theme() {
         'link' => NULL),
     ),
 
-    'logger_account_devices' => array(
+    'logger_userdevices' => array(
       'arguments' => array(
         'form' => NULL),
       'file' => 'logger.admin.inc',
     ),
 
-    'logger_account_devices_list' => array(
+    'logger_userdevices_list' => array(
       'arguments' => array(
         'items' => NULL),
       'file' => 'logger.admin.inc',
     ),
 
-    'logger_account_sensors_list' => array(
+    'logger_usersensors_list' => array(
       'arguments' => array(
         'items' => NULL),
       'file' => 'logger.admin.inc',
@@ -1058,7 +1060,7 @@ function theme_logger_power_chart_area($chart) {
   $yvalue2 = $chart->yaxis[1] + 0;
 
   $chart_properties = array(
-    'height'             => CHART_HEIGHT,
+    'height'             => LOGGER_CHART_HEIGHT,
     'dateWindow'         => "[$xvalue1, $xvalue2]",
     'drawCallback'       => 'updatePowerChartForm',
     'zoomCallback'       => 'updateSliderChart',
@@ -1070,7 +1072,7 @@ function theme_logger_power_chart_area($chart) {
   }
 
   $slider_properties = array(
-    'height'           => SLIDER_HEIGHT,
+    'height'           => LOGGER_SLIDER_HEIGHT,
     'gridLineColor'    => '"transparent"',
     'yValueFormatter'  => 'hideZero',
     'zoomCallback'     => 'updatePowerChart',
@@ -1119,7 +1121,7 @@ function theme_logger_energy_chart_area($chart) {
   $id = $chart->context . 'Chart';
 
   return "
-    <div id='$id' style='width: 640px; height: " . CHART_HEIGHT . "px;'></div>
+    <div id='$id' style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
         [ [ " . implode('], [' , $series)        . " ] ],
@@ -1478,7 +1480,6 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#type'   => 'submit',
     '#value'  => t('Refresh')
   );
-
   return $form;
 }
 
@@ -1867,7 +1868,7 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
   $elapsed_time = $now - $end;
   $max_window = $storage_periods[$resolution] - $elapsed_time;
 
-  $window *= (CHART_HEIGHT / SLIDER_HEIGHT);
+  $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
   $window = $window > $max_window ? $max_window : $window;
 
   $start = $end - $window;
@@ -2050,11 +2051,11 @@ function logger_query_device_measurements($interval, $device, $offset) {
 
   $sql = "SELECT m.meter, m.function FROM {logger_meters} m WHERE m.device = '%s'";
   $sensors = db_query($sql, $device);
-  $measurements = array();
 
   $resolution = _logger_get_resolution($interval);
   $period = _logger_get_period($interval, $resolution);
 
+  $measurements = array();
   while($sensor = db_fetch_object($sensors)) {
 
     $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $offset, $period, $resolution);

@@ -1,0 +1,294 @@
+<?php
+
+/**
+ * This module dumps data from Flukso devices in high resolution
+ * to a sqlite database and provides the possibility to download this data.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
+define('MSGDUMP_DB_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . MSGDUMP_DB_REL_PATH);
+
+
+function msgdump_perm() {
+  return array('data dump');
+}
+
+function msgdump_menu() {
+
+  $items['user/%user_uid_optional/setup'] = array(
+    'title'            => "Dump values",
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('msgdump_setup_form'),
+    'access arguments' => array('data dump'),
+    'type'             => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function msgdump_setup_form(&$form_state) {
+
+  global $user;
+  $newdate = new DateTime('now');
+  $newdate->setTime(0, 0);
+  $newdate->modify('+1 week');
+
+  $sql = 'SELECT serial FROM {logger_devices} WHERE uid = %d';
+  $result = db_query($sql, $user->uid);
+
+  $fluksos = array();
+  while($device = db_fetch_object($result)) {
+    $fluksos[$device->serial] = $device->serial;
+  }
+
+  $sql = 'SELECT file FROM {msgdump} WHERE uid = %d';
+  $result = db_query($sql, $user->uid);
+
+  while($file = db_fetch_object($result)) {
+
+    $form[$file->file] = array(
+      '#type'       => 'submit',
+      '#value'      => 'X',
+      '#name'       => $file->file,
+      '#attributes' => array(
+        'style' => 'background-color: transparent; color:#ff0000;'
+      )
+    );
+  }
+
+  $form['flukso'] = array(
+    '#type'         => 'select',
+    '#options'      => $fluksos,
+    '#title'        => t('Flukso'),
+    '#description'  => t('Flukso to use for recording'),
+  );
+
+  $form['type'] = array(
+    '#type'         => 'hidden',
+    '#value'        => CONSUMPTION_SENSOR_TYPE,
+  );
+
+  $form['from'] = array(
+    '#type'         => 'date',
+    '#title'        => t("From"),
+    '#after_build'  => array('_msgdump_limit_year'),
+    '#description'  => t('The date dumping should start on'),
+  );
+
+  $form['to'] = array(
+    '#type'          => 'date',
+    '#title'         => t("Until"),
+    '#after_build'   => array('_msgdump_limit_year'),
+    '#description'   => t('The date dumping should stop on'),
+    '#default_value' => array(
+      'year'  => $newdate->format("Y"),
+      'month' => $newdate->format("n"),
+      'day'   => $newdate->format("d")),
+  );
+
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t("Submit"),
+  );
+
+  $form['#theme'] = 'magdump_setup';
+
+  return $form;
+}
+
+function msgdump_setup_form_submit($form, &$form_state) {
+
+  global $user;
+
+  if (strcmp($form_state['clicked_button']['#value'], t('Submit')) == 0) {
+
+    $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+    $to = strtotime(implode('-', $form_state['values']['to']) . '23:59');
+    $file = md5(uniqid(rand(), TRUE));
+    $serial = $form_state['values']['flukso'];
+    $type = $form_state['values']['type'];
+
+    $sql = "
+      INSERT INTO
+        {msgdump} (serial, uid, start, stop, file)
+      VALUES
+        ('%s', %d, %d, %d, '%s')";
+
+    $result = db_query($sql, $serial, $user->uid, $from, $to, $file);
+
+    _msgdump_register($file, $serial, $type);
+
+  } else {
+
+    $file = $form_state['clicked_button']['#name'];
+
+    $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
+    db_query($sql, $file);
+
+    exec('rm ' . MSGDUMP_DB_ABS_PATH . '/' . $file . '.*');
+  }
+}
+
+function msgdump_setup_form_validate($form, &$form_state) {
+  
+  global $user;
+
+  if (strcmp($form_state['clicked_button']['#value'], t('Submit')) == 0) {
+
+    $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+    $to = strtotime(implode('-', $form_state['values']['to']) . ' 23:59');
+
+    $now = new DateTime("now");
+    $now->setTime(0,0);
+    $now = $now->format("U");
+
+    if ($now > $from) {
+      form_set_error('from', t('Can\'t record values in the past.'));
+    }
+    
+    if ($from > $to) {
+      form_set_error('to', t('Time to stop has to be after time to start.'));
+    }
+    
+    if (!$from) {
+      form_set_error('from', t('Invalid date.'));
+    }
+    
+    if (!$to) {
+      form_set_error('to', t('Invalid date.'));
+    }
+  }
+}
+
+function _msgdump_register($file, $serial, $type) {
+
+  global $base_url;
+
+  $sql = "
+    SELECT
+      t.token,
+      m.meter
+    FROM
+      {logger_tokens} t
+        LEFT JOIN {logger_meters} m ON t.meter = m.meter
+        LEFT JOIN {logger_devices} d  ON m.device = d.device
+    WHERE
+      d.serial = '%s' AND
+      m.type = %d";
+
+  $values = db_query($sql, $serial, $type);
+
+  while ($value = db_fetch_object($values)) {
+
+    $config = 
+      'DB_FILE: "'       . MSGDUMP_DB_ABS_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
+      'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
+      'ACCESS_TOKEN: "'  . $value->token . '"' . PHP_EOL .
+      'SENSOR_ID: "'     . $value->meter . '"' . PHP_EOL .
+      'BASE_URL: "'      . $base_url . '/sensor' . '"' . PHP_EOL;
+  }
+
+  $out = fopen(MSGDUMP_DB_ABS_PATH . "/$file.flukso4rrc", 'w');
+  fwrite($out, $config);
+  fclose($out);
+
+  exec("flukso_create_db -c " . MSGDUMP_DB_ABS_PATH . "/$file.flukso4rrc");
+}
+
+function _msgdump_limit_year($form_element, $form_values) {
+  
+  $now = date('Y');
+  $form_element['year']['#options'] = drupal_map_assoc(range($now, 2037));
+
+  return $form_element;
+}
+
+function msgdump_theme() {
+
+  return array(
+    'msgdump_setup' => array(
+      'arguments' => array('form' => NULL)
+    ),
+
+    'msgdump_setup_list' => array(
+      'arguments' => array('items' => NULL)
+    ),
+  );
+}
+
+function theme_msgdump_setup($form) {
+
+  global $user;
+  $rows = array();
+
+  $sql = "SELECT * FROM {msgdump} WHERE uid = %d";
+  $result = db_query($sql, $user->uid);
+
+  while ($device = db_fetch_object($result)) {
+
+    $startdate = new DateTime('@' . $device->start);
+    $stopdate = new DateTime('@' . $device->stop);
+
+    $row = array();
+    $row[] = drupal_render($form[$device->file]);
+    $row[] = $device->serial;
+    $row[] = $startdate->format("Y-m-d");
+    $row[] = $stopdate->format("Y-m-d");
+    $row[] = $device->type;
+    $row[] = l(t('Download'), MSGDUMP_DB_REL_PATH . '/' . $device->file . '.sqlite');
+
+    $rows[] = $row;
+  }
+
+  return drupal_render($form) .
+    theme('msgdump_setup_list', $rows);
+}
+
+function theme_msgdump_setup_list($items) {
+
+  $headers = array('',t('Flukso'), t('Startdate'), t('Stopdate'), t('File'));
+  return theme('table', $headers, $items);
+}
+
+function msgdump_cron() {
+
+  $now = new DateTime('now');
+  $now = $now->format('U');
+
+  //get requested dumps from database
+  $sql = "SELECT stop, file FROM {msgdump} WHERE start <= %d";
+  $result = db_query($sql, $now);
+  //watchdog("cron", "[msgdump_cron] Running: " . mysqli_num_rows($result));
+
+  while($data = db_fetch_object($result)) {
+
+    if ($data->stop + 2629743 < $now) {
+      //delete dumps older then 3 months
+      exec("rm " . MSGDUMP_DB_ABS_PATH . "/" . $date->file . ".*");
+
+      $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
+      db_query($sql, $date->file);
+
+    } elseif ($data->stop > $now) {
+      $res = exec("flukso_archive_watts -c " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
+      watchdog("cron", "[msgdump_cron] " . $data->file . ": " . $res);
+
+    } else {
+      watchdog("cron", "[msgdump_cron] Nothing to do for " . $data->file);
+    }
+  }
+}

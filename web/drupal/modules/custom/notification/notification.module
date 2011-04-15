@@ -29,22 +29,9 @@ define('MEASUREMENT_RECEIVED_EVENT_ID', 7);
 define('HOUR_UNIT_ID', 2);
 define('WATT_UNIT_ID', 3);
 
-define('TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
-define('TIMESTAMP_FORMAT_PHP', 'd-m-Y H:i');
+define('NOTIFICATION_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
+define('NOTIFICATION_TIMESTAMP_FORMAT_PHP', 'd-m-Y H:i');
 
-
-function notification_help($path, $arg) {
-
-  $output = '';
-
-  switch ($path) {
-    case "admin/help#notification":
-      $output = '<p>'.t("Allows the users to manage device event notifications.").'</p>';
-      break;
-  }
-
-  return $output;
-}
 
 function notification_perm() {
   return array(
@@ -63,8 +50,6 @@ function notification_settings_access($permission, $account) {
 
 function notification_menu() {
 
-  $items = array();
-
   $items['notification/list'] = array(
     'title'             => 'Event Notifications',
     'page callback'     => 'notification_list_page',
@@ -76,13 +61,14 @@ function notification_menu() {
     'title'             => $items['notification/list']['title'],
     'page callback'     => 'notification_delete',
     'page arguments'    => array(2, 3, 4, 5),
-    'access arguments'  => array('delete event notification'),
+    'access arguments'  => array('delete event notifications'),
     'type'              => MENU_CALLBACK
   );
 
   $items['notification/register'] = array(
     'title'             => 'Event Notification Registration',
-    'page callback'     => 'notification_registration_page',
+    'page callback'     => 'drupal_get_form',
+    'page arguments'    => array('notification_registration_form'),
     'access arguments'  => array('view event notifications'),
     'type'              => MENU_CALLBACK
   );
@@ -117,7 +103,6 @@ function notification_menu() {
     'access callback'   => TRUE,
     'type'              => MENU_NORMAL_ITEM
   );
-
   return $items;
 }
 
@@ -134,15 +119,6 @@ function notification_delete($device, $event_id, $limit_up, $unit_id) {
 
   _notification_delete($device, $event_id, $limit_up, $unit_id);
   return notification_list_page();
-}
-
-/**
- * Builds the event registration page.
- *
- * @return the event registration page.
- */
-function notification_registration_page() {
-  return drupal_get_form('notification_registration_form');
 }
 
 /**
@@ -225,7 +201,7 @@ function notification_list_page() {
   $sql .= tablesort_sql($headers);
 
   global $user;
-  $result = db_query($sql, TIMESTAMP_FORMAT_SQL, $user->uid);
+  $result = db_query($sql, NOTIFICATION_TIMESTAMP_FORMAT_SQL, $user->uid);
 
   $rows = array();
   while ($object = db_fetch_array($result)) {
@@ -277,7 +253,7 @@ function notification_eventlog_page($serial) {
       d.serial = '%s' AND
       d.uid = u.uid";
 
-  $args = array(TIMESTAMP_FORMAT_SQL, $serial);
+  $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, $serial);
 
   $headers = array(
     array('data' => t('Time'),  'field' => 'time', 'sort' => 'DESC'),
@@ -310,10 +286,8 @@ function notification_eventlog_page($serial) {
   $caption = '<p>' . t('Serial Number') . ': ' . $serial . '</p>' . '<p>' .
     l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
 
-  $output = theme('table', $headers, $rows, array(), $caption);
-  $output .= theme('pager', NULL, $limit, 0);
-
-  return $output;
+  return theme('table', $headers, $rows, array(), $caption) .
+    theme('pager', NULL, $limit, 0);
 }
 
 /**
@@ -583,7 +557,6 @@ function notification_registration_form() {
     '#type'   => 'submit',
     '#value'  => t('Save'),
   );
-
   return $form;
 }
 
@@ -694,7 +667,6 @@ function notification_edition_form(&$form_state, $notification) {
     '#type'  => 'submit',
     '#value' => t('Save'),
   );
-
   return $form;
 }
 
@@ -732,7 +704,6 @@ function notification_newsletter_form() {
     '#type'  => 'submit',
     '#value' => t("Subscribe"),
   );
-
   return $form;
 }
 
@@ -842,8 +813,6 @@ function notification_newsletter_form_submit($form, &$form_state) {
 
     _notification_send_system_error_email('newsletter', $response, $url);
   }
-
-  return $output;
 }
 
 function _notification_register_event($form, $form_state, $event_id) {
@@ -891,7 +860,6 @@ function _notification_tokenize_emails($str) {
 
   $sep = " \n\r";
   $tokens = array();
-
   $token = strtok($str, $sep);
 
   while ($token !== FALSE) {
@@ -899,7 +867,6 @@ function _notification_tokenize_emails($str) {
     $tokens[] = trim($token, $sep);
     $token = strtok($sep);
   }
-
   return $tokens;
 }
 
@@ -913,7 +880,6 @@ function _notification_get_event_name($event_id) {
 
   $sql = "SELECT name FROM {event} WHERE id = %d";
   $name = db_result(db_query($sql, $event_id));
-
   return t($name);
 }
 
@@ -944,7 +910,6 @@ function _notification_get_units_options($event_id) {
   while ($row = db_fetch_array($result)) {
     $units[$row['id']] = t($row['name']);
   }
-
   return $units;
 }
 
@@ -1035,7 +1000,6 @@ function _notification_update($device, $event_id, $limit_up, $unit_id, $time_fie
 function notification_cron() {
 
   $now = time();
-
   _notification_send_no_communication_emails($now);
   _notification_send_corrupted_message_emails($now);
   _notification_send_peak_consumption_emails($now);
@@ -1393,14 +1357,13 @@ function _notification_query_peak_consumption_violations($notifiable) {
         if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['start_time'] + $notifiable['timezone']) {
 
           $sublist = $sublist? $sublist : t('Sensor') . ': ' . $function . '<br> ';
-          $sublist .= date(TIMESTAMP_FORMAT_PHP, $timestamp) . ' - ' .
+          $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $timestamp) . ' - ' .
             number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
         }
       }
       $list .= $sublist;
     }
   }
-
   return $list ? array('timestamp' => $timestamp, 'list' => $list) : NULL;
 }
 

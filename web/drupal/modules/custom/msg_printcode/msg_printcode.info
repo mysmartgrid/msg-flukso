@@ -1,4 +1,0 @@
-; $Id$
-name = Print Codes
-description = Prints activation codes for Flukso devices.
-core = 6.x

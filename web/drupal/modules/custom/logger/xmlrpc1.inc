@@ -182,7 +182,6 @@ function _logger_measurement_add($auth, $logs) {
         }
       }
     }
-
     return $info;
 
   } else {

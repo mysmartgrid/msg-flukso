@@ -20,51 +20,51 @@
  */
 
 //Device states
-define('UNINSTALLED_STATE_NAME',       t('Uninstalled'));
-define('UNREGISTERED_STATE_NAME',      t('Unregistered'));
-define('NO_COMMUNICATION_STATE_NAME',  t('No Communication'));
-define('CORRUPTED_STATE_NAME',         t('Corrupted Message'));
-define('WORKING_STATE_NAME',           t('Working'));
+define('UNINSTALLED_STATE_NAME',      t('Uninstalled'));
+define('UNREGISTERED_STATE_NAME',     t('Unregistered'));
+define('NO_COMMUNICATION_STATE_NAME', t('No Communication'));
+define('CORRUPTED_STATE_NAME',        t('Corrupted Message'));
+define('WORKING_STATE_NAME',          t('Working'));
 
-function deployment_overview_help($path, $arg) {
+define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
+define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
 
-  $output = '';
 
-  switch ($path) {
-    case "admin/help#deployment_overview":
-      $output = '<p>'.t("Informs Flukso devices' deployment statuses.").'</p>';
-      break;
-  }
-
-  return $output;
+function deployment_perm() {
+  return array(
+    'device deployment overview',
+    'print activation code'
+  );
 }
 
-function deployment_overview_perm() {
-  return array('device deployment overview');
-}
-
-function deployment_overview_settings_access($permission, $account) {
+function deployment_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-function deployment_overview_menu() {
-
-  $items = array();
+function deployment_menu() {
 
   $items['deploymentoverview'] = array(
     'title'             => 'Deployment Overview',
-    'page callback'     => 'deployment_overview_list_page',
+    'page callback'     => 'deployment_list_page',
     'access arguments'  => array('device deployment overview'),
     'type'              => MENU_NORMAL_ITEM
   );
 
   $items['devicecheckup'] = array(
     'title'             => 'Device Check Up',
-    'page callback'     => 'deployment_overview_checkup_page',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('deployment_checkup_form'),
     'access arguments'  => array('device deployment overview'),
     'type'              => MENU_NORMAL_ITEM
   );
 
+  $items['print'] = array(
+    'title'            => "Print Code",
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('deployment_printcode_form'),
+    'access arguments' => array('print activation code'),
+    'type'             => MENU_NORMAL_ITEM,
+  );
   return $items;
 }
 
@@ -73,7 +73,7 @@ function deployment_overview_menu() {
  *
  * @return the device deployment overview page.
  */
-function deployment_overview_list_page() {
+function deployment_list_page() {
 
   $headers = array(
     array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'desc'),
@@ -83,14 +83,11 @@ function deployment_overview_list_page() {
   );
 
   $limit = 15;
-
-  $data = _deployment_overview_get_devices($headers, $limit);
+  $data = _deployment_get_devices($headers, $limit);
 
   if($data){
-    $output = theme('table', $headers, $data);
-    $output .= theme('pager', NULL, $limit, 0);
+    $output = theme('table', $headers, $data) . theme('pager', NULL, $limit, 0);
   }
-
   return $output;
 }
 
@@ -102,7 +99,7 @@ function deployment_overview_list_page() {
  * @param $serial  The serial number for selecting a single device (optionally).
  * @return the array of user devices.
  */
-function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial = NULL) {
+function _deployment_get_devices($headers = NULL, $limit = 15, $serial = NULL) {
 
   global $user;
   $tzdif = $user->timezone / 3600; //divided by 1 hour
@@ -194,17 +191,7 @@ function _deployment_overview_get_devices($headers = NULL, $limit = 15, $serial 
   return $data;
 }
 
-/**
- * Builds the device status checkup page.
- *
- * @return the device status checkup page.
- */
-function deployment_overview_checkup_page() {
-  $output .= drupal_get_form('deployment_overview_checkup_form');
-  return $output;
-}
-
-function deployment_overview_checkup_form() {
+function deployment_checkup_form(&$form_state) {
 
   $form['serial'] = array(
     '#type'        => 'textfield',
@@ -219,14 +206,13 @@ function deployment_overview_checkup_form() {
     '#type'  => 'submit',
     '#value' => t("Check Up")
   );
- 
-  return $form;
+   return $form;
 }
 
-function deployment_overview_checkup_form_submit($form, &$form_state) {
+function deployment_checkup_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
-  $result = _deployment_overview_get_devices(NULL, 1, $serial);
+  $result = _deployment_get_devices(NULL, 1, $serial);
 
   if (empty($result)) {
     drupal_set_message(t('No device was found with such serial number.'));
@@ -257,4 +243,85 @@ function deployment_overview_checkup_form_submit($form, &$form_state) {
       }
     }
   }
+}
+
+function deployment_printcode_form(&$form_state) {
+
+  $form['serial'] = array(
+    '#type'        => 'textfield',
+    '#title'       => t("Serial"),
+    '#size'        => 32,
+    '#maxlength'   => 40,
+    '#description' => t('Enter the serial you want to generate the PDF file for'),
+  );
+
+  $form['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t("Generate")
+  );
+  return $form;
+}
+
+function deployment_printcode_form_submit($form, &$form_state) {
+
+  $filename = substr(md5(uniqid(rand(), TRUE)),0,10);
+  $output_file_path = "/pdf/$filename.pdf";
+
+  require_once('fpdf/fpdf.php');
+  require_once('fpdi/fpdi.php');
+
+  define('FPDF_FONTPATH',   DEPLOYMENT_ABS_PATH . '/fpdf/font/');
+  define('PDF_SOURCE_FILE', DEPLOYMENT_ABS_PATH . '/Beipackzettel.pdf');
+  define('PDF_OUTPUT_FILE', DEPLOYMENT_REL_PATH . $output_file_path);
+
+  $pdf = new FPDI();
+  $pagecount = $pdf->setSourceFile(PDF_SOURCE_FILE);
+  $tplidx = $pdf->importPage(1);
+
+  preg_match_all('/[\d]*[-[\d]*]?/', $form_state['values']['serial'], $values);
+
+  foreach($values[0] as $serial) {
+
+    if ($serial != '') {
+
+      if (stripos($serial,'-') < 1) {
+
+        $sql = "SELECT * FROM {logger_devices} WHERE serial = %d";
+        $result = db_query($sql, $serial);
+
+      } else {
+        preg_match_all('/([\d]*)-([\d]*)/', $serial, $match);
+
+        $sql = "SELECT * FROM {logger_devices} WHERE serial >= %d AND serial <= %d";
+        $result = db_query($sql, $match[1][0], $match[2][0]);
+      }
+
+      if ($result) {
+
+        while ($device = db_fetch_object($result)) {
+
+          $pdf->AddPage();
+          $pdf->useTemplate($tplidx, 10, 10, 190);
+
+          $pdf->SetFont('Arial', '', 12);
+          $pdf->SetTextColor(0,0,0);
+          $pdf->SetXY(43, 165);
+
+          $pdf->Write(0, 'Seriennummer: WA' . $device->serial);
+          $pdf->setXY(43,175);
+          $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device,0,10));
+
+        }
+      } else {
+        form_set_error('serial', t('Error while looking up activation code!'));
+      }
+    }
+  }
+
+  $pdf->Output(PDF_OUTPUT_FILE, 'F');
+  drupal_set_message(l(t('Download'), DEPLOYMENT_REL_PATH . $output_file_path));
+}
+
+function deployment_cron() {
+  exec('rm ' . DEPLOYMENT_ABS_PATH . '/pdf/*');
 }
