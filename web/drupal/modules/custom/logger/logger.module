@@ -1119,7 +1119,7 @@ function theme_logger_energy_chart_area($chart) {
   $id = $chart->context . 'Chart';
 
   return "
-    <div id='$id' style='width: 600px; height: 300px;'></div>
+    <div id='$id' style='width: 640px; height: " . CHART_HEIGHT . "px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
         [ [ " . implode('], [' , $series)        . " ] ],
@@ -1148,7 +1148,7 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
   $properties = array_merge($properties, array(
     'labelsDiv'         => '"chartLabels"',
     'colors'            => '["' . implode('","', $chart->colors) . '"]',
-    'width'             => 600,
+    'width'             => 640,
     'yAxisLabelWidth'   => 50,
     'axisLabelFontSize' => 12,
     'includeZero'       => 'true',
