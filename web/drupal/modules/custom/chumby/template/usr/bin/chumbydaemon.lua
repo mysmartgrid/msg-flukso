@@ -54,13 +54,24 @@ end
 
 log("starting flukso data provider daemon")
 
-function updateCommand()
+function setIP()
 	if config.IP == "" then
-		io.input('/tmp/flukso/ip')
-		ip = io.read()
+		-- first check if /tmp/flukso/ip exists
+		local file = io.open('/tmp/flukso/ip')
+		if file ~= nil then
+			io.close(file)
+			io.input('/tmp/flukso/ip')
+			ip = io.read()
+		else
+			ip = ""
+		end
 	else
 		ip = config.IP
 	end
+end
+
+function updateCommand()
+	setIP()
 
 	log("Using " .. ip)
 
