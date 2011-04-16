@@ -2,7 +2,6 @@
 
 #Parameters
 BASE_DIR=~/www/public/sites/all/modules/logger/data/base
-NIGHT_DIR=~/www/public/sites/all/modules/logger/data/night
 
 
 cd $BASE_DIR;
@@ -25,21 +24,5 @@ while [ $i -lt $len ]; do
   let i++
 done
 
-
-cd $NIGHT_DIR;
-
-files=(`ls *.rrd`)
-len=${#files[*]}
-
-i=0
-while [ $i -lt $len ]; do
-
-  filename=${files[$i]};
-
-  ~/www/public/sites/all/modules/logger/rrdtool resize $filename 0 GROW 120
-  mv "resize.rrd" $filename
-
-  let i++
-done
 
 cd ~/www/public/sites/all/modules/logger

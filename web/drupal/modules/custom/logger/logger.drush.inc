@@ -55,8 +55,8 @@ function logger_drush_command() {
       'meter'     => 'Meter ID.',
       'type'      => 'Meter type.',
       'function'  => 'Meter function.',
-      'phase'     => 'Meter phase. Only applicable in case of type = electricity.',
-      'constant'  => 'Meter constant. Only applicable in case of type = electricity.',
+      'phase'     => 'Meter phase.',
+      'constant'  => 'Meter constant.',
       'unit'      => 'Meter unit.',
     ),
     'options'     => array(
@@ -140,13 +140,6 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
 
       if (!($return == 0)) {
         drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
-      }
-
-      // create the meter night rrd
-      $return = logger_rrd_night_create($meter);
-
-      if (!($return == 0)) {
-        drush_set_error('LOGGER_CREATE_RRD_NIGHT_ERROR', dt('Error creating the night @meter rrd.', array('@meter' => $meter)));
       }
 
       if (!drush_get_error()) {

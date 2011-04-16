@@ -59,7 +59,7 @@ function _logger_account_devices_validate($form, &$form_state) {
   if (strlen($code) == 10) {
 
     $count = db_result(db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE '%s%' AND uid = %d", $code, 0));
-    
+
     if ($count != 1) {
       form_set_error('code', t('Please specify a valid activation code.'));
     }
@@ -89,14 +89,17 @@ function _logger_account_devices_submit($form, &$form_state) {
       $i++;
     }
 
-    db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+    if ($function) {
+      db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+    }
   }
+
+  $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (!user_access('logger')) {
+  if (empty($user->roles[$rid])) {
 
-    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
 
     db_query("INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)", $user->uid, $rid);
     db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $user->uid, 0);
@@ -313,14 +316,12 @@ function _logger_sensor_edit($meter) {
 
   $sensor = _get_sensor($meter);
 
-  $output .= drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
-  return $output;
+  return drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
 }
 
 function _logger_sensor_activate($meter) {
 
-  $output .= drupal_get_form('logger_sensor_form', $meter, 'electricity', 'main');
-  return $output;
+  return drupal_get_form('logger_sensor_form', $meter, CONSUMPTION_SENSOR_TYPE, 'main');
 }
 
 function logger_sensor_form(&$form_state, $meter, $type, $function) {
@@ -336,12 +337,11 @@ function logger_sensor_form(&$form_state, $meter, $type, $function) {
   );
 
   $form['type'] = array(
-    '#type'          => 'textfield',
+    '#type'          => 'select',
     '#description'   => t('The sensor type.'),
-    '#maxlength'     => 16,
-    '#size'          => 16,
-    '#required'      => TRUE,
+    '#options'       => logger_get_sensor_types_options(),
     '#default_value' => $type,
+    '#required'      => TRUE,
     '#attributes'    => array('readonly' => 'readonly')
   );
 
@@ -387,7 +387,7 @@ function logger_sensor_form_submit($form, &$form_state) {
       {logger_meters}
     SET
       function = '%s',
-      type = '%s'
+      type = %d
     WHERE
       meter = '%s'";
 
@@ -414,19 +414,22 @@ function _get_sensor($meter) {
 function _logger_function_name_validate($function, $meter) {
 
   global $user;
+  $count = 0;
 
-  $sql = "
-    SELECT
-      count(*)
-    FROM
-      {logger_meters} m
-    WHERE
-      m.function = '%s' AND
-      m.uid = %d AND
-      m.meter <> '%s'";
+  if ($function) {
 
-  $count = db_result(db_query($sql, $function, $user->uid, $meter));
+    $sql = "
+      SELECT
+        count(*)
+      FROM
+        {logger_meters} m
+      WHERE
+        m.function = '%s' AND
+        m.uid = %d AND
+        m.meter <> '%s'";
 
+    $count = db_result(db_query($sql, $function, $user->uid, $meter));
+  }
   return $count == 0;
 }
 

@@ -47,7 +47,14 @@ function notification_help($path, $arg) {
 }
 
 function notification_perm() {
-  return array('manage notifications');
+  return array(
+    'list event notifications',
+    'view event notifications',
+    'save event notifications',
+    'delete event notifications',
+    'list event logs',
+    'delete event logs'
+  );
 }
 
 function notification_settings_access($permission, $account) {
@@ -61,7 +68,7 @@ function notification_menu() {
   $items['notification/list'] = array(
     'title'             => 'Event Notifications',
     'page callback'     => 'notification_list_page',
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('list event notifications'),
     'type'              => MENU_NORMAL_ITEM
   );
 
@@ -69,14 +76,14 @@ function notification_menu() {
     'title'             => $items['notification/list']['title'],
     'page callback'     => 'notification_delete',
     'page arguments'    => array(2, 3, 4, 5),
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('delete event notification'),
     'type'              => MENU_CALLBACK
   );
 
   $items['notification/register'] = array(
     'title'             => 'Event Notification Registration',
     'page callback'     => 'notification_registration_page',
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('view event notifications'),
     'type'              => MENU_CALLBACK
   );
 
@@ -84,7 +91,7 @@ function notification_menu() {
     'title'             => 'Event Notification Edition',
     'page callback'     => 'notification_edition_page',
     'page arguments'    => array(2, 3, 4, 5),
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('view event notifications'),
     'type'              => MENU_CALLBACK
   );
 
@@ -92,7 +99,7 @@ function notification_menu() {
     'title'             => 'Device History',
     'page callback'     => 'notification_eventlog_page',
     'page arguments'    => array(3),
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('list event logs'),
     'type'              => MENU_CALLBACK
   );
 
@@ -100,7 +107,7 @@ function notification_menu() {
     'title'             => $items['event/log/list']['title'],
     'page callback'     => '_notification_eventlog_clear',
     'page arguments'    => array(3),
-    'access arguments'  => array('manage notifications'),
+    'access arguments'  => array('delete event logs'),
     'type'              => MENU_CALLBACK
   );
 
@@ -414,6 +421,33 @@ function notification_newsletter_page() {
   $output .= '<div><p><br><br><br>' .
     t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
     '</p></div>';
+
+  $output .= '<div><p><br>' .
+    t('Latest publications:');
+
+  $sql = '
+    SELECT
+      n.nid
+    FROM
+      {node} n,
+      {users} u,
+      {users_roles} ur
+    WHERE
+      n.type = "%s" AND
+      n.title LIKE "%s" AND
+      n.uid = u.uid AND
+      u.uid = ur.uid AND
+      ur.rid = %d
+    ORDER BY
+      n.created DESC LIMIT 3';
+
+  $results = db_query($sql, "blogpost", "Newsletter %/%", 8); //Posted by a Blogger
+  while ($result = db_fetch_object($results)) {
+
+    $blog = node_load(array('nid' => $result->nid));
+    $output .= '&nbsp;&nbsp;&nbsp;' . l($blog->title, 'node/' . $blog->nid);
+  }
+  $output .= '</p></div>';
 
   return $output;
 }
@@ -750,6 +784,17 @@ function notification_limit_up_validate($field, $form_state) {
       form_error($field, t('Peak consumption can not be lesser than 0 watt / min.'));
     }
   }
+}
+
+function notification_registration_form_validate($form, &$form_state) {
+
+  if (!user_access('save event notifications')) {
+    form_set_error('', t('Operation not allowed.'));
+  }
+}
+
+function notification_edition_form_validate($form, &$form_state) {
+  notification_registration_form_validate($form, $form_state);
 }
 
 function notification_registration_form_submit($form, &$form_state) {
@@ -1142,9 +1187,9 @@ function _notification_send_peak_consumption_emails($now) {
       n.unit_id = un.id AND
       %d > (n.last_sent + n.min_interval) AND
       m.device = d.device AND
-      m.type = '%s'";
+      m.type = %d";
 
-  $args = array(PEAK_CONSUMPTION_EVENT_ID, $now, 'electricity');
+  $args = array(PEAK_CONSUMPTION_EVENT_ID, $now, CONSUMPTION_SENSOR_TYPE);
 
   $notifiables = array();
   foreach (_notification_query_notifiables($sql, $args) as $notifiable) {

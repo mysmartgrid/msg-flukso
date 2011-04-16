@@ -1,0 +1,21 @@
+  ; --------------------------------------------------------------------------
+  ; Basic information about the theme.
+  ; --------------------------------------------------------------------------
+name        = mySmartGrid Mobile
+description = "mySmartGrid for Mobile Devices"
+screenshot  = screenshot.png
+core        = 6.x
+engine      = phptemplate
+
+  ; --------------------------------------------------------------------------
+  ; Theme features.
+  ; --------------------------------------------------------------------------
+stylesheets[all][] = style/fraunhofer.css
+stylesheets[handheld][] = style/fraunhofer-handheld.css
+
+features[] = name
+features[] = slogan
+features[] = favicon
+features[] = node_user_picture
+features[] = comment_user_picture
+features[] = logo

@@ -59,7 +59,7 @@ function chumby_cron() {
 
 function chumby_form() {
   global $user;
-  $result = db_query('SELECT meter,function FROM {logger_meters} WHERE uid=%d AND function<>"NULL"', $user->uid);
+  $result = db_query('SELECT meter, function FROM {logger_meters} WHERE uid=%d AND function IS NOT NULL', $user->uid);
   $sensors = array();
   while($flukso = db_fetch_object($result)) {
     $sensors[$flukso->meter] = $flukso->function;

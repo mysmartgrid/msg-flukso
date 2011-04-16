@@ -140,7 +140,7 @@ function msg_dump_setup() {
 
   $form['type'] = array(
     '#type'         => 'hidden',
-    '#value'        => 'electricity',
+    '#value'        => CONSUMPTION_SENSOR_TYPE,
   );
 
   $form['from'] = array(
@@ -253,7 +253,7 @@ function theme_msg_dump_setup($form) {
     $row[] = $device->serial;
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
-    # not needed yet as only available type ist electricity
+    //FIXME: consider other types
     #$row[] = $device->type;
     $row[] = l(t('Download'), DB_RELATIVE_PATH . '/' . $device->file . '.sqlite');
 
@@ -284,7 +284,7 @@ function msg_dump_register($file, $serial, $type) {
         LEFT JOIN logger_devices ON logger_meters.device = logger_devices.device
     WHERE
       logger_devices.serial = '%s' AND
-      logger_meters.type = '%s'";
+      logger_meters.type = %d";
 
   $values = db_query($sql, $serial, $type);
 

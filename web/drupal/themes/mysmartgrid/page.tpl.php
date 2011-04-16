@@ -19,24 +19,24 @@
 
 		<DIV id="page">
 
-		<!-- HEADER include start -->
-		<DIV id="header" role="banner">
-		
-			<DIV class="wrapper">
-				<!-- Logo with facility name, linked to start page, except on the start page itself! -->
-				<H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
-				<H2>Service-Navigation</H2>
-		
-				<DIV class="section">
-				<?php if ($header != ""): ?><div id="header"><?php print $header ?></div><?php endif; ?>
-				
-				<ul id="meta-nav">
-        </ul>
-				
-				</DIV>
-			</DIV>
-		</DIV><!-- #header -->
-		<!-- HEADER include end -->
+      <!-- HEADER include start -->
+      <DIV id="header" role="banner">
+
+        <DIV class="wrapper">
+
+          <!-- Logo with facility name, linked to start page, except on the start page itself! -->
+          <H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
+          <H2>Service-Navigation</H2>
+
+          <DIV class="section">
+            <?php if ($header != ""): ?><div id="header"><?php print $header ?></div><?php endif; ?>
+
+            <ul id="meta-nav">
+            </ul>
+          </DIV>
+        </DIV>
+      </DIV><!-- #header -->
+      <!-- HEADER include end -->
 						
 			<!-- Main content section -->
 			<DIV id="doc">
@@ -44,65 +44,49 @@
 
 				<!-- Text content -->
 				<DIV id="main" role="main">
-				
-				<div id="breadcrumb"><?php print $breadcrumb ?></div>
-        
-<DIV role="section">
-	<DIV class="headings">
-<?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
-<?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
-    
-	</DIV>
-</DIV>
+          <DIV id="breadcrumb"><?php print $breadcrumb ?></DIV>
 
-<DIV class="section" role="section">
-	
-  <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
-  
-  <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
-  <?php if ($messages != ""): ?><div id="message"><?php print $messages ?></div><?php endif; ?>
-  
-  <!-- start main content --><?php print($content) ?><!-- end main content -->
-</DIV>
+          <DIV role="section">
+            <DIV class="headings">
+              <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
+              <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
+            </DIV>
+          </DIV>
 
+          <DIV class="section" role="section">
 
+            <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
+
+            <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
+            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
+
+            <!-- start main content --><?php print($content) ?><!-- end main content -->
+          </DIV>
 				</DIV><!-- #main -->
 
+        <!-- NAVIGATION include start -->
+        <DIV id="nav" class="nav-fhg">
+          <H2>Menü</H2>
+          <H3>Hauptmenü</H3>
+          <?php if (isset($primary_links)) { ?><DIV id="primary"><?php print theme('links', $primary_links) ?></DIV><?php } ?><!-- #nav-direct-first -->
+        </DIV>
+	
+        <?php if ($left) { ?> <DIV id="contentboxes"><?php print $left ?></DIV> <?php } ?>
 
-<!-- NAVIGATION include start -->
-<DIV id="nav" class="nav-fhg">
-	<H2>Menü</H2>
-
-	<H3>Hauptmenü</H3>
-	<?php if (isset($primary_links)) { ?><div id="primary"><?php print theme('links', $primary_links) ?></div><?php } ?><!-- #nav-direct-first -->
-	
-	
-	
-	</DIV>
-	
-	<?php if ($left) { ?> <div id="contentboxes"><?php print $left ?></div> <?php } ?>
-	
-
-	</DIV>
-
-	</DIV><!-- #doc -->
+      </DIV><!-- #doc -->
 	
 	
 		<!-- FOOTER include start -->
 		<DIV id="footer">
 			<DIV class="wrapper">
-				<!-- Footer navigation -->
-				
+
+        <!-- Footer navigation -->
 				<ul id="footer-nav" role="contentinfo">
-        					<li>&copy;2010 Fraunhofer-Gesellschaft</li>
-        					<li><a href="/kontakt" >Kontakt</a>
-        </li>
-        					<li><a href="/impressum" >Impressum</a>
-        </li>
-        					<li><a href="/content/datenschutzerklärung" >Datenschutzerklärung</a>
-        </li>
-        				</ul>
-				
+  				<li>&copy;2010 Fraunhofer-Gesellschaft</li>
+  				<li><a href="/kontakt" >Kontakt</a></li>
+ 					<li><a href="/impressum" >Impressum</a></li>
+ 					<li><a href="/content/datenschutzerklärung" >Datenschutzerklärung</a></li>
+ 				</ul>
 				
 				<?php print $footer_message;?>
 				
