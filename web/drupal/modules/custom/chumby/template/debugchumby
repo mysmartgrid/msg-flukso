@@ -37,7 +37,11 @@ else
 fi
 
 if [[ -f $DEST_PATH/usr/version ]]; then
-	. $DEST_PATH/usr/version
+	if [[ $(grep -c CURVERSION $DEST_PATH/usr/version) -gt 0 ]]; then
+		. $DEST_PATH/usr/version
+	else
+		CURVERSION=$(cat $DEST_PATH/usr/version)
+	fi
 	echo $CURVERSION
 	if [[ $CURVERSION -lt $VERSION ]]; then
 		COPYUSR=1
