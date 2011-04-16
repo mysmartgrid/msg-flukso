@@ -10,8 +10,11 @@ WIDGET_SWF=$BASEPATH/widgets/currentpower.swf
 if [ -e $DAEMON_BIN ]; then
 	if [ -e $DAEMON_CONFIG ]; then
 		echo "Starting msg-chumby-daemon"
+		if [ ! -d /tmp/flukso ]; then
+			mkdir -p /tmp/flukso
+		fi
 		if [ -e $FLUKSO_BIN ]; then
-			$FLUKSO_BIN _realtime-flukso._tcp /tmp/flukso/ip &
+			$FLUKSO_BIN _flukso-realtime._tcp /tmp/flukso/ip &
 		else
 			echo "Autoconfiguration disabled."
 		fi
