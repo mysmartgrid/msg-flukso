@@ -13,12 +13,14 @@ if [ -e $DAEMON_BIN ]; then
 		if [ ! -d /tmp/flukso ]; then
 			mkdir -p /tmp/flukso
 		fi
-		if [ -e $FLUKSO_BIN ]; then
+		if [ -e $FLUKSO_BIN ] && [ $(ps | grep -c $FLUKSO_BIN) == 1 ]; then
 			$FLUKSO_BIN _flukso-realtime._tcp /tmp/flukso/ip &
-		else
+		else    
 			echo "Autoconfiguration disabled."
 		fi
-		$BASEPATH/bin/lua $DAEMON_BIN $DAEMON_CONFIG &
+		if [ $(ps | grep -c $DAEMON_BIN) == 1 ]; then
+			$BASEPATH/bin/lua $DAEMON_BIN $DAEMON_CONFIG &
+		fi
 		sleep 1
 		/usr/sbin/httpd -p 3000 -h /tmp/flukso
 	else
