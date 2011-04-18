@@ -1864,16 +1864,23 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
     $end = $now;
   }
 
+  //Expand window to fill slider
+  $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
+
   $storage_periods = logger_get_storage_periods();
   $elapsed_time = $now - $end;
-  $max_window = $storage_periods[$resolution] - $elapsed_time;
 
-  $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
-  $window = $window > $max_window ? $max_window : $window;
+  if ($storage_periods[$resolution] > $elapsed_time) {
+
+    $max_window = $storage_periods[$resolution] - $elapsed_time;
+
+    //RRD requires the time window to be covered by the RRA
+    $window = min($window, $max_window);
+  }
 
   $start = $end - $window;
 
-  return array('start' => $start, 'end'   => $end);
+  return array('start' => $start, 'end' => $end);
 }
 
 /**
