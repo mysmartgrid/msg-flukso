@@ -771,6 +771,8 @@ function _logger_get_overview_chart_data($chart) {
 
 function _logger_format_power_series_data($chart, $measurements) {
 
+  //TODO: get rid of this function. move formats to rrd.inc
+
   $start = $chart->period['start'] + $chart->offset - $chart->period['start'] % $chart->resolution;
   $end   = $chart->period['end']   + $chart->offset - $chart->period['end'] % $chart->resolution;
 
@@ -779,10 +781,17 @@ function _logger_format_power_series_data($chart, $measurements) {
 
   for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 
-    $key = date('Y-m-d H:i', $timestamp) . " $tz";
     $value = $measurements[$timestamp];
 
-    $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
+    if ($value) {
+      $key = date('Y-m-d H:i', $timestamp) . " $tz";
+      $formatted[$key] = number_format($value, 3, '.', '');
+    }
+  }
+
+  if (count($formatted) == 0) {
+    $formatted[date('Y-m-d H:i', $start)] = '';
+    $formatted[date('Y-m-d H:i', $end)] = '';
   }
   return $formatted;
 }
@@ -1654,7 +1663,6 @@ function logger_powerchart_form_validate($form, &$form_state) {
   $yvalue2 = _logger_get_yvalue(2);
 
   if (!($yvalue1 == '' && $yvalue2 == '') && !($yvalue1 >= 0 && $yvalue2 > $yvalue1)) {
-
     form_set_error('yvalue', t('The value range is invalid.'));
   }
 
@@ -1662,7 +1670,6 @@ function logger_powerchart_form_validate($form, &$form_state) {
   $xvalue2 = _logger_get_xvalue(2);
 
   if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
-
     form_set_error('xvalue', t('Time period is invalid.'));
   }
 }
@@ -1867,12 +1874,12 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
   //Expand window to fill slider
   $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
 
-  $storage_periods = logger_get_storage_periods();
+  $storage_period = logger_rrd_get_storage_period($resolution);
   $elapsed_time = $now - $end;
 
-  if ($storage_periods[$resolution] > $elapsed_time) {
+  if ($storage_period > $elapsed_time) {
 
-    $max_window = $storage_periods[$resolution] - $elapsed_time;
+    $max_window = $storage_period - $elapsed_time;
 
     //RRD requires the time window to be covered by the RRA
     $window = min($window, $max_window);

@@ -37,7 +37,7 @@ define('METER', 'meter');
 function logger_rrd_base_create($meter) {
 
   $step = 1 * MINUTE;
-  $archives = logger_get_storage_periods();
+  $archives = _logger_rrd_get_storage_periods();
 
   return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
 }
@@ -47,13 +47,24 @@ function logger_rrd_base_create($meter) {
  *
  * @return the array of storage periods.
  */
-function logger_get_storage_periods() {
+function _logger_rrd_get_storage_periods() {
   return array(
      //resolution   storage period
      1 * MINUTE =>  1 * WEEK,
     15 * MINUTE =>  1 * MONTH,
      1 * DAY    =>  6 * MONTH,
      1 * WEEK   => 10 * YEAR);
+}
+
+/**
+ * Returns the storage period of measurements in the informed time resolution.
+ *
+ * @param $step  The time resolution.
+ * @return the storage period.
+ */
+function logger_rrd_get_storage_period($step) {
+  $periods = _logger_rrd_get_storage_periods();
+  return $periods[$step];
 }
 
 /**
@@ -316,6 +327,12 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
   $start = $start - ($start % $step);
   $end = $end - ($end % $step);
 
+  $storage_period = logger_rrd_get_storage_period($step);
+
+  if ((time() - $end) > $storage_period) {
+    return array();
+  }
+
   $maxrows = 1 + ($end - $start) / $step;
   $maxrows = $maxrows < 10? 10: $maxrows; //RRDTool exports at least 8 rows
 
@@ -355,13 +372,7 @@ function _logger_rrd_parse_exported_lines($lines, $offset) {
       $timestamp = trim(substr($line, 0, $div_pos)) + $offset;
       $value = trim(substr($line, $div_pos + 1));
 
-      if ($value == 'nan') {
-
-        if ($include_nan) {
-          $data[$timestamp] = null;
-        }
-
-      } else {
+      if ($value != 'nan') {
         $data[$timestamp] = $value;
       }
     }
