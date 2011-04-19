@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION=20110117 			#current version
+VERSION=20110417 			#current version
 COPYUSR=0				#copy /mnt/storage/usr
 
 SRC_PATH=/mnt/usb
@@ -37,9 +37,13 @@ else
 fi
 
 if [[ -f $DEST_PATH/usr/version ]]; then
-	. $DEST_PATH/usr/version
+	if [[ $(grep -c CURVERSION $DEST_PATH/usr/version) -gt 0 ]]; then
+		. $DEST_PATH/usr/version
+	else
+		CURVERSION=$(cat $DEST_PATH/usr/version)
+	fi
 	echo $CURVERSION
-	if [[ $CURVERSION < $VERSION ]]; then
+	if [[ $CURVERSION -lt $VERSION ]]; then
 		COPYUSR=1
 	else
 		echo "currently installed version newer then the actual version"
@@ -52,11 +56,12 @@ echo $COPYUSR
 if [[ $COPYUSR -gt 0 ]]; then
 	echo "updating $DEST_PATH/usr"
 	cp -R $SRC_PATH/usr $DEST_PATH/
-	echo $VERSION > $DEST_PATH/usr/version
+	echo "CURVERSION="$VERSION > $DEST_PATH/usr/version
 fi
 
 if [[ -f $DEST_PATH/usr/etc/daemonconfig.lua ]]; then
 	echo "config file found"
+	cp $SRC_PATH/daemonconfig.lua $DEST_PATH/usr/etc/
 else
 	echo "no config file found"
 	cp $SRC_PATH/daemonconfig.lua $DEST_PATH/usr/etc/

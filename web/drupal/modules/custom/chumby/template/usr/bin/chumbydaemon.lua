@@ -54,42 +54,68 @@ end
 
 log("starting flukso data provider daemon")
 
-function updateCommand()
+function setIP()
 	if config.IP == "" then
-		io.input('/tmp/flukso/ip')
-		ip = io.read()
+		-- first check if /tmp/flukso/ip exists
+		local file = io.open('/tmp/flukso/ip')
+		if file ~= nil then
+			io.close(file)
+			io.input('/tmp/flukso/ip')
+			ip = io.read()
+		else
+			ip = ""
+		end
 	else
 		ip = config.IP
 	end
+end
+
+function updateCommand()
+	setIP()
 
 	log("Using " .. ip)
 
 	command = {}
-	command['last_reading'] = {
-					cmd = config.BINPATH .. config.CMD .. 
-								" -l " .. ip .. 
-								" -s " .. config.SENSOR ..
-								" -n " .. config.DATADIR .. "/last_reading" ..
-								" -f chumby-current -o file",
-					interval = 2
-				}
-	command['last_minute'] = {
-					cmd = config.BINPATH .. config.CMD .. 
-								" -l " .. ip .. 
-								" -s " .. config.SENSOR ..
-								" -n " .. config.DATADIR .. "/last_minute" ..
-								" -f chumby-lastminute -o file",
-					interval = 10
-				}
-	command['last_hour'] = {
-					cmd = config.BINPATH .. config.CMD .. 
-								" -l " .. ip .. 
-								" -s " .. config.SENSOR ..
-								" -t " .. config.TOKEN ..
-								" -n " .. config.DATADIR .. "/last_hour" ..
-								" -f chumby-lasthour -o file -i hour",
-					interval = 11
-				}
+	if ip ~= "" then
+		command['last_reading'] = {
+						cmd = config.BINPATH .. config.CMD .. 
+									" -l " .. ip .. 
+									" -s " .. config.SENSOR ..
+									" -n " .. config.DATADIR .. "/last_reading" ..
+									" -f chumby-current -o file",
+						interval = 2
+					}
+		command['last_minute'] = {
+						cmd = config.BINPATH .. config.CMD .. 
+									" -l " .. ip .. 
+									" -s " .. config.SENSOR ..
+									" -n " .. config.DATADIR .. "/last_minute" ..
+									" -f chumby-lastminute -o file",
+						interval = 10
+					}
+		command['last_hour'] = {
+						cmd = config.BINPATH .. config.CMD .. 
+									" -l " .. ip .. 
+									" -s " .. config.SENSOR ..
+									" -t " .. config.TOKEN ..
+									" -n " .. config.DATADIR .. "/last_hour" ..
+									" -f chumby-lasthour -o file -i hour",
+						interval = 11
+					}
+	else
+		command['last_reading'] = {
+						cmd = "",
+						interval = 2
+					}
+		command['last_minute'] = {
+						cmd = "",
+						interval = 10
+					}
+		command['last_hour'] = {
+						cmd = "",
+						interval = 11
+					}
+	end
 end
 
 updateCommand();
