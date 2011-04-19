@@ -36,12 +36,13 @@ function _logger_user_sensors_page() {
     SELECT
       lm.meter,
       lm.function,
-      lm.type,
+      st.name AS type,
       lt.token,
       lt.permissions
     FROM
       {logger_meters} lm
       INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
+      LEFT JOIN {logger_meter_type} st ON lm.type = st.id
     WHERE
       lm.uid = %d
     ORDER BY
@@ -65,7 +66,7 @@ function _logger_user_sensors_page() {
 
     } else {
       $row[] = t('Active');
-      $row[] = $sensor->type;
+      $row[] = t($sensor->type);
       $row[] = $sensor->function;
       $operations .=
 	      l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
