@@ -77,7 +77,6 @@ function logger_menu() {
   // Main operations
 
   $items['logger'] = array(
-    'title'            => 'Homepage',
     'description'      => 'Show the home page',
     'page callback'    => '_logger_home_page',
     'page arguments'   => array(1),
@@ -259,10 +258,9 @@ function _logger_home_page($interval) {
  */
 function _logger_power_page($interval) {
 
-  $interval = $interval ? $interval : 'hour';
-
   drupal_set_title(t('Your power consumption'));
 
+  $interval = $interval ? $interval : 'hour';
   $xvalue1 = _logger_get_xvalue(1);
   $xvalue2 = _logger_get_xvalue(2);
   $yvalue1 = _logger_get_yvalue(1);
@@ -290,10 +288,9 @@ function _logger_power_page($interval) {
  */
 function _logger_overview_page($interval) {
 
-  $interval = $interval ? $interval : 'hour';
-
   drupal_set_title(t('Overall View'));
 
+  $interval = $interval ? $interval : 'hour';
   $cache_id = 'logger_overview';
   $cache = cache_get($cache_id, 'cache_page');
 
@@ -369,32 +366,34 @@ function _logger_overview_page($interval) {
  */
 function _logger_relative_energy_consumption_page() {
 
-  $output = t('The following chart allows you to compare current and previous levels of
-    energy consumption in six different time frames: hour, day, week, month, and year.
-    The bars are explained in the legend bellow.') . '<br><br>';
-
-  $types = array(CONSUMPTION_SENSOR_TYPE);
-  $all_sensors = _logger_get_user_sensors($types);
   $meters = _logger_get_variable('selected_meters', 1);
   $all_meters = array();
   $sensors = array();
+
+  $types = array(CONSUMPTION_SENSOR_TYPE);
+  $all_sensors = _logger_get_user_sensors($types);
+
   foreach($all_sensors as $sensor) {
     $all_meters[] = $sensor->meter;
     if ($meters[$sensor->meter]) {
       $sensors[] = $sensor;
     }
   }
+
   if (empty($sensors)) {
     $sensors = $all_sensors;
     _logger_set_variable('selected_meters', $all_meters);
   }
 
+  $output = t('The following chart allows you to compare current and previous levels of
+    energy consumption in six different time frames: hour, day, week, month, and year.
+    The bars are explained in the legend bellow.') . '<br><br>';
+
   $chart = _logger_create_chart_object('relative', $types, 'year', 'kWh', TRUE, $sensors);
 
-  $output .= theme('logger_energy_chart_area', $chart);
+  $output .= theme('logger_energy_chart_area', $chart) .
+    drupal_get_form('logger_relativechart_form', $chart);
 
-  $output .= drupal_get_form('logger_relativechart_form', $chart);
-  
   return $output;
 }
 
@@ -409,9 +408,9 @@ function _logger_energy_page() {
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
 
+  $aggregate_sensors = _logger_get_variable('aggregate_sensors', 1);
   $types = _logger_get_variable('selected_sensor_types', array(CONSUMPTION_SENSOR_TYPE));
   $sensors = _logger_get_user_sensors($types);
-  $aggregate_sensors = _logger_get_variable('aggregate_sensors', 1);
 
   $chart = _logger_create_chart_object('energy', $types, 'week', 'kWh', FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors);
   $consumed = number_format($chart->data['last'], 2, '.', '');
@@ -638,6 +637,7 @@ function _logger_get_energy_chart_data(&$chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
   $last_day_consumption = 0;
 
+  $groups = array();
   foreach ($chart->sensors as &$sensor) {
     $key = $chart->aggregate_sensors? $sensor->type : $sensor->meter;
     $groups[$key][] = $sensor;
@@ -1110,6 +1110,10 @@ function theme_logger_power_chart_area($chart) {
  */
 function theme_logger_energy_chart_area($chart) {
 
+  if (!$chart->data['series'] || !$chart->data['labels']) {
+    return "<div style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>";
+  }
+
   foreach ($chart->data['series'] as $uid => $userdata) {
     foreach($userdata as $username => $sensors) {
       foreach($sensors as $sensor => $sensordata) {
@@ -1218,6 +1222,10 @@ function _logger_create_chart_legend($chart) {
   $header = array(
     array('data' => t('Color'))
   );
+
+  if (!$data) {
+    return '';
+  }
 
   foreach ($data as $line_id => $cells) {
 
