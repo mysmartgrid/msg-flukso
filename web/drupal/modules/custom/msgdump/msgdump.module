@@ -21,7 +21,7 @@
  */
 
 define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
-define('MSGDUMP_DB_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . MSGDUMP_DB_REL_PATH);
+define('MSGDUMP_DB_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . MSGDUMP_DB_REL_PATH);
 
 
 function msgdump_perm() {
@@ -124,11 +124,11 @@ function msgdump_setup_form_submit($form, &$form_state) {
 
     $sql = "
       INSERT INTO
-        {msgdump} (serial, uid, start, stop, file)
+        {msgdump} (meter, uid, start, stop, file)
       VALUES
         ('%s', %d, %d, %d, '%s')";
 
-    $result = db_query($sql, $serial, $user->uid, $from, $to, $file);
+    db_query($sql, $serial, $user->uid, $from, $to, $file);
 
     _msgdump_register($file, $serial, $type);
 
@@ -278,10 +278,10 @@ function msgdump_cron() {
 
     if ($data->stop + 2629743 < $now) {
       //delete dumps older then 3 months
-      exec("rm " . MSGDUMP_DB_ABS_PATH . "/" . $date->file . ".*");
+      exec("rm " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".*");
 
       $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
-      db_query($sql, $date->file);
+      db_query($sql, $data->file);
 
     } elseif ($data->stop > $now) {
       $res = exec("flukso_archive_watts -c " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
