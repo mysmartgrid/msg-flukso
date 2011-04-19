@@ -368,11 +368,11 @@ function _logger_relative_energy_consumption_page() {
 
   $meters = _logger_get_variable('selected_meters', 1);
   $all_meters = array();
-  $sensors = array();
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $all_sensors = _logger_get_user_sensors($types);
 
+  $sensors = array();
   foreach($all_sensors as $sensor) {
     $all_meters[] = $sensor->meter;
     if ($meters[$sensor->meter]) {
@@ -404,28 +404,40 @@ function _logger_relative_energy_consumption_page() {
  */
 function _logger_energy_page() {
 
+  global $user;
   $now = time();
   $start = $now - 6 * DAY - $now % DAY;
   $end = $start + 7 * DAY;
 
-  $aggregate_sensors = _logger_get_variable('aggregate_sensors', 1);
-  $types = _logger_get_variable('selected_sensor_types', array(CONSUMPTION_SENSOR_TYPE));
+  $all_types = array_keys(logger_get_sensor_types_options($user->uid));
+  $selected_types_options = _logger_get_variable('selected_sensor_types', array());
+
+  //User can change sensor types any time
+  foreach ($selected_types_options as $type => $selected) {
+    if ($selected && in_array($type, $all_types)) {
+      $types[] = $type;
+    }
+  }
+  if (empty($types)) {
+    $types = $all_types;
+    _logger_set_variable('selected_sensor_types', $types);
+  }
+
   $sensors = _logger_get_user_sensors($types);
+  $aggregate_sensors = _logger_get_variable('aggregate_sensors', 1);
 
   $chart = _logger_create_chart_object('energy', $types, 'week', 'kWh', FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors);
   $consumed = number_format($chart->data['last'], 2, '.', '');
 
   drupal_set_title(t('Your energy consumption'));
 
-  $output = t('Today you have consumed %consumed kWh so far. ' .
+  return t('Today you have consumed %consumed kWh so far. ' .
     'The following chart shows your energy consumption along the week.',
-    array('%consumed' => $consumed)) . '<br><br>';
+    array('%consumed' => $consumed)) . '<br><br>' .
+          
+    theme('logger_energy_chart_area', $chart) .
 
-  $output .= theme('logger_energy_chart_area', $chart);
-
-  $output .= drupal_get_form('logger_energychart_form', $chart);
-
-  return $output;
+    drupal_get_form('logger_energychart_form', $chart);
 }
 
 /**
@@ -1374,6 +1386,9 @@ function logger_mail_alter(&$message) {
 
 function logger_energychart_form(&$form_state, $chart) {
 
+  global $user;
+  $attributes = array('onchange' => 'submitEnergyChartForm(this)');
+
   $form['aggregate_sensors'] = array(
     '#type'          => 'checkbox',
     '#title'         => t("Sum of sensor readings"),
@@ -1381,7 +1396,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('aggregate_sensors', 1),
     '#return_value'  => 1,
     '#required'      => TRUE,
-    '#attributes'    => array('onchange' => 'submitEnergyChartForm()')
+    '#attributes'    => $attributes
   );
 
   $form['selected_sensor_types'] = array(
@@ -1389,9 +1404,9 @@ function logger_energychart_form(&$form_state, $chart) {
     '#title'         => t('Sensor types'),
     '#description'   => t('Select the types of sensors to be shown on the chart.'),
     '#default_value' => _logger_get_variable('selected_sensor_types', array(CONSUMPTION_SENSOR_TYPE)),
-    '#options'       => logger_get_sensor_types_options(),
+    '#options'       => logger_get_sensor_types_options($user->uid),
     '#required'      => TRUE,
-    '#attributes'    => array('onchange' => 'submitEnergyChartForm()')
+    '#attributes'    => $attributes
   );
 
   $form['submit'] = array(
@@ -1722,10 +1737,30 @@ function logger_relativechart_form_submit($form, &$form_state) {
  *
  * @return an array of sensor types.
  */
-function logger_get_sensor_types_options() {
+function logger_get_sensor_types_options($uid = NULL) {
 
-  $sql = "SELECT id, name FROM {logger_meter_type} ORDER BY id";
-  $result = db_query($sql);
+  if ($uid) {
+  
+    $sql = "
+      SELECT
+        t.id,
+        t.name
+      FROM
+        {logger_meter_type} t,
+        {logger_meters} m
+      WHERE
+        m.type = t.id AND
+        m.uid = %d
+      ORDER BY
+        t.id";
+
+      $result = db_query($sql, $uid);
+
+  } else {
+
+    $sql = "SELECT id, name FROM {logger_meter_type} ORDER BY id";
+    $result = db_query($sql);
+  }
 
   $options = array();
   while ($type = db_fetch_object($result)) {

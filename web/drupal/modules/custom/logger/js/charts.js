@@ -107,10 +107,16 @@ function submitPowerChartForm(resetY) {
   form.submit();
 }
 
-function submitEnergyChartForm() {
+function submitEnergyChartForm(clickedField) {
 
   var form = document.getElementById('logger-energychart-form');
-  form.submit();
+  for(var i = 0; i < form.elements.length; i++) {
+    if (form.elements[i].name.indexOf('selected_sensor_types', 0) == 0 && form.elements[i].checked) {
+      form.submit();
+      return;
+    }
+  }
+  clickedField.checked = true;
 }
 
 function submitRelativeChartForm(clickedField) {
