@@ -25,7 +25,8 @@
 //Constants
 //Some constants need to be redefined because this file can be called from xmlrpc.php
 //drupal_get_path does not work, because xmlrpc.php is called from xmlrpc.php.
-define('RRDTOOL', LOGGER_PATH . '/rrdtool');
+define('RRDTOOL_PATH', 'sites/all/modules/logger');
+define('RRDTOOL', RRDTOOL_PATH . '/rrdtool');
 define('METER', 'meter');
 
 /**
@@ -91,8 +92,6 @@ function _logger_rrd_create($meter, $step, $ds_type, $archives) {
       "--step $step " .
       "$ds " .
       _logger_rrd_rras($step, $archives);
-
-    system($command, $return);
   }
   return $return;
 }
@@ -146,6 +145,8 @@ function logger_rrd_update($meter, $values) {
   $file_path = _logger_rrd_file($meter);
 
   $command = RRDTOOL . " update $file_path ";
+
+  system("echo $command >> /tmp/test.txt");
 
   ksort($values);
 
@@ -299,7 +300,7 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
  */
 function _logger_rrd_file($meter) {
 
-  return LOGGER_PATH . "/data/base/$meter.rrd";
+  return RRDTOOL_PATH . "/data/base/$meter.rrd";
 }
 
 /**

@@ -831,35 +831,37 @@ function _logger_create_power_legend_line($username, $sensor, $type, $i, $operat
 function _logger_get_user_sensors($types) {
 
   global $user;
-
-  $sql = "
-    SELECT
-      lm.uid,
-      '%s' AS username,
-      lm.meter,
-      lm.function,
-      st.name AS type,
-      lm.unit,
-      lu.private
-    FROM
-      {logger_meter_type} st,
-      {logger_meters} lm
-      INNER JOIN {logger_users} lu ON lm.uid = lu.uid
-    WHERE
-      lm.uid = %d AND
-      lm.type IN (%s) AND
-      lm.type = st.id AND
-      lm.function IS NOT NULL
-    ORDER BY
-      lm.function";
-
-  $result = db_query($sql, $user->name, $user->uid, implode(',', $types));
-
   $sensors = array();
-  while ($sensor = db_fetch_object($result)) {
-    $sensors[] = $sensor;
-  }
 
+  if (!empty($types)) {
+
+    $sql = "
+      SELECT
+        lm.uid,
+        '%s' AS username,
+        lm.meter,
+        lm.function,
+        st.name AS type,
+        lm.unit,
+        lu.private
+      FROM
+        {logger_meter_type} st,
+        {logger_meters} lm
+        INNER JOIN {logger_users} lu ON lm.uid = lu.uid
+      WHERE
+        lm.uid = %d AND
+        lm.type IN (%s) AND
+        lm.type = st.id AND
+        lm.function IS NOT NULL
+      ORDER BY
+        lm.function";
+
+    $result = db_query($sql, $user->name, $user->uid, implode(',', $types));
+
+    while ($sensor = db_fetch_object($result)) {
+      $sensors[] = $sensor;
+    }
+  }
   return $sensors;
 }
 
@@ -874,7 +876,7 @@ function _logger_get_subscribed_sensors($types) {
   global $user;
   $sensors = array();
 
-  if (user_access('view logger charts')) {
+  if (user_access('view logger charts') && !empty($types)) {
 
     $sql = "
       SELECT
@@ -918,24 +920,28 @@ function _logger_get_subscribed_sensors($types) {
  */
 function _logger_get_active_sensors($types) {
 
-  $sql = "
-    SELECT
-      lm.meter,
-      st.name AS type
-    FROM
-      {logger_meter_type} st,
-      {logger_meters} lm
-    WHERE
-      lm.uid > 0 AND
-      lm.type = st.id AND
-      lm.type IN (%s) AND
-      lm.function IS NOT NULL";
-
-  $result = db_query($sql, implode(',', $types));
-
   $sensors = array();
-  while ($sensor = db_fetch_object($result)) {
-    $sensors[] = $sensor;
+
+  if (!empty($types)) {
+
+    $sql = "
+      SELECT
+        lm.meter,
+        st.name AS type
+      FROM
+        {logger_meter_type} st,
+        {logger_meters} lm
+      WHERE
+        lm.uid > 0 AND
+        lm.type = st.id AND
+        lm.type IN (%s) AND
+        lm.function IS NOT NULL";
+
+    $result = db_query($sql, implode(',', $types));
+
+    while ($sensor = db_fetch_object($result)) {
+      $sensors[] = $sensor;
+    }
   }
   return $sensors;
 }
