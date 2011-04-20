@@ -897,7 +897,7 @@ function _logger_get_subscribed_sensors($types) {
       WHERE
         ur.requester_id = %d AND
         urt.name = '%s' AND
-        lm.type = %d AND
+        lm.type IN (%s) AND
         lm.type = st.id AND
         lm.function IS NOT NULL
       ORDER BY
@@ -1405,12 +1405,14 @@ function logger_energychart_form(&$form_state, $chart) {
     '#attributes'    => $attributes
   );
 
+  $types_options = logger_get_sensor_types_options($user->uid);
+
   $form['selected_sensor_types'] = array(
     '#type'          => 'checkboxes',
     '#title'         => t('Sensor types'),
     '#description'   => t('Select the types of sensors to be shown on the chart.'),
-    '#default_value' => _logger_get_variable('selected_sensor_types', array(CONSUMPTION_SENSOR_TYPE)),
-    '#options'       => logger_get_sensor_types_options($user->uid),
+    '#default_value' => array_keys($types_options),
+    '#options'       => $types_options,
     '#required'      => TRUE,
     '#attributes'    => $attributes
   );
@@ -1419,7 +1421,6 @@ function logger_energychart_form(&$form_state, $chart) {
     '#type'  => 'submit',
     '#value' => t('Refresh')
   );
-
   return $form;
 }
 
