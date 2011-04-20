@@ -385,16 +385,15 @@ function _logger_relative_energy_consumption_page() {
     _logger_set_variable('selected_meters', $all_meters);
   }
 
-  $output = t('The following chart allows you to compare current and previous levels of
-    energy consumption in six different time frames: hour, day, week, month, and year.
-    The bars are explained in the legend bellow.') . '<br><br>';
-
   $chart = _logger_create_chart_object('relative', $types, 'year', 'kWh', TRUE, $sensors);
 
-  $output .= theme('logger_energy_chart_area', $chart) .
-    drupal_get_form('logger_relativechart_form', $chart);
+  return t('The following chart allows you to compare current and previous levels of ' .
+    'energy consumption in six different time frames: hour, day, week, month, and year. ' .
+    'The bars are explained in the legend bellow.') . '<br><br>' .
+  
+    theme('logger_energy_chart_area', $chart) .
 
-  return $output;
+    drupal_get_form('logger_relativechart_form', $chart);
 }
 
 /**
@@ -783,27 +782,18 @@ function _logger_get_overview_chart_data($chart) {
 
 function _logger_format_power_series_data($chart, $measurements) {
 
-  //TODO: get rid of this function. move formats to rrd.inc
-
   $start = $chart->period['start'] + $chart->offset - $chart->period['start'] % $chart->resolution;
-  $end   = $chart->period['end']   + $chart->offset - $chart->period['end'] % $chart->resolution;
+  $end   = $chart->period['end']   + $chart->offset - $chart->period['end']   % $chart->resolution;
 
   $diff = $chart->offset / HOUR;
-  $tz = 'GMT' . ($diff < 0? '-' : '+') . (abs($diff) > 9 ? '0' : '') . abs($diff) . '00';
+  $tz = 'GMT' . ($diff < 0? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
 
   for($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 
+    $key = date('Y-m-d H:i', $timestamp) . " $tz";
     $value = $measurements[$timestamp];
 
-    if ($value) {
-      $key = date('Y-m-d H:i', $timestamp) . " $tz";
-      $formatted[$key] = number_format($value, 3, '.', '');
-    }
-  }
-
-  if (count($formatted) == 0) {
-    $formatted[date('Y-m-d H:i', $start)] = '';
-    $formatted[date('Y-m-d H:i', $end)] = '';
+    $formatted[$key] = $value? number_format($value, 3, '.', '') : '';
   }
   return $formatted;
 }
@@ -979,15 +969,13 @@ function _logger_get_timezone_offset() {
   global $user;
 
   if ($user->uid) {
-    $offset = $user->timezone;
+    return $user->timezone;
 
   } else { //If user is not logged in
 
-    //Gets timezone used in the browser. Auto Timezone option must be turned on.
-    $offset = $_SESSION['timezone'];
+    //Returns timezone used in the browser. Auto Timezone option must be turned on.
+    return $_SESSION['timezone'];
   }
-
-  return $offset;
 }
 
 function logger_theme() {
@@ -1224,7 +1212,6 @@ function _logger_create_interval_menu($context) {
     l(t('Month'),  "$context/month"),
     l(t('Year'),   "$context/year")
   );
-
   return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
 }
 
@@ -1411,7 +1398,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#type'          => 'checkboxes',
     '#title'         => t('Sensor types'),
     '#description'   => t('Select the types of sensors to be shown on the chart.'),
-    '#default_value' => array_keys($types_options),
+    '#default_value' => _logger_get_variable('selected_sensor_types', array_keys($types_options)),
     '#options'       => $types_options,
     '#required'      => TRUE,
     '#attributes'    => $attributes
@@ -1440,7 +1427,6 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#type'   => 'submit',
     '#value'  => t('Refresh')
   );
-
   return $form;
 }
 
@@ -1698,7 +1684,7 @@ function logger_powerchart_form_validate($form, &$form_state) {
 
   $xvalue1 = _logger_get_xvalue(1);
   $xvalue2 = _logger_get_xvalue(2);
-
+  
   if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
     form_set_error('xvalue', t('Time period is invalid.'));
   }
@@ -1900,7 +1886,8 @@ function _logger_get_default_time_window($interval) {
 }
 
 /**
- * Returns an array containing two timestamps representing a period of time.
+ * Returns an array containing two timestamps representing period of time of
+ * the slider chart.
  *
  * @param $interval    The time interval menu option.
  * @param $resolution  The time resolution.
@@ -1911,33 +1898,25 @@ function _logger_get_default_time_window($interval) {
 function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
+  $storage_period = logger_rrd_get_storage_period($resolution);
+
+  //If period not informed, consider default time window
+  $window = $start > 0 && $end > 0 ? $end - $start :
+    _logger_get_default_time_window($interval);
+
   $now = time();
-
-  if ($start > 0 && $end > 0) {
-    $window = $end - $start;
-
-  } else {
-    $window = _logger_get_default_time_window($interval);
+  if ($end < ($now - $storage_period)) {
     $end = $now;
   }
 
   //Expand window to fill slider
   $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
 
-  $storage_period = logger_rrd_get_storage_period($resolution);
-  $elapsed_time = $now - $end;
+  //RRD requires the time window to be covered by RRD
+  $max_window = $storage_period - ($now - $end);
+  $window = min($window, $max_window);
 
-  if ($storage_period > $elapsed_time) {
-
-    $max_window = $storage_period - $elapsed_time;
-
-    //RRD requires the time window to be covered by the RRA
-    $window = min($window, $max_window);
-  }
-
-  $start = $end - $window;
-
-  return array('start' => $start, 'end' => $end);
+  return array('start' => ($end - $window), 'end' => $end);
 }
 
 /**
