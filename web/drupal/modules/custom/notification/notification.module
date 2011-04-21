@@ -1063,7 +1063,7 @@ function _notification_send_no_communication_emails($now) {
       %d > (n.last_sent + n.limit_up) AND
       %d > (n.last_sent + n.min_interval)";
 
-  $args = array(TIMESTAMP_FORMAT_SQL, NO_COMMUNICATION_EVENT_ID, $now, $now, $now);
+  $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, NO_COMMUNICATION_EVENT_ID, $now, $now, $now);
 
   $notifiables = _notification_query_notifiables($sql, $args);
 
@@ -1108,7 +1108,7 @@ function _notification_send_corrupted_message_emails($now) {
       m.device = d.device AND
       m.corrupted <> 0";
 
-  $args = array(TIMESTAMP_FORMAT_SQL, CORRUPTED_MESSAGE_EVENT_ID, $now);
+  $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, CORRUPTED_MESSAGE_EVENT_ID, $now);
 
   $notifiables = _notification_query_notifiables($sql, $args);
 
