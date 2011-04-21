@@ -387,6 +387,8 @@ function _logger_relative_energy_consumption_page() {
 
   $chart = _logger_create_chart_object('relative', $types, 'year', 'kWh', TRUE, $sensors);
 
+  drupal_set_title(t('Your relative energy consumption'));
+
   return t('The following chart allows you to compare current and previous levels of ' .
     'energy consumption in six different time frames: hour, day, week, month, and year. ' .
     'The bars are explained in the legend bellow.') . '<br><br>' .
