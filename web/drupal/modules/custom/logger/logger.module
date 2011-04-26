@@ -1426,13 +1426,10 @@ function logger_energychart_form(&$form_state, $chart) {
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
+    '#price'          => $chart->price,
     '#required'       => TRUE,
     '#attributes'     => $attributes
   );
-
-  if ($chart->unit == 'eur') {
-    $form['unit']['#price'] = $chart->price;
-  }
 
   $form['submit'] = array(
     '#type'  => 'submit',
@@ -1464,13 +1461,10 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
+    '#price'          => $chart->price,
     '#required'       => TRUE,
     '#attributes'     => $attributes
   );
-
-  if ($chart->unit == 'eur') {
-    $form['unit']['#price'] = $chart->price;
-  }
 
   $form['submit'] = array(
     '#type'   => 'submit',
@@ -1499,13 +1493,10 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_power_units_options(),
     '#default_value'  => $chart->unit,
+    '#price'          => $chart->price,
     '#required'       => TRUE,
     '#attributes'     => array('onchange' => 'submitPowerChartForm(true)')
   );
-
-  if ($chart->unit == 'eur/year') {
-    $form['unit']['#price'] = $chart->price;
-  }
 
   $form['step_plot'] = array(
     '#type'           => 'checkbox',
@@ -1624,8 +1615,10 @@ function theme_logger_unit_selector($element) {
   $multiple = $element['#multiple'];
   $name = $element['#name'];
   $attributes = drupal_attributes($element['#attributes']);
-  $price = $element['#price'];
-  $visible = $price ? 'visible' : 'hidden';
+
+  $unit = $element['#default_value'];
+  $visible = strpos(" $unit", 'eur', 1) > 0 ? 'visible' : 'hidden';
+  $price = $element['#price'] ? $element['#price'] : 0.18;
 
   _form_set_class($element, array('form-select'));
 
