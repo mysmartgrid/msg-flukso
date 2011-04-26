@@ -230,7 +230,6 @@ function logger_menu() {
     'file'             => 'logger.admin.inc',
     'weight'           => 2,
   );
-
   return $items;
 }
 
@@ -373,6 +372,8 @@ function _logger_relative_energy_consumption_page() {
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $all_sensors = _logger_get_user_sensors($types);
+  $unit = _logger_get_variable('relativechart_unit', 'kWh');
+  $price = _logger_get_variable('price', NULL);
 
   $sensors = array();
   foreach($all_sensors as $sensor) {
@@ -387,7 +388,7 @@ function _logger_relative_energy_consumption_page() {
     _logger_set_variable('selected_meters', $all_meters);
   }
 
-  $chart = _logger_create_chart_object('relative', $types, 'year', 'kWh', TRUE, $sensors);
+  $chart = _logger_create_chart_object('relative', $types, 'year', $unit, TRUE, $sensors, array(0, 0), array(0, 0), FALSE, $price);
 
   drupal_set_title(t('Your relative energy consumption'));
 
@@ -592,8 +593,8 @@ function _logger_get_relative_chart_data($chart) {
     $period1 = array('start' => $time1, 'end' => $time2 - 1); //Until the last second
     $period2 = array('start' => $time2, 'end' => $time3 - 1); //Until the last second
 
-    $current  = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period2, $resolution);
-    $previous = logger_rrd_query_energy($chart->sensors, 'kWh', $interval, $chart->offset, $period1, $resolution);
+    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $chart->offset, $period2, $resolution, $chart->price);
+    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $chart->offset, $period1, $resolution, $chart->price);
 
     $so_far    = min($previous, $current);
     $remaining = max($previous - $current, 0);
@@ -1394,8 +1395,9 @@ function logger_energychart_form(&$form_state, $chart) {
 
   global $user;
   $types_options = logger_get_sensor_types_options($user->uid);
-  $unit = _logger_get_variable('energychart_unit', 'watt');
   $attributes = array('onchange' => 'submitEnergyChartForm(this)');
+
+  $form['#validate'] = '_logger_chartform_validate';
 
   $form['aggregate_sensors'] = array(
     '#type'          => 'checkbox',
@@ -1423,13 +1425,13 @@ function logger_energychart_form(&$form_state, $chart) {
     '#title'          => t('Chart Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
-    '#default_value'  => $unit,
+    '#default_value'  => $chart->unit,
     '#required'       => TRUE,
     '#attributes'     => $attributes
   );
 
-  if ($unit == 'eur') {
-    $form['unit']['#price'] = _logger_get_variable('price', '0.18');
+  if ($chart->unit == 'eur') {
+    $form['unit']['#price'] = $chart->price;
   }
 
   $form['submit'] = array(
@@ -1441,6 +1443,10 @@ function logger_energychart_form(&$form_state, $chart) {
 
 function logger_relativechart_form(&$form_state, $chart) {
 
+  $attributes = array('onchange' => 'submitRelativeChartForm(this)');
+
+  $form['#validate'] = '_logger_chartform_validate';
+
   $form['selected_meters'] = array(
     '#type'          => 'checkboxes',
     '#title'         => t('Sensors'),
@@ -1448,8 +1454,23 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('selected_meters', 1),
     '#options'       => _logger_get_meters_options($chart->types),
     '#required'      => TRUE,
-    '#attributes'    => array('onchange' => 'submitRelativeChartForm(this)')
+    '#attributes'    => $attributes
   );
+
+  $form['unit'] = array(
+    '#type'           => 'select',
+    '#theme'          => 'logger_unit_selector',
+    '#title'          => t('Chart Unit'),
+    '#description'    => t('Select the chart unit.'),
+    '#options'        => _logger_get_energy_units_options(),
+    '#default_value'  => $chart->unit,
+    '#required'       => TRUE,
+    '#attributes'     => $attributes
+  );
+
+  if ($chart->unit == 'eur') {
+    $form['unit']['#price'] = $chart->price;
+  }
 
   $form['submit'] = array(
     '#type'   => 'submit',
@@ -1471,21 +1492,19 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#attributes'     => array('onchange' => 'submitPowerChartForm(true)')
   );
 
-  $unit = _logger_get_variable('powerchart_unit', 'watt');
-
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
     '#title'          => t('Chart Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_power_units_options(),
-    '#default_value'  => $unit,
+    '#default_value'  => $chart->unit,
     '#required'       => TRUE,
     '#attributes'     => array('onchange' => 'submitPowerChartForm(true)')
   );
 
-  if ($unit == 'eur/year') {
-    $form['unit']['#price'] = _logger_get_variable('price', '0.18');
+  if ($chart->unit == 'eur/year') {
+    $form['unit']['#price'] = $chart->price;
   }
 
   $form['step_plot'] = array(
@@ -1719,15 +1738,6 @@ function _logger_create_custom_field($element, $sufix, $value, $size = 0, $maxle
     $attributes . ' />';
 }
 
-function logger_energychart_form_validate($form, &$form_state) {
-
-  $price = $_REQUEST['price'];
-
-  if ($price && !is_numeric($price)) {
-    form_set_error('unit', t('The price is invalid.') . $price);
-  }
-}
-
 function logger_powerchart_form_validate($form, &$form_state) {
 
   $smoothing_level = $form_state['values']['smoothing_level'];
@@ -1756,8 +1766,14 @@ function logger_powerchart_form_validate($form, &$form_state) {
     form_set_error('xvalue', t('Time period is invalid.'));
   }
 
+  _logger_chartform_validate($form, $form_state);
+}
+
+function _logger_chartform_validate($form, &$form_state) {
+
+  global $_REQUEST;
   $price = $_REQUEST['price'];
-  
+
   if ($price && !is_numeric($price)) {
     form_set_error('unit', t('The price is invalid.') . $price);
   }
@@ -1765,6 +1781,7 @@ function logger_powerchart_form_validate($form, &$form_state) {
 
 function logger_energychart_form_submit($form, &$form_state) {
 
+  global $_REQUEST;
   $aggregate = $form_state['values']['aggregate_sensors'];
   $types     = $form_state['values']['selected_sensor_types'];
   $unit      = $form_state['values']['unit'];
@@ -1782,7 +1799,6 @@ function logger_energychart_form_submit($form, &$form_state) {
 function logger_powerchart_form_submit($form, &$form_state) {
 
   global $_REQUEST;
-
   $new_user        = $form_state['values']['new_user'];
   $step_plot       = $form_state['values']['step_plot'];
   $smoothing_level = $form_state['values']['smoothing_level'];
@@ -1806,8 +1822,17 @@ function logger_powerchart_form_submit($form, &$form_state) {
 
 function logger_relativechart_form_submit($form, &$form_state) {
 
+  global $_REQUEST;
   $meters = $form_state['values']['selected_meters'];
+  $unit   = $form_state['values']['unit'];
+  $price  = $_REQUEST['price'];
+
   _logger_set_variable('selected_meters', $meters);
+  _logger_set_variable('relativechart_unit', $unit);
+
+  if ($price) {
+    _logger_set_variable('price', $price);
+  }
 }
 
 /**
@@ -1893,6 +1918,7 @@ function _logger_get_energy_units_options() {
  * @return the value.
  */
 function _logger_get_yvalue($index) {
+  global $_REQUEST;
   return $_REQUEST['yvalue' . $index];
 }
 
@@ -1905,6 +1931,7 @@ function _logger_get_yvalue($index) {
  */
 function _logger_get_xvalue($index) {
 
+  global $_REQUEST;
   $formatted = $_REQUEST['xvalue' . $index. 'date'] . ' ' . $_REQUEST['xvalue' . $index. 'time'];
 
   //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
@@ -1926,6 +1953,7 @@ function _logger_get_xvalue($index) {
  */
 function _logger_get_resolution($interval) {
 
+  global $_REQUEST;
   $resolution = $_REQUEST['resolution'];
   if ($resolution > 0) {
     return $resolution;
