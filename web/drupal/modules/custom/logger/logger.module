@@ -258,6 +258,8 @@ function _logger_home_page($interval) {
  */
 function _logger_power_page($interval) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   drupal_set_title(t('Your power consumption'));
 
   $interval = $interval ? $interval : 'hour';
@@ -265,15 +267,21 @@ function _logger_power_page($interval) {
   $xvalue2 = _logger_get_xvalue(2);
   $yvalue1 = _logger_get_yvalue(1);
   $yvalue2 = _logger_get_yvalue(2);
-  $unit = _logger_get_variable('chart_unit', 'watt');
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $unit = _logger_get_variable('chart_unit', 'watt');
+
+  $unit_factor = NULL;
+  if ($unit == 'eur') {
+    $price = _logger_get_variable('price', NULL);
+    $unit_factor = $price ? $price * logger_rrd_get_unit_factor('kwh') : NULL;
+  }
 
   $sensors = array_merge(
     _logger_get_user_sensors($types),
     _logger_get_subscribed_sensors($types)
   );
 
-  $chart = _logger_create_chart_object('power', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2));
+  $chart = _logger_create_chart_object('power', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $unit_factor);
 
   return theme('logger_power_chart_area', $chart) .
 
@@ -444,24 +452,26 @@ function _logger_energy_page() {
 /**
  * Creates an object to hold chart parameters.
  *
- * @param $context           The page where the chart is going to be placed (overview or logger).
- * @param $types             The array of sensor types.
- * @param $interval          The time interval.
- * @param $unit              The chart unit.
- * @param $stacked           Whether the chart has stacked bars or not.
- * @param $sensors           The sensors whose values are plotted on the chart.
- * @param $xaxis             An array containing the minimum and maximum timestamps of the x axis.
- * @param $yaxis             An array containing the minimum and maximum values of the y axis.
- * @param $aggregate_sensors Whether the sensors series should be aggregated.
+ * @param $context            The page where the chart is going to be placed (overview or logger).
+ * @param $types              The array of sensor types.
+ * @param $interval           The time interval.
+ * @param $unit               The chart unit.
+ * @param $stacked            Whether the chart has stacked bars or not.
+ * @param $sensors            The sensors whose values are plotted on the chart.
+ * @param $xaxis              An array containing the minimum and maximum timestamps of the x axis.
+ * @param $yaxis              An array containing the minimum and maximum values of the y axis.
+ * @param $aggregate_sensors  Whether the sensors series should be aggregated.
+ * @param $unit_factor        The unit conversion factor.
  * @return the chart object.
  */
-function _logger_create_chart_object($context, $types, $interval, $unit, $stacked, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE) {
+function _logger_create_chart_object($context, $types, $interval, $unit, $stacked, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $unit_factor = NULL) {
 
   $chart = new stdClass();
   $chart->context = $context;
   $chart->types = $types;
   $chart->interval = $interval;
   $chart->unit = $unit;
+  $chart->unit_factor = $unit_factor;
   $chart->stacked = $stacked;
 
   $chart->resolution = _logger_get_resolution($interval);
@@ -481,7 +491,7 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $lifetime = 15 * MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
-  $unique_id = "$context " . implode(',', $types) . " $unit $chart->resolution $t1 $t2 $aggregate_sensors";
+  $unique_id = "$context " . implode(',', $types) . " $unit $unit_factor $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter $sensor->type";
   }
@@ -746,7 +756,7 @@ function _logger_get_power_chart_data($chart) {
   $i = 0;
   foreach ($chart->sensors as &$sensor) {
 
-    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution, $chart->unit_factor);
 
     $values = _logger_format_power_series_data($chart, $measurements);
 
@@ -1038,6 +1048,11 @@ function logger_theme() {
         'chartId'   => NULL,
         'index'     => NULL,
         'colors'    => NULL),
+    ),
+
+    'logger_unit_selector' => array(
+      'arguments' => array(
+        'element' => NULL),
     ),
   );
 }
@@ -1445,15 +1460,23 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#attributes'     => array('onchange' => 'submitPowerChartForm(true)')
   );
 
+  $unit = _logger_get_variable('chart_unit', 'watt');
+
   $form['unit'] = array(
     '#type'           => 'select',
+    '#theme'          => 'logger_unit_selector',
     '#title'          => t('Chart Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_units_options(),
-    '#default_value'  => _logger_get_variable('chart_unit', 'watt'),
+    '#default_value'  => $unit,
     '#required'       => TRUE,
     '#attributes'     => array('onchange' => 'submitPowerChartForm(true)')
   );
+
+  if ($unit == 'eur') {
+    $price = round(logger_rrd_get_unit_factor('eur') / logger_rrd_get_unit_factor('kwh'), 2);
+    $form['unit']['#price'] = _logger_get_variable('price', $price);
+  }
 
   $form['step_plot'] = array(
     '#type'           => 'checkbox',
@@ -1564,6 +1587,29 @@ function theme_logger_time_period($element) {
   $field2 = _logger_create_time_fields($element, 2);
 
   return _logger_compose_range_fields($element, $field1, $field2);
+}
+
+function theme_logger_unit_selector($element) {
+
+  $size = $element['#size'] ? ' size="' . $element['#size'] . '"' : '';
+  $multiple = $element['#multiple'];
+  $name = $element['#name'];
+  $attributes = drupal_attributes($element['#attributes']);
+  $price = $element['#price'];
+  $visible = $price ? 'visible' : 'hidden';
+
+  _form_set_class($element, array('form-select'));
+
+  $field2 = '<div style="display: inline; visibility: ' . $visible . ';">' .
+    t('€ ') . '<input type="text" name="price" size="4" ' .
+    'value="' . $price . '" style="text-align: right;"/> / kWh</div>';
+
+  $field1 = '<select name="' . $name . '' . ($multiple ? '[]' : '') . '"' .
+    ($multiple ? ' multiple="multiple" ' : '') .
+    $attributes . ' id="' . $element['#id'] . '" ' . $size . '>' .
+    form_select_options($element) . '</select>';
+
+  return theme('form_element', $element, "$field1 &nbsp;&nbsp;&nbsp;$field2");
 }
 
 /**
@@ -1690,6 +1736,13 @@ function logger_powerchart_form_validate($form, &$form_state) {
   if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
     form_set_error('xvalue', t('Time period is invalid.'));
   }
+
+  $unit = $form_state['values']['unit'];
+  $price = $_REQUEST['price'];
+  
+  if ($price && !is_numeric($price)) {
+    form_set_error('unit', t('The price is invalid.') . $price);
+  }
 }
 
 function logger_energychart_form_submit($form, &$form_state) {
@@ -1706,12 +1759,17 @@ function logger_powerchart_form_submit($form, &$form_state) {
   global $_REQUEST;
 
   $new_user        = $form_state['values']['new_user'];
-  $unit            = $form_state['values']['unit'];
   $step_plot       = $form_state['values']['step_plot'];
   $smoothing_level = $form_state['values']['smoothing_level'];
+  $unit            = $form_state['values']['unit'];
+  $price           = $_REQUEST['price'];
 
   if ($new_user > 0) {
     _logger_add_user($new_user);
+  }
+
+  if ($price) {
+    _logger_set_variable('price', $price);
   }
 
   _logger_set_variable('chart_unit', $unit);
@@ -1790,8 +1848,7 @@ function _logger_get_units_options() {
   return array(
     'watt' => t('watt'),
     'kwh'  => t('kWh/year'),
-    'eur'  => t('euro/year (0.18eur/kWh)'),
-    'aud'  => t('aud/year (0.19aud/kWh)')
+    'eur'  => t('euro/year')
   );
 }
 
