@@ -235,17 +235,21 @@ function logger_menu() {
 
 /**
  * Forwards request to a suitable home page.
- *
- * @param $interval The time interval.
+ * 
+ * @param $arg  any page argument.
  * @return the home page.
  */
-function _logger_home_page($interval) {
+function _logger_home_page($arg = NULL) {
+
+  if ($arg) {
+    drupal_goto('logger', NULL, NULL, 301);
+  }
 
   if (user_access('view logger charts')) {
     return _logger_energy_page();
 
   } else {
-    return _logger_overview_page($interval);
+    return _logger_overview_page('hour');
   }
 }
 
@@ -259,9 +263,13 @@ function _logger_power_page($interval) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  $interval = $interval ? $interval : 'hour';
+  if (!_logger_get_default_time_window($interval)) {
+    drupal_goto('power', NULL, NULL, 301);
+  }
+
   drupal_set_title(t('Your power consumption'));
 
-  $interval = $interval ? $interval : 'hour';
   $xvalue1 = _logger_get_xvalue(1);
   $xvalue2 = _logger_get_xvalue(2);
   $yvalue1 = _logger_get_yvalue(1);
@@ -290,9 +298,13 @@ function _logger_power_page($interval) {
  */
 function _logger_overview_page($interval) {
 
+  $interval = $interval ? $interval : 'hour';
+  if (!_logger_get_default_time_window($interval)) {
+    drupal_goto('overview', NULL, NULL, 301);
+  }
+
   drupal_set_title(t('Overall View'));
 
-  $interval = $interval ? $interval : 'hour';
   $cache_id = 'logger_overview';
   $cache = cache_get($cache_id, 'cache_page');
 
