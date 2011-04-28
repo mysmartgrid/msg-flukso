@@ -97,6 +97,7 @@ function logger_menu() {
     'title'            => 'Your energy consumption',
     'description'      => 'Show the energy consumption page',
     'page callback'    => '_logger_energy_page',
+    'page arguments'   => array(1),
     'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
@@ -246,7 +247,7 @@ function _logger_home_page($arg = NULL) {
   }
 
   if (user_access('view logger charts')) {
-    return _logger_energy_page();
+    return _logger_energy_page('week');
 
   } else {
     return _logger_overview_page('hour');
@@ -416,14 +417,32 @@ function _logger_relative_energy_consumption_page() {
 /**
  * Builds the energy consumption page.
  *
+ * @param $interval The time interval.
  * @return the energy consumption page.
  */
-function _logger_energy_page() {
+function _logger_energy_page($interval) {
 
   global $user;
-  $now = time();
-  $start = $now - 6 * DAY - $now % DAY;
-  $end = $start + 7 * DAY;
+
+  $interval = $interval ? $interval : 'week';
+  $window = _logger_get_default_time_window($interval);
+  if (!$window) {
+    drupal_goto('energy', NULL, NULL, 301);
+  }
+
+  if ($interval == 'year') {
+    $start = mktime(0, 0, 0, date('n') - 11, 1);
+    $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
+
+  } else {
+    $sub_interval = _logger_get_sub_interval($interval);
+    $sub_time_window = _logger_get_default_time_window($sub_interval);
+
+    $now = time();
+    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - $now % $sub_time_window;
+    $start -= $interval == 'month' ? 3 * DAY : 0;
+    $end = $start + round($window / $sub_time_window) * $sub_time_window;
+  }
 
   $all_types = array_keys(logger_get_sensor_types_options($user->uid));
   $selected_types_options = _logger_get_variable('selected_sensor_types', array());
@@ -444,15 +463,22 @@ function _logger_energy_page() {
   $unit = _logger_get_variable('energychart_unit', 'kWh');
   $price = _logger_get_variable('price', NULL);
 
-  $chart = _logger_create_chart_object('energy', $types, 'week', $unit, FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price);
-  $consumed = number_format($chart->data['last'], 2, '.', '');
+  $chart = _logger_create_chart_object('energy', $types, $interval, $unit, FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price);
+  $consumed = $chart->data['last'][CONSUMPTION_SENSOR_TYPE];
+  $produced = $chart->data['last'][PRODUCTION_SENSOR_TYPE];
 
   drupal_set_title(t('Your energy consumption'));
 
-  return t('Today you have consumed %consumed %unit so far. ' .
-    'The following chart shows your energy consumption along the week.',
-    array('%consumed' => $consumed, '%unit' => t($unit))) . '<br><br>' .
-          
+  $today = array('week' => 'Today', 'month' => 'This week', 'year' => 'This month');
+
+  return t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
+    "The following chart shows your energy consumption and production along the !interval.",
+    array('!today'  => t($today[$interval]),
+        '%consumed' => number_format($consumed, 2, '.', ''),
+        '%produced' => number_format($produced, 2, '.', ''),
+        '%unit'     => t($unit),
+        '!interval' => t($interval))) . '<br><br>' .
+
     theme('logger_energy_chart_area', $chart) .
 
     drupal_get_form('logger_energychart_form', $chart);
@@ -549,7 +575,7 @@ function _logger_download_chart_data_file($cache_id) {
 
     $lines = '';
     foreach($values as $timestamp => $values_list) {
-      $lines .= str_replace('<br>', ' ', $timestamp); //Removes HTML tags
+      $lines .= str_replace(array('&nbsp;', '<br>'), ' ', $timestamp); //Removes HTML tags
       $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
@@ -667,7 +693,7 @@ function _logger_get_energy_chart_data(&$chart) {
 
   global $user;
   module_load_include('inc', 'logger', 'logger.rrd');
-  $last_day_consumption = 0;
+  $last = array();
 
   $groups = array();
   foreach ($chart->sensors as &$sensor) {
@@ -675,43 +701,71 @@ function _logger_get_energy_chart_data(&$chart) {
     $groups[$key][] = $sensor;
   }
 
+  $sub_interval = _logger_get_sub_interval($chart->interval);
+  $sub_time_window = _logger_get_default_time_window($sub_interval);
+
   foreach ($groups as $key => &$series_sensors) {
 
     $min_day = 0;
     $max_day = 0;
-    $min = 999999999999;
-    $max = 0;
+    $min = NULL;
+    $max = NULL;
     $sum = 0;
     $total = 0;
     $series = array();
     $data_labels = array();
 
     $from = $chart->xaxis[0];
-    $to = $chart->xaxis[1] - DAY;
-    for($time = $from; $time <= $to; $time += DAY) {
+    $to = $chart->xaxis[1] - $sub_time_window;
+    for ($time = $from; $time <= $to; $time += $sub_time_window) {
 
-      $period = array('start' => $time, 'end' => ($time + DAY - 1)); //from 00:00:00 until 23:59:59
-      $value = logger_rrd_query_energy($series_sensors, $chart->unit, 'day', $chart->offset, $period, $chart->resolution, $chart->price);
+      if ($chart->interval == 'year') {
+        $start = mktime(0, 0, 0, date('n', $time + WEEK),     1, date('Y', $time + WEEK));
+        $end   = mktime(0, 0, 0, date('n', $time + WEEK) + 1, 1, date('Y', $time + WEEK)) - 1;
 
-      if ($value < $min && $time < $to) {
-        $min = $value;
-        $min_day = $time;
+      } else {
+        $start = $time;
+        $end = $time + $sub_time_window - 1;
       }
 
-      if ($value > $max) {
+      $period = array('start' => $start, 'end' => $end); //from 00:00:00 until 23:59:59
+      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $chart->offset, $period, $chart->resolution, $chart->price);
+
+      if ($chart->interval == 'week') {
+        $formatted_time = t(date("l", $start));
+        $complement = date("d-M", $start);
+
+      } else if ($chart->interval == 'month') {
+        $formatted_time = t('Week') . ' ' . date("W", $start);
+        $complement = t('from: ') . '&nbsp;&nbsp;' . date("d-M", $start) . '<br>' .
+                      t('to: ')   . '&nbsp;&nbsp;' . date("d-M", $end);
+
+      } else if ($chart->interval == 'year') {
+        $formatted_time = t(date("M", $start));
+        $complement = date("Y", $start);
+      }
+      $title = $formatted_time . '<br>' . $complement;
+
+      if (!$min || ($value < $min && $time < $to)) {
+        $min = $value;
+        $min_day = $formatted_time;
+      }
+
+      if (!$max || $value > $max) {
         $max = $value;
-        $max_day = $time;
+        $max_day = $formatted_time;
       }
 
       $sum += $value;
       $total++;
 
-      $title = t(date("l", $time)) . '<br>' . date("d-M", $time);
       $series[$title] = $value;
-
       $data_labels[$title] = $value;
     }
-    $last_day_consumption += $value;
+
+    $sensor = $series_sensors[0];
+    $type_id = $sensor->type_id;
+    $last[$type_id] = $last[$type_id] + $value;
 
     if ($chart->aggregate_sensors) {
       $sensor = new stdClass();
@@ -719,37 +773,37 @@ function _logger_get_energy_chart_data(&$chart) {
       $sensor->username = $user->name;
       $sensor->function = t('All');
       $sensor->type = t($key);
-
-    } else {
-      $sensor = $series_sensors[0];
     }
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->function][t($sensor->type)] = $series;
     $data['labels'][$sensor->function][t($sensor->type)] = $data_labels;
-    $data['legend'][] = _logger_create_energy_legend_line($sensor, $min, $max, $total, $sum, $min_day, $max_day);
+    $data['legend'][] = _logger_create_energy_legend_line($sensor, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
   }
-  $data['last'] = $last_day_consumption;
+  $data['last'] = $last;
 
   return $data;
 }
 
-function _logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_day, $max_day) {
+function _logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_day, $max_day, $interval) {
 
   return array(
     t('User')   => $sensor->username,
     t('Sensor') => $sensor->function,
     t('Type')   => t($sensor->type),
-    t('Min')    => $total > 0 ? _logger_format_energy_legend_day($min, $min_day) : '',
-    t('Max')    => $total > 0 ? _logger_format_energy_legend_day($max, $max_day) : '',
+    t('Min')    => $total > 0 ? _logger_format_energy_legend_day($min, $min_day, $interval) : '',
+    t('Max')    => $total > 0 ? _logger_format_energy_legend_day($max, $max_day, $interval) : '',
     t('Avg')    => $total > 0 ? $sum / $total : '',
     t('Sum')    => $total > 0 ? $sum : ''
   );
 }
 
-function _logger_format_energy_legend_day($value, $day) {
-  return t('%value on %day', array(
-    '%value' => number_format($value, 2, '.', ''),
-    '%day' => t(date('l', $day))));
+function _logger_format_energy_legend_day($value, $formatted_time, $interval) {
+
+  $prep = $interval == 'year' ? 'in' : 'am';
+
+  return t("%value $prep %day", array(
+    '%value' => number_format($value, 2, '.', ''), 
+    '%day'   => $formatted_time));
 }
 
 /**
@@ -853,6 +907,7 @@ function _logger_get_user_sensors($types) {
         lm.meter,
         lm.function,
         st.name AS type,
+        st.id AS type_id,
         lm.unit,
         lu.private
       FROM
@@ -896,6 +951,7 @@ function _logger_get_subscribed_sensors($types) {
         lm.meter,
         lm.function,
         st.name AS type,
+        st.id AS type_id,
         lm.unit,
         lu.private
       FROM
@@ -938,7 +994,8 @@ function _logger_get_active_sensors($types) {
     $sql = "
       SELECT
         lm.meter,
-        st.name AS type
+        st.name AS type,
+        st.id AS type_id
       FROM
         {logger_meter_type} st,
         {logger_meters} lm
@@ -1165,7 +1222,8 @@ function theme_logger_energy_chart_area($chart) {
 
   $id = $chart->context . 'Chart';
 
-  return "
+  return _logger_create_interval_menu($chart->context) . "
+
     <div id='$id' style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
@@ -1230,14 +1288,18 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
  */
 function _logger_create_interval_menu($context) {
 
-  $items = array(
-    l(t('Hour'),   "$context/hour"),
-    l(t('Day'),    "$context/day"),
-    l(t('3 Days'), "$context/days"),
-    l(t('Week'),   "$context/week"),
-    l(t('Month'),  "$context/month"),
-    l(t('Year'),   "$context/year")
-  );
+  if ($context != 'energy') {
+    $items = array(
+      l(t('Hour'),   "$context/hour"),
+      l(t('Day'),    "$context/day"),
+      l(t('3 Days'), "$context/days")
+    );
+  }
+
+  $items[] = l(t('Week'),  "$context/week");
+  $items[] = l(t('Month'), "$context/month");
+  $items[] = l(t('Year'),  "$context/year");
+
   return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
 }
 
@@ -2004,6 +2066,17 @@ function _logger_get_default_time_window($interval) {
     'week'  =>   7 * DAY,
     'month' =>  30 * DAY,
     'year'  => 365 * DAY
+  );
+  return $windows[$interval];
+}
+
+function _logger_get_sub_interval($interval) {
+  $windows = array(
+    'day'   => 'hour',
+    'days'  => 'day',
+    'week'  => 'day',
+    'month' => 'week',
+    'year'  => 'month'
   );
   return $windows[$interval];
 }
