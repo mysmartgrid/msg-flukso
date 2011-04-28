@@ -472,12 +472,12 @@ function _logger_energy_page($interval) {
   $today = array('week' => 'Today', 'month' => 'This week', 'year' => 'This month');
 
   return t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
-    "The following chart shows your energy consumption and production along the !interval.",
+    "The following chart shows your energy consumption and production !interval.",
     array('!today'  => t($today[$interval]),
         '%consumed' => number_format($consumed, 2, '.', ''),
         '%produced' => number_format($produced, 2, '.', ''),
         '%unit'     => t($unit),
-        '!interval' => t($interval))) . '<br><br>' .
+        '!interval' => t("along the $interval"))) . '<br><br>' .
 
     theme('logger_energy_chart_area', $chart) .
 
@@ -1221,9 +1221,9 @@ function theme_logger_energy_chart_area($chart) {
   }
 
   $id = $chart->context . 'Chart';
+  $menu = $chart->context == 'energy' ? _logger_create_interval_menu($chart->context) : '';
 
-  return _logger_create_interval_menu($chart->context) . "
-
+  return " $menu
     <div id='$id' style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>
     <script type='text/javascript'>
       $id = createBarChart('$id',
