@@ -269,7 +269,7 @@ function _logger_power_page($interval) {
     drupal_goto('power', NULL, NULL, 301);
   }
 
-  drupal_set_title(t('Your power consumption'));
+  drupal_set_title(t('Your power consumption and production'));
 
   $xvalue1 = _logger_get_xvalue(1);
   $xvalue2 = _logger_get_xvalue(2);
@@ -467,7 +467,7 @@ function _logger_energy_page($interval) {
   $consumed = $chart->data['last'][CONSUMPTION_SENSOR_TYPE];
   $produced = $chart->data['last'][PRODUCTION_SENSOR_TYPE];
 
-  drupal_set_title(t('Your energy consumption'));
+  drupal_set_title(t('Your energy consumption and production'));
 
   $today = array('week' => 'Today', 'month' => 'This week', 'year' => 'This month');
 
@@ -659,29 +659,33 @@ function _logger_get_relative_chart_data($chart) {
 
 function _logger_format_period($interval, $period, $offset) {
 
-  $start = $period['start'];
-  $end = $period['end'];
+  $start = $period['start'] + $offset;
+  $end   = $period['end'] + $offset;
 
   switch ($interval) {
     case 'hour':
-      $start += $offset;
-      $end += $offset;
-      $formatted = t('from: ') . '&nbsp;' . date('H:i', $start) . '<br>' . t('to: ') . '&nbsp;&nbsp;' . date('H:i', $end);
-      break;
+      return date('H:i', $start);
+
+    case 'dayquarter':
+      return _logger_format_period_line($start, $end, 'H:i');
+
     case 'day':
-      $formatted = date('d/m', $start);
-      break;
+      return date('d/m', $start);
+
     case 'week':
-      $formatted = t('from: ') . '&nbsp;' . date('d/m', $start) . '<br>' . t('to: ') . '&nbsp;&nbsp;' . date('d/m', $end);
-      break;
+      return _logger_format_period_line($start, $end, 'd/m');
+
     case 'month':
-      $formatted = t(date('F', $start));
-      break;
+      return t(date('F', $start));
+
     case 'year':
-      $formatted = t(date('Y', $start)) . '<br>';
-      break;
+      return t(date('Y', $start)) . '<br>';
   }
-  return $formatted;
+}
+
+function _logger_format_period_line($start, $end, $format) {
+  return t('from: ') . '&nbsp;&nbsp;' . date($format, $start) . '<br>' .
+         t('to: ')   . '&nbsp;&nbsp;' . date($format, $end);
 }
 
 /**
@@ -731,18 +735,23 @@ function _logger_get_energy_chart_data(&$chart) {
       $period = array('start' => $start, 'end' => $end); //from 00:00:00 until 23:59:59
       $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $chart->offset, $period, $chart->resolution, $chart->price);
 
-      if ($chart->interval == 'week') {
-        $formatted_time = t(date("l", $start));
-        $complement = date("d-M", $start);
-
-      } else if ($chart->interval == 'month') {
-        $formatted_time = t('Week') . ' ' . date("W", $start);
-        $complement = t('from: ') . '&nbsp;&nbsp;' . date("d-M", $start) . '<br>' .
-                      t('to: ')   . '&nbsp;&nbsp;' . date("d-M", $end);
-
-      } else if ($chart->interval == 'year') {
-        $formatted_time = t(date("M", $start));
-        $complement = date("Y", $start);
+      switch ($chart->interval) {
+        case 'day':
+          $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
+          $complement = _logger_format_period('dayquarter', $period, 0);
+          break;
+        case 'week':
+          $formatted_time = t(date("l", $start));
+          $complement = date("d-M", $start);
+          break;
+        case 'month':
+          $formatted_time = t('Week') . ' ' . date("W", $start);
+          $complement = _logger_format_period('week', $period, 0);
+          break;
+        case 'year':
+          $formatted_time = t(date("M", $start));
+          $complement = date("Y", $start);
+          break;
       }
       $title = $formatted_time . '<br>' . $complement;
 
@@ -1283,23 +1292,29 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
 /**
  * Creates the chart intervals' horizontal menu.
  *
- * @param $context  The page where the menu is going to be placed (overview or logger).
+ * @param $context  The page where the menu is going to be placed.
  * @return the list of intervals' menus.
  */
 function _logger_create_interval_menu($context) {
 
-  if ($context != 'energy') {
+  if ($context == 'energy') {
+    $items = array(
+      l(t('Day'),    "$context/day"),
+      l(t('Week'),   "$context/week"),
+      l(t('Month'),  "$context/month"),
+      l(t('Year'),   "$context/year")
+    );
+
+  } else {
     $items = array(
       l(t('Hour'),   "$context/hour"),
       l(t('Day'),    "$context/day"),
-      l(t('3 Days'), "$context/days")
+      l(t('3 Days'), "$context/days"),
+      l(t('Week'),   "$context/week"),
+      l(t('Month'),  "$context/month"),
+      l(t('Year'),   "$context/year")
     );
   }
-
-  $items[] = l(t('Week'),  "$context/week");
-  $items[] = l(t('Month'), "$context/month");
-  $items[] = l(t('Year'),  "$context/year");
-
   return theme_item_list($items, NULL, 'ul', array('class' => 'tabs secondary'));
 }
 
@@ -2032,7 +2047,6 @@ function _logger_get_resolution($interval) {
     'month' =>  1 * DAY,
     'year'  =>  1 * WEEK
   );
-
   return $options[$interval];
 }
 
@@ -2060,23 +2074,25 @@ function _logger_get_resolutions_options() {
 function _logger_get_default_time_window($interval) {
 
   $windows = array(
-    'hour'  =>   1 * HOUR,
-    'day'   =>   1 * DAY,
-    'days'  =>   3 * DAY,
-    'week'  =>   7 * DAY,
-    'month' =>  30 * DAY,
-    'year'  => 365 * DAY
+    'hour'       =>   1 * HOUR,
+    'dayquarter' =>   6 * HOUR,
+    'day'        =>   1 * DAY,
+    'days'       =>   3 * DAY,
+    'week'       =>   7 * DAY,
+    'month'      =>  30 * DAY,
+    'year'       => 365 * DAY
   );
   return $windows[$interval];
 }
 
 function _logger_get_sub_interval($interval) {
   $windows = array(
-    'day'   => 'hour',
-    'days'  => 'day',
-    'week'  => 'day',
-    'month' => 'week',
-    'year'  => 'month'
+    'dayquarter' => 'hour',
+    'day'        => 'dayquarter',
+    'days'       => 'day',
+    'week'       => 'day',
+    'month'      => 'week',
+    'year'       => 'month'
   );
   return $windows[$interval];
 }
