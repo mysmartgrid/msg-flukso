@@ -19,12 +19,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('NO_COMMUNICATION_EVENT_ID',     1);
-define('CORRUPTED_MESSAGE_EVENT_ID',    2);
-define('PEAK_CONSUMPTION_EVENT_ID',     4);
-define('BROWNOUT_EVENT_ID',             5);
-define('HEARTBEAT_RECEIVED_EVENT_ID',   6);
-define('MEASUREMENT_RECEIVED_EVENT_ID', 7);
+define('NO_COMMUNICATION_EVENT_ID',       1);
+define('CORRUPTED_MESSAGE_EVENT_ID',      2);
+define('COMMUNICATION_RESTORED_EVENT_ID', 3);
+define('PEAK_CONSUMPTION_EVENT_ID',       4);
+define('BROWNOUT_EVENT_ID',               5);
+define('HEARTBEAT_RECEIVED_EVENT_ID',     6);
+define('MEASUREMENT_RECEIVED_EVENT_ID',   7);
 
 define('HOUR_UNIT_ID', 2);
 define('WATT_UNIT_ID', 3);
@@ -544,6 +545,14 @@ function notification_registration_form() {
     '#suffix'         => '</tr>'
   );
 
+  $form['events']['event_id3'] = array(
+    '#title'          => _notification_get_event_name(COMMUNICATION_RESTORED_EVENT_ID),
+    '#type'           => 'checkbox',
+    '#default_value'  => FALSE,
+    '#prefix'         => '<tr><td colspan="3"/>',
+    '#suffix'         => '</tr>'
+  );
+
   $form['min_interval'] = array(
     '#type'           => 'select',
     '#title'          => t('Amount of Notifications'),
@@ -642,7 +651,7 @@ function notification_edition_form(&$form_state, $notification) {
       break;
   }
 
-  if ($notification->event_id <> CORRUPTED_MESSAGE_EVENT_ID) {
+  if ($notification->event_id <> CORRUPTED_MESSAGE_EVENT_ID && $notification->event_id <> COMMUNICATION_RESTORED_EVENT_ID) {
 
     $form['unit_id'] = array(
       '#type'           => 'select',
@@ -773,6 +782,7 @@ function notification_registration_form_submit($form, &$form_state) {
   _notification_register_event($form, $form_state, NO_COMMUNICATION_EVENT_ID);
   _notification_register_event($form, $form_state, CORRUPTED_MESSAGE_EVENT_ID);
   _notification_register_event($form, $form_state, PEAK_CONSUMPTION_EVENT_ID);
+  _notification_register_event($form, $form_state, COMMUNICATION_RESTORED_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -1003,6 +1013,7 @@ function notification_cron() {
   _notification_send_no_communication_emails($now);
   _notification_send_corrupted_message_emails($now);
   _notification_send_peak_consumption_emails($now);
+  _notification_send_communication_restored_emails($now);
 
   _notification_eventlog_clear_old($now);
 }
@@ -1176,6 +1187,92 @@ function _notification_send_peak_consumption_emails($now) {
 
     "The following list shows the measurements above the limit.<br><br> " .
     "!violations <br><br>");
+
+  _notification_send_emails($message, $notifiables);
+}
+
+/**
+ * Sends e-mails notifying users of "Communication Restored" events.
+ *
+ * @param $now The event checkup time.
+ */
+function _notification_send_communication_restored_emails($now) {
+
+  $sql = "
+    SELECT DISTINCT
+      n.event_id,
+      n.device,
+      n.serial,
+      n.emails,
+      FROM_UNIXTIME(n.access + n.timezone, '%s') AS event_time,
+      n.limit_up,
+      n.unit_id
+    FROM
+      (
+        SELECT
+          n.event_id,
+          d.device,
+          d.serial,
+          n.emails,
+          n.last_sent,
+          n.min_interval,
+          l.last_event1_time,
+          IF(d.access > MAX(m.access), d.access, MAX(m.access)) AS access,
+          u.timezone
+        FROM
+          {logger_meters} m,
+          {logger_devices} d,
+          {notification} n,
+          {users} u,
+          (
+            SELECT
+              l.device,
+              l.last_event1_time
+            FROM
+              {event_log} el,
+              (
+                SELECT
+                  l.device,
+                  MAX(l.time) AS last_event1_time
+                FROM
+                  {event_log} l
+                WHERE
+                  l.event_id = %d
+                GROUP BY
+                  l.device
+              ) l
+            WHERE
+              el.device = l.device AND
+              el.time = l.last_event1_time AND
+              el.event_id = %d
+          ) l
+        WHERE
+          l.device = n.device AND
+          n.device = d.device AND
+          n.event_id = %d AND
+          d.device = m.device AND
+          d.uid = u.uid
+        GROUP BY
+          d.device
+        HAVING
+          SUM(m.corrupted) = 0
+      ) n
+    WHERE
+      n.access >= n.last_event1_time AND
+      n.access > n.last_sent AND
+      %d > (n.last_sent + n.min_interval)";
+
+  $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, NO_COMMUNICATION_EVENT_ID, NO_COMMUNICATION_EVENT_ID, COMMUNICATION_RESTORED_EVENT_ID, $now);
+
+  $notifiables = _notification_query_notifiables($sql, $args);
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = _notification_compose_email(
+    "Your Flukso device (serial number: %serial) has restored its " .
+    "communication with the server at %event_time.",
+
+    "Check your WLAN configuration and make sure that it remains active for " .
+    "at least 1 hour per day.");
 
   _notification_send_emails($message, $notifiables);
 }
