@@ -94,7 +94,7 @@ function logger_menu() {
   );
 
   $items['energy'] = array(
-    'title'            => 'Your energy consumption',
+    'title'            => 'Your energy consumption and production',
     'description'      => 'Show the energy consumption page',
     'page callback'    => '_logger_energy_page',
     'page arguments'   => array(1),
@@ -111,7 +111,7 @@ function logger_menu() {
   );
 
   $items['power'] = array(
-    'title'            => 'Your power consumption',
+    'title'            => 'Your power consumption and production',
     'description'      => 'Show the power consumption page',
     'page callback'    => '_logger_power_page',
     'page arguments'   => array(1),
@@ -469,7 +469,7 @@ function _logger_energy_page($interval) {
 
   drupal_set_title(t('Your energy consumption and production'));
 
-  $today = array('week' => 'Today', 'month' => 'This week', 'year' => 'This month');
+  $today = array('day' => 'In the last 6 hours', 'week' => 'Today', 'month' => 'This week', 'year' => 'This month');
 
   return t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
     "The following chart shows your energy consumption and production !interval.",
