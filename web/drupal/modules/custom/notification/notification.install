@@ -557,15 +557,16 @@ function notification_update_6032() {
   return $items;
 }
 
-function notification_update_6033() {
+function notification_update_6034() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
-      $items[] = update_sql("INSERT INTO {event} (id, name) VALUES (3, 'Communication Restored')");
-      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 0)");
       $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (6, 0)");
       $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (7, 0)");
+      $items[] = update_sql("INSERT INTO {event} (id, name) VALUES (3, 'Communication Restored')");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 1)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (3, 2)");
      break;
     case 'pgsql':
       break;
