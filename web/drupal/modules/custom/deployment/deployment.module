@@ -50,7 +50,7 @@ function deployment_settings_access($permission, $account) {
 function deployment_menu() {
 
   $items['deployment/list'] = array(
-    'title'             => 'Deployment List',
+    'title'             => 'Device List',
     'page callback'     => 'deployment_list_page',
     'page arguments'    => array(2),
     'access arguments'  => array('device deployment overview'),
@@ -84,7 +84,7 @@ function deployment_menu() {
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('deployment_printcode_form'),
     'access arguments' => array('print activation code'),
-    'type'             => MENU_NORMAL_ITEM,
+    'type'             => MENU_CALLBACK,
   );
   return $items;
 }
