@@ -465,7 +465,7 @@ function notification_registration_form() {
     'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.');
   
   $form['events'] += _notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-    'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty. When it resumes sending messages, the communication is considered restablished.');
+    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered restablished.');
 
   $form['events'] += _notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
@@ -598,7 +598,7 @@ function notification_edition_form(&$form_state, $notification) {
 
     case COMMUNICATION_RESTORED_EVENT_ID:
       $form['limit_up']['#title'] = t('Maximum Delay');
-      $form['limit_up']['#description'] = t('Here you can set the maximum message delay. Beyond this limit, the device is considered faulty. When it resumes sending messages, the communication is considered restablished.');
+      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered restablished.');
       break;
 
     case PEAK_CONSUMPTION_EVENT_ID:
@@ -1062,8 +1062,7 @@ function _notification_send_communication_restored_emails($now) {
       n.device,
       d.serial,
       n.emails,
-      FROM_UNIXTIME(%d + u.timezone, '%s') AS event_time,
-      FROM_UNIXTIME(e.latest_time - (n.limit_up * un.factor) + u.timezone, '%s') AS last_event_time,
+      FROM_UNIXTIME(e.latest_time + u.timezone, '%s') AS event_time,
       n.limit_up,
       n.unit_id,
       un.name AS unit_name
@@ -1090,7 +1089,7 @@ function _notification_send_communication_restored_emails($now) {
       d.uid = u.uid AND
       %d > (n.last_sent + n.limit_up) AND
       %d > (n.last_sent + n.min_interval) AND
-      EXISTS (
+      NOT EXISTS (
         SELECT
           1
         FROM
@@ -1098,12 +1097,12 @@ function _notification_send_communication_restored_emails($now) {
         WHERE
           p.device = e.device AND
           p.event_id IN (%d, %d) AND
-          (p.time + (n.limit_up * un.factor)) < e.latest_time  AND
+          p.time <> e.latest_time AND
+          (p.time + (n.limit_up * un.factor)) > e.latest_time  AND
           (p.time > n.last_sent OR n.last_sent = 0)
       )";
 
-  $args = array($now,
-    NOTIFICATION_TIMESTAMP_FORMAT_SQL, NOTIFICATION_TIMESTAMP_FORMAT_SQL,
+  $args = array($now, NOTIFICATION_TIMESTAMP_FORMAT_SQL, 
     HEARTBEAT_RECEIVED_EVENT_ID, MEASUREMENT_RECEIVED_EVENT_ID,
     COMMUNICATION_RESTORED_EVENT_ID, $now, $now,
     HEARTBEAT_RECEIVED_EVENT_ID, MEASUREMENT_RECEIVED_EVENT_ID);
@@ -1113,10 +1112,9 @@ function _notification_send_communication_restored_emails($now) {
   //ATTENTION: Any change in the following message requires its translations to be redefined.
 
   $message = _notification_compose_error_email(
-    "Your Flukso device (serial number: %serial) has restored its " .
-    "communication with the server at %event_time. " .
-    "It had not been sending data for more than %limit_up %unit_name, " .
-    "since %last_event_time.",
+    "A message has finally been received from your Flukso device " .
+    "(serial number: %serial) at %event_time.  It had not been sending data " .
+    "for more than %limit_up %unit_name.",
 
     "Check your WLAN configuration and make sure that it remains active for " .
     "at least 1 hour per day. The device might be working fine, but it is " .
