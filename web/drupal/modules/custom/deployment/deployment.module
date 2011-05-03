@@ -199,7 +199,20 @@ function _deployment_get_all_states() {
 function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15, $serial = NULL) {
 
   global $user;
+  $now = time();
 
+  $tzdif = $user->timezone / 3600; //divided by 1 hour
+  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
+  $registration_delay = 3 * 24 * 3600; //3 days
+  $heartbeat_timeout = 7200; //2 hours
+  
+  $uninstalled_id      = UNINSTALLED_STATE_ID;
+  $unregistered_id     = UNREGISTERED_STATE_ID;
+  $corrupted_id        = CORRUPTED_STATE_ID;
+  $no_communication_id = NO_COMMUNICATION_STATE_ID;
+  $working_id          = WORKING_STATE_ID;
+
+  //NOTE: If SQL arguments are used, sql_count does not work.
   $sql = "
     SELECT
       d.serial,
@@ -216,12 +229,12 @@ function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15,
 
           CONVERT_TZ( FROM_UNIXTIME(
             IF(d.corrupted > 0, d.corrupted, IF(d.access > 0, d.access, d.created))
-          ), '+00:00', '%s') AS latest,
+          ), '+00:00', '$tz') AS latest,
 
           IF(d.uid = 0,
-            IF((%d - d.access) > %d,  %d,  %d),
-            IF(d.corrupted > 0, %d,
-              IF(%d > (d.access + %d), %d, %d)
+            IF(($now - d.access) > $registration_delay,  $uninstalled_id,  $unregistered_id),
+            IF(d.corrupted > 0, $corrupted_id,
+              IF($now > (d.access + $heartbeat_timeout), $no_communication_id, $working_id)
             )
           ) AS state
 
@@ -247,38 +260,25 @@ function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15,
             d.access ) d
       ) d";
 
-  $tzdif = $user->timezone / 3600; //divided by 1 hour
-  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $now = time();
-
-  $args = array(
-    $tz, $now,
-    3 * 24 * 3600, //3 days registration_delay
-    UNINSTALLED_STATE_ID, UNREGISTERED_STATE_ID, CORRUPTED_STATE_ID,
-    $now,
-    7200, //2 hs heartbeat_timeout
-    NO_COMMUNICATION_STATE_ID, WORKING_STATE_ID
-  );
 
   if($serial || $state_id) {
     $sql .= ' WHERE ';
 
     if($serial) {
-      $sql .= 'd.serial = %d';
-      $args[] = $serial;
+      $sql .= "d.serial = $serial";
     }
-
     if($state_id) {
-      $sql .= ($serial? ' AND ' : '') . ' d.state = %d';
-      $args[] = $state_id;
+      $sql .= ($serial? ' AND ' : '') . " d.state = $state_id";
     }
   }
+
+  $count_sql = "SELECT COUNT(*) FROM ($sql) d ";
 
   if ($headers) {
     $sql .= tablesort_sql($headers);
   }
 
-  $result = pager_query($sql, $limit, 0, NULL, $args);
+  $result = pager_query($sql, $limit, 0, $count_sql);
   $states = _deployment_get_all_states();
 
   $data = array();
