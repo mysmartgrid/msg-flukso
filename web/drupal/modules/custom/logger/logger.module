@@ -224,9 +224,8 @@ function logger_menu() {
   $items['user/%user_uid_optional/privacy'] = array(
     'title'            => 'Privacy',
     'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('chumby_form'),
-    'access callback'  => 'logger_userprivacy_form',
-    'access arguments' => array('set user preferences', 1),
+    'page arguments'   => array('logger_userprivacy_form'),
+    'access arguments' => array('set user preferences'),
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'logger.admin.inc',
     'weight'           => 2,
@@ -2260,12 +2259,6 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
   }
 }
 
-/**
- * Access callback ensuring the user account tabs are visible only to the owner.
- *
- * @param $permission Required permission to view the item.
- * @param $account    A user object.
- */
 function _logger_account_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
