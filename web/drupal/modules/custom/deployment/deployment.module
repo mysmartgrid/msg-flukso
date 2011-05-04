@@ -355,7 +355,7 @@ function deployment_printcode_form(&$form_state) {
 function deployment_listfilter_form_submit($form, &$form_state) {
 
   $_SESSION['state_id']   = $form_state['values']['state_id'];
-  $_SESSION['page_limit'] = $form_state['values']['page_limit'];
+  $form_state['redirect'] = 'deployment/list';
 }
 
 function deployment_checkup_form_submit($form, &$form_state) {
