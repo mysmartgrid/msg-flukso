@@ -1068,16 +1068,16 @@ function _notification_send_communication_restored_emails($now) {
       FROM_UNIXTIME(e2.time + u.timezone, '%s') AS event_time,
       FROM_UNIXTIME(e1.time + u.timezone, '%s') AS since_time
     FROM
-      users u,
-      unit un,
-      logger_devices d,
-      ((notification n JOIN
+      {users} u,
+      {unit} un,
+      {logger_devices} d,
+      (({notification} n JOIN
       (
         SELECT
           device,
           time
         FROM
-          event_log 
+          {event_log}
         WHERE
           event_id IN (%d, %d)
       ) e1 ON e1.device = n.device) JOIN
@@ -1086,7 +1086,7 @@ function _notification_send_communication_restored_emails($now) {
           device,
           time
         FROM
-          event_log 
+          {event_log}
         WHERE
           event_id IN (%d, %d)
       ) e2 ON e2.device = n.device)
@@ -1105,7 +1105,7 @@ function _notification_send_communication_restored_emails($now) {
         SELECT
           1
         FROM
-          event_log e
+          {event_log} e
         WHERE
           e.device = n.device AND
           e.event_id IN (%d, %d) AND

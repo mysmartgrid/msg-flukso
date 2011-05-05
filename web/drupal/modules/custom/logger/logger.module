@@ -533,6 +533,7 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $chart->id = 'logger_' . $interval . '_chart_data_' . md5($unique_id);
   $cache = cache_get($chart->id, 'cache_page');
   $chart->data = $cache->data;
+  $chart->file_url = 'logger/file/' . $chart->id;
 
   if (!$chart->data) {
     $get_data = '_logger_get_' . $chart->context . '_chart_data';
@@ -1194,7 +1195,7 @@ function theme_logger_power_chart_area($chart) {
     '<div>' . t($unit) . '</div>' .
 
     _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
-    _logger_create_dygraph('sliderChart', $chart, false, $slider_properties) .
+    _logger_create_dygraph('sliderChart', $chart, FALSE, $slider_properties) .
 
     _logger_create_chart_legend($chart);
 }
@@ -1256,7 +1257,7 @@ function theme_logger_energy_chart_area($chart) {
  * @param $properties     The Dygraph properties.
  * @return the Dygraph output.
  */
-function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
+function _logger_create_dygraph($id, $chart, $create_labels, $properties = array()) {
 
   $properties = array_merge($properties, array(
     'labelsDiv'         => '"chartLabels"',
@@ -1282,7 +1283,7 @@ function _logger_create_dygraph($id, $chart, $create_labels, $properties) {
     '<script type="text/javascript">' .
         $id . ' = new Dygraph(
           document.getElementById("' . $id . '"),
-          "/logger/file/' . $chart->id . '", {' .
+          "/' . $chart->file_url . '", {' .
           implode(', ', $pairs) . ' }
       );
     </script> ';
@@ -1356,7 +1357,7 @@ function _logger_create_chart_legend($chart) {
     }
   }
   return theme('table', $header, $lines, array('id' => 'logger-legend-table')) .
-    '<p align="right">' . l(t('Save Data'), "logger/file/" . $chart->id) . '</p>';
+    '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
 }
 
 /**
@@ -1391,7 +1392,7 @@ function _logger_get_series_colors($chart_id) {
   $palettes['overview'] = $palettes['power'];
   $palettes['relative'] = $palettes['energy'];
 
-  $palette = $palettes[$chart_id];
+  $palette = isset($palettes[$chart_id])? $palettes[$chart_id] : $palettes['power'];
 
   for($i = 0; $i < count($palette); $i++) {
     $default = $palette[$i % count($palette)];

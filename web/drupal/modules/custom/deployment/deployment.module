@@ -20,12 +20,6 @@
  */
 
 //Device states
-define('UNINSTALLED_STATE_NAME',      t('Uninstalled'));
-define('UNREGISTERED_STATE_NAME',     t('Unregistered'));
-define('NO_COMMUNICATION_STATE_NAME', t('No Communication'));
-define('CORRUPTED_STATE_NAME',        t('Corrupted Message'));
-define('WORKING_STATE_NAME',          t('Working'));
-
 define('UNINSTALLED_STATE_ID',        1);
 define('UNREGISTERED_STATE_ID',       2);
 define('NO_COMMUNICATION_STATE_ID',   3);
@@ -43,25 +37,49 @@ function deployment_perm() {
   );
 }
 
+//FIXME
+function deployment_init() {
+
+  drupal_add_js(LOGGER_PATH . '/js/jscolor/jscolor.js');
+  drupal_add_js(LOGGER_PATH . '/js/charts.js');
+
+  //If IE
+  if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
+    drupal_add_js(LOGGER_PATH . '/js/dygraph/excanvas.js');
+  }
+
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/strftime-min.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/rgbcolor.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph-canvas.js');
+  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph.js');
+}
+
 function deployment_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
 function deployment_menu() {
 
+  $items['deployment'] = array(
+    'title'             => 'Device',
+    'page callback'     => 'deployment_overview_page',
+    'access arguments'  => array('device deployment overview'),
+    'type'              => MENU_NORMAL_ITEM
+  );
+
   $items['deployment/list'] = array(
     'title'             => 'Device List',
     'page callback'     => 'deployment_list_page',
     'page arguments'    => array(2),
     'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_CALLBACK
+    'type'              => MENU_NORMAL_ITEM
   );
 
   $items['deployment/overview'] = array(
     'title'             => 'Deployment Overview',
     'page callback'     => 'deployment_overview_page',
     'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_CALLBACK
+    'type'              => MENU_NORMAL_ITEM
   );
 
   $items['deployment/checkup'] = array(
@@ -69,14 +87,7 @@ function deployment_menu() {
     'page callback'     => 'drupal_get_form',
     'page arguments'    => array('deployment_checkup_form'),
     'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_CALLBACK
-  );
-
-  $items['deployment/file'] = array(
-    'title'            => 'Downloads a deployment list file',
-    'page callback'    => '_deployment_download_file',
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
+    'type'              => MENU_NORMAL_ITEM
   );
 
   $items['deployment/print'] = array(
@@ -84,7 +95,21 @@ function deployment_menu() {
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('deployment_printcode_form'),
     'access arguments' => array('print activation code'),
-    'type'             => MENU_CALLBACK,
+    'type'             => MENU_NORMAL_ITEM,
+  );
+
+  $items['deployment/list/file'] = array(
+    'title'            => 'Downloads a deployment list file',
+    'page callback'    => '_deployment_download_list_file',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['deployment/chart/file'] = array(
+    'title'            => 'Downloads a deployment chart file',
+    'page callback'    => '_depolyment_download_chart_file',
+    'access callback'  => TRUE,
+    'type'             => MENU_CALLBACK
   );
   return $items;
 }
@@ -116,7 +141,7 @@ function deployment_list_page($id = NULL) {
 
   if($data){
     $output .= theme('table', $headers, $data) . theme('pager', NULL, $limit, 0) .
-      '<p align="right">' . l(t('Save Data'), 'deployment/file') . '</p>';
+      '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
   }
   return $output;
 }
@@ -130,32 +155,100 @@ function deployment_overview_page() {
 
   drupal_set_title(t('Deployment Overview'));
 
-  $all_devices = _deployment_get_devices(NULL, NULL, 9999999999999999, NULL);
+  $sql = "
+    SELECT
+      s.id,
+      s.name,
+      s.description,
+      d.total
+    FROM
+      {deployment_summary} d,
+      {deployment_state} s,
+      (SELECT MAX(time) AS time FROM {deployment_summary}) m
+    WHERE
+      d.state_id = s.id AND
+      d.time = m.time
+    ORDER BY
+      s.id";
 
-  foreach($all_devices as $device) {
-    $state = $device['state'];
+  $legend = array();
+  $state_title = t('State');
+  $total_title = t('Total');
+  $percentage_title = t('Percentage');
+  $total = 0;
 
-    $data[$state]['state'] = l($state, 'deployment/list/' . $device['state_id']);
-    $data[$state]['total']++;
+  $result = db_query($sql);
+  while($summary = db_fetch_array($result)) {
+    $id = $summary['id'];
+
+    $legend[$id][$state_title] = '<b>' . l(t($summary['name']), 'deployment/list/' . $id) . '</b> - ' . t($summary['description']);
+    $legend[$id][$total_title] = $summary['total'];
+    $total += $summary['total'];
   }
 
-  foreach($all_devices as $device) {
-    $state = $device['state'];
-    $data[$state]['perc'] = round(($data[$state]['total'] / count($all_devices)) * 100, 2) . ' %';
+  foreach($legend as &$row) {
+    $perc = $total > 0 ? round(($row[$total_title] / $total) * 100, 2) : 0;
+    $row[$percentage_title] = $perc? $perc . ' %' : '';
   }
 
-  $headers = array(
-    array('data' => t('State'),      'field' => 'state'),
-    array('data' => t('Total'),      'field' => 'total'),
-    array('data' => t('Percentual'), 'field' => 'perc')
-  );
-  return theme('table', $headers, $data);
+  //TODO: use a creation method
+  $chart = new stdClass();
+  $chart->context = 'deployment';
+  $chart->data['legend'] = $legend;
+  $chart->colors = _logger_get_series_colors($chart->context);
+  $chart->file_url = 'deployment/chart/file';
+
+  return _logger_create_dygraph('deploymentChart', $chart, TRUE) . '<br>' .
+
+        _logger_create_chart_legend($chart);
 }
 
 /**
- * Downloads a device list file.
+ * Downloads a deployment summary chart file.
  */
-function _deployment_download_file() {
+function _depolyment_download_chart_file() {
+
+  drupal_set_header('Content-Type: text/plain');
+  drupal_set_header('Content-disposition: attachment; filename=chart-data-file.txt');
+
+  $sql = "
+    SELECT
+      d.time,
+      d.state_id,
+      s.name AS state_name,
+      d.total
+    FROM
+      {deployment_summary} d,
+      {deployment_state} s
+    WHERE
+      d.state_id = s.id
+    ORDER BY
+      d.time,
+      s.name";
+  $result = db_query($sql);
+
+  $time = 0;
+  while($summary = db_fetch_array($result)) {
+
+    if ($summary['time'] != $time) {
+      $lines .= $time ? "\r\n" : '';
+      $time = $summary['time'];
+      $lines .= date('d-M-Y H:i', $time);
+      $header = t('Time');
+    }
+
+    $header .= ',S' . $summary['state_id'];
+    $lines .= ',' . $summary['total'];
+  }
+
+  print $header . PHP_EOL . $lines;
+  exit(0);
+}
+
+/**
+ * Downloads a deployment list file.
+ */
+function _deployment_download_list_file() {
 
   drupal_set_header('Content-Type: text/plain');
   drupal_set_header('Content-disposition: attachment; filename=deployment-list.txt');
@@ -178,13 +271,14 @@ function _deployment_download_file() {
  */
 function _deployment_get_all_states() {
 
-  return array(
-    UNINSTALLED_STATE_ID      => UNINSTALLED_STATE_NAME,
-    UNREGISTERED_STATE_ID     => UNREGISTERED_STATE_NAME,
-    NO_COMMUNICATION_STATE_ID => NO_COMMUNICATION_STATE_NAME,
-    CORRUPTED_STATE_ID        => CORRUPTED_STATE_NAME,
-    WORKING_STATE_ID          => WORKING_STATE_NAME
-  );
+  $states = array();
+  $sql = "SELECT id, name FROM {deployment_state}";
+  $result = db_query($sql, $user->uid);
+
+  while ($state = db_fetch_array($result)) {
+    $states[$state['id']] = t($state['name']);
+  }
+  return $states;
 }
 
 /**
@@ -368,28 +462,31 @@ function deployment_checkup_form_submit($form, &$form_state) {
 
   } else {
     $device = $result[0];
-    $state = $device['state'];
+    $latest = array('%latest' => $device['latest']);
 
-    drupal_set_message(t('Status: ') . $state);
+    drupal_set_message(t('Status: ') . $device['state']);
 
-    if ($state == UNINSTALLED_STATE_NAME) {
-      drupal_set_message(t('This device has not yet been installed.'));
+    switch ($device['state_id']) {
 
-    } else {
-      $latest = array('%latest' => $device['latest']);
+      case UNINSTALLED_STATE_ID:
+        drupal_set_message(t('This device has not yet been installed.'));
+        break;
 
-      if ($state == UNREGISTERED_STATE_NAME) {
+      case UNREGISTERED_STATE_ID:
         drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
+        break;
 
-      } else if ($state == NO_COMMUNICATION_STATE_NAME) {
+      case NO_COMMUNICATION_STATE_ID:
         drupal_set_message(t('No message has been received from this device since %latest.', $latest));
+        break;
 
-      } else if ($state == CORRUPTED_STATE_NAME) {
+      case CORRUPTED_STATE_ID:
         drupal_set_message(t('This device has sent a message with corrupted data at %latest.', $latest));
+        break;
 
-      } else if ($state == WORKING_STATE_NAME) {
+      case WORKING_STATE_ID:
         drupal_set_message(t('This device is working fine. Latest message received at %latest.', $latest));
-      }
+        break;
     }
   }
 }
@@ -456,4 +553,26 @@ function deployment_printcode_form_submit($form, &$form_state) {
 
 function deployment_cron() {
   exec('rm ' . DEPLOYMENT_ABS_PATH . '/pdf/*');
+  _deployment_create_summary();
+}
+
+function _deployment_create_summary() {
+
+  $now = time();
+  $now = $now - ($now % 3600);
+  $states = _deployment_get_all_states();
+
+  $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = %d";
+  $result = db_result(db_query($sql, $now));
+
+  if ($result == 0) {
+    foreach (array_keys($states) as $state_id) {
+      $devices = _deployment_get_devices($state_id, NULL, 9999999999999999, NULL);
+
+      $sql = "INSERT INTO {deployment_summary}(time, state_id, total) VALUES(%d, %d, %d)";
+      db_query($sql, $now, $state_id, count($devices));
+    }
+  }
+  $sql = "DELETE FROM {deployment_summary} WHERE time < %d";
+  db_query($sql, $now - 3 * 30 * 24 * 3600);
 }

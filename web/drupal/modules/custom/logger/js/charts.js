@@ -22,6 +22,7 @@ var powerChart;
 var sliderChart;
 var relativeChart;
 var energyChart;
+var deploymentChart;
 
 function formatDate(d) {
   return '' +
@@ -494,8 +495,16 @@ function setSeriesColor(chartId, i, color) {
     energyChart.plot();
 
   } else {
-    updateDygraphColor(powerChart, i, color);
-    updateDygraphColor(sliderChart, i, color);
+    //FIXME: improve this code
+    if (powerChart) {
+      updateDygraphColor(powerChart, i, color);
+    }
+    if (sliderChart) {
+      updateDygraphColor(sliderChart, i, color);
+    }
+    if (deploymentChart) {
+      updateDygraphColor(deploymentChart, i, color);
+    }
   }
 
   $.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
