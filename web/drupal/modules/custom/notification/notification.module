@@ -465,7 +465,7 @@ function notification_registration_form() {
     'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.');
   
   $form['events'] += _notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered restablished.');
+    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
 
   $form['events'] += _notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');

@@ -489,12 +489,16 @@ function deployment_checkup_form_submit($form, &$form_state) {
         break;
     }
   }
+  
+  drupal_set_message('<br>' . l(t('Device History'), "event/log/list/$serial"));
 }
 
 function deployment_printcode_form_submit($form, &$form_state) {
 
-  $filename = substr(md5(uniqid(rand(), TRUE)),0,10);
-  $output_file_path = "/pdf/$filename.pdf";
+  exec('mkdir -p ' . DEPLOYMENT_ABS_PATH . '/pdf');
+
+  $file_name = substr(md5(uniqid(rand(), TRUE)),0,10);
+  $output_file_path = "/pdf/$file_name.pdf";
 
   require_once('fpdf/fpdf.php');
   require_once('fpdi/fpdi.php');
