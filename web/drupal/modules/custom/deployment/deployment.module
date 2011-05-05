@@ -569,12 +569,13 @@ function _deployment_create_summary() {
 
   $now = time();
   $now = $now - ($now % 3600);
-  $states = _deployment_get_all_states();
 
   $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = %d";
   $result = db_result(db_query($sql, $now));
 
   if ($result == 0) {
+    $states = _deployment_get_all_states();
+
     foreach (array_keys($states) as $state_id) {
       $devices = _deployment_get_devices($state_id, NULL, 9999999999999999, NULL);
 
