@@ -137,6 +137,9 @@ function deployment_list_page($id = NULL) {
 
   $limit = 15;
   $data = _deployment_get_devices($state_id, $headers, $limit);
+  foreach ($data as &$device) {
+    $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
+  }
   $_SESSION['deployment_list'] = $data;
 
   if($data){
