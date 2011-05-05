@@ -182,9 +182,9 @@ function deployment_overview_page() {
 
   $result = db_query($sql);
   while($summary = db_fetch_array($result)) {
-    $id = $summary['id'];
+    $id = $summary['id'] - 1;//Must start from zero
 
-    $legend[$id][$state_title] = '<b>' . l(t($summary['name']), 'deployment/list/' . $id) . '</b> - ' . t($summary['description']);
+    $legend[$id][$state_title] = '<b>' . l(t($summary['name']), 'deployment/list/' . $summary['id']) . '</b> - ' . t($summary['description']);
     $legend[$id][$total_title] = $summary['total'];
     $total += $summary['total'];
   }
@@ -227,7 +227,7 @@ function _depolyment_download_chart_file() {
       d.state_id = s.id
     ORDER BY
       d.time,
-      s.name";
+      d.state_id";
   $result = db_query($sql);
 
   $time = 0;
@@ -236,6 +236,8 @@ function _depolyment_download_chart_file() {
     if ($summary['time'] != $time) {
       $lines .= $time ? "\r\n" : '';
       $time = $summary['time'];
+      $state_id = $summary['state_id'];
+
       $lines .= date('d-M-Y H:i', $time);
       $header = t('Time');
     }

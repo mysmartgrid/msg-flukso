@@ -258,13 +258,15 @@ function notification_eventlog_page($serial) {
       l.event_id = e.id AND
       l.device = d.device AND
       d.serial = '%s' AND
-      d.uid = u.uid";
+      d.uid = u.uid
+    ORDER BY
+      l.time DESC";
 
   $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, $serial);
 
   $headers = array(
-    array('data' => t('Time'),  'field' => 'time', 'sort' => 'DESC'),
-    array('data' => t('Event'), 'field' => 'name', 'sort' => 'ASC'),
+    array('data' => t('Time')),
+    array('data' => t('Event'))
   );
 
   $sql_count = "
@@ -276,8 +278,6 @@ function notification_eventlog_page($serial) {
     WHERE
       l.device = d.device AND
       d.serial = '$serial'";
-
-  $sql .= tablesort_sql($headers);
 
   $limit = 20;
   $result = pager_query($sql, $limit, 0, $sql_count, $args);
@@ -598,7 +598,7 @@ function notification_edition_form(&$form_state, $notification) {
 
     case COMMUNICATION_RESTORED_EVENT_ID:
       $form['limit_up']['#title'] = t('Maximum Delay');
-      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered restablished.');
+      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
       break;
 
     case PEAK_CONSUMPTION_EVENT_ID:
