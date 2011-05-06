@@ -21,12 +21,15 @@
 
 //Constants
 define('NO_COMMUNICATION_EVENT_ID',       1);
-define('CORRUPTED_MESSAGE_EVENT_ID',      2);
 define('COMMUNICATION_RESTORED_EVENT_ID', 3);
 define('PEAK_CONSUMPTION_EVENT_ID',       4);
-define('BROWNOUT_EVENT_ID',               5);
-define('HEARTBEAT_RECEIVED_EVENT_ID',     6);
-define('MEASUREMENT_RECEIVED_EVENT_ID',   7);
+
+//Message events
+define('MESSAGE_RECEIVED_EVENT_ID',       100);
+define('HEARTBEAT_RECEIVED_EVENT_ID',     101);
+define('MEASUREMENT_RECEIVED_EVENT_ID',   102);
+define('CORRUPTED_MESSAGE_EVENT_ID',      103);
+define('BROWNOUT_EVENT_ID',               104);
 
 define('HOUR_UNIT_ID', 2);
 define('WATT_UNIT_ID', 3);
@@ -331,7 +334,7 @@ function _notification_eventlog_clear($serial) {
 function _notification_eventlog_clear_old($now) {
 
   $sql = "DELETE FROM {event_log} WHERE time < %d";
-  db_query($sql, $now - WEEK);
+  db_query($sql, $now - (2 * DAY));
 }
 
 /**
@@ -470,8 +473,9 @@ function notification_registration_form() {
   $form['events'] += _notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
 
-  $form['events']['event_id2'] = array(
-    '#title'         => _notification_get_event_name(CORRUPTED_MESSAGE_EVENT_ID),
+  $event_id = CORRUPTED_MESSAGE_EVENT_ID;
+  $form['events']["event_id$event_id"] = array(
+    '#title'         => _notification_get_event_name($event_id),
     '#type'          => 'checkbox',
     '#default_value' => FALSE,
     '#prefix'        => '<tr><td colspan="3"/>',
@@ -981,45 +985,45 @@ function notification_cron() {
 function _notification_send_no_communication_emails($now) {
 
   $sql = "
-    SELECT DISTINCT
-      n.event_id,
+    SELECT SQL_NO_CACHE
       n.device,
-      n.serial,
-      n.emails,
-      FROM_UNIXTIME(%d + n.timezone, '%s') AS event_time,
-      FROM_UNIXTIME(n.access + n.timezone, '%s') AS last_event_time,
+      n.event_id,
       n.limit_up,
       n.unit_id,
+      FROM_UNIXTIME(%d + n.timezone, '%s') AS event_time,
+      FROM_UNIXTIME(n.access + n.timezone, '%s') AS last_event_time,
+      n.serial,
+      n.emails,
       n.unit_name
     FROM
       (
         SELECT
+          n.device,
+          n.limit_up,
+          n.unit_id,
           n.event_id,
-          d.device,
           d.serial,
           n.emails,
-          n.limit_up,
           n.last_sent,
           n.min_interval,
-          n.unit_id,
           un.name AS unit_name,
           un.factor,
           IF(d.access > MAX(m.access), d.access, MAX(m.access)) AS access,
           u.timezone
         FROM
-          {logger_meters} m,
-          {logger_devices} d,
-          {notification} n,
           {unit} un,
-          {users} u
+          {users} u,
+          {notification} n,
+          {logger_devices} d,
+          {logger_meters} m
         WHERE
-          m.device = d.device AND
-          d.device = n.device AND
           n.event_id = %d AND
           n.unit_id = un.id AND
+          n.device = d.device AND
+          d.device = m.device AND
           d.uid = u.uid
         GROUP BY
-          d.device,
+          n.device,
           n.limit_up,
           n.unit_id
         HAVING
@@ -1057,67 +1061,69 @@ function _notification_send_no_communication_emails($now) {
 function _notification_send_communication_restored_emails($now) {
 
   $sql = "
-    SELECT DISTINCT
-      n.event_id,
+    SELECT
       n.device,
-      d.serial,
-      n.emails,
+      n.event_id,
       n.limit_up,
       n.unit_id,
-      un.name AS unit_name,
-      FROM_UNIXTIME(e2.time + u.timezone, '%s') AS event_time,
-      FROM_UNIXTIME(e1.time + u.timezone, '%s') AS since_time
+      FROM_UNIXTIME(n.time1 + u.timezone, '%s') AS since_time,
+      FROM_UNIXTIME(n.time2 + u.timezone, '%s') AS event_time,
+      d.serial,
+      n.emails,
+      n.last_sent,
+      n.min_interval,
+      un.name AS unit_name
     FROM
-      {users} u,
-      {unit} un,
-      {logger_devices} d,
-      (({notification} n JOIN
+      unit un,
+      users u,
+      logger_devices d,
       (
         SELECT
-          device,
-          time
+          n.device,
+          n.event_id,
+          n.limit_up,
+          n.unit_id,
+          n.emails,
+          n.last_sent,
+          n.min_interval,
+          e1.time AS time1,
+          e2.time AS time2
         FROM
-          {event_log}
+          notification n,
+          event_log e1,
+          event_log e2
         WHERE
-          event_id IN (%d, %d)
-      ) e1 ON e1.device = n.device) JOIN
-      (
-        SELECT
-          device,
-          time
-        FROM
-          {event_log}
-        WHERE
-          event_id IN (%d, %d)
-      ) e2 ON e2.device = n.device)
+          n.event_id = %d AND
+          e1.device = n.device AND
+          e2.device = n.device AND
+          e1.event_id > %d AND
+          e2.event_id > %d AND
+          e1.time > n.base_time AND
+          e2.time > e1.time
+      ) n
     WHERE
-      d.device = n.device AND
-      n.event_id = %d AND
+      n.device = d.device AND
       n.unit_id = un.id AND
       d.uid = u.uid AND
-      e1.time > n.base_time AND
-      e2.time > n.base_time AND
-      e2.time > e1.time AND
+      ((n.time2 - n.time1) > (n.limit_up * un.factor)) AND
       %d > (n.last_sent + n.limit_up) AND
       %d > (n.last_sent + n.min_interval) AND
-      ((e2.time - e1.time) > (n.limit_up * un.factor)) AND
       NOT EXISTS (
         SELECT
           1
         FROM
-          {event_log} e
+          event_log e
         WHERE
           e.device = n.device AND
-          e.event_id IN (%d, %d) AND
-          (e.time > e1.time AND e.time < e2.time)
+          e.event_id > %d AND
+          e.time > n.time1 AND
+          e.time < n.time2
       )";
 
   $args = array(
     NOTIFICATION_TIMESTAMP_FORMAT_SQL, NOTIFICATION_TIMESTAMP_FORMAT_SQL,
-    HEARTBEAT_RECEIVED_EVENT_ID, MEASUREMENT_RECEIVED_EVENT_ID,
-    HEARTBEAT_RECEIVED_EVENT_ID, MEASUREMENT_RECEIVED_EVENT_ID,
-    COMMUNICATION_RESTORED_EVENT_ID, $now, $now,
-    HEARTBEAT_RECEIVED_EVENT_ID, MEASUREMENT_RECEIVED_EVENT_ID);
+    COMMUNICATION_RESTORED_EVENT_ID, MESSAGE_RECEIVED_EVENT_ID, MESSAGE_RECEIVED_EVENT_ID,
+    $now, $now, MESSAGE_RECEIVED_EVENT_ID);
 
   $notifiables = _notification_query_notifiables($sql, $args);
 
@@ -1147,24 +1153,24 @@ function _notification_send_communication_restored_emails($now) {
 function _notification_send_corrupted_message_emails($now) {
 
   $sql = "
-    SELECT DISTINCT
+    SELECT SQL_NO_CACHE
+      n.device,
       n.event_id,
-      d.device,
-      d.serial,
-      n.emails,
-      FROM_UNIXTIME(m.corrupted + u.timezone, '%s') AS event_time,
       n.limit_up,
-      n.unit_id
+      n.unit_id,
+      FROM_UNIXTIME(m.corrupted + u.timezone, '%s') AS event_time,
+      d.serial,
+      n.emails
     FROM
       {users} u,
+      {notification} n,
       {logger_devices} d,
-      {logger_meters} m,
-      {notification} n
+      {logger_meters} m
     WHERE
-      d.uid = u.uid AND
-      d.device = n.device AND
       n.event_id = %d AND
       %d > (n.last_sent + n.min_interval) AND
+      d.device = n.device AND
+      d.uid = u.uid AND
       m.device = d.device AND
       m.corrupted <> 0";
 
@@ -1188,22 +1194,22 @@ function _notification_send_corrupted_message_emails($now) {
 function _notification_send_peak_consumption_emails($now) {
 
   $sql = "
-    SELECT DISTINCT
+    SELECT SQL_NO_CACHE
+      n.device,
       n.event_id,
-      d.device,
+      n.limit_up,
+      n.unit_id,
+      n.base_time AS start_time,
       d.serial,
       n.emails,
-      n.base_time AS start_time,
-      n.limit_up,
-      un.id AS unit_id,
       un.name AS unit_name,
       u.timezone
     FROM
+      {unit} un,
       {users} u,
-      {logger_devices} d,
-      {logger_meters} m,
       {notification} n,
-      {unit} un
+      {logger_devices} d,
+      {logger_meters} m
     WHERE
       d.uid = u.uid AND
       d.device = n.device AND
