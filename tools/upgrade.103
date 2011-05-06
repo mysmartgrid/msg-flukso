@@ -1,0 +1,60 @@
+#!/bin/sh
+# Stephan Platz <stephan.platz@itwm.fraunhofer.de>
+
+VERSION="103"
+URL="http://dev2-logger.mysmartgrid.de/"
+TMPDIR=$(mktemp -d)
+FLUKSO_HOME="flukso"
+LUCI_HOME="."
+OLDDIR=$(pwd)
+
+cd $TMPDIR;
+wget "$URL"files/upgrade/upgrade.$VERSION.tar.gz;
+gzip -d upgrade.$VERSION.tar.gz;
+tar xf upgrade.$VERSION.tar;
+#grep "xmlrpcaddress = \'"$URL"xmlrpc\'" < "$FLUKSO_HOME/flukso.lua" > /dev/null
+#if [ $? != 0 ]; then
+#	echo "flukso.lua contains the wrong xmlrpcaddress"
+#	exit 1
+#fi
+
+#grep "xmlrpcaddress = \'"$URL"xmlrpc\'" < "$FLUKSO_HOME/heartbeat.lua" > /dev/null
+#if [ $? != 0 ]; then
+#	echo "heartbeat.lua contains the wrong xmlrpcaddress"
+#	exit 1
+#fi
+
+# Copy the new Flukso scripts on the Flukso
+echo "Copying the Flukso scripts..."
+cp $FLUKSO_HOME/* /usr/share/lua/flukso/ || continue
+test -L /www || ( ln -s /tmp/sensor /www && echo "Create sensor symlink..." )
+
+# Copy the msg_wizard on the Flukso
+echo "Copying the msg_wizard..."
+MODEL="$LUCI_HOME/model/cbi"
+CONT="$LUCI_HOME/controller"
+cp "$MODEL"/msg_wizard.lua "$MODEL"/wlan.lua "$MODEL"/lan.lua "$MODEL"/tryit.lua /usr/lib/lua/luci/model/cbi/mini/ || continue
+cp "$CONT"/msg_wizard.lua "$CONT"/wlan.lua "$CONT"/lan.lua "$CONT"/tryit.lua /usr/lib/lua/luci/controller/mini/ || continue
+cp "$LUCI_HOME"/index.html /www/ || continue
+
+# Install the avahi daemon and copy the configuration file
+echo "Install and configure the avahi daemon"
+((opkg update > /dev/null 2>1 && opkg -V 0 install avahi-daemon > /dev/null 2>1 && echo 'Installation erfolgreich') || echo 'Installation fehlgeschlagen')
+test -e /etc/rc.d/S96avahi-daemon || ln -s /etc/init.d/avahi-daemon /etc/rc.d/S96avahi-daemon
+test -e /etc/avahi/services/flukso.service || cp ./tools/flukso.service /etc/avahi/services/
+
+# Copy the firewall.user file to disable the firewall for port 22 and 80 on the wireless interface
+cat ./tools/firewall.user | while read line;
+	do
+		[ $(cat /etc/firewall.user | grep -c "$line") -lt 1 ] && echo $line >> /etc/firewall.user
+	done
+
+# Use the reset button to return to the default network, wireless and firewall config
+#flukso_update.exp "scp $SSH_OPT ./tools/system.tail root@192.168.255.1:/tmp/"
+test -e /bin/net_default || cp ./tools/net_defaults /bin
+sed -e 's:/etc/init.d/network restart:net_defaults:' < /etc/config/system > /etc/config/system.new && mv /etc/config/system.new /etc/config/system && echo 'Use reset button to return to default settings'
+
+cd $OLDDIR;
+rm -rf $TMPDIR
+
+reboot

@@ -1,0 +1,13 @@
+changelog
+
+102
+-- flukso scripts updated (including local interface)
+-- msg_wizard added for configuration
+-- avahi daemon added
+-- firewall rules added to enable webserver and ssh on the wireless interface
+-- scripts added to enable the reset button
+
+103
+-- upgrade script fixed not to crash if some changes are made by the user
+-- brownout event added
+-- firewall rule added to enable avahi
