@@ -22,6 +22,7 @@ var powerChart;
 var sliderChart;
 var relativeChart;
 var energyChart;
+var deploymentChart;
 
 function formatDate(d) {
   return '' +
@@ -107,10 +108,16 @@ function submitPowerChartForm(resetY) {
   form.submit();
 }
 
-function submitEnergyChartForm() {
+function submitEnergyChartForm(clickedField) {
 
   var form = document.getElementById('logger-energychart-form');
-  form.submit();
+  for(var i = 0; i < form.elements.length; i++) {
+    if (form.elements[i].name.indexOf('selected_sensor_types', 0) == 0 && form.elements[i].checked) {
+      form.submit();
+      return;
+    }
+  }
+  clickedField.checked = true;
 }
 
 function submitRelativeChartForm(clickedField) {
@@ -488,8 +495,16 @@ function setSeriesColor(chartId, i, color) {
     energyChart.plot();
 
   } else {
-    updateDygraphColor(powerChart, i, color);
-    updateDygraphColor(sliderChart, i, color);
+    //FIXME: improve this code
+    if (powerChart) {
+      updateDygraphColor(powerChart, i, color);
+    }
+    if (sliderChart) {
+      updateDygraphColor(sliderChart, i, color);
+    }
+    if (deploymentChart) {
+      updateDygraphColor(deploymentChart, i, color);
+    }
   }
 
   $.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));

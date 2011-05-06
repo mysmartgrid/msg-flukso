@@ -187,7 +187,7 @@ function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit
 
   module_load_include('inc', 'logger', 'logger.admin');
 
-  if (_logger_function_name_validate($function, $meter)) {
+  if (_logger_sensor_function_validate($function, $meter)) {
 
     $sql = "
       UPDATE

@@ -1,0 +1,4 @@
+; $Id$
+name = Deployment Overview
+description =  Allows the user to see devices' statuses.
+core = 6.x

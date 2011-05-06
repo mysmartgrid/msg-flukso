@@ -364,3 +364,16 @@ function logger_update_6011() {
   }
   return $items;
 }
+
+function logger_update_6012() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
