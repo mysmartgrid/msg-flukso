@@ -564,16 +564,25 @@ function _deployment_create_summary() {
   $result = db_result(db_query($sql, $now));
 
   if ($result == 0) {
+    $totals = array();
+    $devices = _deployment_get_devices(NULL, NULL, 1000, NULL);//FIXME: avoid informing a limit
+
+    foreach ($devices as $device) {
+      $state_id = $device['state_id'];
+      $totals[$state_id]++;
+    }
+
     $states = _deployment_get_all_states();
 
     foreach (array_keys($states) as $state_id) {
-      $devices = _deployment_get_devices($state_id, NULL, 9999999999999999, NULL);
+      $total = $totals[$state_id];
+      $total = $total > 0 ? $total : 0;
 
       $sql = "INSERT INTO {deployment_summary}(time, state_id, total) VALUES(%d, %d, %d)";
-      db_query($sql, $now, $state_id, count($devices));
+      db_query($sql, $now, $state_id, $total);
     }
 
     $sql = "DELETE FROM {deployment_summary} WHERE time < %d";
-    db_query($sql, $now - 3 * 30 * 24 * 3600);
+    db_query($sql, $now - 3 * 30 * 24 * 3600); //90 days
   }
 }
