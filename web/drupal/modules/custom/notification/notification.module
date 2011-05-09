@@ -987,21 +987,21 @@ function _notification_send_no_communication_emails($now) {
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
-      n.event_id,
+      %d AS event_id,
       n.limit_up,
       n.unit_id,
-      FROM_UNIXTIME(%d + n.timezone, '%s') AS event_time,
-      FROM_UNIXTIME(n.access + n.timezone, '%s') AS last_event_time,
+      %d AS event_time,
+      n.access AS since_time,
       n.serial,
       n.emails,
-      n.unit_name
+      n.unit_name,
+      n.timezone
     FROM
       (
         SELECT
           n.device,
           n.limit_up,
           n.unit_id,
-          n.event_id,
           d.serial,
           n.emails,
           n.last_sent,
@@ -1030,13 +1030,11 @@ function _notification_send_no_communication_emails($now) {
           SUM(m.corrupted) = 0
       ) n
     WHERE
-      %d > (n.access + (n.limit_up * n.factor)) AND
-      %d > (n.last_sent + n.limit_up) AND
+      %d > (n.access + n.limit_up * n.factor) AND
+      %d > (n.last_sent + n.limit_up * n.factor) AND
       %d > (n.last_sent + n.min_interval)";
 
-  $args = array($now,
-    NOTIFICATION_TIMESTAMP_FORMAT_SQL, NOTIFICATION_TIMESTAMP_FORMAT_SQL,
-    NO_COMMUNICATION_EVENT_ID, $now, $now, $now);
+  $args = array(NO_COMMUNICATION_EVENT_ID, $now, NO_COMMUNICATION_EVENT_ID, $now, $now, $now);
 
   $notifiables = _notification_query_notifiables($sql, $args);
 
@@ -1044,7 +1042,7 @@ function _notification_send_no_communication_emails($now) {
 
   $message = _notification_compose_error_email(
     "Your Flukso device (serial number: %serial) has not been sending " .
-    "data for more than %limit_up %unit_name, since %last_event_time.",
+    "data for more than %limit_up %unit_name, since %since_time.",
 
     "Check your WLAN configuration and make sure that it remains active for " .
     "at least 1 hour per day. The device might be working fine, but it is " .
@@ -1061,74 +1059,70 @@ function _notification_send_no_communication_emails($now) {
 function _notification_send_communication_restored_emails($now) {
 
   $sql = "
-    SELECT
+    SELECT SQL_NO_CACHE
       n.device,
       n.event_id,
       n.limit_up,
       n.unit_id,
-      FROM_UNIXTIME(n.time1 + u.timezone, '%s') AS since_time,
-      FROM_UNIXTIME(n.time2 + u.timezone, '%s') AS event_time,
       d.serial,
       n.emails,
+      n.base_time,
       n.last_sent,
-      n.min_interval,
-      un.name AS unit_name
+      un.name AS unit_name,
+      un.factor,
+      u.timezone,
+      un.factor
     FROM
-      unit un,
-      users u,
-      logger_devices d,
-      (
-        SELECT
-          n.device,
-          n.event_id,
-          n.limit_up,
-          n.unit_id,
-          n.emails,
-          n.last_sent,
-          n.min_interval,
-          e1.time AS time1,
-          e2.time AS time2
-        FROM
-          notification n,
-          event_log e1,
-          event_log e2
-        WHERE
-          n.event_id = %d AND
-          e1.device = n.device AND
-          e2.device = n.device AND
-          e1.event_id > %d AND
-          e2.event_id > %d AND
-          e1.time > n.base_time AND
-          e2.time > e1.time
-      ) n
+      {unit} un,
+      {users} u,
+      {logger_devices} d,
+      {notification} n
     WHERE
-      n.device = d.device AND
+      n.event_id = %d AND
       n.unit_id = un.id AND
+      n.device = d.device AND
       d.uid = u.uid AND
-      ((n.time2 - n.time1) > (n.limit_up * un.factor)) AND
-      %d > (n.last_sent + n.limit_up) AND
-      %d > (n.last_sent + n.min_interval) AND
-      NOT EXISTS (
-        SELECT
-          1
-        FROM
-          event_log e
-        WHERE
-          e.device = n.device AND
-          e.event_id > %d AND
-          e.time > n.time1 AND
-          e.time < n.time2
-      )";
+      %d > (n.base_time + n.limit_up * un.factor) AND
+      %d > (n.last_sent + n.min_interval)";
 
-  $args = array(
-    NOTIFICATION_TIMESTAMP_FORMAT_SQL, NOTIFICATION_TIMESTAMP_FORMAT_SQL,
-    COMMUNICATION_RESTORED_EVENT_ID, MESSAGE_RECEIVED_EVENT_ID, MESSAGE_RECEIVED_EVENT_ID,
-    $now, $now, MESSAGE_RECEIVED_EVENT_ID);
+  $args = array(COMMUNICATION_RESTORED_EVENT_ID, $now, $now);
+  $notifiables = array();
 
-  $notifiables = _notification_query_notifiables($sql, $args);
+  foreach (_notification_query_notifiables($sql, $args) as $notifiable) {
 
-  foreach ($notifiables as $notifiable) {
-    _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $now);
+    $sql = "
+      SELECT SQL_NO_CACHE
+        time
+      FROM
+        {event_log}
+      WHERE
+        device = '%s' AND
+        time > %d AND
+        event_id > %d
+      ORDER BY
+        time";
+
+    $args = array($notifiable['device'], $notifiable['base_time'], MESSAGE_RECEIVED_EVENT_ID);
+    $result = db_query($sql, $args);
+    $last_time = 0;
+    $limit_up = $notifiable['limit_up'] * $notifiable['factor'];
+
+    while ($event = db_fetch_array($result)) {
+
+      //First event time
+      $last_time = $last_time == 0 ? $event['time'] : $last_time;
+
+      if ($event['time'] - $last_time > $limit_up) {
+        $notifiable['since_time'] = $last_time;
+        $notifiable['event_time'] = $event['time'];
+      }
+      $last_time = $event['time'];
+    }
+
+    if (isset($notifiable['event_time'])) {
+      $notifiables[] = $notifiable;
+      _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $last_time - 1);
+    }
   }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
@@ -1158,7 +1152,7 @@ function _notification_send_corrupted_message_emails($now) {
       n.event_id,
       n.limit_up,
       n.unit_id,
-      FROM_UNIXTIME(m.corrupted + u.timezone, '%s') AS event_time,
+      m.corrupted AS event_time,
       d.serial,
       n.emails
     FROM
@@ -1174,14 +1168,14 @@ function _notification_send_corrupted_message_emails($now) {
       m.device = d.device AND
       m.corrupted <> 0";
 
-  $args = array(NOTIFICATION_TIMESTAMP_FORMAT_SQL, CORRUPTED_MESSAGE_EVENT_ID, $now);
+  $args = array(CORRUPTED_MESSAGE_EVENT_ID, $now);
 
   $notifiables = _notification_query_notifiables($sql, $args);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_error_email(
-    "Your Flukso device (serial number: %serial) has sent either a measurement or a heartbeat with " .
-    "corrupted data at %event_time.");
+    "Your Flukso device (serial number: %serial) has sent either a " .
+    "measurement or a heartbeat with corrupted data at %event_time.");
 
   _notification_send_emails($message, $notifiables);
 }
@@ -1199,7 +1193,7 @@ function _notification_send_peak_consumption_emails($now) {
       n.event_id,
       n.limit_up,
       n.unit_id,
-      n.base_time AS start_time,
+      n.base_time AS since_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
@@ -1382,6 +1376,10 @@ function _notification_send_emails($message, $notifiables) {
   $variables["!base_url"] = $base_url;
 
   foreach ($notifiables as $notifiable) {
+
+    $notifiable['since_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $notifiable['since_time'] + $notifiable['timezone']);
+    $notifiable['event_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $notifiable['event_time'] + $notifiable['timezone']);
+
     foreach ($notifiable as $key => $value) {
 
       $variables["%$key"] = $value;
@@ -1419,7 +1417,7 @@ function _notification_query_peak_consumption_violations($notifiable) {
 
       foreach ($values as $timestamp => $value) {
 
-        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['start_time'] + $notifiable['timezone']) {
+        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time'] + $notifiable['timezone']) {
 
           $sublist = $sublist? $sublist : t('Sensor') . ': ' . $function . '<br> ';
           $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $timestamp) . ' - ' .
