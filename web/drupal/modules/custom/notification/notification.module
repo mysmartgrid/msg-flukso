@@ -583,35 +583,35 @@ function notification_edition_form(&$form_state, $notification) {
     '#element_validate'  => array('notification_emails_validate')
   );
 
-  $form['limit_up'] = array(
-    '#type'              => 'textfield',
-    '#required'          => TRUE,
-    '#maxlength'         => 9,
-    '#size'              => 12,
-    '#prefix'            => '<table border="0"><tr><td>',
-    '#suffix'            => '</td>',
-    '#default_value'     => $notification->limit_up,
-    '#element_validate'  => array('notification_limit_up_validate'),
-  );
-
-  switch ($notification->event_id) {
-    case NO_COMMUNICATION_EVENT_ID:
-      $form['limit_up']['#title'] = t('Maximum Delay');
-      $form['limit_up']['#description'] = t('Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.');
-      break;
-
-    case COMMUNICATION_RESTORED_EVENT_ID:
-      $form['limit_up']['#title'] = t('Maximum Delay');
-      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
-      break;
-
-    case PEAK_CONSUMPTION_EVENT_ID:
-      $form['limit_up']['#title'] = t('Maximum Consumption');
-      $form['limit_up']['#description'] = t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
-      break;
-  }
-
   if ($notification->event_id <> CORRUPTED_MESSAGE_EVENT_ID) {
+
+    $form['limit_up'] = array(
+      '#type'              => 'textfield',
+      '#required'          => TRUE,
+      '#maxlength'         => 9,
+      '#size'              => 12,
+      '#prefix'            => '<table border="0"><tr><td>',
+      '#suffix'            => '</td>',
+      '#default_value'     => $notification->limit_up,
+      '#element_validate'  => array('notification_limit_up_validate'),
+    );
+
+    switch ($notification->event_id) {
+      case NO_COMMUNICATION_EVENT_ID:
+        $form['limit_up']['#title'] = t('Maximum Delay');
+        $form['limit_up']['#description'] = t('Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.');
+        break;
+
+      case COMMUNICATION_RESTORED_EVENT_ID:
+        $form['limit_up']['#title'] = t('Maximum Delay');
+        $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
+        break;
+
+      case PEAK_CONSUMPTION_EVENT_ID:
+        $form['limit_up']['#title'] = t('Maximum Consumption');
+        $form['limit_up']['#description'] = t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
+        break;
+    }
 
     $form['unit_id'] = array(
       '#type'           => 'select',
