@@ -443,18 +443,18 @@ function _logger_energy_page($interval) {
     $end = $start + round($window / $sub_time_window) * $sub_time_window;
   }
 
-  $all_types = array_keys(logger_get_sensor_types_options($user->uid));
-  $selected_types_options = _logger_get_variable('selected_sensor_types', array());
+  $all_types_options = logger_get_sensor_types_options($user->uid);
+  $selected_types_options = _logger_get_variable('selected_sensor_types', $all_types_options);
 
   //User can change sensor types any time
   foreach ($selected_types_options as $type => $selected) {
-    if ($selected && in_array($type, $all_types)) {
+    if ($selected && isset($all_types_options[$type])) {
       $types[] = $type;
     }
   }
   if (empty($types)) {
-    $types = $all_types;
-    _logger_set_variable('selected_sensor_types', $types);
+    $types = array_keys($all_types_options);
+    _logger_set_variable('selected_sensor_types', $all_type_options);
   }
 
   $sensors = _logger_get_user_sensors($types);
@@ -1529,6 +1529,7 @@ function logger_energychart_form(&$form_state, $chart) {
 
 function logger_relativechart_form(&$form_state, $chart) {
 
+  $meter_options = _logger_get_meters_options($chart->types);
   $attributes = array('onchange' => 'submitRelativeChartForm(this)');
 
   $form['#validate'] = array('_logger_chartform_validate');
@@ -1537,8 +1538,8 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#type'          => 'checkboxes',
     '#title'         => t('Sensors'),
     '#description'   => t('Select the sensors you want to plot on the chart.'),
-    '#default_value' => _logger_get_variable('selected_meters', 1),
-    '#options'       => _logger_get_meters_options($chart->types),
+    '#default_value' => _logger_get_variable('selected_meters', array_keys($meter_options)),
+    '#options'       => $meter_options,
     '#required'      => TRUE,
     '#attributes'    => $attributes
   );
@@ -2223,11 +2224,25 @@ function _logger_get_variable($id, $default_value) {
   $id = "logger_$id";
 
   if ($user->uid) {
-    $id .= '_' . $user->uid;
-    return variable_get($id, $default_value);
+
+    //Visitors must use cookies
+    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
+    if ($user->roles[$rid]) {
+      $id .= '_' . $user->uid;
+      return variable_get($id, $default_value);
+
+    } else {
+      return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
+    }
 
   } else {
-    return isset($_COOKIE[$id])? $_COOKIE[$id] : $default_value;
+
+    $value = isset($_COOKIE[$id])? $_COOKIE[$id] : $default_value;
+    if (strpos(" $value", 'ARR') == 1) {
+      $value = explode(',', substr($value, 3));
+    }
+    return $value;
   }
 }
 
@@ -2243,10 +2258,22 @@ function _logger_set_variable($id, $value) {
   $id = "logger_$id";
 
   if ($user->uid) {
-    $id .= '_' . $user->uid;
-    variable_set($id, $value);
+
+    //Visitors must use cookies
+    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
+    if ($user->roles[$rid]) {
+      $id .= '_' . $user->uid;
+      variable_set($id, $value);
+
+    } else {
+      $_SESSION[$id] = $value;
+    }
 
   } else {
+    if (is_array($value)) {
+      $value = 'ARR' . implode(',', $value);
+    }
     setcookie($id, $value, time() + WEEK, '/');
   }
 }

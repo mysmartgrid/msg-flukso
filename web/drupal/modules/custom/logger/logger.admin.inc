@@ -228,7 +228,7 @@ function logger_userdevices_form_submit($form, &$form_state) {
     }
   }
 
-  $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
@@ -288,7 +288,7 @@ function _logger_device_deactivate($serial) {
   // if not, remove entries in {users_roles} and {logger_users}
   if ($count == 0) {
 
-    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
 
     db_query("DELETE FROM {users_roles} WHERE uid = %d AND rid = %d", $user->uid, $rid);
     db_query("DELETE FROM {logger_users} WHERE uid = %d AND private = 0", $user->uid);
