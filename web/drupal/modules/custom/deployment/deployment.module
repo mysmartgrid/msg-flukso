@@ -128,11 +128,11 @@ function deployment_list_page($id = NULL) {
   $output = drupal_get_form('deployment_listfilter_form', $state_id);
 
   $headers = array(
-    array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'desc'),
-    array('data' => t('User'),          'field' => 'name',   'sort'=> 'desc'),
-    array('data' => t('E-mail'),        'field' => 'email',  'sort'=> 'desc'),
-    array('data' => t('Latest Update'), 'field' => 'latest', 'sort'=> 'desc'),
-    array('data' => t('State'),         'field' => 'state',  'sort'=> 'desc')
+    array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'asc'),
+    array('data' => t('User'),          'field' => 'name'),
+    array('data' => t('E-mail'),        'field' => 'email'),
+    array('data' => t('Latest Update'), 'field' => 'latest'),
+    array('data' => t('State'))
   );
 
   $limit = 15;
@@ -267,7 +267,7 @@ function _deployment_download_file($file_name, $header, $lines) {
 function _deployment_get_all_states() {
 
   $states = array();
-  $sql = "SELECT id, name FROM {deployment_state}";
+  $sql = "SELECT SQL_CACHE id, name FROM {deployment_state}";
   $result = db_query($sql, $user->uid);
 
   while ($state = db_fetch_array($result)) {
@@ -290,98 +290,94 @@ function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15,
   global $user;
   $now = time();
 
-  $tzdif = $user->timezone / 3600; //divided by 1 hour
-  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $registration_delay = 3 * 24 * 3600; //3 days
-  $heartbeat_timeout = 7200; //2 hours
-  
-  $uninstalled_id      = UNINSTALLED_STATE_ID;
-  $unregistered_id     = UNREGISTERED_STATE_ID;
-  $corrupted_id        = CORRUPTED_STATE_ID;
-  $no_communication_id = NO_COMMUNICATION_STATE_ID;
-  $working_id          = WORKING_STATE_ID;
-
-  //NOTE: If SQL arguments are used, sql_count does not work.
-  $sql = "
-    SELECT
-      d.serial,
-      d.name,
-      d.email,
-      d.latest,
-      d.state
-    FROM
-      (
-        SELECT
-          d.serial,
-          d.name,
-          d.email,
-
-          CONVERT_TZ( FROM_UNIXTIME(
-            IF(d.corrupted > 0, d.corrupted, IF(d.access > 0, d.access, d.created))
-          ), '+00:00', '$tz') AS latest,
-
-          IF(d.uid = 0,
-            IF(($now - d.access) > $registration_delay,  $uninstalled_id,  $unregistered_id),
-            IF(d.corrupted > 0, $corrupted_id,
-              IF($now > (d.access + $heartbeat_timeout), $no_communication_id, $working_id)
-            )
-          ) AS state
-
-        FROM
-          (SELECT
-            d.uid,
-            u.name,
-            u.mail AS email,
-            d.serial,
-            d.created,
-            d.access,
-            MAX(m.corrupted) AS corrupted
-          FROM
-            {logger_meters} m,
-            {logger_devices} d
-            LEFT OUTER JOIN {users} u ON u.uid = d.uid
-          WHERE
-            m.device = d.device
-          GROUP BY
-            d.uid,
-            d.serial,
-            d.created,
-            d.access ) d
-      ) d";
-
-
-  if($serial || $state_id) {
-    $sql .= ' WHERE ';
-
-    if($serial) {
-      $sql .= "d.serial = $serial";
-    }
-    if($state_id) {
-      $sql .= ($serial? ' AND ' : '') . " d.state = $state_id";
-    }
-  }
-
-  $count_sql = "SELECT COUNT(*) FROM ($sql) d ";
+  $sql = _deployment_create_devices_query($now, $state_id, $serial);
 
   if ($headers) {
+    $count_sql = "SELECT SQL_NO_CACHE COUNT(*) FROM ($sql) d ";
     $sql .= tablesort_sql($headers);
+    $result = pager_query($sql, $limit, 0, $count_sql);
+
+  } else {
+    $result = db_query($sql);
   }
 
-  $result = pager_query($sql, $limit, 0, $count_sql);
   $states = _deployment_get_all_states();
 
   $data = array();
   while($device = db_fetch_array($result)) {
 
-    //TODO simplify this part
-    $state_id = $device['state'];
-    $device['state'] = $states[$state_id];
-    if (!$headers) {
-      $device['state_id'] = $state_id;
+    $device['state'] = $states[$device['state_id']];
+    if ($headers) {
+      unset($device['state_id']);
     }
     $data[] = $device;
   }
   return $data;
+}
+
+function _deployment_create_devices_query($now, $state_id, $serial) {
+
+  //If parameters are used in this SQL query, pager_query does not count rows correctly
+
+  $tzdif = $user->timezone / 3600; //divided by 1 hour
+  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
+  $registration_time = $now - 3 * 24 * 3600; //3 days
+  $heartbeat_time = $now - 7200; //2 hours
+
+  $latest_field = "IF(d.access > 0, d.access, d.created)";
+  $state_id_field = $state_id;
+
+  switch ($state_id) {
+    case UNINSTALLED_STATE_ID:
+      $filters = "AND d.uid = 0 AND d.access  < $registration_time";
+      break;
+
+    case UNREGISTERED_STATE_ID:
+      $filters = "AND d.uid = 0 AND d.access >= $registration_time";
+      break;
+
+    case CORRUPTED_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted > 0";
+      $latest_field = "MAX(m.corrupted)";
+      break;
+
+    case NO_COMMUNICATION_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $heartbeat_time";
+      break;
+
+    case WORKING_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $heartbeat_time";
+      break;
+
+    default:
+      $latest_field = "IF(MAX(m.corrupted) > 0, MAX(m.corrupted), IF(d.access > 0, d.access, d.created))";
+      $state_id_field = "
+        IF(d.uid = 0,
+          IF(d.access < $registration_time, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
+          IF(MAX(m.corrupted) > 0, " . CORRUPTED_STATE_ID . " ,
+            IF(d.access < $heartbeat_time, " . NO_COMMUNICATION_STATE_ID . ", " . WORKING_STATE_ID . ")
+          )
+        )";
+  }
+  $filters .= $serial ? " AND d.serial = $serial" : '';
+
+  return "
+    SELECT SQL_NO_CACHE
+      d.serial,
+      u.name,
+      u.mail AS email,
+      CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz') AS latest,
+      ($state_id_field) AS state_id
+    FROM
+      {logger_devices} d
+      LEFT OUTER JOIN {users} u ON u.uid = d.uid,
+      {logger_meters} m
+    WHERE
+      m.device = d.device
+      $filters 
+    GROUP BY
+      d.uid,
+      d.serial";
 }
 
 function deployment_listfilter_form(&$form_state, $state_id) {
@@ -565,7 +561,7 @@ function _deployment_create_summary() {
 
   if ($result == 0) {
     $totals = array();
-    $devices = _deployment_get_devices(NULL, NULL, 1000, NULL);//FIXME: avoid informing a limit
+    $devices = _deployment_get_devices();
 
     foreach ($devices as $device) {
       $state_id = $device['state_id'];
