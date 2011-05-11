@@ -1384,6 +1384,7 @@ function _logger_get_series_colors($chart_id) {
     '#F27D79', //PINK2
     '#00ffff', //CYAN
     '#FBEB0D', //YELLOW
+    '#5DA3CF', //BLUE2
     '#C0C0C0', //GRAY2
     '#BFD9D3', //GREEN5
     '#4D7060'  //GREEN4
