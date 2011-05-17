@@ -1814,11 +1814,11 @@ ul.con input {
 	width:10em;
 }
 #edit-smoothing-level {
-	width:5em;
+	width:2em;
 }
 ul.tabs.primary,
 ul.tabs.secondary {
-	white-space: normal;
+  white-space: normal;
 	line-height: 20px;
 	/*text-align: center;*/
 }
@@ -2825,7 +2825,7 @@ ul.links li {
   padding: 0;
 }
 
-/* Added by Ely de Oliveira (24/08/2010) */
+/* Forum (24/08/2010) */
 
 li.comment_delete a, li.comment_edit a, li.comment_reply a, li.mollom_comment_report a {
   border-left: 1px solid #aaa;
@@ -2866,4 +2866,25 @@ div.comment-author {
   padding: 10px;
 }
 
-/* End Added */
+/* Chart */
+
+div.legend {
+  min-height: 20px;
+  padding-bottom: 10px;
+}
+
+div.chart {
+  height: 350px;
+  width: 100%;
+  font-size: 12px;
+}
+
+div.slider {
+  height: 50px;
+  width: 100%;
+  font-size: 12px;
+}
+
+table.resizable {
+  width: 100%;
+}

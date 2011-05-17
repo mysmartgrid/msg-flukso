@@ -31,10 +31,10 @@ html, body {
 /* Fraunhofer-Logo Lines ___________________________________________________ */
 
 #header .wrapper {
-  height: 7em;
+  height: 4em;
 	margin: 0 auto;
 	position: relative;
-	background: url(../img/bg-doc-silver.png) left top repeat;
+	background: #E0E0E0;
 }
 
 #doc, #footer .wrapper {
@@ -383,13 +383,9 @@ body.font-xl {
 
 #main .headings h2, #main .headings p {
 	font-family: "Frutiger 45 Light", Frutiger, Arial, "Trebuchet MS", "Segoe UI", clean, sans-serif;
-	font-size: 170%;
+	font-size: 110%;
+	font-weight: bold;
 	line-height: 1;
-}
-#main .headings p {
-	font-size: 135%;
-	letter-spacing: 0.02em;
-	line-height: 1.1;
 }
 
 #main .home h2 {
@@ -433,7 +429,6 @@ div.vignette ul.fisheye li.fisheyeM {
 	padding-top: 4px;
 	padding-bottom: 4px;
 	line-height: 85%;
-
 }
 div.vignette ul.fisheye li.fisheyeS {
 	font-size: 77%;
@@ -447,7 +442,6 @@ div.vignette ul.fisheye li.fisheyeXS {
 }
 div.vignette ul.fisheye li.fisheyeXXS {
 	font-size: 66%;
-
 }
 div.vignette ul.fisheye li.fisheyeXXXS {
 	font-size: 63%;
@@ -465,10 +459,10 @@ div.vignette ul.fisheye li.fisheyeXXXS {
 	z-index: 1000;
 }
 #logo {
-	left: 2em;
+	left: 1em;
 	position: absolute;
 	top: 10px;
-	width: 190px; /* fixed width as logo is an image that will not resize */
+	width: 100px; /* fixed width as logo is an image that will not resize */
 	z-index: 1000;
 }
 #header #logo a {
@@ -478,7 +472,7 @@ div.vignette ul.fisheye li.fisheyeXXXS {
 	float: right;
 	margin-right: 1.05em;
 	height: 0px;
-	width: 47.85em;
+	width: 100%; /*screen */
 }
 #header ul {
 	padding: 0.72em 0 0.6em; /* 0.923 * 13px = 12px */
@@ -819,8 +813,6 @@ form #main h3.search {
 
 
 
-
-
 /****************
  * Main Content *
  ****************/
@@ -829,7 +821,7 @@ form #main h3.search {
   margin-left: 0em;
 	clear: both;
 	position: relative;
-	width: 47.75em; /* 622px / 13px */
+	width: 100%; /*screen */
 }
 #start #main {
 	margin-top: 2.75em;
@@ -852,7 +844,7 @@ form #main h3.search {
 }
 
 .headings {
-	min-height: 2.5em; /* 77px + 2 x 8px = 93px */
+	min-height: 1.0em; /* 77px + 2 x 8px = 93px */
 	padding: 0.65em 0.84em;
 	position: relative;
 }
@@ -1806,7 +1798,7 @@ ul.con li {
 .form-text,
 ul.con input {
 	height:1.33em;
-	width:20.25em;
+	width:12.25em;
 }
 #edit-serial {
 	width:10em;
@@ -1815,19 +1807,31 @@ ul.con input {
 	width:10em;
 }
 #edit-smoothing-level {
-	width:5em;
+	width:2em;
 }
 ul.tabs.primary,
 ul.tabs.secondary {
-	white-space: normal;
+	white-space: nowrap;
 	line-height: 20px;
-	/*text-align: center;*/
+  margin-left: 0;
+  padding-left: 0;
 }
 
 ul.tabs.primary li,
 ul.tabs.secondary li {
 	white-space: nowrap;
+	text-align: center;
+  margin: 0;
+  padding: 0;
 }
+
+ul.tabs.primary a,
+ul.tabs.secondary a {
+  margin-left: 0.5em;
+  margin-right: 0.5em;
+  padding: 0;
+}
+
 /*end added*/
 
 ul.con input.input-medium {
@@ -1845,7 +1849,7 @@ ul.con label, ul.con span.label {
 	float:left;
 	line-height:1.5em;
 	padding-right:0;
-	width:11.7em;
+	width:10.0em;
 }
 ul.con span.label label {
 	display: inline;
@@ -2826,7 +2830,7 @@ ul.links li {
   padding: 0;
 }
 
-/* Added by Ely de Oliveira (24/08/2010) */
+/* Forum (24/08/2010) */
 
 li.comment_delete a, li.comment_edit a, li.comment_reply a, li.mollom_comment_report a {
   border-left: 1px solid #aaa;
@@ -2867,4 +2871,26 @@ div.comment-author {
   padding: 10px;
 }
 
-/* End Added */
+/* Chart */
+
+div.legend {
+  min-height: 17px;
+  padding-bottom: 8px;
+}
+
+div.chart {
+  height: 220px;
+  width: 100%;
+  font-size: 9px;
+}
+
+div.slider {
+  height: 50px;
+  width: 100%;
+  font-size: 9px;
+}
+
+table.resizable {
+  width: 100%;
+  font-size: 11px;
+}

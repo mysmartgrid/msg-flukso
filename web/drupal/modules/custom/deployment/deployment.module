@@ -37,23 +37,6 @@ function deployment_perm() {
   );
 }
 
-//FIXME
-function deployment_init() {
-
-  drupal_add_js(LOGGER_PATH . '/js/jscolor/jscolor.js');
-  drupal_add_js(LOGGER_PATH . '/js/charts.js');
-
-  //If IE
-  if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
-    drupal_add_js(LOGGER_PATH . '/js/dygraph/excanvas.js');
-  }
-
-  drupal_add_js(LOGGER_PATH . '/js/dygraph/strftime-min.js');
-  drupal_add_js(LOGGER_PATH . '/js/dygraph/rgbcolor.js');
-  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph-canvas.js');
-  drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph.js');
-}
-
 function deployment_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
@@ -193,18 +176,16 @@ function deployment_overview_page() {
     $row[$percentage_title] = $perc? $perc . ' %' : '';
   }
 
-  //TODO: use a creation method
-  $chart = new stdClass();
-  $chart->context = 'deployment';
+  $chart = _logger_create_chart_object('deployment', array(), 'year', t('Devices'), FALSE, array());
+  $chart->file_url = 'deployment/chart/file';//TODO: avoid setting this property
   $chart->data['legend'] = $legend;
-  $chart->colors = _logger_get_series_colors($chart->context);
-  $chart->file_url = 'deployment/chart/file';
 
   drupal_set_title(t('Deployment Overview'));
 
-  return _logger_create_dygraph('deploymentChart', $chart, TRUE) . '<br>' .
-
-        _logger_create_chart_legend($chart);
+  return
+    '<div>' . t($chart->unit) . '</div>' . '<br>' .
+    _logger_create_dygraph($chart, TRUE) . '<br>' .
+    _logger_create_chart_legend($chart);
 }
 
 /**
@@ -231,7 +212,7 @@ function _depolyment_download_chart_file() {
     $lines .= ',' . $summary['total'];
   }
 
-  _deployment_download_file('chart-data-file', $header, $lines);
+  _logger_download_file('chart-data-file', $header, $lines);
 }
 
 /**
@@ -247,16 +228,7 @@ function _deployment_download_list_file() {
   $lines = preg_replace("/<\/a>/", '', $lines);
   $lines = preg_replace("/<a href=(.*)>/", '', $lines);
 
-  _deployment_download_file('deployment-list', $header, $lines);
-}
-
-function _deployment_download_file($file_name, $header, $lines) {
-  
-  drupal_set_header('Content-Type: text/plain');
-  drupal_set_header("Content-disposition: attachment; filename=$file_name.txt");
-
-  print $header . PHP_EOL . $lines;
-  exit(0);
+  _logger_download_file('deployment-list', $header, $lines);
 }
 
 /**

@@ -27,7 +27,6 @@
         <DIV class="wrapper">
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
           <H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
-
         </DIV>
       </DIV><!-- #header -->
       <!-- HEADER include end -->
@@ -35,7 +34,6 @@
 
       <!-- Main content section -->
       <DIV id="doc">
-        <IMG src="/<?php print path_to_theme(); ?>/style/bg-vorlage.jpg" id="doc-bg" alt="" width="620" height="400" />
 
         <!-- Login Form -->
         <?php
@@ -43,27 +41,35 @@
           if ($left && !($user->uid)) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
         <?php } ?>
 
-        <!-- Text content -->
-        <DIV id="main" role="main">
 
-          <DIV role="section">
-            <DIV class="headings">
-              <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
-              <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
+        <?php
+          global $user;
+          if ($content != "" && $user->uid) { ?>
+
+          <!-- Text content -->
+          <DIV id="main" role="main">
+
+            <DIV role="section">
+              <DIV class="headings">
+                <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
+                <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
+              </DIV>
             </DIV>
-          </DIV>
 
-          <DIV class="section" role="section">
+            <DIV class="section" role="section">
 
-            <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
+              <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
 
-            <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
-            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
+              <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
+              <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
 
-            <!-- start main content --><?php print($content) ?><!-- end main content -->
-          </DIV>
+              <!-- start main content -->
+              <?php print($content) ?>
+              <!-- end main content -->
+            </DIV>
 
-        </DIV><!-- #main -->
+          </DIV><!-- #main -->
+        <?php } ?>
 
         <!-- Menu -->
         <?php
@@ -76,14 +82,16 @@
         <DIV id="nav" class="nav-fhg">
           <H2>Menü</H2>
           <H3>Hauptmenü</H3>
-          <?php if (isset($primary_links)) { ?><div id="primary"><?php print theme('links', $primary_links) ?></div><?php } ?><!-- #nav-direct-first -->
+          <!-- php if (isset($primary_links)) { -->
+          <?php if (isset($primary_links)) { ?>
+            <?php unset($primary_links['menu-617'])  ?> <!--TODO: adapt forum to the mobile theme -->
+            <div id="primary">
+              <?php print theme('links', $primary_links) ?>
+            </div>
+          <?php } ?><!-- #nav-direct-first -->
         </DIV>
 
-
       </DIV><!-- #doc -->
-
-
-
 
       <!-- FOOTER include start -->
       <DIV id="footer">
@@ -118,9 +126,7 @@
         </P>
       </DIV><!-- #print-footer -->
       <!-- FOOTER include end -->
-    
       
     </DIV><!--page-->
-
   </BODY>
 </HTML>

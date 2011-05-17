@@ -426,3 +426,29 @@ function logger_update_6018() {
   }
   return $items;
 }
+
+function logger_update_6020() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("
+        DELETE
+          FROM
+            user_relationships
+          WHERE
+            EXISTS(
+              SELECT
+                1
+              FROM
+                user_relationship_types
+              WHERE
+                user_relationships.rtid = user_relationship_types.rtid AND
+                user_relationship_types.name = 'subscription'
+            )");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
