@@ -807,8 +807,8 @@ function _notification_edit_event($values) {
   $old_limit_up = $values["old_limit_up"];
   $old_unit_id  = $values["old_unit_id"];
 
-  $limit_up     = $values["limit_up$event_id"];
-  $unit_id      = $values["unit_id$event_id"];
+  $limit_up     = $values["limit_up"];
+  $unit_id      = $values["unit_id"];
   $emails       = $values['emails'];
   $min_interval = $values['min_interval'];
 
