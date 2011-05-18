@@ -130,9 +130,9 @@ function submitRelativeChartForm(clickedField) {
   clickedField.checked = true;
 }
 
-function removePowerSeries(uid, i, username) {
+function removePowerSeries(uid, i, username, tableId) {
 
-  var table = document.getElementById('logger-legend-table');
+  var table = document.getElementById(tableId);
 
   //Check if it is the last visible one
   var visibleOnes = 0;

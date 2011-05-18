@@ -30,6 +30,7 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',   52 * WEEK);
+define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
@@ -853,7 +854,7 @@ function _logger_get_power_chart_data($chart) {
 
     $operations = $sensor->uid > 0 ?
       '<a href="javascript: void(0)" 
-        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username'" . ');">' .
+        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
         t('Remove') . '</a>' : '';
 
     $data['legend'][] = _logger_create_power_legend_line($sensor->username, $sensor->function, t($sensor->type), $i++, $operations);
@@ -1367,11 +1368,10 @@ function _logger_create_chart_legend($chart) {
     }
   }
 
-  $legend_id = 'logger-list-table';
-  $resize_handler = 'function() { resizePage("' . $legend_id . '"); }';
+  $resize_handler = 'function() { resizePage("' . LOGGER_LEGEND_TABLE_ID . '"); }';
   drupal_add_js("$(window).resize(  $resize_handler );", 'inline');
 
-  return theme('table', $header, $lines, array('id' => $legend_id, 'class' => 'resizable')) .
+  return theme('table', $header, $lines, array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')) .
     '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
 }
 
@@ -1500,7 +1500,6 @@ function logger_energychart_form(&$form_state, $chart) {
 
   global $user;
   $types_options = logger_get_sensor_types_options($user->uid);
-  $attributes = array('onchange' => 'submitEnergyChartForm(this)');
 
   $form['#validate'] = array('_logger_chartform_validate');
 
@@ -1511,7 +1510,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('aggregate_sensors', 1),
     '#return_value'  => 1,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitEnergyChartForm(this)')//In IE, onchange does not work
   );
 
   $form['selected_sensor_types'] = array(
@@ -1521,7 +1520,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('selected_sensor_types', array_keys($types_options)),
     '#options'       => $types_options,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitEnergyChartForm(this)')//In IE, onchange does not work
   );
 
   $form['unit'] = array(
@@ -1533,7 +1532,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value'  => $chart->unit,
     '#price'          => $chart->price,
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitEnergyChartForm(this)')
   );
 
   $form['submit'] = array(
@@ -1546,7 +1545,6 @@ function logger_energychart_form(&$form_state, $chart) {
 function logger_relativechart_form(&$form_state, $chart) {
 
   $meter_options = _logger_get_meters_options($chart->types);
-  $attributes = array('onchange' => 'submitRelativeChartForm(this)');
 
   $form['#validate'] = array('_logger_chartform_validate');
 
@@ -1557,7 +1555,7 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('selected_meters', array_keys($meter_options)),
     '#options'       => $meter_options,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitRelativeChartForm(this)')//In IE, onchange does not work
   );
 
   $form['unit'] = array(
@@ -1569,7 +1567,7 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#default_value'  => $chart->unit,
     '#price'          => $chart->price,
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitRelativeChartForm(this)')
   );
 
   $form['submit'] = array(
@@ -1611,7 +1609,7 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#default_value'  => _logger_get_variable('step_plot', 0),
     '#return_value'   => 1,
     '#required'       => TRUE,
-    '#attributes'     => array('onchange' => 'submitPowerChartForm()')
+    '#attributes'     => array('onclick' => 'submitPowerChartForm()')//In IE, onchange does not work
   );
 
   $form['smoothing_level'] = array(
