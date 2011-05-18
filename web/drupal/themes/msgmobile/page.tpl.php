@@ -26,7 +26,12 @@
 
         <DIV class="wrapper">
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
-          <H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
+          <H1 id="logo"><img src="<?php print $logo ?>" alt="mySmartGrid" /></H1>
+          
+          <?php
+            if ($content != "") {?>
+              <H1 id="quickmenu"><A href="/">Menü</A>&nbsp;&nbsp;&nbsp;<A href="/logout">Logout</A></H1>
+          <?php } ?>
         </DIV>
       </DIV><!-- #header -->
       <!-- HEADER include end -->
@@ -35,16 +40,29 @@
       <!-- Main content section -->
       <DIV id="doc">
 
-        <!-- Login Form -->
         <?php
-          global $user;
-          if ($left && !($user->uid)) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
-        <?php } ?>
+          if ($content == "") { ?>
 
+          <!-- Login Form or Menu -->
+          <?php
+            if ($left) {?>
+              <DIV id="contentboxes"><?php print $left ?></DIV>
+          <?php } ?>
 
-        <?php
-          if ($content != "") { ?>
+          <!-- NAVIGATION include start -->
+          <DIV id="nav" class="nav-fhg">
+            <H2>Menü</H2>
+            <H3>Hauptmenü</H3>
+            <!-- php if (isset($primary_links)) { -->
+            <?php if (isset($primary_links)) { ?>
+              <?php unset($primary_links['menu-617'])  ?> <!--TODO: adapt forum to the mobile theme -->
+              <div id="primary">
+                <?php print theme('links', $primary_links) ?>
+              </div>
+            <?php } ?><!-- #nav-direct-first -->
+          </DIV>
 
+        <?php } else { ?>
           <!-- Text content -->
           <DIV id="main" role="main">
 
@@ -69,26 +87,6 @@
 
           </DIV><!-- #main -->
         <?php } ?>
-
-        <!-- Menu -->
-        <?php
-          global $user;
-          if ($left && $user->uid) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
-        <?php } ?>
-
-
-        <!-- NAVIGATION include start -->
-        <DIV id="nav" class="nav-fhg">
-          <H2>Menü</H2>
-          <H3>Hauptmenü</H3>
-          <!-- php if (isset($primary_links)) { -->
-          <?php if (isset($primary_links)) { ?>
-            <?php unset($primary_links['menu-617'])  ?> <!--TODO: adapt forum to the mobile theme -->
-            <div id="primary">
-              <?php print theme('links', $primary_links) ?>
-            </div>
-          <?php } ?><!-- #nav-direct-first -->
-        </DIV>
 
       </DIV><!-- #doc -->
 

@@ -2894,3 +2894,13 @@ table.resizable {
   width: 100%;
   font-size: 11px;
 }
+
+#quickmenu {
+  text-align: right;
+  font-size: 14px;
+}
+
+#quickmenu a {
+	background: transparent;
+  font-weight: bold;
+}
