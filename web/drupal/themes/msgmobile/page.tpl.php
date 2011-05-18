@@ -43,8 +43,7 @@
 
 
         <?php
-          global $user;
-          if ($content != "" && $user->uid) { ?>
+          if ($content != "") { ?>
 
           <!-- Text content -->
           <DIV id="main" role="main">
