@@ -30,12 +30,12 @@ define('DAY',    24 * HOUR);
 define('WEEK',    7 * DAY);
 define('MONTH',  30 * DAY);
 define('YEAR',   52 * WEEK);
-define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
 
 define('LOGGER_PATH', drupal_get_path('module', 'logger'));
+define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 
 
 function logger_init() {
@@ -1368,8 +1368,9 @@ function _logger_create_chart_legend($chart) {
     }
   }
 
-  $resize_handler = 'function() { resizePage("' . LOGGER_LEGEND_TABLE_ID . '"); }';
-  drupal_add_js("$(window).resize(  $resize_handler );", 'inline');
+  $handler = 'function() { resizePage("' . LOGGER_LEGEND_TABLE_ID . '"); }';
+  drupal_add_js("$(window).resize(  $handler );", 'inline');
+  drupal_add_js("$(document).ready(  $handler );", 'inline');
 
   return theme('table', $header, $lines, array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')) .
     '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
@@ -1526,7 +1527,7 @@ function logger_energychart_form(&$form_state, $chart) {
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
@@ -1561,7 +1562,7 @@ function logger_relativechart_form(&$form_state, $chart) {
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
@@ -1593,7 +1594,7 @@ function logger_powerchart_form(&$form_state, $chart) {
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_power_units_options(),
     '#default_value'  => $chart->unit,
@@ -1726,16 +1727,16 @@ function theme_logger_unit_selector($element) {
 
   _form_set_class($element, array('form-select'));
 
-  $field2 = '<div style="display: inline; visibility: ' . $visible . ';">' .
-    t('price') . ':&nbsp;&nbsp;€ ' . '<input type="text" name="price" size="4" ' .
-    'value="' . $price . '" style="text-align: right;"/> / kWh</div>';
-
   $field1 = '<select name="' . $name . '' . ($multiple ? '[]' : '') . '"' .
     ($multiple ? ' multiple="multiple" ' : '') .
     $attributes . ' id="' . $element['#id'] . '" ' . $size . '>' .
     form_select_options($element) . '</select>';
 
-  return theme('form_element', $element, "$field1 &nbsp;&nbsp;&nbsp;$field2");
+  $field2 = '<div style="display: inline; visibility: ' . $visible . '; white-space: nowrap;">' .
+    t('price') . ':&nbsp;€ ' . '<input type="text" name="price" size="4" ' .
+    'value="' . $price . '" style="text-align: right;"/>&nbsp;/kWh</div>';
+
+  return theme('form_element', $element, "$field1&nbsp;&nbsp;$field2");
 }
 
 /**

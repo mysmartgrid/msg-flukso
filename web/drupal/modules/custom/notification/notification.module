@@ -234,13 +234,14 @@ function notification_list_page() {
     $rows[] = $row;
   }
 
-  $legend_id = 'notification-list-table';
-  $resize_handler = 'function() { resizePage("' . $legend_id . '"); }';
-  drupal_add_js("$(window).resize(  $resize_handler );", 'inline');
+  $table_id = 'notification-list-table';
+  $handler = 'function() { resizePage("' . $table_id . '"); }';
+  drupal_add_js("$(window).resize(  $handler );", 'inline');
+  drupal_add_js("$(document).ready(  $handler );", 'inline');
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
-  return theme('table', $headers, $rows, array('id' => $legend_id, 'class' => 'resizable'), $caption);
+  return theme('table', $headers, $rows, array('id' => $table_id, 'class' => 'resizable'), $caption);
 }
 
 /**
