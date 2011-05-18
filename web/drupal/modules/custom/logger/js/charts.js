@@ -60,6 +60,40 @@ function formatCVSTimeStamp(d) {
     (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 }
 
+/**
+ * Look through stylesheets in reverse order that they appear in the document.
+ */
+function getStyleBySelector(selector) {
+  var sheets = document.styleSheets;
+  var rules, s, r;
+
+  for (s = sheets.length - 1; s >= 0; s--) {
+    rules = sheets[s].cssRules == undefined ? sheets[s].rules : sheets[s].cssRules;
+
+    for (r = 0; r < rules.length; r++){
+
+      if (rules[r].selectorText && rules[r].selectorText.toLowerCase() == selector){
+        return rules[r].style;
+      }
+    }
+  }
+  return null;
+}
+
+function percentToPx(value, max) {
+  if (value.indexOf('%') > -1)  {
+    var perc = parseInt(value.replace("%",""));
+    return perc * max / 100;
+  } else {
+    return value.replace("px","");
+  }
+}
+
+function isMobile() {
+  //If client is a mobile device
+  return document.body.clientWidth < 600;
+}
+
 function hideZero(value) {
   return value == 0 ? "" : value.toFixed(2);
 }
@@ -361,35 +395,6 @@ function removePowerAnnotation(chart, text) {
   }
 }
 
-/**
- * Look through stylesheets in reverse order that they appear in the document.
- */
-function getStyleBySelector(selector) {
-  var sheets = document.styleSheets;
-  var rules, s, r;
-
-  for (s = sheets.length - 1; s >= 0; s--) {
-    rules = sheets[s].cssRules == undefined ? sheets[s].rules : sheets[s].cssRules;
-
-    for (r = 0; r < rules.length; r++){
-
-      if (rules[r].selectorText && rules[r].selectorText.toLowerCase() == selector){
-        return rules[r].style;
-      }
-    }
-  }
-  return null;
-}
-
-function percentToPx(value, max) {
-  if (value.indexOf('%') > -1)  {
-    var perc = parseInt(value.replace("%",""));
-    return perc * max / 100;
-  } else {
-    return value.replace("px","");
-  }
-}
-
 function createLineChart(id, fileURL, properties) {
 
   var div = document.getElementById(id);
@@ -408,56 +413,7 @@ function createLineChart(id, fileURL, properties) {
   return chart;
 }
 
-function resizePage(legendId) {
-
-  //If client is a mobile device
-  if (document.body.clientWidth < 600) {
-
-    var isLarge = document.body.clientWidth > 400;
-    resizeLegend(legendId, isLarge);
-
-    resizeLineChart('lineChart', isLarge);
-    resizeLineChart('sliderChart', isLarge);
-    resizeBarChart();
-  }
-}
-
-function resizeLegend(id, isLarge) {
-
-  var table = document.getElementById(id);
-  if (table) {
-    var display = isLarge ? 'table-cell' : 'none';
-
-    for(var r = 0; r < table.rows.length; r++) {
-      var cells = table.rows[r].cells;
-      for(var c = 3; c < cells.length - 1; c++) {
-        cells[c].style.display = display;
-      }
-    }
-  }
-}
-
-function resizeLineChart(id, isLarge) {
-
-  var chart = getChart(id);
-
-  //TODO: simplify this method
-  if (chart) {
-    var div = document.getElementById(id);
-    var clazz = getStyleBySelector('div.' + div.className);
-    var height = clazz.height.replace("px","");
-    var width = isLarge ? 460 : 295; //Cellphone possibilities
-    chart.resize(width, height);
-  }
-}
-
-function resizeBarChart() {
-  if (barChart) {
-    barChart.plot();
-  }
-}
-
-function createBarChart(id, series, names, colors, dataLabels, stacked, mobile) {
+function createBarChart(id, series, names, colors, dataLabels, stacked) {
 
   var numTicks = names.length;
   var barWidth = stacked ? 0.5 : (1 / (series.length + 1));
@@ -520,7 +476,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked, mobile) 
 
   chart.plot = function() {
     var plot = $.plot($('#' + id), data, options);
-    showBarDataLabels(plot, stacked, dataLabels, barWidth, mobile);
+    showBarDataLabels(plot, stacked, dataLabels, barWidth);
   };
   chart.plot();
 
@@ -561,7 +517,9 @@ function getChart(id) {
   return null;
 }
 
-function showBarDataLabels(plot, stacked, dataLabels, barWidth, mobile) {
+function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
+
+  var labelDivClass = getStyleBySelector('p.chart-label');
 
   var series = plot.getData();
   var offset = plot.pointOffset({x: 0, y: 0});
@@ -602,22 +560,18 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth, mobile) {
           extraOffset[v] += barHeight;
         }
 
+        var fontSize = parseInt(labelDivClass.fontSize.replace('px', ''));
+        fontSize += (barWidth > 0.4 ? 2 : barWidth > 0.3 ? 1 : 0);
+
         var value = dataLabels[d][v];
-        var precision;
-        if (mobile) {
-          precision = value < 1 ? 2 : value < 10 ? 1 : 0;
-        } else {
-          precision = value < 1 ? 3 : value < 100 ? 2 : 1;
-        }
+        var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
+        precision -= fontSize < 8 ? 1 : 0;
 
         value = value.toFixed(precision);
 
         if (value == 0) {
           value += '...';
         }
-
-        var fontSize = barWidth > 0.4 ? 10 : barWidth > 0.3 ? 9 : 8;
-        fontSize -= (mobile ? 2 : 0);
 
         var div = '<div style="font-size: ' + fontSize + 'px; font-weight: bold; width: 50px; height: ' +
             labelHeight + 'px; text-align: center;">' + value + '</div>';
@@ -660,4 +614,55 @@ function updateDygraphColor(chart, i, color) {
   var values = chart.getColors();
   values[i] = color;
   chart.updateOptions({colors: values});
+}
+
+function resizeCharts() {
+
+  if (isMobile()) {
+
+    resizeLineChart('lineChart');
+    resizeLineChart('sliderChart');
+    resizeBarChart();
+  }
+}
+
+function resizeLineChart(id) {
+
+  var chart = getChart(id);
+
+  //TODO: simplify this method
+  if (chart) {
+    var isLarge = document.body.clientWidth > 400;
+
+    var div = document.getElementById(id);
+    var clazz = getStyleBySelector('div.' + div.className);
+    var height = clazz.height.replace("px","");
+    var width = isLarge ? 460 : 295; //Cellphone possibilities
+    chart.resize(width, height);
+  }
+}
+
+function resizeBarChart() {
+  if (barChart) {
+    barChart.plot();
+  }
+}
+
+function resizeLegend(id) {
+
+  if (isMobile()) {
+
+    var table = document.getElementById(id);
+    if (table) {
+      var isLarge = document.body.clientWidth > 400;
+      var display = isLarge ? 'table-cell' : 'none';
+
+      for(var r = 0; r < table.rows.length; r++) {
+        var cells = table.rows[r].cells;
+        for(var c = 3; c < cells.length - 1; c++) {
+          cells[c].style.display = display;
+        }
+      }
+    }
+  }
 }

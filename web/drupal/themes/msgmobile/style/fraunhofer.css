@@ -2881,13 +2881,13 @@ div.legend {
 div.chart {
   height: 220px;
   width: 100%;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 div.slider {
   height: 50px;
   width: 100%;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 table.resizable {
@@ -2903,4 +2903,8 @@ table.resizable {
 #quickmenu a {
 	background: transparent;
   font-weight: bold;
+}
+
+p.chart-label {
+  font-size: 6px;
 }

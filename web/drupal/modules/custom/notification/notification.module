@@ -235,8 +235,8 @@ function notification_list_page() {
   }
 
   $table_id = 'notification-list-table';
-  $handler = 'function() { resizePage("' . $table_id . '"); }';
-  drupal_add_js("$(window).resize(  $handler );", 'inline');
+  $handler = "function() { resizeLegend('$table_id'); }";
+  drupal_add_js("$(window).resize( $handler );", 'inline');
   drupal_add_js("$(document).ready(  $handler );", 'inline');
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';

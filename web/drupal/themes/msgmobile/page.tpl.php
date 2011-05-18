@@ -30,7 +30,7 @@
           
           <?php
             if ($content != "") {?>
-              <H1 id="quickmenu"><A href="/">Menü</A>&nbsp;&nbsp;&nbsp;<A href="/logout">Logout</A></H1>
+              <H1 id="quickmenu"><A href="/">Menü</A>&nbsp;&nbsp;&nbsp;<A href="/logout">Abmelden</A></H1>
           <?php } ?>
         </DIV>
       </DIV><!-- #header -->

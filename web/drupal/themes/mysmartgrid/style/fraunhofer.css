@@ -2888,3 +2888,7 @@ div.slider {
 table.resizable {
   width: 100%;
 }
+
+p.chart-label {
+  font-size: 8px;
+}

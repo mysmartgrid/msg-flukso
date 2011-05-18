@@ -523,7 +523,6 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $chart->period = _logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->sensors = $sensors;
   $chart->aggregate_sensors = $aggregate_sensors;
-  $chart->mobile = _logger_is_mobile_device();
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
     $xaxis[1] = time();
@@ -535,7 +534,7 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $lifetime = 15 * MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
-  $unique_id = "$context " . implode(',', $types) . " $unit $price $chart->resolution $t1 $t2 $aggregate_sensors $chart->mobile";
+  $unique_id = "$context " . implode(',', $types) . " $unit $price $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter $sensor->type";
   }
@@ -625,9 +624,9 @@ function _logger_get_relative_chart_data($chart) {
   );
 
   $legend = array(
-    array('Serie' => '<b>' . t('Current')  . '</b>' . ($chart->mobile ? '' : ' - ' . t('How much has been consumed so far in the current time frame.'))),
-    array('Serie' => '<b>' . t('Previous') . '</b>' . ($chart->mobile ? '' : ' - ' . t('How much was consumed in the previous time frame.'))),
-    array('Serie' => '<b>' . t('Excess')   . '</b>' . ($chart->mobile ? '' : ' - ' . t('How much the current consumption has exceeded the previous one.'))),
+    array('Serie' => '<b>' . t('Current')  . '</b>' . ' - ' . t('How much has been consumed so far in the current time frame.')),
+    array('Serie' => '<b>' . t('Previous') . '</b>' . ' - ' . t('How much was consumed in the previous time frame.')),
+    array('Serie' => '<b>' . t('Excess')   . '</b>' . ' - ' . t('How much the current consumption has exceeded the previous one.')),
   );
 
   foreach ($intervals as $interval => $label) {
@@ -1256,8 +1255,7 @@ function theme_logger_energy_chart_area($chart) {
         ['"   . implode("', '" , $names)         . "'],
         ['"   . implode("', '" , $chart->colors) . "'],
         [ [ " . implode('], [' , $data_labels)   . " ] ], " .
-        ($chart->stacked ? 'true' : 'false') . ', ' .
-        ($chart->mobile ? 'true' : 'false') . ");
+        ($chart->stacked ? 'true' : 'false') . ");
     </script>" .
                 
     '<br>' . t('Unit') . ': ' . t($chart->unit) .
@@ -1368,9 +1366,8 @@ function _logger_create_chart_legend($chart) {
     }
   }
 
-  $handler = 'function() { resizePage("' . LOGGER_LEGEND_TABLE_ID . '"); }';
-  drupal_add_js("$(window).resize(  $handler );", 'inline');
-  drupal_add_js("$(document).ready(  $handler );", 'inline');
+  drupal_add_js("$(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", 'inline');
+  drupal_add_js("$(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", 'inline');
 
   return theme('table', $header, $lines, array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')) .
     '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
