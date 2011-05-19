@@ -15,7 +15,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/msg-flukso
   SECTION:=utils
   CATEGORY:=Utilities
-  DEPENDS:=+luaxmlrpc +luaxyssl +ntpclient +avahi-daemon
+  DEPENDS:=+liblua-xmlrpc +luaposix +luaxyssl +ntpclient +avahi-daemon +luci-lib-sys +libuci-lua +luci-lib-web +luci-lib-nixio
   TITLE:=mySmartGrid - die intelligente Gerätesteuerung für Ihr Zuhause.
   URL:=http://mysmartgrid.de/
 endef
@@ -55,7 +55,7 @@ define Package/msg-flukso/postinst
   #create symlink for local lan interface
   test -L /www || ln -s /tmp/sensor /www
 
-	uci set system.system.version = '103'
+	uci add system.@system[0].version=103
 	uci commit system
 endef
 
@@ -63,7 +63,7 @@ define Package/msg-flukso/prerm
   #!/bin/sh
 
   #remove symlink for local lan interface
-	rm /www
+	#rm /www
 endef
 
 $(eval $(call BuildPackage,msg-flukso))
