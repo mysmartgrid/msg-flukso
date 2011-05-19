@@ -966,7 +966,13 @@ function _logger_get_user_sensors($types) {
 function _logger_get_subscribed_sensors($types) {
 
   global $user;
-  $selected_users = _logger_get_variable('selected_users', array($user->uid));
+  $selected_users = _logger_get_variable('selected_users', array());
+  
+  if (empty($selected_users)) {
+    $selected_users = array($user->uid);
+    _logger_set_variable('selected_users', $selected_users);
+  }
+
   $sensors = array();
 
   if (user_access('view logger charts') && !empty($types)) {
