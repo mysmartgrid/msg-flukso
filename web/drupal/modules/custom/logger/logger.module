@@ -35,14 +35,10 @@ define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
 
 define('LOGGER_PATH', drupal_get_path('module', 'logger'));
-define('LOGGER_CHART_HEIGHT', 350);
-define('LOGGER_SLIDER_HEIGHT', 50);
+define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 
 
 function logger_init() {
-
-  drupal_add_js(LOGGER_PATH . '/js/jscolor/jscolor.js');
-  drupal_add_js(LOGGER_PATH . '/js/charts.js');
 
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
@@ -53,6 +49,9 @@ function logger_init() {
   drupal_add_js(LOGGER_PATH . '/js/dygraph/rgbcolor.js');
   drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph-canvas.js');
   drupal_add_js(LOGGER_PATH . '/js/dygraph/dygraph.js');
+
+  drupal_add_js(LOGGER_PATH . '/js/jscolor/jscolor.js');
+  drupal_add_js(LOGGER_PATH . '/js/charts.js');
 
   jquery_ui_add(array('ui.datepicker'));
   drupal_add_css(LOGGER_PATH . '/style/ui.datepicker.css');
@@ -236,7 +235,7 @@ function logger_menu() {
 /**
  * Forwards request to a suitable home page.
  * 
- * @param $arg  any page argument.
+ * @param $arg  Any page argument.
  * @return the home page.
  */
 function _logger_home_page($arg = NULL) {
@@ -245,12 +244,27 @@ function _logger_home_page($arg = NULL) {
     drupal_goto('logger', NULL, NULL, 301);
   }
 
+  if (_logger_is_mobile_device()) {
+    return '';
+  }
+
   if (user_access('view logger charts')) {
     return _logger_energy_page('week');
 
   } else {
     return _logger_overview_page('hour');
   }
+}
+
+/**
+ * Checks if the client is a mobile device.
+ *
+ * @return true if it is; false otherwise.
+ */
+function _logger_is_mobile_device() {
+
+  $check = mobile_tools_is_mobile_device();
+  return $check['type'] == 'mobile';
 }
 
 /**
@@ -277,11 +291,7 @@ function _logger_power_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $unit = _logger_get_variable('powerchart_unit', 'watt');
   $price = _logger_get_variable('price', NULL);
-
-  $sensors = array_merge(
-    _logger_get_user_sensors($types),
-    _logger_get_subscribed_sensors($types)
-  );
+  $sensors = _logger_get_subscribed_sensors($types);
 
   $chart = _logger_create_chart_object('power', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price);
 
@@ -331,12 +341,12 @@ function _logger_overview_page($interval) {
     }
 
     //Counters
-    $sql = "SELECT count(*) FROM {logger_devices} d WHERE d.uid <> %d";
+    $sql = "SELECT COUNT(*) FROM {logger_devices} d WHERE d.uid <> %d";
     $devcounter = db_result( db_query($sql, 0));
 
     $sql = "
       SELECT
-        count(*)
+        COUNT(*)
       FROM
         {users} u
       WHERE
@@ -443,18 +453,18 @@ function _logger_energy_page($interval) {
     $end = $start + round($window / $sub_time_window) * $sub_time_window;
   }
 
-  $all_types = array_keys(logger_get_sensor_types_options($user->uid));
-  $selected_types_options = _logger_get_variable('selected_sensor_types', array());
+  $all_types_options = logger_get_sensor_types_options($user->uid);
+  $selected_types_options = _logger_get_variable('selected_sensor_types', $all_types_options);
 
   //User can change sensor types any time
   foreach ($selected_types_options as $type => $selected) {
-    if ($selected && in_array($type, $all_types)) {
+    if ($selected && isset($all_types_options[$type])) {
       $types[] = $type;
     }
   }
   if (empty($types)) {
-    $types = $all_types;
-    _logger_set_variable('selected_sensor_types', $types);
+    $types = array_keys($all_types_options);
+    _logger_set_variable('selected_sensor_types', $all_type_options);
   }
 
   $sensors = _logger_get_user_sensors($types);
@@ -507,7 +517,6 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $chart->unit = $unit;
   $chart->price = $price;
   $chart->stacked = $stacked;
-
   $chart->resolution = _logger_get_resolution($interval);
   $chart->offset = _logger_get_timezone_offset();
   $chart->colors = _logger_get_series_colors($context);
@@ -537,9 +546,11 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
 
   if (!$chart->data) {
     $get_data = '_logger_get_' . $chart->context . '_chart_data';
-    $chart->data = $get_data($chart);
     
-    cache_set($chart->id, $chart->data, 'cache_page', time() + $lifetime);
+    if (!empty($types)) {
+      $chart->data = $get_data($chart);
+      cache_set($chart->id, $chart->data, 'cache_page', time() + $lifetime);
+    }
   }
   return $chart;
 }
@@ -550,9 +561,6 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
  * @param $cache_id  The chart cache id.
  */
 function _logger_download_chart_data_file($cache_id) {
-
-  drupal_set_header('Content-Type: text/plain');
-  drupal_set_header('Content-disposition: attachment; filename=chart-data-file.txt');
 
   $cache = cache_get($cache_id, 'cache_page');
   if ($cache->data) {
@@ -579,6 +587,15 @@ function _logger_download_chart_data_file($cache_id) {
       $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
+
+  _logger_download_file('chart-data-file.txt', $header, $lines);
+}
+
+function _logger_download_file($file_name, $header, $lines) {
+
+  drupal_set_header('Content-Type: text/plain');
+  drupal_set_header("Content-disposition: attachment; filename=$file_name.txt");
+
   print $header . PHP_EOL . $lines;
   exit(0);
 }
@@ -834,9 +851,9 @@ function _logger_get_power_chart_data($chart) {
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->function][$sensor->type] = $values;
 
-    $operations = ($sensor->uid > 0 && $sensor->uid != $user->uid)?
+    $operations = $sensor->uid > 0 ?
       '<a href="javascript: void(0)" 
-        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username'" . ');">' .
+        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
         t('Remove') . '</a>' : '';
 
     $data['legend'][] = _logger_create_power_legend_line($sensor->username, $sensor->function, t($sensor->type), $i++, $operations);
@@ -885,14 +902,14 @@ function _logger_format_power_series_data($chart, $measurements) {
 function _logger_create_power_legend_line($username, $sensor, $type, $i, $operations = '') {
 
   return array(
-      t('User')       => $username,
-      t('Sensor')     => $sensor,
-      t('Type')       => $type,
-      t('Max')        => "<div id='max$i'/>",
-      t('Min')        => "<div id='min$i'/>",
-      t('Avg')        => "<div id='avg$i'/>",
-      t('Last')       => "<div id='last$i'/>",
-      t('Operation')  => $operations
+    t('User')      => $username,
+    t('Sensor')    => $sensor,
+    t('Type')      => $type,
+    t('Max')       => "<div id='max$i'/>",
+    t('Min')       => "<div id='min$i'/>",
+    t('Avg')       => "<div id='avg$i'/>",
+    t('Last')      => "<div id='last$i'/>",
+    t('Operation') => $operations
   );
 }
 
@@ -949,6 +966,7 @@ function _logger_get_user_sensors($types) {
 function _logger_get_subscribed_sensors($types) {
 
   global $user;
+  $selected_users = _logger_get_variable('selected_users', array($user->uid));
   $sensors = array();
 
   if (user_access('view logger charts') && !empty($types)) {
@@ -965,21 +983,21 @@ function _logger_get_subscribed_sensors($types) {
         lu.private
       FROM
         {logger_meter_type} st,
-        ((({users} u
-        INNER JOIN {user_relationships} ur ON u.uid = ur.requestee_id)
-        INNER JOIN {user_relationship_types} urt ON ur.rtid = urt.rtid)
-        INNER JOIN {logger_meters} lm ON u.uid = lm.uid)
-        INNER JOIN {logger_users} lu ON u.uid = lu.uid
+        {users} u,
+        {logger_users} lu,
+        {logger_meters} lm
       WHERE
-        ur.requester_id = %d AND
-        urt.name = '%s' AND
-        lm.type IN (%s) AND
         lm.type = st.id AND
+        lm.uid = u.uid AND
+        u.uid = lu.uid AND
+        u.uid IN (%s) AND
+        lm.type IN (%s) AND
         lm.function IS NOT NULL
       ORDER BY
-        ur.rid";
+        u.name,
+        lm.function";
 
-    $result = db_query($sql, $user->uid, 'subscription', implode(',', $types));
+    $result = db_query($sql, implode(',', $selected_users), implode(',', $types));
 
     while($sensor = db_fetch_object($result)) {
       $sensors[] = $sensor;
@@ -1167,7 +1185,6 @@ function theme_logger_power_chart_area($chart) {
   $yvalue2 = $chart->yaxis[1] + 0;
 
   $chart_properties = array(
-    'height'             => LOGGER_CHART_HEIGHT,
     'dateWindow'         => "[$xvalue1, $xvalue2]",
     'drawCallback'       => 'updatePowerChartForm',
     'zoomCallback'       => 'updateSliderChart',
@@ -1179,7 +1196,6 @@ function theme_logger_power_chart_area($chart) {
   }
 
   $slider_properties = array(
-    'height'           => LOGGER_SLIDER_HEIGHT,
     'gridLineColor'    => '"transparent"',
     'yValueFormatter'  => 'hideZero',
     'zoomCallback'     => 'updatePowerChart',
@@ -1194,8 +1210,8 @@ function theme_logger_power_chart_area($chart) {
     _logger_create_interval_menu($chart->context) .
     '<div>' . t($unit) . '</div>' .
 
-    _logger_create_dygraph('powerChart', $chart, TRUE, $chart_properties) .
-    _logger_create_dygraph('sliderChart', $chart, FALSE, $slider_properties) .
+    _logger_create_dygraph($chart, TRUE, $chart_properties) .
+    _logger_create_dygraph($chart, FALSE, $slider_properties, TRUE) .
 
     _logger_create_chart_legend($chart);
 }
@@ -1208,34 +1224,33 @@ function theme_logger_power_chart_area($chart) {
  */
 function theme_logger_energy_chart_area($chart) {
 
-  if (!$chart->data['series'] || !$chart->data['labels']) {
-    return "<div style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>";
-  }
+  if ($chart->data['series'] && $chart->data['labels']) {
 
-  foreach ($chart->data['series'] as $uid => $userdata) {
-    foreach($userdata as $username => $sensors) {
-      foreach($sensors as $sensor => $sensordata) {
-        foreach($sensordata as $type => $values) {
-          $series[] = implode(', ', $values);
+    foreach ($chart->data['series'] as $uid => $userdata) {
+      foreach($userdata as $username => $sensors) {
+        foreach($sensors as $sensor => $sensordata) {
+          foreach($sensordata as $type => $values) {
+            $series[] = implode(', ', $values);
+          }
         }
       }
     }
-  }
-  $names = array_keys($values);
+    $names = array_keys($values);
 
-  foreach ($chart->data['labels'] as $function => $typedata) {
-    foreach ($typedata as $type => $values) {
-      $data_labels[] = implode(', ', $values);
+    foreach ($chart->data['labels'] as $function => $typedata) {
+      foreach ($typedata as $type => $values) {
+        $data_labels[] = implode(', ', $values);
+      }
     }
   }
 
-  $id = $chart->context . 'Chart';
+  $id = 'barChart';
   $menu = $chart->context == 'energy' ? _logger_create_interval_menu($chart->context) : '';
 
   return " $menu
-    <div id='$id' style='width: 640px; height: " . LOGGER_CHART_HEIGHT . "px;'></div>
+    <div id='$id' class='chart'></div>
     <script type='text/javascript'>
-      $id = createBarChart('$id',
+      createBarChart('$id',
         [ [ " . implode('], [' , $series)        . " ] ],
         ['"   . implode("', '" , $names)         . "'],
         ['"   . implode("', '" , $chart->colors) . "'],
@@ -1251,41 +1266,35 @@ function theme_logger_energy_chart_area($chart) {
 /**
  * Creates a Dygraph chart.
  *
- * @param $id             The chart div id.
  * @param $chart          The chart object.
  * @param $create_labels  If a div needs to be created to show labels.
  * @param $properties     The Dygraph properties.
+ * @param $slider         If the chart is a slider.
  * @return the Dygraph output.
  */
-function _logger_create_dygraph($id, $chart, $create_labels, $properties = array()) {
+function _logger_create_dygraph($chart, $create_labels, $properties = array(), $slider = FALSE) {
 
   $properties = array_merge($properties, array(
-    'labelsDiv'         => '"chartLabels"',
-    'colors'            => '["' . implode('","', $chart->colors) . '"]',
-    'width'             => 640,
-    'yAxisLabelWidth'   => 50,
-    'axisLabelFontSize' => 12,
-    'includeZero'       => 'true',
-    'stepPlot'          => _logger_get_variable('step_plot', 0),
-    'rollPeriod'        => _logger_get_variable('smooting_level', 1)
-  ));
+    'labelsDiv'    => '"chartLabels"',
+    'colors'       => '["' . implode('","', $chart->colors) . '"]',
+    'includeZero'  => 'true',
+    'stepPlot'     => _logger_get_variable('step_plot', 0),
+    'rollPeriod'   => _logger_get_variable('smooting_level', 1)));
 
   if ($create_labels) {
-    $labels_output = '<div id=' . $properties['labelsDiv'] . ' style="min-height: 20px; padding-bottom: 10px;"></div>';
+    $labels_output = '<div id=' . $properties['labelsDiv'] . ' class="legend"></div>';
   }
 
   foreach ($properties as $key => $value) {
     $pairs[] = "$key: $value";
   }
 
-  return '<div id="' . $id . '"></div><br>' .
+  $cssClass = $slider ? 'slider' : 'chart';
+  $id = $slider ? 'sliderChart' : 'lineChart';
+  return '<div id="' . $id . '" class="' . $cssClass . '"></div><br>' .
     $labels_output .
-    '<script type="text/javascript">' .
-        $id . ' = new Dygraph(
-          document.getElementById("' . $id . '"),
-          "/' . $chart->file_url . '", {' .
-          implode(', ', $pairs) . ' }
-      );
+    '<script type="text/javascript">
+       createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $pairs) . ' });
     </script> ';
 }
 
@@ -1328,7 +1337,7 @@ function _logger_create_chart_legend($chart) {
 
   $data = $chart->data['legend'];
   $header = array(
-    array('data' => t('Color'))
+    array('data' => '')
   );
 
   if (!$data) {
@@ -1356,7 +1365,11 @@ function _logger_create_chart_legend($chart) {
       $header[$title] = array('data' => t($title));
     }
   }
-  return theme('table', $header, $lines, array('id' => 'logger-legend-table')) .
+
+  drupal_add_js("$(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", 'inline');
+  drupal_add_js("$(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", 'inline');
+
+  return theme('table', $header, $lines, array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')) .
     '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
 }
 
@@ -1384,6 +1397,7 @@ function _logger_get_series_colors($chart_id) {
     '#F27D79', //PINK2
     '#00ffff', //CYAN
     '#FBEB0D', //YELLOW
+    '#5DA3CF', //BLUE2
     '#C0C0C0', //GRAY2
     '#BFD9D3', //GREEN5
     '#4D7060'  //GREEN4
@@ -1484,7 +1498,6 @@ function logger_energychart_form(&$form_state, $chart) {
 
   global $user;
   $types_options = logger_get_sensor_types_options($user->uid);
-  $attributes = array('onchange' => 'submitEnergyChartForm(this)');
 
   $form['#validate'] = array('_logger_chartform_validate');
 
@@ -1495,7 +1508,7 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('aggregate_sensors', 1),
     '#return_value'  => 1,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitEnergyChartForm(this)')//In IE, onchange does not work
   );
 
   $form['selected_sensor_types'] = array(
@@ -1505,19 +1518,19 @@ function logger_energychart_form(&$form_state, $chart) {
     '#default_value' => _logger_get_variable('selected_sensor_types', array_keys($types_options)),
     '#options'       => $types_options,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitEnergyChartForm(this)')//In IE, onchange does not work
   );
 
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
     '#price'          => $chart->price,
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitEnergyChartForm(this)')
   );
 
   $form['submit'] = array(
@@ -1529,7 +1542,7 @@ function logger_energychart_form(&$form_state, $chart) {
 
 function logger_relativechart_form(&$form_state, $chart) {
 
-  $attributes = array('onchange' => 'submitRelativeChartForm(this)');
+  $meter_options = _logger_get_meters_options($chart->types);
 
   $form['#validate'] = array('_logger_chartform_validate');
 
@@ -1537,22 +1550,22 @@ function logger_relativechart_form(&$form_state, $chart) {
     '#type'          => 'checkboxes',
     '#title'         => t('Sensors'),
     '#description'   => t('Select the sensors you want to plot on the chart.'),
-    '#default_value' => _logger_get_variable('selected_meters', 1),
-    '#options'       => _logger_get_meters_options($chart->types),
+    '#default_value' => _logger_get_variable('selected_meters', array_keys($meter_options)),
+    '#options'       => $meter_options,
     '#required'      => TRUE,
-    '#attributes'    => $attributes
+    '#attributes'    => array('onclick' => 'submitRelativeChartForm(this)')//In IE, onchange does not work
   );
 
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_energy_units_options(),
     '#default_value'  => $chart->unit,
     '#price'          => $chart->price,
     '#required'       => TRUE,
-    '#attributes'     => $attributes
+    '#attributes'     => array('onchange' => 'submitRelativeChartForm(this)')
   );
 
   $form['submit'] = array(
@@ -1578,7 +1591,7 @@ function logger_powerchart_form(&$form_state, $chart) {
   $form['unit'] = array(
     '#type'           => 'select',
     '#theme'          => 'logger_unit_selector',
-    '#title'          => t('Chart Unit'),
+    '#title'          => t('Unit'),
     '#description'    => t('Select the chart unit.'),
     '#options'        => _logger_get_power_units_options(),
     '#default_value'  => $chart->unit,
@@ -1594,7 +1607,7 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#default_value'  => _logger_get_variable('step_plot', 0),
     '#return_value'   => 1,
     '#required'       => TRUE,
-    '#attributes'     => array('onchange' => 'submitPowerChartForm()')
+    '#attributes'     => array('onclick' => 'submitPowerChartForm()')//In IE, onchange does not work
   );
 
   $form['smoothing_level'] = array(
@@ -1602,8 +1615,8 @@ function logger_powerchart_form(&$form_state, $chart) {
     '#theme'          => 'logger_smoothing_level',
     '#title'          => t('Smoothing Level'),
     '#description'    => t("Increase this number to smooth the series' lines and make the chart more readable."),
-    '#maxlength'      => 5,
-    '#size'           => 5,
+    '#maxlength'      => 3,
+    '#size'           => 3,
     '#text-align'     => 'center',
     '#default_value'  => _logger_get_variable('smooting_level', 1),
     '#required'       => TRUE
@@ -1662,7 +1675,7 @@ function theme_logger_smoothing_level($element) {
     _operation_button($id, '<<', -10) .
     _operation_button($id, '<',  -1) .
 
-    _logger_create_custom_field($element, '', $value, $attributes) .
+    _logger_create_custom_field($element, '', $value) .
 
     _operation_button($id, '>',   1) .
     _operation_button($id, '>>',  10);
@@ -1711,16 +1724,16 @@ function theme_logger_unit_selector($element) {
 
   _form_set_class($element, array('form-select'));
 
-  $field2 = '<div style="display: inline; visibility: ' . $visible . ';">' .
-    t('price') . ':&nbsp;&nbsp;€ ' . '<input type="text" name="price" size="4" ' .
-    'value="' . $price . '" style="text-align: right;"/> / kWh</div>';
-
   $field1 = '<select name="' . $name . '' . ($multiple ? '[]' : '') . '"' .
     ($multiple ? ' multiple="multiple" ' : '') .
     $attributes . ' id="' . $element['#id'] . '" ' . $size . '>' .
     form_select_options($element) . '</select>';
 
-  return theme('form_element', $element, "$field1 &nbsp;&nbsp;&nbsp;$field2");
+  $field2 = '<div style="display: inline; visibility: ' . $visible . '; white-space: nowrap;">' .
+    t('price') . ':&nbsp;€ ' . '<input type="text" name="price" size="4" ' .
+    'value="' . $price . '" style="text-align: right;"/>&nbsp;/kWh</div>';
+
+  return theme('form_element', $element, "$field1&nbsp;&nbsp;$field2");
 }
 
 /**
@@ -1785,7 +1798,12 @@ function _logger_create_time_fields($element, $sufix) {
  */
 function _logger_compose_range_fields($element, $field1, $field2) {
 
-  $output = t('from: ') . $field1 . ' &nbsp;&nbsp;&nbsp;' . t('to: ') . $field2;
+  $output = 
+    '<span style="white-space:nowrap;">' .
+    t('from: ') . $field1 . '&nbsp;&nbsp;&nbsp;' . '</span>' .
+    '<span style="white-space:nowrap;">' .
+    t('to: ') . '&nbsp;&nbsp;' . $field2 . '</span>';
+
   return theme('form_element', $element, $output);
 }
 
@@ -2122,7 +2140,7 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
   }
 
   //Expand window to fill slider
-  $window *= (LOGGER_CHART_HEIGHT / LOGGER_SLIDER_HEIGHT);
+  $window *= 7;
 
   //RRD requires the time window to be covered by RRD
   $max_window = $storage_period - ($now - $end);
@@ -2140,40 +2158,32 @@ function _logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 function _logger_get_users_options() {
 
   global $user;
+  $selected_users = _logger_get_variable('selected_users', array($user->uid));
 
   $sql = "
     SELECT
-      f.uid,
-      f.name
+      u.uid,
+      u.name
     FROM
-      {users} f,
+      {users} u,
       {users_roles} ur,
       {role} r
     WHERE
-      f.uid <> %d AND
-      f.uid = ur.uid AND
+      u.uid = ur.uid AND
       ur.rid = r.rid AND
       r.name = '%s' AND
-      NOT EXISTS(
-        SELECT
-          1
-        FROM
-          {user_relationships} urel,
-          {user_relationship_types} t
-        WHERE
-          t.name = '%s' AND
-          urel.rtid = t.rtid AND
-          urel.requestee_id = f.uid AND
-          urel.requester_id = %d
-      )
+      u.uid NOT IN (%s)
     ORDER BY
-      f.name";
+      u.name";
 
-  $fluksonians = db_query($sql, $user->uid, 'fluksonian', 'subscription', $user->uid);
+  $fluksonians = db_query($sql, 'fluksonian', implode(',', $selected_users));
+
+  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+  $u = 1;
 
   $options = array(0 => '');
   while($fluksonian = db_fetch_object($fluksonians)) {
-    $options[$fluksonian->uid] = $fluksonian->name;
+    $options[$fluksonian->uid] = $user->roles[$rid] ? $fluksonian->name : t('User') . $u++;
   }
   return $options;
 }
@@ -2186,28 +2196,28 @@ function _logger_get_users_options() {
 function _logger_add_user($uid) {
 
   global $user;
-
-  //Users are not allowed to add themselves
-  if ($uid != $user->uid) {
-
-    $sql = "SELECT rtid FROM {user_relationship_types} WHERE name = '%s'";
-    $rtid = db_result(db_query($sql, 'subscription'));
-
-    user_relationships_request_relationship($user->uid, $uid, $rtid, TRUE);
-  }
+  $selected_users = _logger_get_variable('selected_users', array($user->uid));
+  $selected_users[] = $uid;
+  _logger_set_variable('selected_users', $selected_users);
 }
 
 /**
  * Removes an user from the chart.
  *
- * @param $requestee_id  The id of the user to be removed.
+ * @param $uid  The id of the user to be removed.
  */
-function _logger_remove_user($requestee_id) {
+function _logger_remove_user($uid) {
 
-  global $user;
+  $selected_users = _logger_get_variable('selected_users', array());
+  for($i = 0; $i < count($selected_users); $i++) {
 
-  $sql = "DELETE FROM {user_relationships} WHERE requester_id = %d AND requestee_id = %d";
-  db_query($sql, $user->uid, $requestee_id);
+    if ($selected_users[$i] == $uid) {
+      unset($selected_users[$i]);
+
+      _logger_set_variable('selected_users', array_values($selected_users));
+      return;
+    }
+  }
 }
 
 /**
@@ -2223,11 +2233,25 @@ function _logger_get_variable($id, $default_value) {
   $id = "logger_$id";
 
   if ($user->uid) {
-    $id .= '_' . $user->uid;
-    return variable_get($id, $default_value);
+
+    //Visitors must use cookies
+    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
+    if ($user->roles[$rid]) {
+      $id .= '_' . $user->uid;
+      return variable_get($id, $default_value);
+
+    } else {
+      return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
+    }
 
   } else {
-    return isset($_COOKIE[$id])? $_COOKIE[$id] : $default_value;
+
+    $value = isset($_COOKIE[$id])? $_COOKIE[$id] : $default_value;
+    if (strpos(" $value", 'ARR') == 1) {
+      $value = explode(',', substr($value, 3));
+    }
+    return $value;
   }
 }
 
@@ -2243,10 +2267,22 @@ function _logger_set_variable($id, $value) {
   $id = "logger_$id";
 
   if ($user->uid) {
-    $id .= '_' . $user->uid;
-    variable_set($id, $value);
+
+    //Visitors must use cookies
+    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+
+    if ($user->roles[$rid]) {
+      $id .= '_' . $user->uid;
+      variable_set($id, $value);
+
+    } else {
+      $_SESSION[$id] = $value;
+    }
 
   } else {
+    if (is_array($value)) {
+      $value = 'ARR' . implode(',', $value);
+    }
     setcookie($id, $value, time() + WEEK, '/');
   }
 }

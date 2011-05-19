@@ -18,11 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-var powerChart;
+var lineChart;
 var sliderChart;
-var relativeChart;
-var energyChart;
-var deploymentChart;
+var barChart;
 
 function formatDate(d) {
   return '' +
@@ -43,14 +41,14 @@ function parseDate(datestr, timestr) {
   var timeParts = timestr.split(':');
 
   return new Date(
-      dateParts[2],
-      dateParts[1] - 1,
-      dateParts[0],
-      timeParts[0],
-      timeParts[1],
-      0,
-      0
-    );
+    dateParts[2],
+    dateParts[1] - 1,
+    dateParts[0],
+    timeParts[0],
+    timeParts[1],
+    0,
+    0
+  );
 }
 
 function formatCVSTimeStamp(d) {
@@ -60,6 +58,40 @@ function formatCVSTimeStamp(d) {
     (d.getDate()  < 10 ? '0' : '') + d.getDate() + ' ' +
     (d.getHours()   < 10 ? '0' : '') + d.getHours() + ':' +
     (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+}
+
+/**
+ * Look through stylesheets in reverse order that they appear in the document.
+ */
+function getStyleBySelector(selector) {
+  var sheets = document.styleSheets;
+  var rules, s, r;
+
+  for (s = sheets.length - 1; s >= 0; s--) {
+    rules = sheets[s].cssRules == undefined ? sheets[s].rules : sheets[s].cssRules;
+
+    for (r = 0; r < rules.length; r++){
+
+      if (rules[r].selectorText && rules[r].selectorText.toLowerCase() == selector){
+        return rules[r].style;
+      }
+    }
+  }
+  return null;
+}
+
+function percentToPx(value, max) {
+  if (value.indexOf('%') > -1)  {
+    var perc = parseInt(value.replace("%",""));
+    return perc * max / 100;
+  } else {
+    return value.replace("px","");
+  }
+}
+
+function isMobile() {
+  //If client is a mobile device
+  return document.body.clientWidth < 600;
 }
 
 function hideZero(value) {
@@ -132,13 +164,25 @@ function submitRelativeChartForm(clickedField) {
   clickedField.checked = true;
 }
 
-function removePowerSeries(uid, i, username) {
+function removePowerSeries(uid, i, username, tableId) {
 
-  var table = document.getElementById('logger-legend-table');
+  var table = document.getElementById(tableId);
+
+  //Check if it is the last visible one
+  var visibleOnes = 0;
+  for (var v = 1; v < table.rows.length; v++) {
+    visibleOnes += (table.rows[v].style.display == 'none') ? 0 : 1;
+  }
+  if (visibleOnes == 1) {
+    return;
+  }
+
   table.rows[i + 1].style.display = 'none';
 
-  powerChart.setVisibility(i, false);
-  sliderChart.setVisibility(i, false);
+  lineChart.setVisibility(i, false);
+  if (sliderChart) {
+    sliderChart.setVisibility(i, false);
+  }
 
   var form = document.getElementById('logger-powerchart-form');
   var field = form.elements['new_user'];
@@ -181,10 +225,12 @@ function updateSmoothingLevel(fieldId, step) {
   level = level < 1 ? 1 : level;
   field.value = level;
 
-  powerChart.setAnnotations(new Array());
+  lineChart.setAnnotations(new Array());
 
-  powerChart.updateOptions({rollPeriod: level});
-  sliderChart.updateOptions({rollPeriod: level});
+  lineChart.updateOptions({rollPeriod: level});
+  if (sliderChart) {
+    sliderChart.updateOptions({rollPeriod: level});
+  }
 
   $.get('/logger/setvariable/smoothing_level/' + level);
 
@@ -193,37 +239,39 @@ function updateSmoothingLevel(fieldId, step) {
 
 function updatePowerChart(xvalue1, xvalue2, yvalues) {
 
-  powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
-  sliderChart.updateOptions({dateWindow: null});
+  lineChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  if (sliderChart) {
+    sliderChart.updateOptions({dateWindow: null});
+  }
 
-  updatePowerChartForm(powerChart);
+  updatePowerChartForm(lineChart);
 }
 
 function updateSliderChart(xvalue1, xvalue2, yvalues) {
 
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
-  updatePowerChartForm(powerChart);
+  updatePowerChartForm(lineChart);
 }
 
 function slidePowerChart(event, center) {
 
-  var xvalue1 = powerChart.xAxisRange(0)[0];
-  var xvalue2 = powerChart.xAxisRange(0)[1];
+  var xvalue1 = lineChart.xAxisRange(0)[0];
+  var xvalue2 = lineChart.xAxisRange(0)[1];
   var drift = (xvalue2 - xvalue1) / 2;
 
   xvalue1 = center - drift;
   xvalue2 = center + drift;
 
-  powerChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
+  lineChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
 
-  updatePowerChartForm(powerChart);
+  updatePowerChartForm(lineChart);
 }
 
 function highlightPowerChart(canvas, area, sliderChart) {
 
-  var xvalue1 = powerChart.xAxisRange(0)[0];
-  var xvalue2 = powerChart.xAxisRange(0)[1];
+  var xvalue1 = lineChart.xAxisRange(0)[0];
+  var xvalue2 = lineChart.xAxisRange(0)[1];
   var yvalue1 = sliderChart.yAxisRange(0)[0];
   var yvalue2 = sliderChart.yAxisRange(0)[1];
 
@@ -295,7 +343,9 @@ function updatePowerLegend(chart) {
 function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
-  div.innerHTML = value > 0 ? value.toFixed(2) : '';
+  if (div) {
+    div.innerHTML = value > 0 ? value.toFixed(2) : '';
+  }
 }
 
 function addPowerAnnotation(event, point) {
@@ -304,9 +354,9 @@ function addPowerAnnotation(event, point) {
   var yval = point.yval.toFixed(2);
   var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
 
-  if (!removePowerAnnotation(powerChart, text)) {
+  if (!removePowerAnnotation(lineChart, text)) {
 
-    var annotations = powerChart.annotations();
+    var annotations = lineChart.annotations();
 
     var width = 50 * ('' + yval).length / 6;
 
@@ -321,7 +371,7 @@ function addPowerAnnotation(event, point) {
       }
     });
 
-    powerChart.setAnnotations(annotations);
+    lineChart.setAnnotations(annotations);
   }
 }
 
@@ -343,6 +393,24 @@ function removePowerAnnotation(chart, text) {
   } else {
     return false;
   }
+}
+
+function createLineChart(id, fileURL, properties) {
+
+  var div = document.getElementById(id);
+  var clazz = getStyleBySelector('div.' + div.className);
+
+  //Dygraph in IE fails if % or px are informed
+  properties.width = percentToPx(clazz.width, div.clientWidth);
+  properties.height = percentToPx(clazz.height);
+
+  properties.axisLabelFontSize = clazz.fontSize.replace("px","");
+  properties.yAxisLabelWidth = properties.axisLabelFontSize * 4;
+
+  var chart = new Dygraph(div, '/' + fileURL, properties);
+  storeChart(id, chart);
+
+  return chart;
 }
 
 function createBarChart(id, series, names, colors, dataLabels, stacked) {
@@ -393,7 +461,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
   options.yaxis = {
     autoscaleMargin: 0.05,
     tickFormatter: function (value, axis) {
-      return stacked ? value.toFixed(0) + ' %' : value.toFixed(2);
+      return stacked ? value.toFixed(0) + '%' : value.toFixed(1);
     }
   };
 
@@ -410,13 +478,48 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
     var plot = $.plot($('#' + id), data, options);
     showBarDataLabels(plot, stacked, dataLabels, barWidth);
   };
-
   chart.plot();
+
+  storeChart(id, chart);
 
   return chart;
 }
 
+function storeChart(id, chart) {
+
+  if (id == 'lineChart') {
+    lineChart = chart;
+    sliderChart = null;
+    barChart = null;
+
+  } else if (id == 'sliderChart') {
+    sliderChart = chart;
+    barChart = null;
+
+  } else if (id == 'barChart') {
+    barChart = chart;
+    lineChart = null;
+    sliderChart = null;
+  }
+}
+
+function getChart(id) {
+
+  if (id == 'lineChart') {
+    return lineChart;
+
+  } else if (id == 'sliderChart') {
+    return sliderChart;
+
+  } else if (id == 'barChart') {
+    return barChart;
+  }
+  return null;
+}
+
 function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
+
+  var labelDivClass = getStyleBySelector('p.chart-label');
 
   var series = plot.getData();
   var offset = plot.pointOffset({x: 0, y: 0});
@@ -457,15 +560,18 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
           extraOffset[v] += barHeight;
         }
 
+        var fontSize = parseInt(labelDivClass.fontSize.replace('px', ''));
+        fontSize += (barWidth > 0.4 ? 2 : barWidth > 0.3 ? 1 : 0);
+
         var value = dataLabels[d][v];
         var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
+        precision -= fontSize < 8 ? 1 : 0;
+
         value = value.toFixed(precision);
 
         if (value == 0) {
           value += '...';
         }
-
-        var fontSize = barWidth > 0.4 ? 10 : barWidth > 0.3 ? 9 : 8;
 
         var div = '<div style="font-size: ' + fontSize + 'px; font-weight: bold; width: 50px; height: ' +
             labelHeight + 'px; text-align: center;">' + value + '</div>';
@@ -486,24 +592,17 @@ function setSeriesColor(chartId, i, color) {
 
   color = '#' + color;
 
-  if (chartId == 'relative') {
-    relativeChart.options['colors'][i] = color;
-    relativeChart.plot();
-
-  } else if (chartId == 'energy') {
-    energyChart.options['colors'][i] = color;
-    energyChart.plot();
+  if (chartId == 'bar') {
+    barChart.options['colors'][i] = color;
+    barChart.plot();
 
   } else {
     //FIXME: improve this code
-    if (powerChart) {
-      updateDygraphColor(powerChart, i, color);
+    if (lineChart) {
+      updateDygraphColor(lineChart, i, color);
     }
     if (sliderChart) {
       updateDygraphColor(sliderChart, i, color);
-    }
-    if (deploymentChart) {
-      updateDygraphColor(deploymentChart, i, color);
     }
   }
 
@@ -515,4 +614,55 @@ function updateDygraphColor(chart, i, color) {
   var values = chart.getColors();
   values[i] = color;
   chart.updateOptions({colors: values});
+}
+
+function resizeCharts() {
+
+  if (isMobile()) {
+
+    resizeLineChart('lineChart');
+    resizeLineChart('sliderChart');
+    resizeBarChart();
+  }
+}
+
+function resizeLineChart(id) {
+
+  var chart = getChart(id);
+
+  //TODO: simplify this method
+  if (chart) {
+    var isLarge = document.body.clientWidth > 400;
+
+    var div = document.getElementById(id);
+    var clazz = getStyleBySelector('div.' + div.className);
+    var height = clazz.height.replace("px","");
+    var width = isLarge ? 460 : 295; //Cellphone possibilities
+    chart.resize(width, height);
+  }
+}
+
+function resizeBarChart() {
+  if (barChart) {
+    barChart.plot();
+  }
+}
+
+function resizeLegend(id) {
+
+  if (isMobile()) {
+
+    var table = document.getElementById(id);
+    if (table) {
+      var isLarge = document.body.clientWidth > 400;
+      var display = isLarge ? 'table-cell' : 'none';
+
+      for(var r = 0; r < table.rows.length; r++) {
+        var cells = table.rows[r].cells;
+        for(var c = 3; c < cells.length - 1; c++) {
+          cells[c].style.display = display;
+        }
+      }
+    }
+  }
 }

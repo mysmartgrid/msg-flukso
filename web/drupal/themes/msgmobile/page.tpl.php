@@ -26,8 +26,12 @@
 
         <DIV class="wrapper">
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
-          <H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
-
+          <H1 id="logo"><img src="<?php print $logo ?>" alt="mySmartGrid" /></H1>
+          
+          <?php
+            if ($content != "") {?>
+              <H1 id="quickmenu"><A href="/">Menü</A>&nbsp;&nbsp;&nbsp;<A href="/logout">Abmelden</A></H1>
+          <?php } ?>
         </DIV>
       </DIV><!-- #header -->
       <!-- HEADER include end -->
@@ -35,55 +39,56 @@
 
       <!-- Main content section -->
       <DIV id="doc">
-        <IMG src="/<?php print path_to_theme(); ?>/style/bg-vorlage.jpg" id="doc-bg" alt="" width="620" height="400" />
 
-        <!-- Login Form -->
         <?php
-          global $user;
-          if ($left && !($user->uid)) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
-        <?php } ?>
+          if ($content == "") { ?>
 
-        <!-- Text content -->
-        <DIV id="main" role="main">
+          <!-- Login Form or Menu -->
+          <?php
+            if ($left) {?>
+              <DIV id="contentboxes"><?php print $left ?></DIV>
+          <?php } ?>
 
-          <DIV role="section">
-            <DIV class="headings">
-              <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
-              <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
+          <!-- NAVIGATION include start -->
+          <DIV id="nav" class="nav-fhg">
+            <H2>Menü</H2>
+            <H3>Hauptmenü</H3>
+            <!-- php if (isset($primary_links)) { -->
+            <?php if (isset($primary_links)) { ?>
+              <?php unset($primary_links['menu-617'])  ?> <!--TODO: adapt forum to the mobile theme -->
+              <div id="primary">
+                <?php print theme('links', $primary_links) ?>
+              </div>
+            <?php } ?><!-- #nav-direct-first -->
+          </DIV>
+
+        <?php } else { ?>
+          <!-- Text content -->
+          <DIV id="main" role="main">
+
+            <DIV role="section">
+              <DIV class="headings">
+                <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
+                <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
+              </DIV>
             </DIV>
-          </DIV>
 
-          <DIV class="section" role="section">
+            <DIV class="section" role="section">
 
-            <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
+              <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
 
-            <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
-            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
+              <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
+              <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
 
-            <!-- start main content --><?php print($content) ?><!-- end main content -->
-          </DIV>
+              <!-- start main content -->
+              <?php print($content) ?>
+              <!-- end main content -->
+            </DIV>
 
-        </DIV><!-- #main -->
-
-        <!-- Menu -->
-        <?php
-          global $user;
-          if ($left && $user->uid) {?> <DIV id="contentboxes"><?php print $left ?></DIV>
+          </DIV><!-- #main -->
         <?php } ?>
-
-
-        <!-- NAVIGATION include start -->
-        <DIV id="nav" class="nav-fhg">
-          <H2>Menü</H2>
-          <H3>Hauptmenü</H3>
-          <?php if (isset($primary_links)) { ?><div id="primary"><?php print theme('links', $primary_links) ?></div><?php } ?><!-- #nav-direct-first -->
-        </DIV>
-
 
       </DIV><!-- #doc -->
-
-
-
 
       <!-- FOOTER include start -->
       <DIV id="footer">
@@ -118,9 +123,7 @@
         </P>
       </DIV><!-- #print-footer -->
       <!-- FOOTER include end -->
-    
       
     </DIV><!--page-->
-
   </BODY>
 </HTML>

@@ -30,7 +30,7 @@ function msgdump_perm() {
 
 function msgdump_menu() {
 
-  $items['user/%user_uid_optional/setup'] = array(
+  $items['dump/%user_uid_optional/setup'] = array(
     'title'            => "Dump values",
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('msgdump_setup_form'),
