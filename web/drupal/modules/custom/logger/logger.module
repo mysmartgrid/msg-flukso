@@ -759,7 +759,7 @@ function _logger_get_energy_chart_data(&$chart) {
           break;
         case 'week':
           $formatted_time = t(date("l", $start));
-          $complement = date("d-M", $start);
+          $complement = date("d", $start) . '-' . t(date("M", $start));
           break;
         case 'month':
           $formatted_time = t('Week') . ' ' . date("W", $start);
