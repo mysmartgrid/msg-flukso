@@ -166,13 +166,12 @@ function logger_rrd_update($meter, $values) {
  * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
- * @param $price        The price of kWh, when the unit is 'eur' or 'eur/year'.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step, $price = NULL) {
+function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step) {
 
   $series_id = METER;
-  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price);
+  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
 
   $latest = _logger_rrd_latest_timestamp($interval, $sensor);
 
@@ -205,10 +204,9 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
  * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
- * @param $price        The price of kWh, when the unit is 'eur' or 'eur/year'.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $step, $price = NULL) {
+function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = time() - 15 * MINUTE;
@@ -220,7 +218,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
 
     $sensor_cdef = METER . $i;
 
-    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price) .
+    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
 
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
@@ -251,15 +249,14 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
  * @param $offset     The user timezone offset.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
- * @param $price      The price of kWh, when the unit is 'eur' or 'eur/year'.
  * @return the summed power consumption.
  */
-function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $step, $price = NULL) {
+function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $step) {
 
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step, $price);
+    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step);
 
     foreach($measurements as $timestamp => $value) {
       $total += $value * $step;
@@ -275,13 +272,12 @@ function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $
  * @param $series_id   The series id.
  * @param $sensor      The sensor.
  * @param $unit        The unit.
- * @param $price       The price of kWh, when the unit is 'eur' or 'eur/year'.
  * @return the DEF tag.
  */
-function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price = NULL) {
+function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
   global $user;
-  $factor = _logger_rrd_get_unit_factor($unit, $price);
+  $factor = _logger_rrd_get_unit_factor($unit, $sensor->price);
 
   if($sensor->private > 0 && $sensor->uid != $user->uid) {
     return null;
