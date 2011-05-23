@@ -1,0 +1,9 @@
+<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+ <name replace-wildcards="yes">Flukso on %h</name>
+  <service>
+   <type>_flukso-realtime._tcp</type>
+   <port>4422</port>
+  </service>
+</service-group>

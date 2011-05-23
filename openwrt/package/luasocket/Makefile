@@ -23,7 +23,7 @@ PKG_INSTALL_DIR:=$(PKG_BUILD_DIR)/ipkg-install
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/liblua-socket
+define Package/luasocket
   SECTION:=lang
   SUBMENU:=LUA
   CATEGORY:=Languages
@@ -32,7 +32,7 @@ define Package/liblua-socket
   TITLE:=TCP/UDP socket library for LUA programming language
 endef
 
-define Package/liblua-socket/description
+define Package/luasocket/description
         Luasocket provides a TCP/UDP socket library for Lua 5.1. Also provided are HTTP and SMTP implementations, a simple FTP implementation and some URL parsing functions. Luasocket supports blocking and non-blocking sockets and also provides a select() interface to the language.
 
 endef
@@ -99,31 +99,31 @@ define Build/InstallDev
 	$(CP) $(PKG_BUILD_DIR)/src/url.lua $(STAGING_DIR)/usr/share/lua/socket/
 	$(CP) $(PKG_BUILD_DIR)/src/socket.h $(STAGING_DIR)/usr/include/lua
 	$(CP) $(PKG_BUILD_DIR)/src/socket.so \
-		$(STAGING_DIR)/usr/lib/liblua-socket.so.$(PKG_VERSION)
+		$(STAGING_DIR)/usr/lib/luasocket.so.$(PKG_VERSION)
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket.so.$(PKG_VERSION) liblua-socket.so
+		ln -fs luasocket.so.$(PKG_VERSION) luasocket.so
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket.so.$(PKG_VERSION) liblua-socket.so.$(PKG_VERSION_MAJOR)
+		ln -fs luasocket.so.$(PKG_VERSION) luasocket.so.$(PKG_VERSION_MAJOR)
 	cd $(STAGING_DIR)/usr/lib/lua/socket && \
-		ln -fs ../../liblua-socket.so.$(PKG_VERSION) core.so
+		ln -fs ../../luasocket.so.$(PKG_VERSION) core.so
 	$(CP) $(PKG_BUILD_DIR)/src/mime.h $(STAGING_DIR)/usr/include/lua
 	$(CP) $(PKG_BUILD_DIR)/src/mime.so \
-		$(STAGING_DIR)/usr/lib/liblua-socket-mime.so.$(PKG_VERSION)
+		$(STAGING_DIR)/usr/lib/luasocket-mime.so.$(PKG_VERSION)
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket-mime.so.$(PKG_VERSION) liblua-socket-mime.so
+		ln -fs luasocket-mime.so.$(PKG_VERSION) luasocket-mime.so
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket-mime.so.$(PKG_VERSION) liblua-socket-mime.so.$(PKG_VERSION_MAJOR)
+		ln -fs luasocket-mime.so.$(PKG_VERSION) luasocket-mime.so.$(PKG_VERSION_MAJOR)
 	cd $(STAGING_DIR)/usr/lib/lua/mime && \
-		ln -fs ../../liblua-socket-mime.so.$(PKG_VERSION) core.so
+		ln -fs ../../luasocket-mime.so.$(PKG_VERSION) core.so
 	$(CP) $(PKG_BUILD_DIR)/src/unix.h $(STAGING_DIR)/usr/include/lua
 	$(CP) $(PKG_BUILD_DIR)/src/unix.so \
-		$(STAGING_DIR)/usr/lib/liblua-socket-unix.so.$(PKG_VERSION)
+		$(STAGING_DIR)/usr/lib/luasocket-unix.so.$(PKG_VERSION)
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket-unix.so.$(PKG_VERSION) liblua-socket-unix.so
+		ln -fs luasocket-unix.so.$(PKG_VERSION) luasocket-unix.so
 	cd $(STAGING_DIR)/usr/lib/ && \
-		ln -fs liblua-socket-unix.so.$(PKG_VERSION) liblua-socket-unix.so.$(PKG_VERSION_MAJOR)
+		ln -fs luasocket-unix.so.$(PKG_VERSION) luasocket-unix.so.$(PKG_VERSION_MAJOR)
 	cd $(STAGING_DIR)/usr/lib/lua/socket && \
-		ln -fs ../../liblua-socket-unix.so.$(PKG_VERSION) unix.so
+		ln -fs ../../luasocket-unix.so.$(PKG_VERSION) unix.so
 endef
 
 define Build/UninstallDev
@@ -136,20 +136,20 @@ define Build/UninstallDev
 	$(RM) -f $(STAGING_DIR)/usr/share/lua/socket/tp.lua
 	$(RM) -f $(STAGING_DIR)/usr/share/lua/socket/url.lua
 	$(RM) -f $(STAGING_DIR)/usr/include/lua/socket.h
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket.so.$(PKG_VERSION)
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket.so.$(PKG_VERSION_MAJOR)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket.so.$(PKG_VERSION)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket.so.$(PKG_VERSION_MAJOR)
 	$(RM) -f $(STAGING_DIR)/usr/lib/lua/socket/core.so
 	$(RM) -f $(STAGING_DIR)/usr/include/lua/mime.h
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket-mime.so.$(PKG_VERSION)
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket-mime.so.$(PKG_VERSION_MAJOR)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket-mime.so.$(PKG_VERSION)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket-mime.so.$(PKG_VERSION_MAJOR)
 	$(RM) -f $(STAGING_DIR)/usr/lib/lua/mime/core.so
 	$(RM) -f $(STAGING_DIR)/usr/include/lua/unix.h
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket-unix.so.$(PKG_VERSION)
-	$(RM) -f $(STAGING_DIR)/usr/lib/liblua-socket-unix.so.$(PKG_VERSION_MAJOR)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket-unix.so.$(PKG_VERSION)
+	$(RM) -f $(STAGING_DIR)/usr/lib/luasocket-unix.so.$(PKG_VERSION_MAJOR)
 	$(RM) -f $(STAGING_DIR)/usr/lib/lua/socket/unix.so
 endef
 
-define Package/liblua-socket/install
+define Package/luasocket/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/mime
 	$(INSTALL_DIR) $(1)/usr/lib/lua/socket
 	$(INSTALL_DIR) $(1)/usr/share/lua/socket
@@ -162,23 +162,23 @@ define Package/liblua-socket/install
 	$(CP) $(PKG_BUILD_DIR)/src/tp.lua $(1)/usr/share/lua/socket/
 	$(CP) $(PKG_BUILD_DIR)/src/url.lua $(1)/usr/share/lua/socket/
 	$(CP) $(PKG_BUILD_DIR)/src/socket.so \
-		$(1)/usr/lib/liblua-socket.so.$(PKG_VERSION)
+		$(1)/usr/lib/luasocket.so.$(PKG_VERSION)
 	cd $(1)/usr/lib/ && \
-		ln -fs liblua-socket.so.$(PKG_VERSION) liblua-socket.so
+		ln -fs luasocket.so.$(PKG_VERSION) luasocket.so
 	cd $(1)/usr/lib/lua/socket && \
-		ln -fs ../../liblua-socket.so.$(PKG_VERSION) core.so
+		ln -fs ../../luasocket.so.$(PKG_VERSION) core.so
 	$(CP) $(PKG_BUILD_DIR)/src/mime.so \
-		$(1)/usr/lib/liblua-socket-mime.so.$(PKG_VERSION)
+		$(1)/usr/lib/luasocket-mime.so.$(PKG_VERSION)
 	cd $(1)/usr/lib/ && \
-		ln -fs liblua-socket-mime.so.$(PKG_VERSION) liblua-socket-mime.so
+		ln -fs luasocket-mime.so.$(PKG_VERSION) luasocket-mime.so
 	cd $(1)/usr/lib/lua/mime && \
-		ln -fs ../../liblua-socket-mime.so.$(PKG_VERSION) core.so
+		ln -fs ../../luasocket-mime.so.$(PKG_VERSION) core.so
 	$(CP) $(PKG_BUILD_DIR)/src/unix.so \
-		$(1)/usr/lib/liblua-socket-unix.so.$(PKG_VERSION)
+		$(1)/usr/lib/luasocket-unix.so.$(PKG_VERSION)
 	cd $(1)/usr/lib/ && \
-		ln -fs liblua-socket-unix.so.$(PKG_VERSION) liblua-socket-unix.so
+		ln -fs luasocket-unix.so.$(PKG_VERSION) luasocket-unix.so
 	cd $(1)/usr/lib/lua/socket && \
-		ln -fs ../../liblua-socket-unix.so.$(PKG_VERSION) unix.so
+		ln -fs ../../luasocket-unix.so.$(PKG_VERSION) unix.so
 endef
 
-$(eval $(call BuildPackage,liblua-socket))
+$(eval $(call BuildPackage,luasocket))
