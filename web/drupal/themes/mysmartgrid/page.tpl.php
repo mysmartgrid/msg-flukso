@@ -104,7 +104,7 @@
 			<P>
 				<STRONG>Quelle: Fraunhofer-Gesellschaft – T2 Übersichts-/Indexseite - Forschungsthemen</STRONG><BR>
 				Online im Internet; URL http://ve-166.bi.server.de/international/seitentypen/t2uebersichtseite1<BR>
-				[Stand: 26.02.2010, 08:39 Uhr]<BR>
+				[Stand: 26.02.2011, 08:39 Uhr]<BR>
 			</P>
 		</DIV><!-- #print-footer -->
 		<!-- FOOTER include end -->

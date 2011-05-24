@@ -28,10 +28,19 @@
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
           <H1 id="logo"><img src="<?php print $logo ?>" alt="mySmartGrid" /></H1>
           
-          <?php
-            if ($content != "") {?>
-              <H1 id="quickmenu"><A href="/">Menü</A>&nbsp;&nbsp;&nbsp;<A href="/logout">Abmelden</A></H1>
-          <?php } ?>
+          <H1 id="quickmenu">
+            <?php
+            global $_SERVER;
+            global $user;
+            
+            if ($_SERVER['REQUEST_URI'] != '/') { ?>
+              <A href="/">Menü</A>&nbsp;&nbsp;&nbsp;
+            <?php } ?>
+            <?php 
+            if ($user->uid) { ?>
+              <A href="/logout">Abmelden</A>
+            <?php } ?>
+          </H1>
         </DIV>
       </DIV><!-- #header -->
       <!-- HEADER include end -->
@@ -41,52 +50,41 @@
       <DIV id="doc">
 
         <?php
-          if ($content == "") { ?>
+          if (!$user->uid && $_SERVER['REQUEST_URI'] == '/') { ?>
 
-          <!-- Login Form or Menu -->
+          <!-- Login Form -->
           <?php
             if ($left) {?>
               <DIV id="contentboxes"><?php print $left ?></DIV>
           <?php } ?>
 
-          <!-- NAVIGATION include start -->
-          <DIV id="nav" class="nav-fhg">
-            <H2>Menü</H2>
-            <H3>Hauptmenü</H3>
-            <!-- php if (isset($primary_links)) { -->
-            <?php if (isset($primary_links)) { ?>
-              <?php unset($primary_links['menu-617'])  ?> <!--TODO: adapt forum to the mobile theme -->
-              <div id="primary">
-                <?php print theme('links', $primary_links) ?>
-              </div>
-            <?php } ?><!-- #nav-direct-first -->
-          </DIV>
+        <?php } ?>
 
-        <?php } else { ?>
-          <!-- Text content -->
-          <DIV id="main" role="main">
+        <!-- Text content -->
+        <DIV id="main" role="main">
 
+          <?php if ($title != "" || $node->title != "") { ?>
             <DIV role="section">
               <DIV class="headings">
                 <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
                 <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
               </DIV>
             </DIV>
+          <?php } ?>
 
-            <DIV class="section" role="section">
+          <DIV class="section" role="section">
 
-              <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
+            <?php if ($tabs != ""): ?><?php print $tabs ?><?php endif; ?>
 
-              <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
-              <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
+            <?php if ($help != ""): ?><p id="help"><?php print $help ?></p><?php endif; ?>
+            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
 
-              <!-- start main content -->
-              <?php print($content) ?>
-              <!-- end main content -->
-            </DIV>
+            <!-- start main content -->
+            <?php print($content) ?>
+            <!-- end main content -->
+          </DIV>
 
-          </DIV><!-- #main -->
-        <?php } ?>
+        </DIV><!-- #main -->
 
       </DIV><!-- #doc -->
 
@@ -96,7 +94,7 @@
           <!-- Footer navigation -->
 
           <ul id="footer-nav" role="contentinfo">
-            <li>&copy;2010 Fraunhofer-Gesellschaft</li>
+            <li>&copy;2011 Fraunhofer-Gesellschaft</li>
             <li><a href="/kontakt" >Kontakt</a></li>
             <li><a href="/impressum" >Impressum</a></li>
             <li><a href="/content/datenschutzerklärung" >Datenschutzerklärung</a></li>
@@ -119,7 +117,7 @@
         <P>
           <STRONG>Quelle: Fraunhofer-Gesellschaft – T2 Übersichts-/Indexseite - Forschungsthemen</STRONG><BR>
           Online im Internet; URL http://ve-166.bi.server.de/international/seitentypen/t2uebersichtseite1<BR>
-          [Stand: 26.02.2010, 08:39 Uhr]<BR>
+          [Stand: 26.02.2011, 08:39 Uhr]<BR>
         </P>
       </DIV><!-- #print-footer -->
       <!-- FOOTER include end -->
