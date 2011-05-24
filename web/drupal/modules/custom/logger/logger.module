@@ -265,37 +265,37 @@ function _logger_mobile_page() {
       <div class="menu-icon">
         <a href="' . $target . '">
           <img src="/sites/all/themes/msgmobile/img/icons/' . $image . '"/>
+          <span>' . $label . '</span>
         </a>
-        <span>' . $label . '</span>
-      </div>';
-  }  
+      </div> ';
+  }
 
   if ($user->uid) {
-    $output = ' ' .
-      _logger_create_icon('energy.png',     t('Energy'),           '/energy') . ' ' .
-      _logger_create_icon('power.png',      t('Power'),            '/power') . ' ' .
-      _logger_create_icon('comparison.png', t('Comparison'),       '/energy/relative') . ' ' .
-      _logger_create_icon('event.png',      t('Event'),            '/notification/list') . ' ' .
-      _logger_create_icon('dump.png',       t('Dump values') ,     '/dump/116/setup') . ' ' .
+    $output =
+      _logger_create_icon('energy.png',     t('Energy'),           '/energy') .
+      _logger_create_icon('power.png',      t('Power'),            '/power') .
+      _logger_create_icon('comparison.png', t('Comparison'),       '/energy/relative') .
+      _logger_create_icon('event.png',      t('Event'),            '/notification/list') .
+      _logger_create_icon('addnode.png',    t('Add Node'),         '/node/add') .
+      _logger_create_icon('chumby.png',     t('Chumby Image'),     '/chumby') .
+      _logger_create_icon('dump.png',       t('Dump values') ,     '/dump/116/setup') .
       _logger_create_icon('myaccount.png',  t('My Account'),       "/users/$user->name");
   }
 
-  $output .= ' ' .
-    _logger_create_icon('project.png',      t('The Project'),      '/content/das-projekt') . ' ' .
-    _logger_create_icon('join.png',         t('Join mySmartGrid'), '/content/werden-sie-teilnehmer') . ' ' .
-    _logger_create_icon('blog.png',         t('Blog'),             '/blog') . ' ' .
-    _logger_create_icon('installation.png', t('Installation'),     '/content/installationsanleitung-des-fluksos') . ' ' .
-    _logger_create_icon('addnode.png',      t('Add Node'),         '/node/add') . ' ' .
-    _logger_create_icon('chumby.png',       t('Chumby Image'),     '/chumby') . ' ' .
-    _logger_create_icon('question.png',     t('FAQ'),              '/content/h%C3%A4ufige-fragen-und-antworten') . ' ' .
-    _logger_create_icon('newsletter.png',   t('Newsletter'),       '/newsletter') . ' ' .
-    _logger_create_icon('contact.png',      t('Contact'),          '/kontakt') . ' ' .
-    _logger_create_icon('developer.png',    t('Developer'),        '/content/seiten-f%C3%BCr-entwickler') . ' ' .
-    _logger_create_icon('overview.png',     t('Overview'),         '/overview');
+  $output .=
+    _logger_create_icon('project.png',      t('The Project'),      '/content/das-projekt') .
+    _logger_create_icon('overview.png',     t('Overview'),         '/overview') .
+    _logger_create_icon('join.png',         t('Join mySmartGrid'), '/content/werden-sie-teilnehmer') .
+    _logger_create_icon('question.png',     t('FAQ'),              '/content/h%C3%A4ufige-fragen-und-antworten') .
+    _logger_create_icon('installation.png', t('Installation'),     '/content/installationsanleitung-des-fluksos') .
+    _logger_create_icon('forum.png',        t('Forums'),           '/forum') .
+    _logger_create_icon('blog.png',         t('Blog'),             '/blog') .
+    _logger_create_icon('newsletter.png',   t('Newsletter'),       '/newsletter') .
+    _logger_create_icon('developer.png',    t('Developer'),        '/content/seiten-f%C3%BCr-entwickler') .
+    _logger_create_icon('contact.png',      t('Contact'),          '/kontakt');
 
   return $output;
 }
-
 
 /**
  * Checks if the client is a mobile device.

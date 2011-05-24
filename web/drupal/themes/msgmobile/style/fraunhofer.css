@@ -1817,6 +1817,9 @@ ul.con input {
   text-align: right;
   width:4em;
 }
+#edit-title {
+  width:11em;
+}
 ul.tabs.primary,
 ul.tabs.secondary {
 	white-space: nowrap;
@@ -2929,4 +2932,12 @@ div.menu-icon {
 div.menu-icon img {
   margin: 0 auto; 
   margin-bottom: 3px;   
+}
+
+div.menu-icon a {
+  text-decoration : none; 
+}
+
+#footer-nav {
+  font-size: 8px;
 }

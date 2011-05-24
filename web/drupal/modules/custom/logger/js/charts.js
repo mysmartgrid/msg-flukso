@@ -648,7 +648,7 @@ function resizeBarChart() {
   }
 }
 
-function resizeLegend(id) {
+function resizeLegend(id, col1, col2) {
 
   if (isMobile()) {
 
@@ -656,10 +656,12 @@ function resizeLegend(id) {
     if (table) {
       var isLarge = document.body.clientWidth > 400;
       var display = isLarge ? 'table-cell' : 'none';
+      col1 = col1 ? col1 : 3;
+      col2 = col2 ? col2 : table.rows[0].cells.length - 1;
 
       for(var r = 0; r < table.rows.length; r++) {
         var cells = table.rows[r].cells;
-        for(var c = 3; c < cells.length - 1; c++) {
+        for(var c = col1; c < col2; c++) {
           cells[c].style.display = display;
         }
       }
