@@ -946,18 +946,22 @@ function _logger_format_power_series_data($chart, $measurements) {
   return $formatted;
 }
 
-function _logger_create_power_legend_line($username, $sensor, $type, $i, $operations = '') {
+function _logger_create_power_legend_line($username, $sensor, $type, $i, $operations = NULL) {
 
-  return array(
+  $line = array(
     t('User')      => $username,
     t('Sensor')    => $sensor,
     t('Type')      => $type,
     t('Max')       => "<div id='max$i'/>",
     t('Min')       => "<div id='min$i'/>",
     t('Avg')       => "<div id='avg$i'/>",
-    t('Last')      => "<div id='last$i'/>",
-    t('Operation') => $operations
+    t('Last')      => "<div id='last$i'/>"
   );
+
+  if ($operations) {
+    $line[t('Operations')] = $operations;
+  }
+  return $line;
 }
 
 /**

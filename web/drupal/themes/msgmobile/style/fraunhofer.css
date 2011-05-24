@@ -28,6 +28,8 @@ html, body {
 	max-width: 100%;
 }
 
+
+
 /* Fraunhofer-Logo Lines ___________________________________________________ */
 
 #header .wrapper {
@@ -112,7 +114,7 @@ strong, strong em, h2 em, h3 em, h4 em, .strong, legend {
  * Colors *
  **********/
 html, body {
-	background: #E9EDEB;
+  background: #E9EDEB;
 	color: #555;
 }
 #nav h2, #nav h3, #nav a, #nav-third, #search-block-form h2, #search-block-form a, #main #key-visual dd, #main h3, #main h4, #main h5, #main h3 a, #main h4 a, #main h5 a, #main h3 a:link, #main h4 a:link, #main h5 a:link, #main h3 a:visited, #main h4 a:visited, #main h5 a:visited, #main .context .linklist a:link, #main .context .linklist a:visited, #main .context a:link, #main .context a:visited, #main .context a:hover, #main .context a:focus, tr.highlight, td.highlight, #main form.context fieldset,
@@ -2939,5 +2941,6 @@ div.menu-icon a {
 }
 
 #footer-nav {
+  margin-top: 10px;
   font-size: 8px;
 }
