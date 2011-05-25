@@ -1238,13 +1238,17 @@ function theme_logger_power_chart_area($chart) {
   $xvalue2 = $chart->xaxis[1] * 1000;
   $yvalue1 = $chart->yaxis[0] + 0;
   $yvalue2 = $chart->yaxis[1] + 0;
+  //FIXME: move these lines to the calling functions
+  $step_plot = _logger_get_variable('step_plot', 0);
+  $smooting_level = _logger_get_variable('smooting_level', 1);
 
   $chart_properties = array(
     'dateWindow'         => "[$xvalue1, $xvalue2]",
     'drawCallback'       => 'updatePowerChartForm',
     'zoomCallback'       => 'updateSliderChart',
-    'pointClickCallback' => 'addPowerAnnotation'
-  );
+    'pointClickCallback' => 'addPowerAnnotation',
+    'stepPlot'           => $step_plot,
+    'rollPeriod'         => $smooting_level);
 
   if ($yvalue1 >= 0 && $yvalue2 > 0) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
@@ -1255,8 +1259,9 @@ function theme_logger_power_chart_area($chart) {
     'yValueFormatter'  => 'hideZero',
     'zoomCallback'     => 'updatePowerChart',
     'clickCallback'    => 'slidePowerChart',
-    'underlayCallback' => 'highlightPowerChart'
-  );
+    'underlayCallback' => 'highlightPowerChart',
+    'stepPlot'         => $step_plot,
+    'rollPeriod'       => $smooting_level);
 
   $options = _logger_get_power_units_options();
   $unit = $options[$chart->unit];
@@ -1332,9 +1337,8 @@ function _logger_create_dygraph($chart, $create_labels, $properties = array(), $
   $properties = array_merge($properties, array(
     'labelsDiv'    => '"chartLabels"',
     'colors'       => '["' . implode('","', $chart->colors) . '"]',
-    'includeZero'  => 'true',
-    'stepPlot'     => _logger_get_variable('step_plot', 0),
-    'rollPeriod'   => _logger_get_variable('smooting_level', 1)));
+    'includeZero'  => 'true')
+  );
 
   if ($create_labels) {
     $labels_output = '<div id=' . $properties['labelsDiv'] . ' class="legend"></div>';
