@@ -21,7 +21,7 @@
 
         <DIV class="wrapper">
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
-          <H1 id="logo"><img src="<?php print $logo ?>" alt="mySmartGrid" /></H1>
+          <H1 id="logo"><A href="/"><img src="<?php print $logo ?>" alt="mySmartGrid" /></a></H1>
           
           <H1 id="quickmenu">
             <?php
