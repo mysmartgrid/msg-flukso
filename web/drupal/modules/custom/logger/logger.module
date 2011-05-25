@@ -280,12 +280,15 @@ function _logger_mobile_page() {
       _logger_create_icon('chumby.png',     t('Chumby Image'),     '/chumby') .
       _logger_create_icon('dump.png',       t('Dump values') ,     '/dump/116/setup') .
       _logger_create_icon('myaccount.png',  t('My Account'),       "/users/$user->name");
+
+  } else {
+    $output .=
+      _logger_create_icon('join.png',       t('Join mySmartGrid'), '/content/werden-sie-teilnehmer');
   }
 
   $output .=
     _logger_create_icon('project.png',      t('The Project'),      '/content/das-projekt') .
     _logger_create_icon('overview.png',     t('Overview'),         '/overview') .
-    _logger_create_icon('join.png',         t('Join mySmartGrid'), '/content/werden-sie-teilnehmer') .
     _logger_create_icon('question.png',     t('FAQ'),              '/content/h%C3%A4ufige-fragen-und-antworten') .
     _logger_create_icon('installation.png', t('Installation'),     '/content/installationsanleitung-des-fluksos') .
     _logger_create_icon('forum.png',        t('Forums'),           '/forum') .
