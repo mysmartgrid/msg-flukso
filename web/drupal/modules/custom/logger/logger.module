@@ -275,7 +275,7 @@ function _logger_mobile_page() {
       _logger_create_icon('energy.png',     t('Energy'),           '/energy') .
       _logger_create_icon('power.png',      t('Power'),            '/power') .
       _logger_create_icon('comparison.png', t('Comparison'),       '/energy/relative') .
-      _logger_create_icon('event.png',      t('Event'),            '/notification/list') .
+      _logger_create_icon('event.png',      t('Events'),           '/notification/list') .
       _logger_create_icon('addnode.png',    t('Add Node'),         '/node/add') .
       _logger_create_icon('chumby.png',     t('Chumby Image'),     '/chumby') .
       _logger_create_icon('dump.png',       t('Dump values') ,     '/dump/116/setup') .
