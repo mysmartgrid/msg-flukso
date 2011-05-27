@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=msg-flukso
 PKG_VERSION:=103
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_INSTALL_DIR:=$(PKG_BUILD_DIR)/ipkg-install
@@ -15,7 +15,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/msg-flukso
   SECTION:=utils
   CATEGORY:=Utilities
-  DEPENDS:=+liblua-xmlrpc +luaposix +luaxyssl +ntpclient +avahi-daemon +luci-lib-sys +libuci-lua +luci-lib-web +luci-lib-nixio +coreutils-stty
+  DEPENDS:=+liblua-xmlrpc +luaposix +luaxyssl +ntpclient +avahi-daemon +luci-lib-sys +libuci-lua +luci-lib-web +luci-lib-nixio +coreutils-stty +uhttpd
   TITLE:=mySmartGrid - die intelligente Gerätesteuerung für Ihr Zuhause.
   URL:=http://mysmartgrid.de/
 endef
@@ -58,6 +58,7 @@ define Package/msg-flukso/postinst
   test -L /www || ln -s /tmp/sensor /www
 
 	/etc/init.d/avahi-daemon enable
+	/etc/init.d/uhttpd enable
 
 	uci set system.@system[0].version=103
 	uci commit system
