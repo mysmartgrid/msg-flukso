@@ -2279,12 +2279,9 @@ function _logger_get_users_options() {
 
   $fluksonians = db_query($sql, 'fluksonian', implode(',', $selected_users));
 
-  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
-  $u = 1;
-
   $options = array(0 => '');
   while($fluksonian = db_fetch_object($fluksonians)) {
-    $options[$fluksonian->uid] = $user->roles[$rid] ? $fluksonian->name : t('User') . $u++;
+    $options[$fluksonian->uid] = $fluksonian->name;
   }
   return $options;
 }
