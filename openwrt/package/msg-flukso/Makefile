@@ -59,7 +59,7 @@ define Package/msg-flukso/postinst
 
 	/etc/init.d/avahi-daemon enable
 
-	uci add system.@system[0].version=103
+	uci set system.@system[0].version=103
 	uci commit system
 endef
 
