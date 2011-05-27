@@ -592,7 +592,8 @@ function setSeriesColor(chartId, i, color) {
 
   color = '#' + color;
 
-  if (chartId == 'bar') {
+  //TODO: avoid these tests
+  if (chartId == 'energy' || chartId == 'relative') {
     barChart.options['colors'][i] = color;
     barChart.plot();
 
