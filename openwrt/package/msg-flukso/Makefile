@@ -15,7 +15,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/msg-flukso
   SECTION:=utils
   CATEGORY:=Utilities
-  DEPENDS:=+liblua-xmlrpc +luaposix +luaxyssl +ntpclient +avahi-daemon +luci-lib-sys +libuci-lua +luci-lib-web +luci-lib-nixio
+  DEPENDS:=+liblua-xmlrpc +luaposix +luaxyssl +ntpclient +avahi-daemon +luci-lib-sys +libuci-lua +luci-lib-web +luci-lib-nixio +coreutils-stty
   TITLE:=mySmartGrid - die intelligente Gerätesteuerung für Ihr Zuhause.
   URL:=http://mysmartgrid.de/
 endef
