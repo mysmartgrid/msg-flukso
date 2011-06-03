@@ -388,7 +388,7 @@ function logger_update_6018() {
 
       $uid = 233;
       $consumption = TRUE;
-      $items[] = update_sql("INSERT INTO {logger_users} (uid, private) VALUES (233, 0)");
+      $items[] = update_sql("INSERT INTO {logger_users} (uid, private) VALUES ($uid, 0)");
 
       for ($d = 1; $d < 5; $d++) {
 
@@ -446,6 +446,54 @@ function logger_update_6020() {
                 user_relationships.rtid = user_relationship_types.rtid AND
                 user_relationship_types.name = 'subscription'
             )");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function logger_update_6021() {
+
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+
+      $uid = 242;
+      $consumption = TRUE;
+      $items[] = update_sql("INSERT INTO {logger_users} (uid, private) VALUES ($uid, 0)");
+
+      for ($d = 6; $d < 8; $d++) {
+
+        $device = "dvdvdvdvdvdvdvdvdvdvdvdvdvdvdvd$d";
+
+        $items[] = update_sql("
+          INSERT INTO {logger_devices} (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, comment)
+          VALUES ('$device', 1234567$d, $uid, '$device', 1267438611, 1300179603, 102, 0, 29, 260768, 13764, 1148, 4304, 1072, 0, 12, 'DE', NULL)");
+
+        $function = "'Sensor$d'";
+        $type = $consumption? '1' : '2';
+        $consumption = !$consumption;
+
+        for ($m = 1; $m < 5; $m++) {
+
+          $meter = "dvd$d" . "mtmtmtmtmtmtmtmtmtmtmtmtmtm$m";
+
+          $items[] = update_sql("
+            INSERT INTO {logger_meters} (meter, uid, device, created, access, corrupted, type, function, phase, constant, value, factor, unit)
+            VALUES ('$meter', $uid, '$device', 1270386792, 0, 0, $type, $function, NULL, NULL, 0, 1, NULL)");
+
+          $function = 'NULL';
+          $type = 'NULL';
+
+          $token = "dvd$d" . "mtm$m" . "tktktktktktktktktktktkt$m";
+
+          $items[] = update_sql("
+            INSERT INTO {logger_tokens} (token, meter, permissions)
+            VALUES ('$token', '$meter', 62)");
+        }
+      }
       break;
     case 'pgsql':
       break;
