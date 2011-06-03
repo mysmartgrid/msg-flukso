@@ -333,6 +333,13 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
   }
   $filters .= $serial ? " AND d.serial = $serial" : '';
 
+  $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = '%s'";
+  $result = db_query($visitor_sql, 'Visitor');
+  
+  while ($visitor = db_fetch_object($result)) {
+    $filters .= " AND d.uid <> $visitor->uid ";
+  }
+  
   return "
     SELECT SQL_NO_CACHE
       d.serial,
