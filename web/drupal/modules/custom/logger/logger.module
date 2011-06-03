@@ -1272,8 +1272,11 @@ function theme_logger_power_chart_area($chart) {
   $options = _logger_get_power_units_options();
   $unit = $options[$chart->unit];
 
+  $icons = "<a href='javascript: expandPowerChart();'><img src='/" . LOGGER_PATH . "/img/expand.png'></a>";
+
   return
     _logger_create_interval_menu($chart->context) .
+    '<div style="float: right;">' . $icons . '</div>' .
     '<div>' . t($unit) . '</div>' .
 
     _logger_create_dygraph($chart, TRUE, $chart_properties) .

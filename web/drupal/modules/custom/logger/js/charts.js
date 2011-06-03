@@ -253,6 +253,12 @@ function updateSliderChart(xvalue1, xvalue2, yvalues) {
   updatePowerChartForm(lineChart);
 }
 
+function expandPowerChart() {
+  lineChart.updateOptions({dateWindow: null});
+  lineChart.updateOptions({valueRange: null});
+  updateSliderChart();
+}
+
 function slidePowerChart(event, center) {
 
   var xvalue1 = lineChart.xAxisRange(0)[0];
