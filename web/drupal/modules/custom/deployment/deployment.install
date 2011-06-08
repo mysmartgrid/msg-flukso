@@ -82,6 +82,22 @@ function deployment_install() {
   db_query($sql);
 }
 
+function deployment_update_6001() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("INSERT INTO {deployment_state} (id, name, description) VALUES (6, 'Offline',
+        'The device is registered, but has not sent any message during the past 24 hours.')");
+
+      $items[] = update_sql("UPDATE {deployment_summary} SET state_id = 6 WHERE state_id = 3");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
 function deployment_uninstall() {
   drupal_uninstall_schema('deployment');
   drupal_set_message(t('Deleted deployment module tables.'));

@@ -25,6 +25,7 @@ define('UNREGISTERED_STATE_ID',       2);
 define('NO_COMMUNICATION_STATE_ID',   3);
 define('CORRUPTED_STATE_ID',          4);
 define('WORKING_STATE_ID',            5);
+define('OFFLINE_STATE_ID',            6);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
@@ -294,7 +295,8 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
   $tzdif = $user->timezone / 3600; //divided by 1 hour
   $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
   $registration_time = $now - 3 * 24 * 3600; //3 days
-  $heartbeat_time = $now - 7200; //2 hours
+  $communication_time = $now - 7200; //2 hours
+  $offline_time = $now - 24 * 3600; //24 hours
 
   $latest_field = "IF(d.access > 0, d.access, d.created)";
   $state_id_field = $state_id;
@@ -313,12 +315,16 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
       $latest_field = "MAX(m.corrupted)";
       break;
 
+    case OFFLINE_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_time";
+      break;
+    
     case NO_COMMUNICATION_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $heartbeat_time";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $offline_time AND d.access < $communication_time";
       break;
 
     case WORKING_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $heartbeat_time";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_time";
       break;
 
     default:
@@ -327,7 +333,9 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
         IF(d.uid = 0,
           IF(d.access < $registration_time, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
           IF(MAX(m.corrupted) > 0, " . CORRUPTED_STATE_ID . " ,
-            IF(d.access < $heartbeat_time, " . NO_COMMUNICATION_STATE_ID . ", " . WORKING_STATE_ID . ")
+            IF(d.access < $offline_time, " . OFFLINE_STATE_ID . ",
+              IF(d.access < $communication_time, " . NO_COMMUNICATION_STATE_ID . ", " . WORKING_STATE_ID . ")
+            )
           )
         )";
   }
@@ -447,6 +455,7 @@ function deployment_checkup_form_submit($form, &$form_state) {
         break;
 
       case NO_COMMUNICATION_STATE_ID:
+      case OFFLINE_STATE_ID:
         drupal_set_message(t('No message has been received from this device since %latest.', $latest));
         break;
 
