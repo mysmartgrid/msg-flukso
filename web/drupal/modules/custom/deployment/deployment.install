@@ -80,6 +80,10 @@ function deployment_install() {
   $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (5, 'Working',
   'The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.')";
   db_query($sql);
+
+  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (6, 'Offline',
+  'The device is registered, but has not sent any message during the past 24 hours.')";
+  db_query($sql);
 }
 
 function deployment_update_6001() {
