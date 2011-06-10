@@ -26,6 +26,7 @@ define('NO_COMMUNICATION_STATE_ID',   3);
 define('CORRUPTED_STATE_ID',          4);
 define('WORKING_STATE_ID',            5);
 define('OFFLINE_STATE_ID',            6);
+define('NO_MEASUREMENT_STATE_ID',     7);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
@@ -292,49 +293,63 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
 
   //If parameters are used in this SQL query, pager_query does not count rows correctly
 
+  global $user;
   $tzdif = $user->timezone / 3600; //divided by 1 hour
   $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $registration_time = $now - 3 * 24 * 3600; //3 days
-  $communication_time = $now - 7200; //2 hours
-  $offline_time = $now - 24 * 3600; //24 hours
+  $registration_timeout  = $now - 3 * 24 * 3600; //3 days
+  $offline_timeout       = $now - 24 * 3600; //24 hours
+  $communication_timeout = $now - 2 * 3600; //2 hours
 
   $latest_field = "IF(d.access > 0, d.access, d.created)";
   $state_id_field = $state_id;
 
   switch ($state_id) {
     case UNINSTALLED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access  < $registration_time";
+      $filters = "AND d.uid = 0 AND d.access  < $registration_timeout";
       break;
 
     case UNREGISTERED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access >= $registration_time";
+      $filters = "AND d.uid = 0 AND d.access >= $registration_timeout";
       break;
 
     case CORRUPTED_STATE_ID:
       $filters = "AND d.uid > 0 AND m.corrupted > 0";
-      $latest_field = "MAX(m.corrupted)";
+      $latest_field = "m.corrupted";
       break;
 
     case OFFLINE_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_time";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout";
       break;
     
     case NO_COMMUNICATION_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $offline_time AND d.access < $communication_time";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $offline_timeout AND d.access < $communication_timeout";
+      break;
+
+    case NO_MEASUREMENT_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout";
+      $latest_field = "m.access";
       break;
 
     case WORKING_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_time";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_timeout AND m.access >= $offline_timeout";
       break;
 
     default:
-      $latest_field = "IF(MAX(m.corrupted) > 0, MAX(m.corrupted), IF(d.access > 0, d.access, d.created))";
+      $latest_field = "
+        IF(m.corrupted > 0, m.corrupted,
+          IF(d.access = 0, d.created, 
+            IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access, d.access)
+          )
+        )";
+      
       $state_id_field = "
         IF(d.uid = 0,
-          IF(d.access < $registration_time, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
-          IF(MAX(m.corrupted) > 0, " . CORRUPTED_STATE_ID . " ,
-            IF(d.access < $offline_time, " . OFFLINE_STATE_ID . ",
-              IF(d.access < $communication_time, " . NO_COMMUNICATION_STATE_ID . ", " . WORKING_STATE_ID . ")
+          IF(d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
+          IF(m.corrupted > 0, " . CORRUPTED_STATE_ID . " ,
+            IF(d.access < $offline_timeout, " . OFFLINE_STATE_ID . ",
+              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ", " . 
+                "IF(m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
+              )
             )
           )
         )";
@@ -358,7 +373,16 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
     FROM
       {logger_devices} d
       LEFT OUTER JOIN {users} u ON u.uid = d.uid,
-      {logger_meters} m
+      (
+        SELECT
+          m.device,
+          MAX(m.access) AS access,
+          MAX(m.corrupted) AS corrupted
+        FROM
+          {logger_meters} m
+        GROUP BY
+          m.device
+      ) m
     WHERE
       m.device = d.device
       $filters 
@@ -457,6 +481,10 @@ function deployment_checkup_form_submit($form, &$form_state) {
       case NO_COMMUNICATION_STATE_ID:
       case OFFLINE_STATE_ID:
         drupal_set_message(t('No message has been received from this device since %latest.', $latest));
+        break;
+
+      case NO_MEASUREMENT_STATE_ID:
+        drupal_set_message(t('No measurement has been received from this device since %latest.', $latest));
         break;
 
       case CORRUPTED_STATE_ID:
