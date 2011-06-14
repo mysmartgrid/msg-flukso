@@ -1,0 +1,14 @@
+--- src/flukso.lua	2011-03-14 14:23:42.975653091 +0100
++++ src/flukso.lua2	2011-05-27 08:04:19.605643027 +0200
+@@ -78,11 +78,6 @@
+       if line:sub(1, 3) == 'pls' and line:len() == 47 and line:find(':') == 37 then -- user data + additional data integrity checks
+         posix.syslog(30, 'received pulse from '..device..': '..line:sub(5))
+ 
+-        -- flash the power led for 50ms
+-        os.execute('gpioctl clear 4 > /dev/null')
+-        socket.select(nil, nil, 0.05)
+-        os.execute('gpioctl set 4 > /dev/null')
+-
+         local meter, value = line:sub(5, 36), tonumber(line:sub(38))
+         coroutine.resume(e_child, meter, os.time(), value)
+ 

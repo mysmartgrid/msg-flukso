@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=msg-flukso
 PKG_VERSION:=103
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_INSTALL_DIR:=$(PKG_BUILD_DIR)/ipkg-install
@@ -28,6 +28,8 @@ endef
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 	$(CP) src/* $(PKG_BUILD_DIR)/
+	$(CP) patches/ $(PKG_BUILD_DIR)/
+	cd $(PKG_BUILD_DIR) && patch -p1 < patches/*
 endef
 
 define Build/Compile
@@ -54,6 +56,8 @@ define Package/msg-flukso/postinst
 
   #create symlink for local lan interface
   test -L /www || ln -s /tmp/sensor /www
+
+	/etc/init.d/avahi-daemon enable
 
 	uci add system.@system[0].version=103
 	uci commit system
