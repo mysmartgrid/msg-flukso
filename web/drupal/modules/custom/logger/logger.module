@@ -579,7 +579,7 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
   $chart->yaxis = $yaxis;
   $chart->xaxis = $xaxis;
 
-  $lifetime = 15 * MINUTE;
+  $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
   $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors";
@@ -594,7 +594,7 @@ function _logger_create_chart_object($context, $types, $interval, $unit, $stacke
 
   if (!$chart->data) {
     $get_data = '_logger_get_' . $chart->context . '_chart_data';
-    
+
     if (!empty($types)) {
       $chart->data = $get_data($chart);
       cache_set($chart->id, $chart->data, 'cache_page', time() + $lifetime);
@@ -891,6 +891,9 @@ function _logger_get_power_chart_data($chart) {
   global $user;
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'Visitor'));
+  $is_visitor = !empty($user->roles[$rid]);
+  
   $i = 0;
   foreach ($chart->sensors as &$sensor) {
 
@@ -901,12 +904,15 @@ function _logger_get_power_chart_data($chart) {
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->function][$sensor->type] = $values;
 
+    //Hide user names for Visitors
+    $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
+    
     $operations = $sensor->uid > 0 ?
       '<a href="javascript: void(0)" 
-        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$sensor->username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
         t('Remove') . '</a>' : '';
-
-    $data['legend'][] = _logger_create_power_legend_line($sensor->username, $sensor->function, t($sensor->type), $i++, $operations);
+    
+    $data['legend'][] = _logger_create_power_legend_line($username, $sensor->function, t($sensor->type), $i++, $operations);
   }
   return $data;
 }
@@ -1266,8 +1272,11 @@ function theme_logger_power_chart_area($chart) {
   $options = _logger_get_power_units_options();
   $unit = $options[$chart->unit];
 
+  $icons = "<a href='javascript: expandPowerChart();'><img src='/" . LOGGER_PATH . "/img/expand.png'></a>";
+
   return
     _logger_create_interval_menu($chart->context) .
+    '<div style="float: right;">' . $icons . '</div>' .
     '<div>' . t($unit) . '</div>' .
 
     _logger_create_dygraph($chart, TRUE, $chart_properties) .
@@ -2261,27 +2270,34 @@ function _logger_get_users_options() {
   global $user;
   $selected_users = _logger_get_variable('selected_users', array($user->uid));
 
+  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'Visitor'));
+  $is_visitor = !empty($user->roles[$rid]);
+
   $sql = "
     SELECT
       u.uid,
       u.name
     FROM
       {users} u,
-      {users_roles} ur,
-      {role} r
+      {logger_meters} m
     WHERE
-      u.uid = ur.uid AND
-      ur.rid = r.rid AND
-      r.name = '%s' AND
-      u.uid NOT IN (%s)
-    ORDER BY
-      u.name";
-
-  $fluksonians = db_query($sql, 'fluksonian', implode(',', $selected_users));
+      m.function IS NOT NULL AND
+      m.uid = u.uid AND
+      u.uid NOT IN (%s) AND
+      u.uid > 0
+    GROUP BY
+      u.uid
+    ORDER BY " .
+      ($is_visitor ? 'u.uid' : 'u.name');
+  
+  $fluksonians = db_query($sql, implode(',', $selected_users));
 
   $options = array(0 => '');
   while($fluksonian = db_fetch_object($fluksonians)) {
-    $options[$fluksonian->uid] = $fluksonian->name;
+    
+    //Hide user names for Visitors
+    $username = $fluksonian->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($fluksonian->uid, 3, '0', STR_PAD_LEFT) : $fluksonian->name;
+    $options[$fluksonian->uid] = $username;
   }
   return $options;
 }
