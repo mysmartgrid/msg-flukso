@@ -16,7 +16,7 @@
 %%%
 %% @doc Flukso API: /device/xyz resource specification 
 
--module(flukso_device_xyz).
+-module(flukso_event_xyz).
 -author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
 
 -export([init/1,
@@ -28,7 +28,7 @@
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
 
-init([]) -> 
+init([]) ->
     {ok, undefined}.
 
 % debugging
@@ -45,7 +45,7 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
+    {Device, ValidDevice} = check_device(wrq:path_info(event, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
     State = #state{device = Device,
@@ -78,82 +78,30 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
              ReqData, State};
 
         _NoKey ->
-            {true, ReqData, State}
+            {"No proper provisioning for this device", ReqData, State}
     end.
 
-% JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1}
-% Mochijson2: {struct,[{<<"memtotal">>,   13572},
-%                      {<<"version">>,      210},
-%                      {<<"memcached">>,   3280},
-%                      {<<"membuffers">>,  1076},
-%                      {<<"memfree">>,      812},
-%                      {<<"uptime">>,     17394},
-%                      {<<"reset">>,          1}]}
+% JSON: {"event":104}
+% Mochijson2: {struct,[{<<"event">>,   104}]}
 process_post(ReqData, #state{device = Device} = State) ->
     {data, Result} = mysql:execute(pool, device_props, [Device]),
+    [[Key, Upgrade, Resets]] = mysql:get_result_rows(Result),
 
-    Timestamp = unix_time(),
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
-    case mysql:get_result_rows(Result) of
+    Timestamp = unix_time(),
 
-      %Device exists
-      [[Key, Upgrade, Resets]] ->
+    Event = proplists:get_value(<<"id">>, JsonData),
 
-        IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
+    mysql:execute(pool, event_insert, [Device, Event, Timestamp]),
 
-        if
-          %New Device Message - 2nd invocation
-           IsKeyInformed == true ->
-
-            NewKey = proplists:get_value(<<"key">>, JsonData),
-            Version = 0,
-            Uptime = 0,
-            Memtotal = 0,
-            Memcached = 0,
-            Membuffers = 0,
-            Memfree = 0,
-            NewResets = 0;
-            
-          %Heartbeat Message
-          true ->
-
-            NewKey = Key,
-            Version = proplists:get_value(<<"version">>, JsonData),
-            Reset = proplists:get_value(<<"reset">>, JsonData),
-            Uptime = proplists:get_value(<<"uptime">>, JsonData),
-            Memtotal = proplists:get_value(<<"memtotal">>, JsonData),
-            Memcached = proplists:get_value(<<"memcached">>, JsonData),
-            Membuffers = proplists:get_value(<<"membuffers">>, JsonData),
-            Memfree = proplists:get_value(<<"memfree">>, JsonData),
-            NewResets = Resets + Reset
-        end,
-
-        mysql:execute(pool, device_update,
-            [Timestamp, Version, 0, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, Device]),
-
-        %TODO: define constants
-        mysql:execute(pool, event_insert, [Device, 101, Timestamp]);
-
-      %New Device Message - 1st invocation
-      _ ->
-     
-        %TODO: find a better Serial Number generator
-        Serial = Timestamp,
-        Upgrade = 0,
-        Key = proplists:get_value(<<"key">>, JsonData),
-
-        mysql:execute(pool, device_insert,
-            [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
-    end,
-
-    JsonResponse = mochijson2:encode({ struct, [{<<"upgrade">>,   Upgrade}, {<<"timestamp">>, Timestamp}] }),
+    JsonResponse = mochijson2:encode({struct, [{<<"timestamp">>, Timestamp}]}),
 
     <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
     Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
 
-    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
+    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData), 
     EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
 
-    {true, EmbodiedReqData, State}.
+    {true , EmbodiedReqData, State}.
 

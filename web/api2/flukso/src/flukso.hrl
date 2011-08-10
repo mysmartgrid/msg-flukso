@@ -16,8 +16,7 @@
 %%%
 %% @doc Common record definitions and helper functions for the Flukso API. 
 
--define(BASE_PATH, "var/data/base/").
--define(NIGHT_PATH, "var/data/night/").
+-define(BASE_PATH,  "var/data/base/").
 
 -define(MINUTE,     60).
 -define(QUARTER,   900).
@@ -203,3 +202,7 @@ rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) ->
 
 rrd_update(Path, RrdSensor, RrdData) ->
     erlrrd:update([Path, [RrdSensor|".rrd"], " ", RrdData]).
+
+rrd_create(Path, RrdSensor) ->
+  %FIXME:  erlrrd:create([Path, [RrdSensor|".rrd"], )
+  file:copy("/home/flukso/www/api/flukso/var/data/base/template.rrd", ["/home/flukso/www/api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).

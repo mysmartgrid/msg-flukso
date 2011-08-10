@@ -47,6 +47,8 @@ malformed_request(ReqData, State) ->
     end.
 
 malformed_POST(ReqData, _State) ->
+    io:fwrite("malformed_POST sensor\n"),
+
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
@@ -88,7 +90,10 @@ is_authorized(ReqData, State) ->
         'GET'  -> is_auth_GET(ReqData, State)
     end.
 
+
 is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
+    io:fwrite("is_auth_POST sensor\n"),
+
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
     case mysql:get_result_rows(Result) of
@@ -104,10 +109,15 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
              ReqData, State};
 
         _NoKey ->
-            {"No proper provisioning for this sensor", ReqData, State}
+          %No proper provisioning for this sensor
+          %FIXME: validate using the device informed as argument
+          {true, ReqData, State}
     end.
 
+
 is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
+    io:fwrite("is_auth_GET sensor\n"),
+
     {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
 
     {case mysql:get_result_rows(Result) of
@@ -121,11 +131,10 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
     case wrq:get_qs_value("interval", ReqData) of
-        "night"   -> Path = ?NIGHT_PATH;
         _Interval -> Path = ?BASE_PATH
     end,
 
-%% debugging: io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
+    %% debugging: io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
 
     case rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
         {ok, Response} ->
@@ -145,6 +154,8 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
 
 
 process_post(ReqData, State) ->
+    io:fwrite("process_post sensor\n"),
+
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     Payload = {proplists:get_value(<<"measurements">>, JsonData),
                proplists:get_value(<<"config">>, JsonData)},
@@ -163,19 +174,51 @@ process_post(ReqData, State) ->
 % JSON: {"config":{"type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
 % Mochijson2: {struct,[{<<"config">>, {struct,[{<<"type">>,<<"electricity">>}, {<<"enable">>,0}, ... ]} }]}
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
-    Args = [proplists:get_value(<<"class">>,    Params),
-            proplists:get_value(<<"type">>,     Params),
-            proplists:get_value(<<"function">>, Params),
-            proplists:get_value(<<"voltage">>,  Params),
-            proplists:get_value(<<"current">>,  Params),
-            proplists:get_value(<<"phase">>,    Params),
-            proplists:get_value(<<"constant">>, Params),
-            proplists:get_value(<<"enable">>,   Params),
-            Sensor],
 
-    {updated, _Result} = mysql:execute(pool, sensor_config, Args),
+    io:fwrite("process_config sensor\n"),
 
-    {true, ReqData, State}.
+    {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
+
+    case mysql:get_result_rows(Result) of
+
+      %Sensor is found
+      [[_Uid, Device]] -> 
+
+        Args = [%proplists:get_value(<<"class">>,    Params),
+                %proplists:get_value(<<"type">>,     Params),
+                proplists:get_value(<<"function">>, Params),
+                %proplists:get_value(<<"voltage">>,  Params),
+                %proplists:get_value(<<"current">>,  Params),
+                %proplists:get_value(<<"phase">>,    Params),
+                %proplists:get_value(<<"constant">>, Params),
+                %proplists:get_value(<<"enable">>,   Params),
+                Sensor],
+
+        %TODO: create fields in table logger_meters
+        {updated, _Result} = mysql:execute(pool, sensor_config, Args),
+        RrdResponse = "ok";
+
+      %Sensor is not found
+      _ ->
+        Timestamp = unix_time(),
+        Function = proplists:get_value(<<"function">>, Params),
+        Device = proplists:get_value(<<"device">>, Params),
+
+        rrd_create(?BASE_PATH, Sensor),
+
+        case rrd_create(?BASE_PATH, Sensor) of
+          {ok, _RrdResponse} ->
+            RrdResponse = "ok",
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 0, 1, Function, 0, 0, 0, 0, "watt", Device]);
+
+          {error, RrdResponse} ->
+            logger(0, <<"rrdcreate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
+        end
+    end,
+
+    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+
 
 % JSON: {"measurements":[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
@@ -184,63 +227,19 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     [LastTimestamp, LastValue] = lists:last(Measurements),
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
-    [[Uid, _Device, Midnight]] = mysql:get_result_rows(Result),
+    [[Uid, _Device]] = mysql:get_result_rows(Result),
 
     case rrd_update(?BASE_PATH, RrdSensor, RrdData) of    
         {ok, _RrdResponse} ->
             RrdResponse = "ok",
-            NewMidnight = update_night(RrdSensor, Uid, Midnight, LastTimestamp, ReqData),
-            mysql:execute(pool, sensor_update, [unix_time(), NewMidnight, LastValue, RrdSensor]);
+            mysql:execute(pool, sensor_update, [unix_time(), LastValue, RrdSensor]);
 
         {error, RrdResponse} ->
             logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
     end,
 
+    %TODO: define constants
+    mysql:execute(pool, event_insert, [_Device, 102, unix_time()]),
+
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
     {true , wrq:set_resp_body(JsonResponse, ReqData), State}.
-
-update_night(RrdSensor, Uid, Midnight, LastTimestamp, ReqData) when LastTimestamp > Midnight + 6 * ?HOUR ->
-    LastMidnight = calculate_midnight(unix_time(), Uid),
-    RrdStart = integer_to_list(LastMidnight + 2 * ?HOUR),
-    RrdEnd = integer_to_list(LastMidnight + 5 * ?HOUR),
-    RrdResolution = integer_to_list(?QUARTER),
-
-    case rrd_fetch(?BASE_PATH, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
-        {ok, Response} ->
-            Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-            Datapoints = [list_to_float(Y) || [_X, Y] <- Filtered, string:len(Y) /= 3],
-            NightAverage = lists:foldl(fun(X, Sum) -> X / 12 + Sum end, 0.0, Datapoints),
-            RrdData = [integer_to_list(LastMidnight + 5 * ?HOUR), ":", float_to_list(NightAverage)],
-
-            case rrd_update(?NIGHT_PATH, RrdSensor, RrdData) of
-                {ok, _Response} ->
-                     logger(Uid, <<"rrdupdate.night">>, <<"Successful update of night rrd.">>, ?INFO, ReqData);
-
-                {error, Reason} ->
-                     logger(Uid, <<"rrdupdate.night">>, list_to_binary(Reason), ?ERROR, ReqData)
-            end;
-
-        {error, Reason} ->
-            logger(Uid, <<"rrdupdate.night">>, list_to_binary(Reason), ?ERROR, ReqData)
-    end,
-
-    LastMidnight + ?DAY;
-update_night(_RrdSensor, _Uid, Midnight, _LastTimestamp, _ReqData) ->
-    Midnight.
-
-calculate_midnight(Timestamp, Uid) ->
-    {data, Result} = mysql:execute(pool, timezone, [Uid]),
-
-    case mysql:get_result_rows(Result) of
-       [[undefined]] ->
-           Timezone = 0;
-       [[TimezoneChar8]] ->
-           Timezone = list_to_integer(binary_to_list(TimezoneChar8))
-    end,
-
-    closest_midnight(trunc(Timestamp/?DAY + 1) * ?DAY - Timezone, Timestamp).
-
-closest_midnight(ProposedMidnight, Timestamp) when ProposedMidnight > Timestamp ->
-    closest_midnight(ProposedMidnight - ?DAY, Timestamp);
-closest_midnight(ProposedMidnight, _Timestamp) ->
-    ProposedMidnight.
