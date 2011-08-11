@@ -1313,6 +1313,10 @@ function theme_logger_energy_chart_area($chart) {
     }
   }
 
+  $series = $series? $series : array();
+  $names = $names? $names : array();
+  $data_labels = $data_labels? $data_labels : array();
+  
   $id = 'barChart';
   $menu = $chart->context == 'energy' ? _logger_create_interval_menu($chart->context) : '';
 
