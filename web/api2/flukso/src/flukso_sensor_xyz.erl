@@ -151,7 +151,7 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
         _Interval -> Path = ?BASE_PATH
     end,
 
-    %% debugging: io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
+    %%debugging: io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
 
     case rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
         {ok, Response} ->
@@ -226,8 +226,15 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
         case rrd_create(?BASE_PATH, Sensor) of
           {ok, _RrdResponse} ->
+
+            B = term_to_binary({node(), now()}),
+            L = binary_to_list(erlang:md5(B)),
+            Token = lists:flatten(list_to_hex(L)),
+
             RrdResponse = "ok",
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 0, 1, Function, 0, 0, 0, 0, "watt", Device]);
+
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 0, 1, Function, 0, 0, 0, 0, "watt", Device]),
+            mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->
             logger(0, <<"rrdcreate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
