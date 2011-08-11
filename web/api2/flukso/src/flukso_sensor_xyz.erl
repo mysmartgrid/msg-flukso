@@ -30,21 +30,26 @@
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
 
+
 init([]) -> 
     {ok, undefined}.
+
 
 % debugging
 %init(Config) ->
 %   {{trace, "/tmp"}, Config}.
 
+
 allowed_methods(ReqData, State) ->
     {['POST', 'GET'], ReqData, State}.
+
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST' -> malformed_POST(ReqData, State);
         'GET'  -> malformed_GET(ReqData, State)
     end.
+
 
 malformed_POST(ReqData, _State) ->
     io:fwrite("malformed_POST sensor\n"),
@@ -61,6 +66,7 @@ malformed_POST(ReqData, _State) ->
         _ -> true
      end,
     ReqData, State}.
+
 
 malformed_GET(ReqData, _State) ->
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData), wrq:get_qs_value("version", ReqData)),
@@ -84,6 +90,7 @@ malformed_GET(ReqData, _State) ->
      end, 
     ReqData, State}.
 
+
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST' -> is_auth_POST(ReqData, State);
@@ -97,22 +104,30 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
     case mysql:get_result_rows(Result) of
-        [[Key]] ->
-            Data = wrq:req_body(ReqData),
-            <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
-            ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
 
-            {case ServerDigest of
-                 ClientDigest -> true;
-                 _WrongDigest -> "Incorrect digest"
-             end,
-             ReqData, State};
+      %Sensor is found
+      [[_Key]] ->
+        Key = _Key;
 
-        _NoKey ->
-          %No proper provisioning for this sensor
-          %FIXME: validate using the device informed as argument
-          {true, ReqData, State}
-    end.
+      %Sensor is not registered yet
+      _NoKey ->
+        %It must be a config
+        {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+        {struct, Params} = proplists:get_value(<<"config">>, JsonData),
+        Device = proplists:get_value(<<"device">>, Params),
+        {_data, _Result} = mysql:execute(pool, device_key, [Device]),
+        [[Key]] = mysql:get_result_rows(_Result)
+    end,
+
+    Data = wrq:req_body(ReqData),
+    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
+    ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
+
+    {case ServerDigest of
+         ClientDigest -> true;
+         _WrongDigest -> "Incorrect digest"
+     end,
+    ReqData, State}.
 
 
 is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
@@ -126,8 +141,10 @@ is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
     end,
     ReqData, State}.
 
+
 content_types_provided(ReqData, State) -> 
         {[{"application/json", to_json}], ReqData, State}.
+
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
     case wrq:get_qs_value("interval", ReqData) of
@@ -170,6 +187,7 @@ process_post(ReqData, State) ->
         {_Measurements, _Config} ->
             {false, ReqData, State}
     end.
+
 
 % JSON: {"config":{"type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
 % Mochijson2: {struct,[{<<"config">>, {struct,[{<<"type">>,<<"electricity">>}, {<<"enable">>,0}, ... ]} }]}

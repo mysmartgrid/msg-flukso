@@ -138,7 +138,7 @@ process_post(ReqData, #state{device = Device} = State) ->
       %New Device Message - 1st invocation
       _ ->
      
-        %TODO: find a better Serial Number generator
+        %FIXME: find a better Serial Number generator
         Serial = Timestamp,
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
