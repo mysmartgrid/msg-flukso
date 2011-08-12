@@ -26,6 +26,17 @@
 -define(MONTH, 2419200).
 -define(YEAR, 31536000).
 
+-define(NO_COMMUNICATION_EVENT_ID,       1).
+-define(COMMUNICATION_RESTORED_EVENT_ID, 3).
+-define(PEAK_CONSUMPTION_EVENT_ID,       4).
+
+-define(MESSAGE_RECEIVED_EVENT_ID,       100).
+-define(HEARTBEAT_RECEIVED_EVENT_ID,     101).
+-define(MEASUREMENT_RECEIVED_EVENT_ID,   102).
+-define(CORRUPTED_MESSAGE_EVENT_ID,      103).
+-define(BROWNOUT_EVENT_ID,               104).
+
+
 -record(state,
         {rrdSensor,
          rrdStart,

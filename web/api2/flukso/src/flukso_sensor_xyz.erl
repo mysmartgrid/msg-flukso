@@ -180,7 +180,7 @@ process_post(ReqData, State) ->
     case Payload of
         {undefined, undefined} ->
             {false, ReqData, State};
-	{Measurements, undefined} ->
+        {Measurements, undefined} ->
             process_measurements(Measurements, ReqData, State);
         {undefined, Config} ->
             process_config(Config, ReqData, State);
@@ -200,7 +200,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[_Uid, Device]] -> 
+      [[_Uid, Device]] ->
 
         Args = [%proplists:get_value(<<"class">>,    Params),
                 %proplists:get_value(<<"type">>,     Params),
@@ -248,23 +248,25 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 % JSON: {"measurements":[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
-    RrdData = [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Measurements],
-    [LastTimestamp, LastValue] = lists:last(Measurements),
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
     [[Uid, _Device]] = mysql:get_result_rows(Result),
+    Timestamp = unix_time(),
 
-    case rrd_update(?BASE_PATH, RrdSensor, RrdData) of    
+    RrdData = [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Measurements],
+    [LastTimestamp, LastValue] = lists:last(Measurements),
+
+    %TODO: mysql:execute(pool, event_insert, [_Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
+
+    case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
         {ok, _RrdResponse} ->
             RrdResponse = "ok",
-            mysql:execute(pool, sensor_update, [unix_time(), LastValue, RrdSensor]);
+            mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
+            mysql:execute(pool, event_insert, [_Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
 
         {error, RrdResponse} ->
             logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
     end,
-
-    %TODO: define constants
-    mysql:execute(pool, event_insert, [_Device, 102, unix_time()]),
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
     {true , wrq:set_resp_body(JsonResponse, ReqData), State}.

@@ -132,8 +132,7 @@ process_post(ReqData, #state{device = Device} = State) ->
         mysql:execute(pool, device_update,
             [Timestamp, Version, 0, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, Device]),
 
-        %TODO: define constants
-        mysql:execute(pool, event_insert, [Device, 101, Timestamp]);
+        mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
       %New Device Message - 1st invocation
       _ ->
@@ -156,4 +155,3 @@ process_post(ReqData, #state{device = Device} = State) ->
     EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
 
     {true, EmbodiedReqData, State}.
-
