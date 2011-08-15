@@ -500,3 +500,16 @@ function logger_update_6021() {
   }
   return $items;
 }
+
+function logger_update_6025() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("ALTER TABLE {logger_devices} CHANGE `sha` `sha` VARCHAR( 32 ) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items; 
+}
