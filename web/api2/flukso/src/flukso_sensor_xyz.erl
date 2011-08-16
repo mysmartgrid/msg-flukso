@@ -58,8 +58,7 @@ malformed_POST(ReqData, _State) ->
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
-    State = #state{rrdSensor = RrdSensor,
-                   digest = Digest},
+    State = #state{rrdSensor = RrdSensor, digest = Digest},
 
     {case {ValidVersion, ValidSensor, ValidDigest} of
         {true, true, true} -> false;
@@ -69,11 +68,19 @@ malformed_POST(ReqData, _State) ->
 
 
 malformed_GET(ReqData, _State) ->
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData), wrq:get_qs_value("version", ReqData)),
+    {_Version, ValidVersion} = check_version(
+      wrq:get_req_header("X-Version", ReqData), 
+      wrq:get_qs_value("version", ReqData)),
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
-    {RrdStart, RrdEnd, RrdResolution, ValidTime} = check_time(wrq:get_qs_value("interval", ReqData), wrq:get_qs_value("start", ReqData), wrq:get_qs_value("end", ReqData), wrq:get_qs_value("resolution", ReqData)),
+    {RrdStart, RrdEnd, RrdResolution, ValidTime} = check_time(
+      wrq:get_qs_value("interval", ReqData), 
+      wrq:get_qs_value("start", ReqData), 
+      wrq:get_qs_value("end", ReqData), 
+      wrq:get_qs_value("resolution", ReqData)),
     {RrdFactor, ValidUnit} = check_unit(wrq:get_qs_value("unit", ReqData)),
-    {Token, ValidToken} = check_token(wrq:get_req_header("X-Token", ReqData), wrq:get_qs_value("token", ReqData)),
+    {Token, ValidToken} = check_token(
+      wrq:get_req_header("X-Token", ReqData),
+      wrq:get_qs_value("token", ReqData)),
     {JsonpCallback, ValidJsonpCallback} = check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)),
 
     State = #state{rrdSensor = RrdSensor, 
@@ -111,7 +118,7 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
 
       %Sensor is not registered yet
       _NoKey ->
-        %It must be a config
+        %This must be a config message
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
         {struct, Params} = proplists:get_value(<<"config">>, JsonData),
         Device = proplists:get_value(<<"device">>, Params),
@@ -119,15 +126,7 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
         [[Key]] = mysql:get_result_rows(_Result)
     end,
 
-    Data = wrq:req_body(ReqData),
-    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
-    ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
-
-    {case ServerDigest of
-         ClientDigest -> true;
-         _WrongDigest -> "Incorrect digest"
-     end,
-    ReqData, State}.
+    {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
 is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
@@ -174,16 +173,20 @@ process_post(ReqData, State) ->
     io:fwrite("process_post sensor\n"),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-    Payload = {proplists:get_value(<<"measurements">>, JsonData),
-               proplists:get_value(<<"config">>, JsonData)},
+    Payload = {
+      proplists:get_value(<<"measurements">>, JsonData),
+      proplists:get_value(<<"config">>, JsonData)},
 
     case Payload of
         {undefined, undefined} ->
             {false, ReqData, State};
+
         {Measurements, undefined} ->
             process_measurements(Measurements, ReqData, State);
+
         {undefined, Config} ->
             process_config(Config, ReqData, State);
+
         {_Measurements, _Config} ->
             {false, ReqData, State}
     end.
@@ -192,7 +195,6 @@ process_post(ReqData, State) ->
 % JSON: {"config":{"type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
 % Mochijson2: {struct,[{<<"config">>, {struct,[{<<"type">>,<<"electricity">>}, {<<"enable">>,0}, ... ]} }]}
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
-
     io:fwrite("process_config sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
@@ -248,25 +250,57 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 % JSON: {"measurements":[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
+    io:fwrite("process_measurements sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
-    [[Uid, _Device]] = mysql:get_result_rows(Result),
-    Timestamp = unix_time(),
 
-    RrdData = [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Measurements],
-    [LastTimestamp, LastValue] = lists:last(Measurements),
+    case mysql:get_result_rows(Result) of
 
-    %TODO: mysql:execute(pool, event_insert, [_Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
+      %Sensor is found
+      [[Uid, Device]] ->
 
-    case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
-        {ok, _RrdResponse} ->
-            RrdResponse = "ok",
-            mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
-            mysql:execute(pool, event_insert, [_Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
+        Timestamp = unix_time(),
 
-        {error, RrdResponse} ->
-            logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
+        case parse_measurements(Measurements) of
+
+          %Measurements are valid
+          {ok, RrdData} ->
+
+            case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
+
+                %RRD files were successfully updated
+                {ok, _RrdResponse} ->
+                    RrdResponse = "ok",
+                    [LastTimestamp, LastValue] = lists:last(Measurements),
+
+                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
+                    mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
+    
+                %RRD files were not successfully updated
+                {error, RrdResponse} ->
+                    logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
+            end;
+
+          %Measurements are corrupted
+          _ ->
+            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
+            RrdResponse = "Invalid Measurements"
+        end;
+
+      %Unknown sensor
+      _ ->
+        RrdResponse = "Unknown Sensor"
     end,
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
-    {true , wrq:set_resp_body(JsonResponse, ReqData), State}.
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+
+
+parse_measurements(Measurements) ->
+  try
+    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Measurements]}
+  catch
+    _:_ ->
+      {error, error}
+  end.
+

@@ -31,55 +31,70 @@
 init([]) -> 
     {ok, undefined}.
 
+
 % debugging
 %init(Config) ->
 %   {{trace, "/tmp"}, Config}.
 
+
 allowed_methods(ReqData, State) ->
     {['POST'], ReqData, State}.
+
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST' -> malformed_POST(ReqData, State)
     end.
 
+
 malformed_POST(ReqData, _State) ->
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
-    State = #state{device = Device,
-                   digest = Digest},
+    {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+    IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
+    if
+      %Key is validated when defined
+      IsKeyDefined == true ->
+        {Key, ValidKey} = check_key(proplists:get_value(<<"key">>, JsonData));
+      true ->
+        ValidKey = true
+    end,
 
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
+    State = #state{device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey} of
+        {true, true, true, true} -> false;
         _ -> true
      end,
     ReqData, State}.
+
 
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST' -> is_auth_POST(ReqData, State)
     end.
 
+
 is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
     case mysql:get_result_rows(Result) of
-        [[Key]] ->
-            Data = wrq:req_body(ReqData),
-            <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
-            ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
 
-            {case ServerDigest of
-                 ClientDigest -> true;
-                 _WrongDigest -> "Incorrect digest"
-             end,
-             ReqData, State};
+      %If device is found, use the key stored in the database
+      [[_Key]] ->
+        Key = _Key;
 
-        _NoKey ->
-            {true, ReqData, State}
-    end.
+      %Otherwise, use key informed in the request
+      _ ->
+        {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+        Key = proplists:is_defined(<<"key">>, JsonData)
+     end,   
+
+     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+
 
 % JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1}
 % Mochijson2: {struct,[{<<"memtotal">>,   13572},
@@ -106,6 +121,7 @@ process_post(ReqData, #state{device = Device} = State) ->
           %New Device Message - 2nd invocation
            IsKeyInformed == true ->
 
+            %Key can be changed, but the encryption is based on the formed key
             NewKey = proplists:get_value(<<"key">>, JsonData),
             Version = 0,
             Uptime = 0,
@@ -118,7 +134,7 @@ process_post(ReqData, #state{device = Device} = State) ->
           %Heartbeat Message
           true ->
 
-            NewKey = Key,
+            NewKey = Key, %Key is not changed
             Version = proplists:get_value(<<"version">>, JsonData),
             Reset = proplists:get_value(<<"reset">>, JsonData),
             Uptime = proplists:get_value(<<"uptime">>, JsonData),
@@ -146,12 +162,5 @@ process_post(ReqData, #state{device = Device} = State) ->
             [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
     end,
 
-    JsonResponse = mochijson2:encode({ struct, [{<<"upgrade">>,   Upgrade}, {<<"timestamp">>, Timestamp}] }),
+    {true, digest_response(Key, [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], ReqData), State}.
 
-    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
-    Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
-
-    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
-    EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
-
-    {true, EmbodiedReqData, State}.

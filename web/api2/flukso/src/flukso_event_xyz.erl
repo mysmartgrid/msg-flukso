@@ -48,8 +48,7 @@ malformed_POST(ReqData, _State) ->
     {Device, ValidDevice} = check_device(wrq:path_info(event, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
-    State = #state{device = Device,
-                   digest = Digest},
+    State = #state{device = Device, digest = Digest},
 
     {case {ValidVersion, ValidDevice, ValidDigest} of
         {true, true, true} -> false;
@@ -67,19 +66,12 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     case mysql:get_result_rows(Result) of
         [[Key]] ->
-            Data = wrq:req_body(ReqData),
-            <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
-            ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
-
-            {case ServerDigest of
-                 ClientDigest -> true;
-                 _WrongDigest -> "Incorrect digest"
-             end,
-             ReqData, State};
-
+            check = check_digest(Key, ReqData, ClientDigest);
         _NoKey ->
-            {"No proper provisioning for this device", ReqData, State}
-    end.
+            check = "No proper provisioning for this device"
+    end,
+
+    {check, ReqData, State}.
 
 % JSON: {"event":104}
 % Mochijson2: {struct,[{<<"event">>,   104}]}
@@ -95,13 +87,5 @@ process_post(ReqData, #state{device = Device} = State) ->
 
     mysql:execute(pool, event_insert, [Device, Event, Timestamp]),
 
-    JsonResponse = mochijson2:encode({struct, [{<<"timestamp">>, Timestamp}]}),
-
-    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
-    Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
-
-    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData), 
-    EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
-
-    {true , EmbodiedReqData, State}.
+    {true, digest_response(Key, [{<<"timestamp">>, Timestamp}], ReqData), State}.
 

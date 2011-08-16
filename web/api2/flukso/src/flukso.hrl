@@ -70,6 +70,9 @@ check_sensor(Sensor) ->
 check_device(Device) ->
     check_hex(Device, 32).
 
+check_key(Key) ->
+    check_hex(Key, 32).
+
 check_token(undefined, undefined) ->
     {false, false};
 check_token(Token, undefined) ->
@@ -141,6 +144,27 @@ check_jsonp_callback(JsonpCallback) ->
         {match, [{0, Length}]} -> {JsonpCallback, true};
         _ -> {false, false}
     end.
+
+check_digest(Key, ReqData, ClientDigest) ->
+    Data = wrq:req_body(ReqData),
+    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, Data),
+    ServerDigest = lists:flatten(io_lib:format("~40.16.0b", [X])),
+
+    case ServerDigest of
+      ClientDigest -> true;
+      _WrongDigest -> "Incorrect digest"
+    end.
+
+digest_response(Key, properties, ReqData) ->
+
+    JsonResponse = mochijson2:encode({struct, properties}),
+
+    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
+    Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
+
+    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
+    wrq:set_resp_body(JsonResponse, DigestedReqData).
+
 
 %% helper functions
 unix_time() ->
