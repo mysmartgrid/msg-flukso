@@ -87,5 +87,5 @@ process_post(ReqData, #state{device = Device} = State) ->
 
     mysql:execute(pool, event_insert, [Device, Event, Timestamp]),
 
-    {true, digest_response(Key, [{<<"timestamp">>, Timestamp}], ReqData), State}.
+    digest_response(Key, [{<<"timestamp">>, Timestamp}], ReqData, State).
 

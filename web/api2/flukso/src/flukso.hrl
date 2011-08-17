@@ -152,18 +152,20 @@ check_digest(Key, ReqData, ClientDigest) ->
 
     case ServerDigest of
       ClientDigest -> true;
-      _WrongDigest -> "Incorrect digest"
+      _ -> "Incorrect digest"
     end.
 
-digest_response(Key, properties, ReqData) ->
+digest_response(Key, Properties, ReqData, State) ->
 
-    JsonResponse = mochijson2:encode({struct, properties}),
+      JsonResponse = mochijson2:encode({struct, Properties}),
 
-    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
-    Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
+      <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
+      Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
 
-    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
-    wrq:set_resp_body(JsonResponse, DigestedReqData).
+      DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
+      EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
+
+      {true , EmbodiedReqData, State}.
 
 
 %% helper functions

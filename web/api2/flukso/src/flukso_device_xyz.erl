@@ -90,10 +90,10 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
       %Otherwise, use key informed in the request
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-        Key = proplists:is_defined(<<"key">>, JsonData)
-     end,   
+        Key = proplists:get_value(<<"key">>, JsonData)
+    end,   
 
-     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+    {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
 % JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1}
@@ -162,5 +162,5 @@ process_post(ReqData, #state{device = Device} = State) ->
             [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
     end,
 
-    {true, digest_response(Key, [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], ReqData), State}.
+    digest_response(Key, [{<<"upgrade">>,   Upgrade}, {<<"timestamp">>, Timestamp}], ReqData, State).
 

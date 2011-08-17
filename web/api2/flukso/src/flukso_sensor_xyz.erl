@@ -117,7 +117,7 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
         Key = _Key;
 
       %Sensor is not registered yet
-      _NoKey ->
+      _ ->
         %This must be a config message
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
         {struct, Params} = proplists:get_value(<<"config">>, JsonData),
