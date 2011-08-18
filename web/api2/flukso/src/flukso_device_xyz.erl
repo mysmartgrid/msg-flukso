@@ -1,20 +1,23 @@
-%% @author Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>
-%% @copyright (C) 2011 Bart Van Der Meerssche
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% (at your option) any later version.
-%%%
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
-%%% You should have received a copy of the GNU General Public License
-%%% along with this program.  If not, see <http://www.gnu.org/licenses/>.
-%%%
-%% @doc Flukso API: /device/xyz resource specification 
+%%
+%% The /device/xyz resource implementation.
+%%
+%% Copyright (c) 2008-2010 flukso.net
+%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+%%
+%% This program is free software; you can redistribute it and/or
+%% modify it under the terms of the GNU General Public License
+%% as published by the Free Software Foundation; either version 2
+%% of the License, or (at your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful,
+%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%% GNU General Public License for more details.
+%%
+%% You should have received a copy of the GNU General Public License
+%% along with this program; if not, write to the Free Software
+%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+%%
 
 -module(flukso_device_xyz).
 -author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
@@ -55,7 +58,7 @@ malformed_POST(ReqData, _State) ->
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
     if
-      %Key is validated when defined
+      %When defines, Key is validated
       IsKeyDefined == true ->
         {Key, ValidKey} = check_key(proplists:get_value(<<"key">>, JsonData));
       true ->
@@ -96,6 +99,9 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
+%
+% Heartbeat message example:
+%
 % JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1}
 % Mochijson2: {struct,[{<<"memtotal">>,   13572},
 %                      {<<"version">>,      210},
@@ -104,6 +110,12 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 %                      {<<"memfree">>,      812},
 %                      {<<"uptime">>,     17394},
 %                      {<<"reset">>,          1}]}
+%
+% Config message example:
+% 
+% JSON: {"key":12345678901234567890123456789012}
+% Mochijson2: {struct,[{<<"key">>, 12345678901234567890123456789012}]}
+%
 process_post(ReqData, #state{device = Device} = State) ->
     {data, Result} = mysql:execute(pool, device_props, [Device]),
 

@@ -1,22 +1,24 @@
-%% @author Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>
-%% @copyright (C) 2009-2011 Bart Van Der Meerssche
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% (at your option) any later version.
-%%%
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
-%%% You should have received a copy of the GNU General Public License
-%%% along with this program.  If not, see <http://www.gnu.org/licenses/>.
-%%%
-%% @doc Ensure that the relatively-installed dependencies are on the code
-%%      loading path, and locate resources relative
-%%      to this application's path.
+%%
+%% Ensure that the relatively-installed dependencies are on the code
+%% loading path, and locate resources relative to this application's path.
+%%
+%% Copyright (c) 2008-2010 flukso.net
+%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+%%
+%% This program is free software; you can redistribute it and/or
+%% modify it under the terms of the GNU General Public License
+%% as published by the Free Software Foundation; either version 2
+%% of the License, or (at your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful,
+%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%% GNU General Public License for more details.
+%%
+%% You should have received a copy of the GNU General Public License
+%% along with this program; if not, write to the Free Software
+%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+%%
 
 -module(flukso_deps).
 -author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
@@ -25,6 +27,7 @@
 -export([get_base_dir/0, get_base_dir/1]).
 -export([local_path/1, local_path/2]).
 -export([deps_on_path/0, new_siblings/1]).
+
 
 %% @spec deps_on_path() -> [ProjNameAndVers]
 %% @doc List of project dependencies on the path.
@@ -40,6 +43,7 @@ deps_on_path() ->
                 end
         end,
     ordsets:from_list(lists:foldl(F, [], code:get_path())).
+
     
 %% @spec new_siblings(Module) -> [Dir]
 %% @doc Find new siblings paths relative to Module that aren't already on the
@@ -65,12 +69,14 @@ ensure(Module) ->
     code:clash(),
     ok.
 
+
 %% @spec ensure() -> ok
 %% @doc Ensure that the ebin and include paths for dependencies of
 %%      this application are on the code path. Equivalent to
 %%      ensure(?Module).
 ensure() ->
     ensure(?MODULE).
+
 
 %% @spec get_base_dir(Module) -> string()
 %% @doc Return the application directory for Module. It assumes Module is in
@@ -79,19 +85,23 @@ get_base_dir(Module) ->
     {file, Here} = code:is_loaded(Module),
     filename:dirname(filename:dirname(Here)).
 
+
 %% @spec get_base_dir() -> string()
 %% @doc Return the application directory for this application. Equivalent to
 %%      get_base_dir(?MODULE).
 get_base_dir() ->
     get_base_dir(?MODULE).
 
+
 %% @spec local_path([string()], Module) -> string()
 %% @doc Return an application-relative directory from Module's application.
 local_path(Components, Module) ->
     filename:join([get_base_dir(Module) | Components]).
+
 
 %% @spec local_path(Components) -> string()
 %% @doc Return an application-relative directory for this application.
 %%      Equivalent to local_path(Components, ?MODULE).
 local_path(Components) ->
     local_path(Components, ?MODULE).
+
