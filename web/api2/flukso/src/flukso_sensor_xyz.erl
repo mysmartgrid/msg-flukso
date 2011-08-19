@@ -284,7 +284,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
                     RrdResponse = "ok",
                     [LastTimestamp, LastValue] = lists:last(Measurements),
 
-                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
+                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, 0, RrdSensor]),
                     mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
     
                 %RRD files were not successfully updated
@@ -295,6 +295,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
           %Measurements are corrupted
           _ ->
             mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
+            mysql:execute(pool, sensor_corrupt, [1, RrdSensor]),
             RrdResponse = "Invalid Measurements"
         end;
 
@@ -304,7 +305,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     end,
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
-    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+    {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
 parse_measurements(Measurements) ->

@@ -58,7 +58,7 @@ malformed_POST(ReqData, _State) ->
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
     if
-      %When defines, Key is validated
+      %When defined, Key is validated
       IsKeyDefined == true ->
         {Key, ValidKey} = check_key(proplists:get_value(<<"key">>, JsonData));
       true ->
@@ -94,7 +94,7 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
         Key = proplists:get_value(<<"key">>, JsonData)
-    end,   
+    end,
 
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
@@ -164,9 +164,9 @@ process_post(ReqData, #state{device = Device} = State) ->
 
       %New Device Message - 1st invocation
       _ ->
-     
-        %FIXME: find a better Serial Number generator
+        %Function unix_time() returns unique ids (as long as this code runs on a single machine).
         Serial = Timestamp,
+
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
 

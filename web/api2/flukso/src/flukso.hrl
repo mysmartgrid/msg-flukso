@@ -247,7 +247,7 @@ rrd_update(Path, RrdSensor, RrdData) ->
     erlrrd:update([Path, [RrdSensor|".rrd"], " ", RrdData]).
 
 rrd_create(Path, RrdSensor) ->
-  %FIXME: use erlrrd:create
+  %TODO: use erlrrd:create
   file:copy("/home/flukso/www/api/flukso/var/data/base/template.rrd", ["/home/flukso/www/api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
 
 
