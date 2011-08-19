@@ -25,7 +25,7 @@ function logger_schema() {
       'sha' => array(
         'type' => 'varchar',
         'length' => '32',
-        'not null' => FALSE,
+        'not null' => TRUE,
       ),
       'created' => array(
         'type' => 'int',
