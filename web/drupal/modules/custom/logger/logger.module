@@ -847,11 +847,12 @@ function _logger_get_energy_chart_data(&$chart) {
       $sensor->uid = $user->uid;
       $sensor->username = $user->name;
       $sensor->function = t('All');
+      $sensor->meter = 'All';
       $sensor->type = t($key);
     }
 
-    $data['series'][$sensor->uid][$sensor->username][$sensor->function][t($sensor->type)] = $series;
-    $data['labels'][$sensor->function][t($sensor->type)] = $data_labels;
+    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][t($sensor->type)] = $series;
+    $data['labels'][$sensor->meter][t($sensor->type)] = $data_labels;
     $data['legend'][] = _logger_create_energy_legend_line($sensor, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
   }
   $data['last'] = $last;
