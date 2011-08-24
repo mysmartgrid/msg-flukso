@@ -636,7 +636,7 @@ function _logger_download_chart_data_file($cache_id) {
     }
   }
 
-  _logger_download_file('chart-data-file.txt', $header, $lines);
+  _logger_download_file('chart-data-file', $header, $lines);
 }
 
 function _logger_download_file($file_name, $header, $lines) {
