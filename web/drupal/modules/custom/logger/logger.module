@@ -117,6 +117,15 @@ function logger_menu() {
     'access arguments' => array('view logger charts'),
     'type'             => MENU_CALLBACK
   );
+  
+  $items['power/user'] = array(
+    'title'            => 'Power consumption and production',
+    'description'      => 'Show the power consumption and production of a single user',
+    'page callback'    => '_logger_user_power_page',
+    'page arguments'   => array(2),
+    'access arguments' => array('view logger charts'),
+    'type'             => MENU_CALLBACK
+  );
 
   $items['logger/setvariable'] = array(
     'title'            => 'Sets a logger variable',
@@ -309,6 +318,11 @@ function _logger_is_mobile_device() {
 
   $check = mobile_tools_is_mobile_device();
   return $check['type'] == 'mobile';
+}
+
+function _logger_user_power_page($uid) {
+  _logger_set_variable('selected_users', array($uid));
+  return _logger_power_page('hour');
 }
 
 /**

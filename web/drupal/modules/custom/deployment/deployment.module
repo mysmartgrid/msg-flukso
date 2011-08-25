@@ -27,6 +27,7 @@ define('CORRUPTED_STATE_ID',          4);
 define('WORKING_STATE_ID',            5);
 define('OFFLINE_STATE_ID',            6);
 define('NO_MEASUREMENT_STATE_ID',     7);
+define('NO_HEARTBEAT_STATE_ID',       8);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
@@ -124,6 +125,8 @@ function deployment_list_page($id = NULL) {
   $data = _deployment_get_devices($state_id, $headers, $limit);
   foreach ($data as &$device) {
     $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
+    $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
+    unset($device['uid']);
   }
   $_SESSION['deployment_list'] = $data;
 
@@ -318,9 +321,14 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
       break;
 
     case OFFLINE_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout AND m.access < $offline_timeout";
       break;
     
+    case NO_HEARTBEAT_STATE_ID:
+      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout AND m.access >= $offline_timeout";
+      $latest_field = "m.access";
+      break;
+
     case NO_COMMUNICATION_STATE_ID:
       $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $offline_timeout AND d.access < $communication_timeout";
       break;
@@ -341,14 +349,15 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
             IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access, d.access)
           )
         )";
-      
+
       $state_id_field = "
         IF(d.uid = 0,
           IF(d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
           IF(m.corrupted > 0, " . CORRUPTED_STATE_ID . " ,
-            IF(d.access < $offline_timeout, " . OFFLINE_STATE_ID . ",
-              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ", " . 
-                "IF(m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
+            IF(d.access < $offline_timeout,  
+              IF(m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
+              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ", 
+                 IF(m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
               )
             )
           )
@@ -358,15 +367,16 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
 
   $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = '%s'";
   $result = db_query($visitor_sql, 'Visitor');
-  
+
   while ($visitor = db_fetch_object($result)) {
     $filters .= " AND d.uid <> $visitor->uid ";
   }
-  
+
   return "
     SELECT SQL_NO_CACHE
       d.serial,
       u.name,
+      u.uid,
       u.mail AS email,
       CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz') AS latest,
       ($state_id_field) AS state_id
@@ -485,6 +495,10 @@ function deployment_checkup_form_submit($form, &$form_state) {
 
       case NO_MEASUREMENT_STATE_ID:
         drupal_set_message(t('No measurement has been received from this device since %latest.', $latest));
+        break;
+
+      case NO_HEARTBEAT_STATE_ID:
+        drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
         break;
 
       case CORRUPTED_STATE_ID:

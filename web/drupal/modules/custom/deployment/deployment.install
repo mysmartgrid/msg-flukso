@@ -84,8 +84,11 @@ function deployment_install() {
   $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (6, 'Offline',
   'The device is registered, but has not sent any message during the past 24 hours.')";
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (7, 'Offline',
+  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (7, 'No Measurement',
   'The device is registered, but has not sent any measurement during the past 24 hours.')";
+
+  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (8, 'No Heartbeat',
+  'The device is registered, but has not sent any heartbeat during the past 24 hours.')";
 
   db_query($sql);
 }
@@ -115,6 +118,22 @@ function deployment_update_6002() {
         'The device is registered, but has not sent any measurement during the past 24 hours.')");
 
       $items[] = update_sql("INSERT INTO {deployment_summary} (time, state_id, total) SELECT time, 7, 0 FROM {deployment_summary} GROUP BY time");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function deployment_update_6003() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("INSERT INTO {deployment_state} (id, name, description) VALUES (8, 'No Heartbeat',
+        'The device is registered, but has not sent any heartbeat during the past 24 hours.')");
+
+      $items[] = update_sql("INSERT INTO {deployment_summary} (time, state_id, total) SELECT time, 8, 0 FROM {deployment_summary} GROUP BY time");
       break;
     case 'pgsql':
       break;
