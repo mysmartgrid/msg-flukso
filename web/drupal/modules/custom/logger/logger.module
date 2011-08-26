@@ -927,7 +927,7 @@ function _logger_get_power_chart_data($chart) {
 
     $values = _logger_format_power_series_data($chart, $measurements);
 
-    $data['series'][$sensor->uid][$sensor->username][$sensor->function][$sensor->type] = $values;
+    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = $values;
 
     //Hide user names for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
