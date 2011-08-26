@@ -175,7 +175,17 @@ function logger_menu() {
     'file'             => 'logger.admin.inc'
   );
 
+  $items['device/support'] = array(
+    'title'            => $items['user/%user_uid_optional/devices']['title'],
+    'page callback'    => '_logger_allow_remote_support',
+    'page arguments'   => array(2, 3),
+    'access callback'  => '_logger_device_access',
+    'access arguments' => array('list devices', 2), //FIXME: create a new right 
+    'type'             => MENU_CALLBACK,
+    'file'             => 'logger.admin.inc'
+  );
 
+  
   //Sensor operations
 
   $items['user/%user_uid_optional/sensors'] = array(
@@ -2479,4 +2489,69 @@ function logger_query_device_measurements($interval, $device, $offset) {
     $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $offset, $period, $resolution);
   }
   return $measurements;
+}
+
+function logger_cron() {
+  
+  _logger_bind_remote_support_ports();
+}
+
+function _logger_bind_remote_support_ports() {
+
+  //Remove old requests
+  $timeout = time() - 4 * DAY;
+  $sql = "UPDATE {logger_devices} SET support_allowed = 0 WHERE support_allowed < %d";
+  
+  db_query($sql, $timeout);
+  
+  //Remove association between device and port
+  $sql = "
+    UPDATE
+      {device_support_slot}
+    SET
+      device = NULL
+    WHERE
+      EXISTS(
+        SELECT
+          1
+        FROM
+          {logger_devices} d
+        WHERE
+          d.device = device_support_slot.device AND
+          d.support_allowed < %d
+      )";  
+  db_query($sql, $timeout);
+  
+    
+  //Find devices with pending support requests
+  $sql = "
+    SELECT
+      device
+    FROM
+      {logger_devices}
+    WHERE
+      support_allowed > 0 AND
+      NOT EXISTS (
+        SELECT
+          1
+        FROM
+          {device_support_slot}
+        WHERE
+          device_support_slot.device = logger_devices.device
+      )";
+  
+  $result = db_query($sql);
+  
+  while ($device = db_fetch_object($result)) {
+
+    //Find available ports
+    $sql = "SELECT MIN(port) AS port FROM {device_support_slot} WHERE device IS NULL";
+
+    $slot = db_fetch_object(db_query($sql));
+
+    if ($slot) {
+      $sql = "UPDATE {device_support_slot} SET device = '%s' WHERE port = %d";
+      db_query($sql, $device->device, $slot->port);
+    }
+  }
 }

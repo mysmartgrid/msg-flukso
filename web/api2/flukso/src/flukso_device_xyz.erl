@@ -174,5 +174,16 @@ process_post(ReqData, #state{device = Device} = State) ->
             [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
     end,
 
-    digest_response(Key, [{<<"upgrade">>,   Upgrade}, {<<"timestamp">>, Timestamp}], ReqData, State).
+    %Check if device has requested remote support, and if a port is available
+    {_data, _Result} = mysql:execute(pool, support_slot, [Device]), 
+
+    case mysql:get_result_rows(_Result) of
+      [[SupportUser, SupportPort]] ->
+        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}, {<<"supportport">>, SupportPort}, {<<"supportuser">>, SupportUser}];
+
+      _ ->
+        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}]
+    end,
+
+    digest_response(Key, L, ReqData, State).
 

@@ -297,6 +297,42 @@ function _logger_device_deactivate($serial) {
   drupal_goto("user/$user->uid/devices");
 }
 
+function _logger_allow_remote_support($serial, $allow) {
+
+  //FIXME: use device id instead of serial number
+  
+  global $user;
+  
+  if ($allow) {
+    $time = time();
+    
+  } else {
+    $time = 0;
+    
+    $sql = "
+      UPDATE
+        {device_support_slot}
+      SET
+        device = NULL
+      WHERE
+        EXISTS(
+          SELECT
+            1
+          FROM 
+            {logger_devices} d
+          WHERE
+            d.serial = '%s' AND
+            d.device = device_support_slot.device
+        )";
+    db_query($sql, $serial);
+  }
+  
+  $sql = "UPDATE {logger_devices} SET support_allowed = %d WHERE serial = '%s'";
+  db_query($sql, $time, $serial);
+  
+  drupal_goto("user/$user->uid/devices");
+}
+
 /**
  * Deactivates a sensor, setting its function to blank.
  *
@@ -352,7 +388,19 @@ function theme_logger_userdevices($form) {
   global $user;
   $rows = array();
 
-  $sql = "SELECT serial, access, resets, uptime FROM {logger_devices} WHERE uid = %d ORDER BY serial";
+  $sql = "
+    SELECT
+      d.serial,
+      d.access,
+      d.resets,
+      d.uptime,
+      d.support_allowed
+    FROM
+      {logger_devices} d
+    WHERE
+      d.uid = %d
+    ORDER BY
+      d.serial";
   $result = db_query($sql, $user->uid);
 
   function unix_to_userlocaltime($unix) {
@@ -369,13 +417,17 @@ function theme_logger_userdevices($form) {
 
   while ($device = db_fetch_object($result)) {
 
+    $allow_support = $device->support_allowed > 0 ? 0 : 1;
+    $support_link = $allow_support ? 'Request Support' : 'Suspend Support';
+    
     $row = array();
     $row[] = $device->serial;
     $row[] = $device->resets;
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
     $row[] = l(t('Remove'),  "device/deactivate/$device->serial") . '<br>' .
-             l(t('History'), "event/log/list/$device->serial");
+             l(t('History'), "event/log/list/$device->serial") . '<br>' .
+             l(t($support_link), "device/support/$device->serial/$allow_support");
 
     $rows[] = $row;
   }
