@@ -112,13 +112,6 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '5',
       ),
-      'support_allowed' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '10',
-      ),
     ),
     'primary key' => array('device'),
   );
@@ -218,34 +211,30 @@ function logger_schema() {
         'default' => 'watt',
       ),
     ),
-      
-    $schema['device_support_slot'] = array(
-      'description' => t('Stores ports that can be used for reverse SSH connections that enable remote support of Flukso devices.'),
-      'fields' => array(
-        'port' => array(
-          'type'      => 'int',
-          'not null'  => TRUE,
-          'unasigned' => TRUE,
-        ),
-        'username' => array(
-          'type' => 'varchar',
-          'length'   => '15',
-          'not null' => TRUE,
-        ),
-        'device' => array(
-          'type' => 'varchar',
-          'length' => '32',
-          'not null' => TRUE,
-        ),
-      ),
-      'primary key' => array(
-        'port'
-      ),
-    ),      
-      
     'primary key' => array('meter'),
   );
 
+  $schema['device_support_request'] = array(
+    'description' => t('Stores device remote support requests via reverse SSH connections.'),
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'requested' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'device'
+    ),
+  );
+  
   return $schema;
 }
 
@@ -546,24 +535,24 @@ function logger_update_6025() {
   return $items; 
 }
 
-function logger_update_6028() {
+function logger_update_6033() {
   $items = array();
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN support_allowed int unsigned NOT NULL default '0'");
+      $items[] = update_sql("CREATE TABLE {device_support_request}(device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, requested int unsigned NOT NULL, PRIMARY KEY (device))");
+      $items[] = update_sql("CREATE TABLE {device_support_slot}(host VARCHAR(40) CHARACTER SET utf8 COLLATE utf8_general_ci, port int unsigned NOT NULL, username VARCHAR(15) CHARACTER SET utf8 COLLATE utf8_general_ci, device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, PRIMARY KEY (port))");
 
-      $items[] = update_sql("CREATE TABLE {device_support_slot}(port int unsigned NOT NULL, username VARCHAR(15) CHARACTER SET utf8 COLLATE utf8_general_ci, device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, PRIMARY KEY (port))");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19990, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19991, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19992, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19993, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19994, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19995, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19996, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19997, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19998, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (port, username) VALUES (19999, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19990, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19991, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19992, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19993, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19994, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19995, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19996, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19997, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19998, 'support')");
+      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19999, 'support')");
       break;
     case 'pgsql':
       break;

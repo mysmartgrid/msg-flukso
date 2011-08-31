@@ -271,16 +271,14 @@ function logger_userprivacy_form_submit($form, &$form_state) {
 /**
  * Deactivates a device and all its sensors, removing their user association.
  *
- * @param $serial  The device serial number.
+ * @param $device  The device id.
  */
-function _logger_device_deactivate($serial) {
+function _logger_device_deactivate($device) {
 
   global $user;
 
-  $device = db_result(db_query("SELECT device FROM {logger_devices} WHERE serial = %d", $serial));
-
-  db_query("UPDATE {logger_devices} SET uid = %d WHERE serial = %d", 0, $serial);
-  db_query("UPDATE {logger_meters} SET uid = %d WHERE device = '%s'", 0, $device);
+  db_query("UPDATE {logger_devices} SET uid = %d WHERE device = '%s'", 0, $device);
+  db_query("UPDATE {logger_meters}  SET uid = %d WHERE device = '%s'", 0, $device);
 
   $count = db_result(db_query("SELECT count(*) FROM {logger_devices} WHERE uid = %d", $user->uid));
 
@@ -294,42 +292,6 @@ function _logger_device_deactivate($serial) {
     db_query("DELETE FROM {logger_users} WHERE uid = %d AND private = 0", $user->uid);
   }
 
-  drupal_goto("user/$user->uid/devices");
-}
-
-function _logger_allow_remote_support($serial, $allow) {
-
-  //FIXME: use device id instead of serial number
-  
-  global $user;
-  
-  if ($allow) {
-    $time = time();
-    
-  } else {
-    $time = 0;
-    
-    $sql = "
-      UPDATE
-        {device_support_slot}
-      SET
-        device = NULL
-      WHERE
-        EXISTS(
-          SELECT
-            1
-          FROM 
-            {logger_devices} d
-          WHERE
-            d.serial = '%s' AND
-            d.device = device_support_slot.device
-        )";
-    db_query($sql, $serial);
-  }
-  
-  $sql = "UPDATE {logger_devices} SET support_allowed = %d WHERE serial = '%s'";
-  db_query($sql, $time, $serial);
-  
   drupal_goto("user/$user->uid/devices");
 }
 
@@ -390,13 +352,15 @@ function theme_logger_userdevices($form) {
 
   $sql = "
     SELECT
+      d.device,
       d.serial,
       d.access,
       d.resets,
       d.uptime,
-      d.support_allowed
+      r.requested AS support_requested
     FROM
-      {logger_devices} d
+      {logger_devices} d LEFT JOIN 
+      {device_support_request} r ON d.device = r.device
     WHERE
       d.uid = %d
     ORDER BY
@@ -417,17 +381,20 @@ function theme_logger_userdevices($form) {
 
   while ($device = db_fetch_object($result)) {
 
-    $allow_support = $device->support_allowed > 0 ? 0 : 1;
-    $support_link = $allow_support ? 'Request Support' : 'Suspend Support';
+    $support_link = $device->support_requested ? 
+      l(t('Suspend Support'), "device/support/suspend/$device->device") :
+      l(t('Request Support'), "device/support/confirm/$device->device");
+    
+    //FIXME: Use $device->device instead of $device->serial
     
     $row = array();
     $row[] = $device->serial;
     $row[] = $device->resets;
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
-    $row[] = l(t('Remove'),  "device/deactivate/$device->serial") . '<br>' .
+    $row[] = l(t('Remove'),  "device/deactivate/$device->device") . '<br>' .
              l(t('History'), "event/log/list/$device->serial") . '<br>' .
-             l(t($support_link), "device/support/$device->serial/$allow_support");
+             $support_link;
 
     $rows[] = $row;
   }

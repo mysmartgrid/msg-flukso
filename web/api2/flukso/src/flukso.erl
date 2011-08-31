@@ -51,7 +51,7 @@ mysql_prepare() ->
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, corrupted, type, function, phase, constant, value, factor, unit) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM logger_devices WHERE device = ?">>),
     mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),
-    mysql:prepare(support_slot, <<"SELECT username, port FROM device_support_slot WHERE device = ?">>).
+    mysql:prepare(support_slot, <<"SELECT username, host, port FROM device_support_slot WHERE device = ?">>).
 
 
 %% @spec start_link() -> {ok,Pid::pid()}

@@ -36,7 +36,7 @@ define('PRODUCTION_SENSOR_TYPE',  2);
 
 define('LOGGER_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
-
+define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 
 function logger_init() {
 
@@ -67,7 +67,9 @@ function logger_perm() {
     'list devices',
     'deactivate devices',
     'list sensors',
-    'manage sensors'
+    'manage sensors',
+    'request device remote support',
+    'attend device remote support requests'
   );
 }
 
@@ -175,14 +177,56 @@ function logger_menu() {
     'file'             => 'logger.admin.inc'
   );
 
-  $items['device/support'] = array(
-    'title'            => $items['user/%user_uid_optional/devices']['title'],
-    'page callback'    => '_logger_allow_remote_support',
-    'page arguments'   => array(2, 3),
+  $items['device/support/confirm'] = array(
+    'title'            => 'Support Requests',
+    'description'      => 'Show the device support request confirmation page',
+    'page callback'    => '_logger_support_confirmation_page',
+    'page arguments'   => array(3),
     'access callback'  => '_logger_device_access',
-    'access arguments' => array('list devices', 2), //FIXME: create a new right 
-    'type'             => MENU_CALLBACK,
-    'file'             => 'logger.admin.inc'
+    'access arguments' => array('request device remote support', 3),
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['device/support/request'] = array(
+    'title'            => $items['user/%user_uid_optional/devices']['title'],
+    'page callback'    => '_logger_request_support',
+    'page arguments'   => array(3),
+    'access callback'  => '_logger_device_access',
+    'access arguments' => array('request device remote support', 3),
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['device/support/suspend'] = array(
+    'title'            => $items['user/%user_uid_optional/devices']['title'],
+    'page callback'    => '_logger_suspend_support',
+    'page arguments'   => array(3),
+    'access callback'  => '_logger_device_access',
+    'access arguments' => array('request device remote support', 3),
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['device/support/requests'] = array(
+    'title'             => 'Support Requests',
+    'description'       => 'Show the device support requests page',
+    'page callback'     => '_logger_support_requests_page',
+    'access arguments'  => array('attend device remote support requests'),
+    'type'              => MENU_NORMAL_ITEM
+  );
+
+  $items['device/support/postpone'] = array(
+    'title'            => $items['device/support/requests']['title'],
+    'page callback'    => '_logger_postpone_support',
+    'page arguments'   => array(3),
+    'access arguments'  => array('attend device remote support requests'),
+    'type'             => MENU_CALLBACK
+  );
+
+  $items['device/support/remove'] = array(
+    'title'            => $items['device/support/requests']['title'],
+    'page callback'    => '_logger_remove_support',
+    'page arguments'   => array(3),
+    'access arguments'  => array('attend device remote support requests'),
+    'type'             => MENU_CALLBACK
   );
 
   
@@ -2457,12 +2501,12 @@ function _logger_sensor_access($permission, $meter) {
 /**
  * Access callback ensuring the device is accessible only to the owner.
  */
-function _logger_device_access($permission, $serial) {
+function _logger_device_access($permission, $device) {
 
-  $sql = "SELECT uid FROM {logger_devices} WHERE serial = %d";
-  $device = db_fetch_object(db_query($sql, $serial));
+  $sql = "SELECT uid FROM {logger_devices} WHERE device = '%s'";
+  $uid = db_result(db_query($sql, $device));
 
-  return ($device->uid == $GLOBALS['user']->uid && user_access($permission));
+  return ($uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
 /**
@@ -2493,14 +2537,14 @@ function logger_query_device_measurements($interval, $device, $offset) {
 
 function logger_cron() {
   
-  _logger_bind_remote_support_ports();
+  _logger_bind_support_ports();
 }
 
-function _logger_bind_remote_support_ports() {
+function _logger_bind_support_ports() {
 
   //Remove old requests
-  $timeout = time() - 4 * DAY;
-  $sql = "UPDATE {logger_devices} SET support_allowed = 0 WHERE support_allowed < %d";
+  $timeout = time() - 2 * DAY;
+  $sql = "DELETE FROM {device_support_request} WHERE requested < %d";
   
   db_query($sql, $timeout);
   
@@ -2511,34 +2555,37 @@ function _logger_bind_remote_support_ports() {
     SET
       device = NULL
     WHERE
-      EXISTS(
+      NOT EXISTS(
         SELECT
           1
         FROM
-          {logger_devices} d
+          {device_support_request} r
         WHERE
-          d.device = device_support_slot.device AND
-          d.support_allowed < %d
+          r.device = device_support_slot.device
       )";  
-  db_query($sql, $timeout);
+  db_query($sql);
   
     
   //Find devices with pending support requests
+  //The clause GROUP BY is used here only as a precaution against duplicated requests
   $sql = "
     SELECT
       device
     FROM
-      {logger_devices}
+      {device_support_request}
     WHERE
-      support_allowed > 0 AND
       NOT EXISTS (
         SELECT
           1
         FROM
-          {device_support_slot}
+          {device_support_slot} s
         WHERE
-          device_support_slot.device = logger_devices.device
-      )";
+          s.device = device_support_request.device
+      )
+    GROUP BY
+      device
+    ORDER BY
+      requested";
   
   $result = db_query($sql);
   
@@ -2554,4 +2601,122 @@ function _logger_bind_remote_support_ports() {
       db_query($sql, $device->device, $slot->port);
     }
   }
+}
+
+function _logger_support_requests_page() {
+
+  $sql = "
+    SELECT
+      d.device,
+      u.name AS requester,
+      d.serial,
+      s.host,
+      s.port,
+      FROM_UNIXTIME(r.requested + u.timezone, '%s') AS requested
+    FROM
+      {users} u,
+      {device_support_slot} s,
+      {device_support_request} r,
+      {logger_devices} d
+    WHERE
+      d.uid = u.uid AND
+      s.device = d.device AND
+      d.device = r.device AND
+      r.requested > 0";
+  
+  $result = db_query($sql, LOGGER_TIMESTAMP_FORMAT_SQL);
+
+  $headers = array(
+    array('data' => t('Requested'),  'field' => 'requested'),
+    array('data' => t('Requester'),  'field' => 'requester'),
+    array('data' => t('Serial'),     'field' => 'serial'),
+    array('data' => t('Host'),       'field' => 'host'),
+    array('data' => t('Command'),    'field' => 'command'),
+    array('data' => t('Operations'), 'field' => 'operations')
+  );
+
+  $rows = array();
+  while ($device = db_fetch_object($result)) {
+
+    $operations =
+      l(t('Remove'), "device/support/remove/$device->device") . '<br>' . 
+      l(t('Postpone'), "device/support/postpone/$device->device");
+    
+    $rows[] = array(
+      'requested'  => $device->requested,
+      'requester'  => $device->requester,
+      'serial'     => $device->serial,
+      'host'       => $device->host,
+      'command'    => "ssh root@localhost -p $device->port",
+      'operations' => $operations
+    );
+  }
+  return theme('table', $headers, $rows);
+}
+
+function _logger_support_confirmation_page($device) {
+
+  global $user;
+  
+  return 
+    t('You are about to request remote support for your Flukso device. ' .
+      'If so, the device will open a reverse SSH connection with our ' .
+      'server that enables our technicians to log into it ' .
+      'in order to check and possibly fix configuration issues.') . '<br><br>' .
+          
+    t('This authorization lasts until either you suspend it on the ' .
+      'previous page or the period of 2 days is elapsed.') . '<br><br>' .
+
+    t('Do you allow our technicians to log into your Flukso device?') . '<br><br>' .
+
+    l(t('Yes'), "device/support/request/$device") . ' ' .
+    l(t('No'), "user/$user->uid/devices");
+}
+
+function _logger_request_support($device) {
+
+  global $user;
+  
+  $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
+  db_query($sql, $device);
+
+  $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
+  db_query($sql, $device);
+  
+  $sql = "INSERT INTO {device_support_request}(device, requested) VALUES('%s', %d)";
+  db_query($sql, $device, time());
+
+  drupal_goto("user/$user->uid/devices");
+}
+
+function _logger_suspend_support($device) {
+
+  global $user;  
+  
+  $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
+  db_query($sql, $device);
+
+  $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
+  db_query($sql, $device);
+  
+  drupal_goto("user/$user->uid/devices");
+}
+
+function _logger_postpone_support($device) {
+  
+  $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
+  db_query($sql, $device);
+  
+  drupal_goto('device/support/requests');
+}
+
+function _logger_remove_support($device) {
+  
+  $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
+  db_query($sql, $device);
+
+  $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
+  db_query($sql, $device);
+  
+  drupal_goto('device/support/requests');
 }

@@ -130,7 +130,7 @@ process_post(ReqData, #state{device = Device} = State) ->
         IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
 
         if
-          %New Device Message - 2nd invocation
+           %New Device Message - 2nd invocation
            IsKeyInformed == true ->
 
             %Key can be changed, but the encryption is based on the formed key
@@ -177,9 +177,23 @@ process_post(ReqData, #state{device = Device} = State) ->
     %Check if device has requested remote support, and if a port is available
     {_data, _Result} = mysql:execute(pool, support_slot, [Device]), 
 
+    %TODO: generate certificates dynamically
+    {ok, DeviceCert} = file:read_file("/home/flukso/www/api/flukso/var/cert/device_id_dss"),
+
     case mysql:get_result_rows(_Result) of
-      [[SupportUser, SupportPort]] ->
-        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}, {<<"supportport">>, SupportPort}, {<<"supportuser">>, SupportUser}];
+      [[User, Host, Port]] ->
+
+        %FIXME: Find a better sollution
+        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/cert/tech_id_dsa.pub"),
+
+        Support = {struct, [
+          {<<"user">>, User},
+          {<<"host">>, Host},
+          {<<"port">>, Port},
+          {<<"devicecert">>, base64:encode(DeviceCert)},
+          {<<"techkey">>, base64:encode(TechKey)}]},
+
+        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}, {<<"support">>, Support}];
 
       _ ->
         L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}]
