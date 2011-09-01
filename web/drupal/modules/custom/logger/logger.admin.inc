@@ -379,16 +379,11 @@ function theme_logger_userdevices($form) {
     return sprintf('%d days %d hours', $days, $hours);
   }
 
-  //FIXME: Some roles are in English, others in German
-  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'Techniker'));
-  $is_technician = !empty($user->roles[$rid]);
-  
   while ($device = db_fetch_object($result)) {
 
-    $support_link = $is_technician ? ('<br>' . (
-      $device->support_requested ?
-        l(t('Suspend Support'), "device/support/suspend/$device->device") :
-        l(t('Request Support'), "device/support/confirm/$device->device"))) : '';
+    $support_link = $device->support_requested ?
+      l(t('Suspend Support'), "device/support/suspend/$device->device") :
+      l(t('Request Support'), "device/support/confirm/$device->device");
     
     //FIXME: Use $device->device instead of $device->serial
     
@@ -398,7 +393,7 @@ function theme_logger_userdevices($form) {
     $row[] = unix_to_userlocaltime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
     $row[] = l(t('Remove'),  "device/deactivate/$device->device") . '<br>' .
-             l(t('History'), "event/log/list/$device->serial") .
+             l(t('History'), "event/log/list/$device->serial") . '<br>' .
              $support_link;
 
     $rows[] = $row;

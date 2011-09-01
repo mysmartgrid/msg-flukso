@@ -2537,10 +2537,14 @@ function logger_query_device_measurements($interval, $device, $offset) {
 
 function logger_cron() {
   
+  _logger_remove_expired_support_requests();
   _logger_bind_support_ports();
 }
 
-function _logger_bind_support_ports() {
+/**
+ * Removes expired device support requests.
+ */
+function _logger_remove_expired_support_requests() {
 
   //Remove old requests
   $timeout = time() - 2 * DAY;
@@ -2564,8 +2568,13 @@ function _logger_bind_support_ports() {
           r.device = device_support_slot.device
       )";  
   db_query($sql);
-  
-    
+}
+
+/**
+ * Binds device support requests with available ports for reverse SSH connections.
+ */
+function _logger_bind_support_ports() {
+
   //Find devices with pending support requests
   //The clause GROUP BY is used here only as a precaution against duplicated requests
   $sql = "
@@ -2603,6 +2612,11 @@ function _logger_bind_support_ports() {
   }
 }
 
+/**
+ * Builds the device support requests page.
+ * 
+ * @return the device support requests page.
+ */
 function _logger_support_requests_page() {
 
   $sql = "
@@ -2641,7 +2655,7 @@ function _logger_support_requests_page() {
     $operations =
       l(t('Remove'), "device/support/remove/$device->device") . '<br>' . 
       l(t('Postpone'), "device/support/postpone/$device->device");
-    
+
     $rows[] = array(
       'requested'  => $device->requested,
       'requester'  => $device->requester,
@@ -2654,6 +2668,12 @@ function _logger_support_requests_page() {
   return theme('table', $headers, $rows);
 }
 
+/**
+ * Builds the device support request confirmation page.
+ * 
+ * @param $device The device id.
+ * @return the device support requests page.
+ */
 function _logger_support_confirmation_page($device) {
 
   global $user;
@@ -2673,6 +2693,12 @@ function _logger_support_confirmation_page($device) {
     l(t('No'), "user/$user->uid/devices");
 }
 
+/**
+ * Creates a device support request.
+ * Any existing request of the same device is previously removed.
+ * 
+ * @param $device The device id.
+ */
 function _logger_request_support($device) {
 
   global $user;
@@ -2689,6 +2715,12 @@ function _logger_request_support($device) {
   drupal_goto("user/$user->uid/devices");
 }
 
+/**
+ * Removes the a device support request and its port association, and returns
+ * to the user devices page.
+ * 
+ * @param $device The device id.
+ */
 function _logger_suspend_support($device) {
 
   global $user;  
@@ -2698,10 +2730,16 @@ function _logger_suspend_support($device) {
 
   $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
   db_query($sql, $device);
-  
+
   drupal_goto("user/$user->uid/devices");
 }
 
+/**
+ * Removes the port association of a device support request and returns
+ * to the support requests page.
+ * 
+ * @param $device The device id.
+ */
 function _logger_postpone_support($device) {
   
   $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
@@ -2710,6 +2748,12 @@ function _logger_postpone_support($device) {
   drupal_goto('device/support/requests');
 }
 
+/**
+ * Removes the a device support request and its port association, and returns
+ * to the support requests page.
+ *
+ * @param $device The device id.
+ */
 function _logger_remove_support($device) {
   
   $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
