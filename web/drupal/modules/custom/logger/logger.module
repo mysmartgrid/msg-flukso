@@ -2539,6 +2539,8 @@ function logger_cron() {
   
   _logger_remove_expired_support_requests();
   _logger_bind_support_ports();
+  
+  _download_serial_numbers();
 }
 
 /**
@@ -2763,4 +2765,39 @@ function _logger_remove_support($device) {
   db_query($sql, $device);
   
   drupal_goto('device/support/requests');
+}
+
+/**
+ * This function updates temporary serial numbers generated upon device
+ * registration. The association between devices and their real SN is
+ * retrieved from a remote data file provided by flukso.net.
+ * 
+ * Data format assumed: <device_id> <serial_number> \n
+ * Possible token separators: space, \t, \n
+ */
+function _download_serial_numbers() {
+  
+  $url = variable_get('device_serial_number_update_url'); //Test: , 'file:///tmp/original.txt'
+  
+  $lines = file_get_contents($url);
+
+  if ($lines) {
+
+    $sql = "UPDATE {logger_devices} SET serial = %d WHERE device = '%s'";
+    
+    $device = strtok($lines, " \n\t");
+
+    while($device != FALSE) {
+
+      $serial = strtok(" \n\t");
+
+      //If device and serial number are valid
+      if (strlen($device) == 32 && $serial > 99999999 && $serial <= 9999999999) {
+        
+        db_query($sql, $serial, $device);
+      }
+
+      $device = strtok(" \n\t");
+    }
+  }
 }
