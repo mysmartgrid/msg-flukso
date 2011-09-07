@@ -177,25 +177,26 @@ process_post(ReqData, #state{device = Device} = State) ->
     %Check if device has requested remote support, and if a port is available
     {_data, _Result} = mysql:execute(pool, support_slot, [Device]), 
 
-    %TODO: generate certificates dynamically
-    {ok, DeviceCert} = file:read_file("/home/flukso/www/api/flukso/var/cert/device_id_dss"),
-
     case mysql:get_result_rows(_Result) of
       [[User, Host, Port]] ->
 
-        %FIXME: Find a better sollution
-        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/cert/tech_id_dsa.pub"),
+        %TODO: use a relative path
+        DeviceKeyPath = string:concat(string:concat("/home/flukso/www/api/flukso/var/cert/", Device), "_dss"),
+        {ok, DeviceKey} = file:read_file(DeviceKeyPath),
+
+        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/cert/tech_id_dss.pub"),
 
         Support = {struct, [
           {<<"user">>, User},
           {<<"host">>, Host},
           {<<"port">>, Port},
-          {<<"devicecert">>, base64:encode(DeviceCert)},
+          {<<"devicekey">>, base64:encode(DeviceKey)},
           {<<"techkey">>, base64:encode(TechKey)}]},
 
         L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}, {<<"support">>, Support}];
 
       _ ->
+
         L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}]
     end,
 

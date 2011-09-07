@@ -37,6 +37,7 @@ define('PRODUCTION_SENSOR_TYPE',  2);
 define('LOGGER_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
+define('LOGGER_DEVICE_CERT_PATH', '/home/flukso/www/api/flukso/var/cert');
 
 function logger_init() {
 
@@ -2540,6 +2541,8 @@ function logger_cron() {
   _logger_remove_expired_support_requests();
   _logger_bind_support_ports();
   
+  _logger_update_support_authorized_keys();
+  
   _download_serial_numbers();
 }
 
@@ -2554,13 +2557,13 @@ function _logger_remove_expired_support_requests() {
   
   db_query($sql, $timeout);
   
-  //Remove association between device and port
   $sql = "
-    UPDATE
+    SELECT
+      device
+    FROM
       {device_support_slot}
-    SET
-      device = NULL
     WHERE
+      device IS NOT NULL AND
       NOT EXISTS(
         SELECT
           1
@@ -2568,8 +2571,19 @@ function _logger_remove_expired_support_requests() {
           {device_support_request} r
         WHERE
           r.device = device_support_slot.device
-      )";  
-  db_query($sql);
+      )";
+
+  $result = db_query($sql);
+  
+  while ($device = db_fetch_object($result)) {
+    
+    //Remove association between device and port
+    $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
+
+    db_query($sql, $device->device);
+    
+    _logger_remove_support_key($device->device);
+  }
 }
 
 /**
@@ -2610,6 +2624,8 @@ function _logger_bind_support_ports() {
     if ($slot) {
       $sql = "UPDATE {device_support_slot} SET device = '%s' WHERE port = %d";
       db_query($sql, $device->device, $slot->port);
+      
+      _logger_create_support_key($device->device);
     }
   }
 }
@@ -2732,6 +2748,8 @@ function _logger_suspend_support($device) {
 
   $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
   db_query($sql, $device);
+  
+  _logger_remove_support_key($device);
 
   drupal_goto("user/$user->uid/devices");
 }
@@ -2746,6 +2764,8 @@ function _logger_postpone_support($device) {
   
   $sql = "UPDATE {device_support_slot} SET device = NULL WHERE device = '%s'";
   db_query($sql, $device);
+  
+  _logger_remove_support_key($device);
   
   drupal_goto('device/support/requests');
 }
@@ -2764,7 +2784,21 @@ function _logger_remove_support($device) {
   $sql = "DELETE FROM {device_support_request} WHERE device = '%s'";
   db_query($sql, $device);
   
+  _logger_remove_support_key($device);
+  
   drupal_goto('device/support/requests');
+}
+
+function _logger_create_support_key($device) {
+  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $device");
+}
+
+function _logger_remove_support_key($device) {
+  system("rm -f " . LOGGER_DEVICE_CERT_PATH . "/$device*");
+}
+
+function _logger_update_support_authorized_keys() {
+  system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh");
 }
 
 /**
