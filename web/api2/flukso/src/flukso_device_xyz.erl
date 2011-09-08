@@ -181,10 +181,10 @@ process_post(ReqData, #state{device = Device} = State) ->
       [[User, Host, Port]] ->
 
         %TODO: use a relative path
-        DeviceKeyPath = string:concat(string:concat("/home/flukso/www/api/flukso/var/cert/", Device), "_dss"),
+        DeviceKeyPath = string:concat(string:concat("/home/flukso/www/api/flukso/var/keys/", Device), "_id_dsa"),
         {ok, DeviceKey} = file:read_file(DeviceKeyPath),
 
-        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/cert/tech_id_dss.pub"),
+        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/keys/tech_id_dsa.pub"),
 
         Support = {struct, [
           {<<"user">>, User},

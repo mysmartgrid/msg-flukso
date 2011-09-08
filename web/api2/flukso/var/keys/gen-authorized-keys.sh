@@ -1,9 +1,9 @@
 #!/bin/bash
 
-cd /home/flukso/www/api/flukso/var/cert
+cd /home/flukso/www/api/flukso/var/keys
 
 # Remove old keys
-find . -name '*_dss*' -mtime +2 -exec rm {} \;
+find . -name '*_dsa*' -mtime +2 -exec rm {} \;
 
 # Create new Authorized Keys File
 files=('*.pub')
@@ -17,6 +17,6 @@ while [ $i -lt $len ]; do
   let i++
 done
 
-ssh -i ./tech_id_dss root@localhost '/bin/cp --preserve=mode /home/flukso/www/api/flukso/var/cert/authorized_keys.new /home/support/.ssh/authorized_keys'
+ssh -i ./tech_id_dsa root@localhost '/bin/cp --preserve=mode /home/flukso/www/api/flukso/var/keys/authorized_keys.new /home/support/.ssh/authorized_keys'
 
 rm -f authorized_keys.new
