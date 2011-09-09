@@ -6,7 +6,7 @@ cd /home/flukso/www/api/flukso/var/keys
 find . -name '*_dsa*' -mtime +2 -exec rm {} \;
 
 # Create new Authorized Keys File
-files=('*.pub')
+files=('*_dsa.pub')
 len=${#files[*]}
 i=0
 
