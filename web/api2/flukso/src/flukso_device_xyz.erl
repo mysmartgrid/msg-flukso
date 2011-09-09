@@ -180,14 +180,12 @@ process_post(ReqData, #state{device = Device} = State) ->
     case mysql:get_result_rows(_Result) of
       [[User, Host, Port]] ->
 
-        %TODO: use a relative path
-
-        DeviceKeyPath = string:concat(string:concat("/home/flukso/www/api/flukso/var/keys/", Device), "_id_dsa"),
+        DeviceKeyPath = string:concat(string:concat("./var/keys/", Device), "_device_id"),
         {ok, DeviceKey} = file:read_file(DeviceKeyPath),
 
-        {ok, TechKey} = file:read_file("/home/flukso/www/api/flukso/var/keys/tech_id_dsa.pub"),
+        {ok, TechKey} = file:read_file("./var/keys/tech_id.pub"),
 
-        {ok, HostKey} = file:read_file("/home/flukso/www/api/flukso/var/keys/host_id_rsa.pub"),
+        {ok, HostKey} = file:read_file("./var/keys/host_id.pub"),
 
         Support = {struct, [
           {<<"user">>, User},

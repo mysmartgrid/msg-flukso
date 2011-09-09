@@ -37,7 +37,7 @@ define('PRODUCTION_SENSOR_TYPE',  2);
 define('LOGGER_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
-define('LOGGER_DEVICE_CERT_PATH', '/home/flukso/www/api/flukso/var/keys');
+define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
 
 function logger_init() {
 
@@ -2789,14 +2789,30 @@ function _logger_remove_support($device) {
   drupal_goto('device/support/requests');
 }
 
+/**
+ * Generates a private DSS key to be used by a device to open reverse
+ * SSL connections that enable remote support.
+ * 
+ * @param $device The device id.
+ */
 function _logger_create_support_key($device) {
   system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $device");
 }
 
+/**
+ * Removes a private DSS key used by a device to open reverse SSL connections
+ * that enable remote support.
+ * 
+ * @param $device The device id.
+ */
 function _logger_remove_support_key($device) {
   system("rm -f " . LOGGER_DEVICE_CERT_PATH . "/$device*");
 }
 
+/**
+ * Creates the file authorized_keys that contains a list of device DSS keys
+ * authorized to open reverse SSL connections for remote support.
+ */
 function _logger_update_support_authorized_keys() {
   system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh");
 }
