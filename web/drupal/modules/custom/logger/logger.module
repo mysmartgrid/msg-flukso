@@ -2827,27 +2827,29 @@ function _logger_update_support_authorized_keys() {
  */
 function _download_serial_numbers() {
   
-  $url = variable_get('device_serial_number_update_url'); //Test: , 'file:///tmp/original.txt'
+  $url = variable_get('device_serial_number_update_url', FALSE); //Test: , 'file:///tmp/original.txt'
   
-  $lines = file_get_contents($url);
+  if ($url) {
+    $lines = file_get_contents($url);
 
-  if ($lines) {
+    if ($lines) {
 
-    $sql = "UPDATE {logger_devices} SET serial = %d WHERE device = '%s'";
-    
-    $device = strtok($lines, " \n\t");
+      $sql = "UPDATE {logger_devices} SET serial = %d WHERE device = '%s'";
 
-    while($device != FALSE) {
+      $device = strtok($lines, " \n\t");
 
-      $serial = strtok(" \n\t");
+      while($device != FALSE) {
 
-      //If device and serial number are valid
-      if (strlen($device) == 32 && $serial > 99999999 && $serial <= 9999999999) {
-        
-        db_query($sql, $serial, $device);
+        $serial = strtok(" \n\t");
+
+        //If device and serial number are valid
+        if (strlen($device) == 32 && $serial > 99999999 && $serial <= 9999999999) {
+
+          db_query($sql, $serial, $device);
+        }
+
+        $device = strtok(" \n\t");
       }
-
-      $device = strtok(" \n\t");
     }
   }
 }
