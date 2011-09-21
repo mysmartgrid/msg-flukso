@@ -42,7 +42,7 @@ function notification_install() {
 
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (4, 'Killowatt', 'kW', 0.001)";
   db_query($sql);
-
+  
   //event_unit
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (1, 1)";
   db_query($sql);
@@ -594,6 +594,27 @@ function notification_update_6035() {
       $items[] = update_sql("UPDATE {event_log} SET event_id = 104 WHERE event_id = 5");
       $items[] = update_sql("UPDATE {notification} SET event_id = 104 WHERE event_id = 5");
       $items[] = update_sql("UPDATE {event} SET id = 104 WHERE id = 5");
+     break;
+    case 'pgsql':
+      break;
+  }
+  return $items;
+}
+
+function notification_update_6037() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("INSERT INTO {event} (id, name) VALUES (5, 'Summary Report')");
+
+      $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (5, 'day', 'day', " . DAY . ")");
+      $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (6, 'week', 'week', " . WEEK . ")");
+      $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (7, 'month', 'month', " . MONTH . ")");
+
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 5)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 6)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 7)");
      break;
     case 'pgsql':
       break;

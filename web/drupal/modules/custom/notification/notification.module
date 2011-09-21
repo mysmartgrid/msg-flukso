@@ -23,6 +23,7 @@
 define('NO_COMMUNICATION_EVENT_ID',       1);
 define('COMMUNICATION_RESTORED_EVENT_ID', 3);
 define('PEAK_CONSUMPTION_EVENT_ID',       4);
+define('SUMMARY_REPORT_EVENT_ID',         5);
 
 //Message events
 define('MESSAGE_RECEIVED_EVENT_ID',       100);
@@ -31,8 +32,9 @@ define('MEASUREMENT_RECEIVED_EVENT_ID',   102);
 define('CORRUPTED_MESSAGE_EVENT_ID',      103);
 define('BROWNOUT_EVENT_ID',               104);
 
-define('HOUR_UNIT_ID', 2);
-define('WATT_UNIT_ID', 3);
+define('HOUR_UNIT_ID',  2);
+define('WATT_UNIT_ID',  3);
+define('MONTH_UNIT_ID', 7);
 
 define('NOTIFICATION_PATH', 'sites/all/modules/notification');
 define('NOTIFICATION_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
@@ -478,6 +480,9 @@ function notification_registration_form() {
   $form['events'] += _notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
 
+  $form['events'] += _notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, MONTH_UNIT_ID,
+    'Here you can set the period of time in which you want to receive summary reports.');
+  
   $event_id = CORRUPTED_MESSAGE_EVENT_ID;
   $form['events']["event_id$event_id"] = array(
     '#title'         => _notification_get_event_name($event_id),
@@ -486,7 +491,7 @@ function notification_registration_form() {
     '#prefix'        => '<tr><td colspan="3"/>',
     '#suffix'        => '</tr>'
   );
-
+  
   $form['min_interval'] = array(
     '#type'          => 'select',
     '#title'         => t('Amount of Notifications'),
@@ -612,6 +617,11 @@ function notification_edition_form(&$form_state, $notification) {
       case PEAK_CONSUMPTION_EVENT_ID:
         $form['limit_up']['#title'] = t('Maximum Consumption');
         $form['limit_up']['#description'] = t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
+        break;
+
+      case SUMMARY_REPORT_EVENT_ID:
+        $form['limit_up']['#title'] = t('Frequency');
+        $form['limit_up']['#description'] = t('Here you can set the period of time in which you want to receive summary reports.');
         break;
     }
   }
@@ -741,6 +751,7 @@ function notification_registration_form_submit($form, &$form_state) {
   _notification_register_event($_REQUEST, CORRUPTED_MESSAGE_EVENT_ID);
   _notification_register_event($_REQUEST, COMMUNICATION_RESTORED_EVENT_ID);
   _notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
+  _notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -1003,6 +1014,7 @@ function notification_cron() {
   _notification_send_corrupted_message_emails($now);
   _notification_send_communication_restored_emails($now);
   _notification_send_peak_consumption_emails($now);
+  _notification_send_summary_report_emails($now);
 
   _notification_eventlog_clear_old($now);
 }
@@ -1100,8 +1112,7 @@ function _notification_send_communication_restored_emails($now) {
       n.last_sent,
       un.name AS unit_name,
       un.factor,
-      u.timezone,
-      un.factor
+      u.timezone
     FROM
       {unit} un,
       {users} u,
@@ -1211,7 +1222,7 @@ function _notification_send_corrupted_message_emails($now) {
 }
 
 /**
- * Sends em-mails notifying users of the occurrence of Peak Consumption events.
+ * Sends e-mails notifying users of the occurrence of Peak Consumption events.
  *
  * @param $now The event checkup time.
  */
@@ -1266,6 +1277,96 @@ function _notification_send_peak_consumption_emails($now) {
 
     "The following list shows the measurements above the limit.<br><br> " .
     "!violations <br><br>");
+
+  _notification_send_emails($message, $notifiables);
+}
+
+/**
+ * Sends summary report e-mails.
+ *
+ * @param $now The event checkup time.
+ */
+function _notification_send_summary_report_emails($now) {
+
+  require_once(LOGGER_PATH . "/logger.rrd.inc");
+  
+  $sql = "
+    SELECT SQL_NO_CACHE
+      d.uid,
+      n.device,
+      n.event_id,
+      n.limit_up,
+      n.unit_id,
+      d.serial,
+      m.meter,
+      m.function AS sensor_name,
+      n.emails,
+      %d AS event_time,
+      n.base_time AS since_time,
+      n.last_sent,
+      un.name AS unit_name,
+      u.timezone
+    FROM
+      {unit} un,
+      {users} u,
+      {logger_devices} d,
+      {logger_meters} m,
+      {notification} n
+    WHERE
+      n.event_id = %d AND
+      n.unit_id = un.id AND
+      n.device = d.device AND
+      d.uid = u.uid AND
+      %d > (n.base_time + n.limit_up * un.factor) AND
+      %d > (n.last_sent + n.min_interval) AND
+      m.device = d.device AND
+      m.type = %d";
+  
+  $args = array($now, SUMMARY_REPORT_EVENT_ID, $now, $now, CONSUMPTION_SENSOR_TYPE);
+
+  $notifiables = array();
+  $price1 = 0.18; //FIXME Use user defined price
+  
+  foreach (_notification_query_notifiables($sql, $args) as $notifiable) {
+
+    $sensor = new stdClass();
+    $sensor->meter = $notifiable['meter'];
+
+    $notifiable['since_time'] -= $notifiable['since_time'] % DAY + $notifiable['timezone'];
+    $notifiable['event_time'] -= $notifiable['event_time'] % DAY + $notifiable['timezone'] + 1; //Until the last second
+    $period = array(
+      'start' => $notifiable['since_time'],
+      'end'   => $notifiable['event_time']);
+
+    $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $notifiable['timezone'], $period, DAY), 2, '.', '');
+    $cost = number_format($energy * $price1, 2, '.', ''); 
+    
+    $uid = $notifiable['uid'];
+    $notifiables[$uid] = array_key_exists($uid, $notifiables) ? $notifiables[$uid] : $notifiable;
+    $notifiables[$uid]['consumption_lines'] .= '<tr>' .
+      '<td>' . $notifiable['serial'] . '</td>' .
+      '<td>' . $notifiable['sensor_name'] . '</td>' .
+      '<td>' . $energy . '</td>' .
+      '<td>' . $cost . '</td>' .
+    '</tr>';
+    
+    $notifiables[$uid]['total_cost'] += $cost;
+    $notifiables[$uid]['total_energy'] += $energy;
+    
+    _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $notifiable['event_time']);
+  }
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = _notification_compose_email(
+    "This is a summary report of your energy consumption " .
+    "between %since_time and %event_time.<br><br> " .
+
+    "<b>Consumption</b><br><br> " .
+    "<table width='600px'>
+       <tr><td width='25%'>Device</td> <td>Sensor</td> <td width='25%'>Energy (kWh)</td><td width='25%'>Cost (Euro)</td></tr>
+       !consumption_lines
+       <tr><td></td><td>Total</td><td>!total_energy</td><td>!total_cost</td></tr>
+     </table><br>");
 
   _notification_send_emails($message, $notifiables);
 }
