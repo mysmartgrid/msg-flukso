@@ -23,7 +23,8 @@
 define('NO_COMMUNICATION_EVENT_ID',       1);
 define('COMMUNICATION_RESTORED_EVENT_ID', 3);
 define('PEAK_CONSUMPTION_EVENT_ID',       4);
-define('SUMMARY_REPORT_EVENT_ID',         5);
+
+define('SUMMARY_REPORT_EVENT_ID',         10);
 
 //Message events
 define('MESSAGE_RECEIVED_EVENT_ID',       100);
@@ -1014,6 +1015,7 @@ function notification_cron() {
   _notification_send_corrupted_message_emails($now);
   _notification_send_communication_restored_emails($now);
   _notification_send_peak_consumption_emails($now);
+
   _notification_send_summary_report_emails($now);
 
   _notification_eventlog_clear_old($now);
@@ -1289,7 +1291,7 @@ function _notification_send_peak_consumption_emails($now) {
 function _notification_send_summary_report_emails($now) {
 
   require_once(LOGGER_PATH . "/logger.rrd.inc");
-  
+
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
@@ -1323,36 +1325,36 @@ function _notification_send_summary_report_emails($now) {
   $notifiables = array();
   foreach (_notification_query_notifiables($sql, $args) as $notifiable) {
 
-    $lines        = array(CONSUMPTION_SENSOR_TYPE => '', PRODUCTION_SENSOR_TYPE  => '');
+    $lines        = array();
     $total_cost   = array(CONSUMPTION_SENSOR_TYPE =>  0, PRODUCTION_SENSOR_TYPE  => 0);
     $total_energy = array(CONSUMPTION_SENSOR_TYPE =>  0, PRODUCTION_SENSOR_TYPE  => 0);
     $period = array(
       'start' => $notifiable['since_time'],
       'end'   => $notifiable['event_time']
     );
-    
+
     $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = '%s' AND type > 0";
     $results = db_query($sql, $notifiable['device']);
-    
+
     while($sensor = db_fetch_object($results)) {
-      
+
       $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $notifiable['timezone'], $period, DAY), 2, '.', '');
       $cost = number_format($energy * $prices[$sensor->type], 2, '.', '');
 
       $lines[$sensor->type] = '<tr>' .
-        '<td>' . $notifiable['serial'] . '</td>' .
-        '<td>' . $sensor->function . '</td>' .
-        '<td>' . $energy . '</td>' .
-        '<td>' . $cost . '</td></tr>';
+        '<td class="odd">' . $notifiable['serial'] . '</td>' .
+        '<td class="odd">' . $sensor->function . '</td>' .
+        '<td class="odd">' . $energy . '</td>' .
+        '<td class="odd">' . $cost . '</td></tr>';
 
       $total_cost[$sensor->type] += $cost;
       $total_energy[$sensor->type] += $energy;
     }
-    
-    $notifiable['tables'] = 
+
+    $notifiable['tables'] =
       _notification_compose_summary_report_table(CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
       _notification_compose_summary_report_table(PRODUCTION_SENSOR_TYPE,  $lines, $total_cost, $total_energy);
-    
+
     $notifiables[] = $notifiable;
     _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $now);
   }
@@ -1368,22 +1370,33 @@ function _notification_send_summary_report_emails($now) {
 
 function _notification_compose_summary_report_table($type, $lines, $total_cost, $total_energy) {
   
-  if (!$lines[$type]) {
+  if (!isset($lines[$type])) {
     return '';
   }
   
   //FIXME: make this dynamic
   $title = $type == CONSUMPTION_SENSOR_TYPE ? 'Energy Consumption' : 'Energy Production';
 
-  return t($title) . "<br><br> " .
-    "<table width='600px'>
-       <tr><td width='25%'>" . t('Device') . "</td> <td>" . t('Sensor') . "</td> <td width='25%'>" . t('Energy') . " (kWh)</td><td width='25%'>" . t('Cost') . " (Euro)</td></tr>" .
-       $lines[$type] . "<tr>
-         <td></td>
-         <td>" . t('Total')           . "</td>
-         <td>" . $total_energy[$type] . "</td>
-         <td>" . $total_cost[$type]   . "</td></tr>
-     </table><br>";
+  return "<label><b>" . t($title) . "</b></label><br><br> 
+    
+    <table class='resizable sticky-enabled'>
+      <thead><tr>
+        <th>" . t('Device') . "</th> 
+        <th>" . t('Sensor') . "</th> 
+        <th>" . t('Energy') . " (kWh)</th>
+        <th>" . t('Cost')   . " (Euro)</th>
+      </tr></thead>
+      
+      <tbody>" .
+         $lines[$type] . "
+         <tr>
+           <td></td>
+           <td><b>" . t('Total')           . "</b></td>
+           <td><b>" . $total_energy[$type] . "</b></td>
+           <td><b>" . $total_cost[$type]   . "</b></td>
+         </tr>
+       </tbody>
+     </table><br><br>";
 }
 
 /**
@@ -1459,10 +1472,17 @@ function _notification_compose_email($description, $complement = NULL) {
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
 
+  //TODO: create email.css
+  
   $complement = $complement == NULL? "" : "<p>$complement</p> ";
 
   return
-    "<p>Dear user " .
+    "<link type='text/css' rel='stylesheet' media='all' " .
+    "href='!base_url/sites/all/themes/mysmartgrid/style/fraunhofer.css?Z'/>" .
+
+    "<table style='width: 700px; background-color: white; margin: 25px;'><tr><td style='padding-bottom: 20px; padding-top: 20px;'>" .
+
+    "<p><b>Dear user</b> " .
     "<br> &nbsp;<br></p> " .
 
     "<p>$description</p> " .
@@ -1472,9 +1492,12 @@ function _notification_compose_email($description, $complement = NULL) {
     "<p>If you want to stop receiving this notification, please remove it from your " .
     "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
 
-    "<p>&nbsp;<br> " .
-    "Best Regards,</p> " .
-    "<p>mySmartGrid Team</p>";
+    "<p>&nbsp;<br>&nbsp;<br> " .
+    "Best Regards,<br>&nbsp;<br> " .
+    "mySmartGrid Team</p>" .
+
+    "<p>&nbsp;<br>&nbsp;<br> !logo</p>" .
+    "</td></tr></table></p>";
 }
 
 /**
@@ -1520,6 +1543,7 @@ function _notification_send_emails($message, $notifiables) {
   global $base_url;
   $variables = array();
   $variables["!base_url"] = $base_url;
+  $variables['!logo'] = "<img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/>";
 
   foreach ($notifiables as $notifiable) {
 
@@ -1533,9 +1557,7 @@ function _notification_send_emails($message, $notifiables) {
     }
 
     $subject = t('Event Notification');
-
-    $logo = "<p><img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/></p>";
-    $body = t($message, $variables) . $logo;
+    $body = t($message, $variables);
 
     $emails = $notifiable['emails'];
     foreach (_notification_tokenize_emails($emails) as $email) {

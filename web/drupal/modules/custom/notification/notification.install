@@ -606,15 +606,15 @@ function notification_update_6037() {
   switch ($GLOBALS['db_type']) {
     case 'mysql':
     case 'mysqli':
-      $items[] = update_sql("INSERT INTO {event} (id, name) VALUES (5, 'Summary Report')");
+      $items[] = update_sql("INSERT INTO {event} (id, name) VALUES (10, 'Summary Report')");
 
       $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (5, 'day', 'day', " . DAY . ")");
       $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (6, 'week', 'week', " . WEEK . ")");
       $items[] = update_sql("INSERT INTO {unit} (id, name, symbol, factor) VALUES (7, 'month', 'month', " . MONTH . ")");
 
-      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 5)");
-      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 6)");
-      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (5, 7)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 5)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 6)");
+      $items[] = update_sql("INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 7)");
      break;
     case 'pgsql':
       break;
