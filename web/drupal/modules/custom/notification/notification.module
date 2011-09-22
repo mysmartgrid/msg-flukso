@@ -1292,25 +1292,20 @@ function _notification_send_summary_report_emails($now) {
   
   $sql = "
     SELECT SQL_NO_CACHE
-      d.uid,
       n.device,
-      n.event_id,
+      n.event_id,      
       n.limit_up,
       n.unit_id,
       d.serial,
-      m.meter,
-      m.function AS sensor_name,
       n.emails,
-      %d AS event_time,
-      n.base_time AS since_time,
-      n.last_sent,
+      (%d - (%d % %d) - u.timezone - 1) AS event_time,
+      (n.base_time - (n.base_time % %d) - u.timezone) AS since_time,
       un.name AS unit_name,
       u.timezone
     FROM
       {unit} un,
       {users} u,
       {logger_devices} d,
-      {logger_meters} m,
       {notification} n
     WHERE
       n.event_id = %d AND
@@ -1318,57 +1313,77 @@ function _notification_send_summary_report_emails($now) {
       n.device = d.device AND
       d.uid = u.uid AND
       %d > (n.base_time + n.limit_up * un.factor) AND
-      %d > (n.last_sent + n.min_interval) AND
-      m.device = d.device AND
-      m.type = %d";
-  
-  $args = array($now, SUMMARY_REPORT_EVENT_ID, $now, $now, CONSUMPTION_SENSOR_TYPE);
+      %d > (n.last_sent + n.min_interval)";
+
+  $args = array($now, $now, DAY, DAY, SUMMARY_REPORT_EVENT_ID, $now, $now);
+
+  //FIXME Use user defined prices
+  $prices = array(CONSUMPTION_SENSOR_TYPE => 0.18, PRODUCTION_SENSOR_TYPE  => 0.18);
 
   $notifiables = array();
-  $price1 = 0.18; //FIXME Use user defined price
-  
   foreach (_notification_query_notifiables($sql, $args) as $notifiable) {
 
-    $sensor = new stdClass();
-    $sensor->meter = $notifiable['meter'];
-
-    $notifiable['since_time'] -= $notifiable['since_time'] % DAY + $notifiable['timezone'];
-    $notifiable['event_time'] -= $notifiable['event_time'] % DAY + $notifiable['timezone'] + 1; //Until the last second
+    $lines        = array(CONSUMPTION_SENSOR_TYPE => '', PRODUCTION_SENSOR_TYPE  => '');
+    $total_cost   = array(CONSUMPTION_SENSOR_TYPE =>  0, PRODUCTION_SENSOR_TYPE  => 0);
+    $total_energy = array(CONSUMPTION_SENSOR_TYPE =>  0, PRODUCTION_SENSOR_TYPE  => 0);
     $period = array(
       'start' => $notifiable['since_time'],
-      'end'   => $notifiable['event_time']);
+      'end'   => $notifiable['event_time']
+    );
+    
+    $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = '%s' AND type > 0";
+    $results = db_query($sql, $notifiable['device']);
+    
+    while($sensor = db_fetch_object($results)) {
+      
+      $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $notifiable['timezone'], $period, DAY), 2, '.', '');
+      $cost = number_format($energy * $prices[$sensor->type], 2, '.', '');
 
-    $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $notifiable['timezone'], $period, DAY), 2, '.', '');
-    $cost = number_format($energy * $price1, 2, '.', ''); 
+      $lines[$sensor->type] = '<tr>' .
+        '<td>' . $notifiable['serial'] . '</td>' .
+        '<td>' . $sensor->function . '</td>' .
+        '<td>' . $energy . '</td>' .
+        '<td>' . $cost . '</td></tr>';
+
+      $total_cost[$sensor->type] += $cost;
+      $total_energy[$sensor->type] += $energy;
+    }
     
-    $uid = $notifiable['uid'];
-    $notifiables[$uid] = array_key_exists($uid, $notifiables) ? $notifiables[$uid] : $notifiable;
-    $notifiables[$uid]['consumption_lines'] .= '<tr>' .
-      '<td>' . $notifiable['serial'] . '</td>' .
-      '<td>' . $notifiable['sensor_name'] . '</td>' .
-      '<td>' . $energy . '</td>' .
-      '<td>' . $cost . '</td>' .
-    '</tr>';
+    $notifiable['tables'] = 
+      _notification_compose_summary_report_table(CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
+      _notification_compose_summary_report_table(PRODUCTION_SENSOR_TYPE,  $lines, $total_cost, $total_energy);
     
-    $notifiables[$uid]['total_cost'] += $cost;
-    $notifiables[$uid]['total_energy'] += $energy;
-    
-    _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $notifiable['event_time']);
+    $notifiables[] = $notifiable;
+    _notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $now);
   }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = _notification_compose_email(
-    "This is a summary report of your energy consumption " .
-    "between %since_time and %event_time.<br><br> " .
-
-    "<b>Consumption</b><br><br> " .
-    "<table width='600px'>
-       <tr><td width='25%'>Device</td> <td>Sensor</td> <td width='25%'>Energy (kWh)</td><td width='25%'>Cost (Euro)</td></tr>
-       !consumption_lines
-       <tr><td></td><td>Total</td><td>!total_energy</td><td>!total_cost</td></tr>
-     </table><br>");
+    "This is a summary report of your energy consumption and production " .
+    "for the period between %since_time and %event_time.<br><br> " .
+    '!tables');
 
   _notification_send_emails($message, $notifiables);
+}
+
+function _notification_compose_summary_report_table($type, $lines, $total_cost, $total_energy) {
+  
+  if (!$lines[$type]) {
+    return '';
+  }
+  
+  //FIXME: make this dynamic
+  $title = $type == CONSUMPTION_SENSOR_TYPE ? 'Energy Consumption' : 'Energy Production';
+
+  return t($title) . "<br><br> " .
+    "<table width='600px'>
+       <tr><td width='25%'>" . t('Device') . "</td> <td>" . t('Sensor') . "</td> <td width='25%'>" . t('Energy') . " (kWh)</td><td width='25%'>" . t('Cost') . " (Euro)</td></tr>" .
+       $lines[$type] . "<tr>
+         <td></td>
+         <td>" . t('Total')           . "</td>
+         <td>" . $total_energy[$type] . "</td>
+         <td>" . $total_cost[$type]   . "</td></tr>
+     </table><br>";
 }
 
 /**
