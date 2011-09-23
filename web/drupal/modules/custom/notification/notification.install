@@ -27,6 +27,9 @@ function notification_install() {
   $sql = "INSERT INTO {event} (id, name) VALUES (7, 'Measurement Received')";
   db_query($sql);
 
+  $sql = "INSERT INTO {event} (id, name) VALUES (10, 'Summary Report')";
+  db_query($sql);
+  
   //unit
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (0, 'none', 'none', 1)";
   db_query($sql);
@@ -43,6 +46,15 @@ function notification_install() {
   $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (4, 'Killowatt', 'kW', 0.001)";
   db_query($sql);
   
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (5, 'day', 'day', " . DAY . ")";
+  db_query($sql);
+  
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (6, 'week', 'week', " . WEEK . ")";
+  db_query($sql);
+  
+  $sql = "INSERT INTO {unit} (id, name, symbol, factor) VALUES (7, 'month', 'month', " . MONTH . ")";
+  db_query($sql);
+
   //event_unit
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (1, 1)";
   db_query($sql);
@@ -69,6 +81,15 @@ function notification_install() {
   db_query($sql);
 
   $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (7, 0)";
+  db_query($sql);
+  
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 5)";
+  db_query($sql);
+  
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 6)";
+  db_query($sql);
+  
+  $sql = "INSERT INTO {event_unit} (event_id, unit_id) VALUES (10, 7)";
   db_query($sql);
 }
 
