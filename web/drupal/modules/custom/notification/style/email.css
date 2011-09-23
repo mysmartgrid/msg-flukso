@@ -1,0 +1,88 @@
+
+body {
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 0px 0px;
+}
+
+p {
+  font: 13px arial,helvetica,clean,sans-serif;
+  color: #555;
+}
+
+p a {
+  font: 13px arial,helvetica,clean,sans-serif;
+  color: #555;
+  font-weight: normal;
+  text-decoration: underline;
+}
+
+ul {
+  list-style-type: square;
+  color: #555;
+}
+
+li p {
+  margin-top: 1em;
+  margin-bottom: 1em;  
+}
+
+p.logo {
+  text-align: right;
+}
+
+table.outer {
+  height: 100%;
+  width: 100%;
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 0px 0px;
+  background-color: #E9EDEB;
+  border-spacing: 0px;
+  border: 0px;
+}
+
+table.outer td {
+  vertical-align: top;
+}
+
+table.email-box {
+  width: 700px;
+  background-color: white;
+  margin: 25px;
+}
+
+table.email-box td {
+  padding: 20px 10px 20px 10px;
+}
+
+table.summary {
+  width: 100%;
+  margin: 0px 0px 0px 0px;
+  border: 0px;
+  border-spacing: 0px;
+}
+
+table.summary td {
+  padding: 2px 2px 2px 2px;
+  font: 13px arial,helvetica,clean,sans-serif;
+  color: #555;
+	border-right: 1px solid #E9EDEB;
+  border-bottom: 1px solid #E9EDEB;
+  text-align: right;
+}
+
+table.summary th {
+  padding: 2px 2px 2px 2px;
+  font: 13px arial,helvetica,clean,sans-serif;
+	font-weight: bold;
+  border-right: 1px solid #E9EDEB;
+  text-align: right;
+  background-color: #a5d2d9;
+}
+
+table.summary tfoot td {
+  font-weight: bold;
+}
+
+p.highlight, label.highlight {
+  font-weight: bold;
+}

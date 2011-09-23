@@ -1342,10 +1342,10 @@ function _notification_send_summary_report_emails($now) {
       $cost = number_format($energy * $prices[$sensor->type], 2, '.', '');
 
       $lines[$sensor->type] = '<tr>' .
-        '<td class="odd">' . $notifiable['serial'] . '</td>' .
-        '<td class="odd">' . $sensor->function . '</td>' .
-        '<td class="odd">' . $energy . '</td>' .
-        '<td class="odd">' . $cost . '</td></tr>';
+        '<td>' . $notifiable['serial'] . '</td>' .
+        '<td>' . $sensor->function . '</td>' .
+        '<td>' . $energy . '</td>' .
+        '<td>' . $cost . '</td></tr>';
 
       $total_cost[$sensor->type] += $cost;
       $total_energy[$sensor->type] += $energy;
@@ -1377,26 +1377,29 @@ function _notification_compose_summary_report_table($type, $lines, $total_cost, 
   //FIXME: make this dynamic
   $title = $type == CONSUMPTION_SENSOR_TYPE ? 'Energy Consumption' : 'Energy Production';
 
-  return "<label><b>" . t($title) . "</b></label><br><br> 
+  return "<label class='highlight'>" . t($title) . "</label><br><br> 
     
-    <table class='resizable sticky-enabled'>
-      <thead><tr>
-        <th>" . t('Device') . "</th> 
-        <th>" . t('Sensor') . "</th> 
-        <th>" . t('Energy') . " (kWh)</th>
-        <th>" . t('Cost')   . " (Euro)</th>
-      </tr></thead>
-      
+    <table class='summary'>
+      <thead>
+        <tr>
+          <th>" . t('Device') . "</th> 
+          <th>" . t('Sensor') . "</th> 
+          <th>" . t('Energy') . " (kWh)</th>
+          <th>" . t('Cost')   . " (Euro)</th>
+        </tr>
+      </thead>
       <tbody>" .
-         $lines[$type] . "
-         <tr>
-           <td></td>
-           <td><b>" . t('Total')           . "</b></td>
-           <td><b>" . $total_energy[$type] . "</b></td>
-           <td><b>" . $total_cost[$type]   . "</b></td>
-         </tr>
-       </tbody>
-     </table><br><br>";
+        $lines[$type] . "
+      </tbody>
+      <tfoot>
+        <tr>
+          <td></td>
+          <td>" . t('Total')           . "</td>
+          <td>" . $total_energy[$type] . "</td>
+          <td>" . $total_cost[$type]   . "</td>
+        </tr>
+      </tfoot>
+    </table><br><br>";
 }
 
 /**
@@ -1470,34 +1473,35 @@ function _notification_send_system_error_email($context, $error_code, $url) {
  */
 function _notification_compose_email($description, $complement = NULL) {
 
+  $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
+  
   //ATTENTION: Any change in the following message requires its translations to be redefined.
 
-  //TODO: create email.css
-  
   $complement = $complement == NULL? "" : "<p>$complement</p> ";
 
   return
-    "<link type='text/css' rel='stylesheet' media='all' " .
-    "href='!base_url/sites/all/themes/mysmartgrid/style/fraunhofer.css?Z'/>" .
+      "<body>
+      <style type='text/css'>$css</style>" .
 
-    "<table style='width: 700px; background-color: white; margin: 25px;'><tr><td style='padding-bottom: 20px; padding-top: 20px;'>" .
+      "<table class='outer'><tr><td>" .
+        "<table class='email-box'><tr><td>" .
+        "<p class='logo'>!logo</p>" .
 
-    "<p><b>Dear user</b> " .
-    "<br> &nbsp;<br></p> " .
+        "<p class='highlight'>Dear user<br><br></p> " .
 
-    "<p>$description</p> " .
+        "<p>$description</p> " .
 
-    $complement .
+        $complement .
 
-    "<p>If you want to stop receiving this notification, please remove it from your " .
-    "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
+        "<p>If you want to stop receiving this notification, please remove it from your " .
+        "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
 
-    "<p>&nbsp;<br>&nbsp;<br> " .
-    "Best Regards,<br>&nbsp;<br> " .
-    "mySmartGrid Team</p>" .
+        "<p><br><br>" .
+        "Best Regards,<br><br> " .
+        "mySmartGrid Team</p>" .
 
-    "<p>&nbsp;<br>&nbsp;<br> !logo</p>" .
-    "</td></tr></table></p>";
+        "</td></tr></table></p>" . 
+      "</td></tr></table></body>";
 }
 
 /**
@@ -1509,26 +1513,26 @@ function _notification_compose_email($description, $complement = NULL) {
  */
 function _notification_compose_error_email($description, $recommendation = NULL) {
 
-  $recommendation = $recommendation == NULL? "": "<li>$recommendation<br><br>";
+  $recommendation = $recommendation == NULL? "": "<li><p>$recommendation</p>";
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   return _notification_compose_email($description,
 
-    "In order to identify and solve the problem, please take the following actions. " .
+    "<p>In order to identify and solve the problem, please take the following actions.<br></p> " .
     "<ul> " .
       $recommendation .
-      "<li>Click " .
+      "<li><p>Click " .
       "<a href='!base_url/event/log/list/!serial '>here</a> " .
-      "to check the latest events of your Flukso device.<br><br> " .
+      "to check the latest events of your Flukso device.</p> " .
 
-      "<li>Check if the device complies with the " .
+      "<li><p>Check if the device complies with the " .
       "<a href='!base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>. " .
-      "It might be improperly installed or misconfigured.<br><br> " .
+      "It might be improperly installed or misconfigured.</p> " .
 
-      "<li>Visit our <a href='!base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
-      "and read the answers to questions made by other users in similar situations.<br><br> " .
+      "<li><p>Visit our <a href='!base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
+      "and read the answers to questions made by other users in similar situations.</p> " .
 
-      "<li>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de. " .
+      "<li><p>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de.</p> " .
     "</ul>");
 }
 
