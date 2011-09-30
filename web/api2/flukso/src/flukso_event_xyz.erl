@@ -53,13 +53,16 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(event, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    {Event, ValidEvent} = check_event(wrq:path_info(event, ReqData)),
 
-    State = #state{device = Device, digest = Digest},
+    {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+    {Device, ValidDevice} = check_device(proplists:get_value(<<"device">>, JsonData)),
 
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
+    State = #state{event = Event, device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidEvent, ValidDevice, ValidDigest} of
+        {true, true, true, true} -> false;
         _ -> true
      end,
     ReqData, State}.
@@ -71,34 +74,32 @@ is_authorized(ReqData, State) ->
     end.
 
 
-is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+is_auth_POST(ReqData, #state{event = Event, device = Device, digest = ClientDigest} = State) ->
+
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    case mysql:get_result_rows(Result) of
+    {case mysql:get_result_rows(Result) of
         [[Key]] ->
-            check = check_digest(Key, ReqData, ClientDigest);
-        _NoKey ->
-            check = "No proper provisioning for this device"
+            check_digest(Key, ReqData, ClientDigest);
+        _ ->
+            "No proper provisioning for this device"
     end,
-
-    {check, ReqData, State}.
+    ReqData, State}.
 
 
 %
 % Event message example:
 %
-% JSON: {"id":104}
-% Mochijson2: {struct,[{<<"id">>,   104}]}
+% JSON: {"device":"01234567890123456789012345678901"}
+% Mochijson2: {struct,[{<<"device">>,   "01234567890123456789012345678901"}]}
 %
-process_post(ReqData, #state{device = Device} = State) ->
+process_post(ReqData, #state{event = Event, device = Device} = State) ->
     {data, Result} = mysql:execute(pool, device_props, [Device]),
     [[Key, Upgrade, Resets]] = mysql:get_result_rows(Result),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
     Timestamp = unix_time(),
-
-    Event = proplists:get_value(<<"id">>, JsonData),
 
     mysql:execute(pool, event_insert, [Device, Event, Timestamp]),
 

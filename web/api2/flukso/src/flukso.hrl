@@ -48,6 +48,7 @@
          rrdFactor,
          token,
          device,
+         event,
          digest,
          jsonpCallback}).
 
@@ -67,6 +68,23 @@ check_version(undefined, Version) ->
     check_version(Version);
 check_version(_, _) ->
     {false, false}.
+
+
+check_event(Event) ->
+    case Event of
+        BROWNOUT_EVENT_ID -> {Event, true};
+        _ -> {false, false}
+    end.
+
+check_event(undefined, undefined) ->
+    {false, false};
+check_event(Event, undefined) ->
+    check_event(Event);
+check_event(undefined, Event) ->
+    check_event(Event);
+check_event(_, _) ->
+    {false, false}.
+
 
 check_sensor(Sensor) ->
     check_hex(Sensor, 32).
