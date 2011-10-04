@@ -82,14 +82,12 @@ function _logger_measurement_add($logs) {
   foreach ($logs as $meter => $measurements) {
 
     //load the normalisation factor, relative to 1pulse = 1Wh
-    $sql = "SELECT uid, factor FROM {logger_meters} WHERE meter = '%s'";
+    $sql = "SELECT uid, device, factor FROM {logger_meters} WHERE meter = '%s'";
     $meterdata = db_fetch_object(db_query($sql, $meter));
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
 
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
-
-      $corrupted_time = 0;
 
       foreach ($measurements as $timestamp => $value) {
 
@@ -98,11 +96,9 @@ function _logger_measurement_add($logs) {
 
         } else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
-          $corrupted_time = time();
+          notification_log_corrupted_message($meterdata->device);
         }
       }
-
-      _logger_update_meter_integrity($meter, $corrupted_time);
 
       $return = logger_rrd_update($meter, $values);
 
@@ -121,15 +117,3 @@ function _logger_measurement_add($logs) {
   return $info;
 }
 
-/**
- * Updates the meter integrity flag.
- *
- * @param $meter            The meter being updated.
- * @param $corruption_time  The time when a corrupted heartbeat was received.
- *                          The value 0 means that the heartbeat was sound.
- */
-function _logger_update_meter_integrity($meter, $corruption_time) {
-
-  $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
-  db_query($sql, $corruption_time, $meter);
-}

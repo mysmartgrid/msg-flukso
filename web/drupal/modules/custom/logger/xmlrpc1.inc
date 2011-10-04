@@ -153,7 +153,6 @@ function _logger_measurement_add($auth, $logs) {
       if ($meterdata->device == $auth['device']) { // extra security check
 
         ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
-        $corrupted_time = 0;
 
         foreach ($measurements as $timestamp => $value) {
 
@@ -162,11 +161,9 @@ function _logger_measurement_add($auth, $logs) {
 
           } else {
             watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
-            $corrupted_time = time();
+            notification_log_corrupted_message($meterdata->device);
           }
         }
-
-        _logger_update_meter_integrity($auth['device'], $meter, $corrupted_time);
 
         $return = logger_rrd_update($meter, $values);
 
@@ -204,26 +201,6 @@ function _logger_brownout($auth, $message) {
 
     return xmlrpc_error(-31000, t('Authentication failed.'));
   }
-}
-
-/**
- * Updates the meter integrity flag.
- *
- * @param $device           The Flukso device to which the meter belongs.
- * @param $meter            The meter being updated.
- * @param $corruption_time  The time when a corrupted heartbeat was received.
- *                          The value 0 means that the heartbeat was sound.
- */
-function _logger_update_meter_integrity($device, $meter, $corruption_time) {
-
-  require_once(XMLRPC_PATH . "/notification/notification.module");
-
-  if ($corruption_time > 0) {
-    notification_log_corrupted_message($device);
-  }
-
-  $sql = "UPDATE {logger_meters} SET corrupted = %d WHERE meter = '%s'";
-  db_query($sql, $corruption_time, $meter);
 }
 
 function _logger_authenticate_hmac_sha1($auth, $message) {
