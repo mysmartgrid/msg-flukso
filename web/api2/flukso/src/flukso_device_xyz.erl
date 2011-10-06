@@ -174,22 +174,34 @@ process_post(ReqData, #state{device = Device} = State) ->
             [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
     end,
 
+    Support = compose_support_tag(Device),
+    Answer = lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support),
+
+    digest_response(Key, Answer, ReqData, State).
+
+
+compose_support_tag(Device) ->
+
     %Check if device has requested remote support, and if a port is available
     {_data, _Result} = mysql:execute(pool, support_slot, [Device]), 
 
     case mysql:get_result_rows(_Result) of
+
       [[User, Host, Port]] ->
 
+        KeysPath = "./var/keys/",
+
         %Device private key
-        DeviceKeyPath = string:concat(string:concat("./var/keys/", Device), "_device_id"),
+        DeviceKeyPath = string:concat(string:concat(KeysPath, Device), "_device_id"),
         {ok, DeviceKey} = file:read_file(DeviceKeyPath),
 
         %Technician public key
-        TechKeyPath = string:concat(string:concat("./var/keys/", Device), "_tech_id.pub"),
+        TechKeyPath = string:concat(string:concat(KeysPath, Device), "_tech_id.pub"),
         {ok, TechKey} = file:read_file(TechKeyPath),
 
         %Support host public key
-        {ok, HostKey} = file:read_file("./var/keys/host_id.pub"),
+        HostKeyPath = string:concat(string:concat(KeysPath, erlang:binary_to_list(Host)), "_host_id.pub"),
+        {ok, HostKey} = file:read_file(HostKeyPath),
 
         Support = {struct, [
           {<<"user">>, User},
@@ -199,12 +211,7 @@ process_post(ReqData, #state{device = Device} = State) ->
           {<<"techkey">>, TechKey},
           {<<"hostkey">>, HostKey}]},
 
-        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}, {<<"support">>, Support}];
+        [{<<"support">>, Support}];
 
-      _ ->
-
-        L = [{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}]
-    end,
-
-    digest_response(Key, L, ReqData, State).
-
+      _ -> []
+    end.
