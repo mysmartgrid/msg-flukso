@@ -1,11 +1,11 @@
 #!/bin/bash
 
-if [ $# -ne 0 ]; then
-  echo "Usage: gen-authorized-keys"
+if [ $# -ne 2 ]; then
+  echo "Usage: gen-authorized-keys <host> <username>"
   exit 1
 fi
 
-cd ~flukso/www/api/flukso/var/keys
+cd ~flukso/www/api/flukso/var/keys/$1
 
 # Remove old keys
 find . -name '*device*' -mtime +2 -exec rm {} \;
@@ -22,7 +22,7 @@ while [ $i -lt $len ]; do
   let i++
 done
 
-#FIXME: in the future, this file will be copied to the support machine
-ssh -i ./tech_id root@localhost '/bin/cp --preserve=mode ~flukso/www/api/flukso/var/keys/authorized_keys.new ~support/.ssh/authorized_keys'
+#FIXME: Use JobQueue, and do not use "root"
+scp -p -i ./flukso_id ./authorized_keys.new root@$1:/home/$2/.ssh/authorized_keys
 
 rm -f authorized_keys.new

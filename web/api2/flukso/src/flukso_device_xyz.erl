@@ -189,7 +189,7 @@ compose_support_tag(Device) ->
 
       [[User, Host, Port]] ->
 
-        KeysPath = "./var/keys/",
+        KeysPath = string:concat(string:concat("./var/keys/", erlang:binary_to_list(Host)), "/"),
 
         %Device private key
         DeviceKeyPath = string:concat(string:concat(KeysPath, Device), "_device_id"),
@@ -200,7 +200,7 @@ compose_support_tag(Device) ->
         {ok, TechKey} = file:read_file(TechKeyPath),
 
         %Support host public key
-        HostKeyPath = string:concat(string:concat(KeysPath, erlang:binary_to_list(Host)), "_host_id.pub"),
+        HostKeyPath = string:concat(KeysPath, "host_id.pub"),
         {ok, HostKey} = file:read_file(HostKeyPath),
 
         Support = {struct, [
