@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# -ne 0 ]; then
+  echo "Usage: gen-authorized-keys"
+  exit 1
+fi
+
 cd ~flukso/www/api/flukso/var/keys
 
 # Remove old keys
@@ -17,7 +22,7 @@ while [ $i -lt $len ]; do
   let i++
 done
 
-#TODO: in the future, this file will be copied to the support machine
+#FIXME: in the future, this file will be copied to the support machine
 ssh -i ./tech_id root@localhost '/bin/cp --preserve=mode ~flukso/www/api/flukso/var/keys/authorized_keys.new ~support/.ssh/authorized_keys'
 
 rm -f authorized_keys.new

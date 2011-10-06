@@ -180,11 +180,15 @@ process_post(ReqData, #state{device = Device} = State) ->
     case mysql:get_result_rows(_Result) of
       [[User, Host, Port]] ->
 
+        %Device private key
         DeviceKeyPath = string:concat(string:concat("./var/keys/", Device), "_device_id"),
         {ok, DeviceKey} = file:read_file(DeviceKeyPath),
 
-        {ok, TechKey} = file:read_file("./var/keys/tech_id.pub"),
+        %Technician public key
+        TechKeyPath = string:concat(string:concat("./var/keys/", Device), "_tech_id.pub"),
+        {ok, TechKey} = file:read_file(TechKeyPath),
 
+        %Support host public key
         {ok, HostKey} = file:read_file("./var/keys/host_id.pub"),
 
         Support = {struct, [
