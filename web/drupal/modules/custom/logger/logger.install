@@ -559,3 +559,16 @@ function logger_update_6033() {
   }
   return $items;
 }
+
+function logger_update_6040() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql("ALTER TABLE {logger_meters} DROP corrupted");
+      break;
+    case 'pgsql':
+      break;
+  }
+  return $items; 
+}

@@ -1028,6 +1028,7 @@ function notification_cron() {
  */
 function _notification_send_no_communication_emails($now) {
 
+  $e_time = $now - 15*MINUTE;
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
@@ -1065,13 +1066,15 @@ function _notification_send_no_communication_emails($now) {
           n.unit_id = un.id AND
           n.device = d.device AND
           d.device = m.device AND
-          d.uid = u.uid
+          d.uid = u.uid AND
+          NOT EXISTS
+          (
+            SELECT 1 FROM {event_log} e WHERE d.device = e.device AND e.event_id = " . CORRUPTED_MESSAGE_EVENT_ID . " AND e.time > $e_time
+          )
         GROUP BY
           n.device,
           n.limit_up,
           n.unit_id
-        HAVING
-          SUM(m.corrupted) = 0
       ) n
     WHERE
       %d > (n.access + n.limit_up * n.factor) AND
@@ -1616,7 +1619,6 @@ function _notification_send_email($email, $subject, $body) {
 }
 
 function notification_mail($key, &$message, $params) {
-
   $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];

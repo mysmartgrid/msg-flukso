@@ -29,6 +29,9 @@ define('OFFLINE_STATE_ID',            6);
 define('NO_MEASUREMENT_STATE_ID',     7);
 define('NO_HEARTBEAT_STATE_ID',       8);
 
+//FIXME get value from notification.module
+define('CORRUPTED_MESSAGE_EVENT_ID',103);
+
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
 
@@ -316,35 +319,35 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
       break;
 
     case CORRUPTED_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted > 0";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NOT NULL";
       $latest_field = "m.corrupted";
       break;
 
     case OFFLINE_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout AND m.access < $offline_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access < $offline_timeout";
       break;
     
     case NO_HEARTBEAT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access < $offline_timeout AND m.access >= $offline_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access >= $offline_timeout";
       $latest_field = "m.access";
       break;
 
     case NO_COMMUNICATION_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $offline_timeout AND d.access < $communication_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $offline_timeout AND d.access < $communication_timeout";
       break;
 
     case NO_MEASUREMENT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout";
       $latest_field = "m.access";
       break;
 
     case WORKING_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted = 0 AND d.access >= $communication_timeout AND m.access >= $offline_timeout";
+      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access >= $offline_timeout";
       break;
 
     default:
       $latest_field = "
-        IF(m.corrupted > 0, m.corrupted,
+        IF(m.corrupted IS NOT NULL, m.corrupted,
           IF(d.access = 0, d.created, 
             IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access, d.access)
           )
@@ -353,7 +356,7 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
       $state_id_field = "
         IF(d.uid = 0,
           IF(d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
-          IF(m.corrupted > 0, " . CORRUPTED_STATE_ID . " ,
+          IF(m.corrupted IS NOT NULL, " . CORRUPTED_STATE_ID . " ,
             IF(d.access < $offline_timeout,  
               IF(m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
               IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ", 
@@ -372,6 +375,7 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
     $filters .= " AND d.uid <> $visitor->uid ";
   }
 
+  $min_time = $now - 15*MINUTE;
   return "
     SELECT SQL_NO_CACHE
       d.serial,
@@ -387,9 +391,20 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
         SELECT
           m.device,
           MAX(m.access) AS access,
-          MAX(m.corrupted) AS corrupted
+          MAX(e.corrupted) AS corrupted
         FROM
-          {logger_meters} m
+          {logger_meters} m LEFT JOIN
+          (
+            SELECT
+            l.device,
+            MAX(l.time) AS corrupted
+            FROM
+              {event_log} l
+            WHERE
+              l.event_id = " . CORRUPTED_MESSAGE_EVENT_ID . " AND l.time > $min_time 
+            GROUP BY
+              l.device
+          ) e ON m.device = e.device
         GROUP BY
           m.device
       ) m
