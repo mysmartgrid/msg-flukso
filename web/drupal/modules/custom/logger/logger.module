@@ -2539,9 +2539,9 @@ function logger_query_device_measurements($interval, $device, $offset) {
 function logger_cron() {
   
   _logger_remove_expired_support_requests();
-  _logger_bind_support_ports();
+  $bindings = _logger_bind_support_ports();
   
-  _logger_update_support_authorized_keys();
+  _logger_update_support_authorized_keys($bindings);
   
   _download_serial_numbers();
 }
@@ -2587,7 +2587,9 @@ function _logger_remove_expired_support_requests() {
 }
 
 /**
- * Binds device support requests with available ports for reverse SSH connections.
+ * Binds device support requests with available hosts/ports for reverse SSH connections.
+ * 
+ * @return the array of bindings.
  */
 function _logger_bind_support_ports() {
 
@@ -2614,20 +2616,24 @@ function _logger_bind_support_ports() {
   
   $result = db_query($sql);
   
+  $bindings = array();
   while ($device = db_fetch_object($result)) {
 
-    //Find available ports
-    $sql = "SELECT MIN(port) AS port FROM {device_support_slot} WHERE device IS NULL";
+    //Find an available port
+    $sql = "SELECT host, port, username FROM {device_support_slot} WHERE device IS NULL LIMIT 1";
 
     $slot = db_fetch_object(db_query($sql));
 
     if ($slot) {
-      $sql = "UPDATE {device_support_slot} SET device = '%s' WHERE port = %d";
-      db_query($sql, $device->device, $slot->port);
+      $sql = "UPDATE {device_support_slot} SET device = '%s' WHERE host = '%s' AND port = %d";
+      db_query($sql, $device->device, $slot->host, $slot->port);
+
+      $bindings[$slot->host] = $slot->username;
       
-      _logger_create_support_key($device->device);
+      _logger_create_support_key($slot->host, $device->device);
     }
   }
+  return $bindings;
 }
 
 /**
@@ -2668,18 +2674,20 @@ function _logger_support_requests_page() {
   );
 
   $rows = array();
-  while ($device = db_fetch_object($result)) {
+  while ($req = db_fetch_object($result)) {
 
     $operations =
-      l(t('Remove'), "device/support/remove/$device->device") . '<br>' . 
-      l(t('Postpone'), "device/support/postpone/$device->device");
+      l(t('Remove'), "device/support/remove/$req->device") . '<br>' . 
+      l(t('Postpone'), "device/support/postpone/$req->device");
+
+    $command = "ssh root@localhost -p $req->port -i $req->device" . "_tech_id";
 
     $rows[] = array(
-      'requested'  => $device->requested,
-      'requester'  => $device->requester,
-      'serial'     => $device->serial,
-      'host'       => $device->host,
-      'command'    => "ssh root@localhost -p $device->port",
+      'requested'  => $req->requested,
+      'requester'  => $req->requester,
+      'serial'     => $req->serial,
+      'host'       => $req->host,
+      'command'    => "<input type='text' value='$command' style='width: 130px;'>",
       'operations' => $operations
     );
   }
@@ -2793,10 +2801,11 @@ function _logger_remove_support($device) {
  * Generates a private DSS key to be used by a device to open reverse
  * SSL connections that enable remote support.
  * 
+ * @param $host   The host to be connected by the device.
  * @param $device The device id.
  */
-function _logger_create_support_key($device) {
-  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $device");
+function _logger_create_support_key($host, $device) {
+  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device");
 }
 
 /**
@@ -2806,15 +2815,20 @@ function _logger_create_support_key($device) {
  * @param $device The device id.
  */
 function _logger_remove_support_key($device) {
-  system("rm -f " . LOGGER_DEVICE_CERT_PATH . "/$device*");
+  system("rm -f " . LOGGER_DEVICE_CERT_PATH . "/*/$device*");
 }
 
 /**
  * Creates the file authorized_keys that contains a list of device DSS keys
  * authorized to open reverse SSL connections for remote support.
+ * @param $bindings  An array of usernames, indexed by hosts, that represent the
+ *                   hosts that need to update the authorized_keys files.
  */
-function _logger_update_support_authorized_keys() {
-  system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh");
+function _logger_update_support_authorized_keys($bindings) {
+  
+  foreach($bindings as $host => $username) {
+    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $host $username");
+  }
 }
 
 /**

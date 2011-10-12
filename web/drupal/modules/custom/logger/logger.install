@@ -234,6 +234,37 @@ function logger_schema() {
       'device'
     ),
   );
+
+  $schema['device_support_slot'] = array(
+    'description' => t('Stores slots for device remote support via reverse SSH connections.'),
+    'fields' => array(
+      'host' => array(
+        'type' => 'varchar',
+        'length' => '40',
+        'not null' => TRUE,
+      ),
+      'port' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'username' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array(
+      'host', 'port'
+    ),
+  );
   
   return $schema;
 }
@@ -541,7 +572,7 @@ function logger_update_6033() {
     case 'mysql':
     case 'mysqli':
       $items[] = update_sql("CREATE TABLE {device_support_request}(device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, requested int unsigned NOT NULL, PRIMARY KEY (device))");
-      $items[] = update_sql("CREATE TABLE {device_support_slot}(host VARCHAR(40) CHARACTER SET utf8 COLLATE utf8_general_ci, port int unsigned NOT NULL, username VARCHAR(15) CHARACTER SET utf8 COLLATE utf8_general_ci, device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, PRIMARY KEY (port))");
+      $items[] = update_sql("CREATE TABLE {device_support_slot}(host VARCHAR(40) CHARACTER SET utf8 COLLATE utf8_general_ci, port int unsigned NOT NULL, username VARCHAR(15) CHARACTER SET utf8 COLLATE utf8_general_ci, device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, PRIMARY KEY (host, port))");
 
       $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19990, 'support')");
       $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('dev1.mysmartgrid.de', 19991, 'support')");
