@@ -1615,11 +1615,51 @@ function _notification_query_peak_consumption_violations($notifiable) {
 function _notification_send_email($email, $subject, $body) {
 
   global $language;
-  drupal_mail('notification', 'notice', $email, $language, array('subject' => $subject, 'body' => $body));
+
+  $body = "--nextPart_0000_001\n" .
+    "Content-Type: text/plain; charset=\"UTF-8\"\n" .
+    "Content-Transfer-Encoding: 8bit\n" .
+    "\n" .
+    _notification_html2txt($body) .
+    "\n" .
+    "--nextPart_0000_001\n" .
+    "Content-Type: text/html; charset=\"UTF-8\"\n" .
+    "Content-Transfer-Encoding: quoted-printable\n" .
+    "\n" .
+    $body;
+
+
+  $header = "Content-Type: multipart/alternative; boundary=\"nextPart_0000_001\"";
+  $emailstring = "Header::" . $header . "|From::mySmartGrid <noreply@mysmartgrid.de>|To::" . $email . "|Subject::" . $subject . "|Body::" . $body;
+  $emailstring = base64_encode($emailstring);
+  // Needs the qworker running, add control mechanism in order to check and restart if not running
+  jobqueue_produce("mail", $emailstring);
 }
 
-function notification_mail($key, &$message, $params) {
-  $message['headers']['Content-Type'] = "text/html; charset=UTF-8";
-  $message['subject'] = $params['subject'];
-  $message['body'][] = $params['body'];
+/**
+ * Converts HTML into plain text
+ *
+ * @param $html   HTML text
+ * @return plain text
+ */
+function _notification_html2txt($html) {
+  $text = "";
+  //extract relevant part from email
+  preg_match("/.*?<\/p>(.*?)<\/table>/m", $html, $text);
+
+  //find link tags ..
+  $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
+          //.. and replace them with the actual link
+          create_function(
+                  '$treffer',
+                  'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $ret);
+                   return "\'" . $ret[1] . "\'";'),
+          $text[1]);
+  //replace <br> and </p> with linebreaks
+  $text = preg_replace("/<br.*?>/", "\n", $text);
+  $text = preg_replace("/<\/p>/", "\n", $text);
+  //remove all other tags
+  $text = preg_replace("/<.*?>/", "", $text);
+
+  return $text;
 }

@@ -1,0 +1,10 @@
+<?php
+
+function jobqueue_install() {
+}
+
+function jobqueue_uninstall() {
+}
+
+#function jobqueue_schema() {
+#}

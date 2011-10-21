@@ -1,0 +1,4 @@
+; $Id$
+name = Jobqueue Interface
+description = Interface with the jobqueue system
+core = 6.x
