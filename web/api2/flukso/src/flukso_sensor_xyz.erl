@@ -1,23 +1,20 @@
-%%
-%% The /sensor/xyz resource implementation.
-%%
-%% Copyright (c) 2008-2010 flukso.net
-%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
-%%
-%% This program is free software; you can redistribute it and/or
-%% modify it under the terms of the GNU General Public License
-%% as published by the Free Software Foundation; either version 2
-%% of the License, or (at your option) any later version.
-%%
-%% This program is distributed in the hope that it will be useful,
-%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%% GNU General Public License for more details.
-%%
-%% You should have received a copy of the GNU General Public License
-%% along with this program; if not, write to the Free Software
-%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-%%
+%% @author Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>
+%% @copyright (C) 2009-2011 Bart Van Der Meerssche
+%%%
+%%% This program is free software: you can redistribute it and/or modify
+%%% it under the terms of the GNU General Public License as published by
+%%% the Free Software Foundation, either version 3 of the License, or
+%%% (at your option) any later version.
+%%%
+%%% This program is distributed in the hope that it will be useful,
+%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%%% GNU General Public License for more details.
+%%%
+%%% You should have received a copy of the GNU General Public License
+%%% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%%%
+%% @doc Flukso API: /sensor/xyz resource specification 
 
 -module(flukso_sensor_xyz).
 -author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
@@ -149,17 +146,19 @@ content_types_provided(ReqData, State) ->
 
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
+
     case wrq:get_qs_value("interval", ReqData) of
         _Interval -> Path = ?BASE_PATH
     end,
 
-    %%debugging: io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
+    %debugging
+    %io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
 
     case rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
         {ok, Response} ->
             Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-            Datapoints = [[list_to_integer(X), round(list_to_float(Y) * RrdFactor)] || [X, Y] <- Filtered, string:len(Y) /= 3],
-            Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 3],
+            Datapoints = [[list_to_integer(X), round(list_to_float(Y) * RrdFactor)] || [X, Y] <- Filtered, string:len(Y) /= 4],
+            Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
             Final = mochijson2:encode(lists:merge(Datapoints, Nans)),
             {case JsonpCallback of
                 undefined -> Final;
@@ -195,12 +194,8 @@ process_post(ReqData, State) ->
     end.
 
 
-%
-% Config message example:
-%
-% JSON: {"config":{"device":"12345678901234567890123456789012","type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
-% Mochijson2: {struct,[{<<"config">>, {struct,[{<<"device">>,<<"12345678901234567890123456789012">>}, {<<"type">>,<<"electricity">>}, ... ]} }]}
-%
+% JSON: {"config":{"type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
+% Mochijson2: {struct,[{<<"config">>, {struct,[{<<"type">>,<<"electricity">>}, {<<"enable">>,0}, ... ]} }]}
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     io:fwrite("process_config sensor\n"),
 
@@ -231,8 +226,6 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
         Function = proplists:get_value(<<"function">>, Params),
         Device = proplists:get_value(<<"device">>, Params),
 
-        rrd_create(?BASE_PATH, Sensor),
-
         case rrd_create(?BASE_PATH, Sensor) of
           {ok, _RrdResponse} ->
 
@@ -254,12 +247,8 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-%
-% Measurement message example:
-%
 % JSON: {"measurements":[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
-%
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
     io:fwrite("process_measurements sensor\n"),
 
@@ -284,7 +273,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
                     RrdResponse = "ok",
                     [LastTimestamp, LastValue] = lists:last(Measurements),
 
-                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, 0, RrdSensor]),
+                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
                     mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
     
                 %RRD files were not successfully updated
@@ -295,7 +284,6 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
           %Measurements are corrupted
           _ ->
             mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
-            mysql:execute(pool, sensor_corrupt, [1, RrdSensor]),
             RrdResponse = "Invalid Measurements"
         end;
 
@@ -305,7 +293,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     end,
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(RrdResponse)}]}),
-    {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
 parse_measurements(Measurements) ->
