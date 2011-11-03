@@ -33,7 +33,7 @@ define('NO_HEARTBEAT_STATE_ID',       8);
 define('CORRUPTED_MESSAGE_EVENT_ID',103);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
-define('DEPLOYMENT_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . '/' . DEPLOYMENT_REL_PATH);
+define('DEPLOYMENT_ABS_PATH', '/var/www/flukso/' . DEPLOYMENT_REL_PATH);
 
 
 function deployment_perm() {
@@ -592,7 +592,7 @@ function deployment_printcode_form_submit($form, &$form_state) {
 }
 
 function deployment_cron() {
-  exec('rm ' . DEPLOYMENT_ABS_PATH . '/pdf/*');
+  exec('rm -f ' . DEPLOYMENT_ABS_PATH . '/pdf/*');
   _deployment_create_summary();
 }
 

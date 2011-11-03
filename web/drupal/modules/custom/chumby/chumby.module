@@ -236,5 +236,5 @@ function chumby_image_form_submit($form, &$form_state) {
 }
 
 function chumby_cron() {
-  exec('rm ' . CHUMBY_PATH . '/files/*.zip');
+  exec('rm -f ' . CHUMBY_PATH . '/files/*.zip');
 }

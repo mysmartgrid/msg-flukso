@@ -21,8 +21,7 @@
  */
 
 define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
-define('MSGDUMP_DB_ABS_PATH', $_SERVER['DOCUMENT_ROOT'] . base_path() . MSGDUMP_DB_REL_PATH);
-
+define('MSGDUMP_DB_ABS_PATH', '/var/www/flukso' . MSGDUMP_DB_REL_PATH);
 
 function msgdump_perm() {
   return array('data dump');
@@ -278,7 +277,7 @@ function msgdump_cron() {
 
     if ($data->stop + 2629743 < $now) {
       //delete dumps older then 3 months
-      exec("rm " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".*");
+      exec("rm -f " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".*");
 
       $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
       db_query($sql, $data->file);

@@ -225,6 +225,8 @@ function logger_userdevices_form_submit($form, &$form_state) {
 
     if ($function) {
       db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
+    } else {
+      db_query("UPDATE {logger_meters} SET function = '%s' WHERE meter = '%s'", $function, $sensor->meter);
     }
   }
 
