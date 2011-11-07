@@ -20,8 +20,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
-define('MSGDUMP_DB_ABS_PATH', '/var/www/flukso' . MSGDUMP_DB_REL_PATH);
+define('MSGDUMP_DB_PATH', drupal_get_path('module', 'msgdump') . '/db');
 
 function msgdump_perm() {
   return array('data dump');
@@ -138,7 +137,7 @@ function msgdump_setup_form_submit($form, &$form_state) {
     $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
     db_query($sql, $file);
 
-    exec('rm ' . MSGDUMP_DB_ABS_PATH . '/' . $file . '.*');
+    exec('rm -f ' . MSGDUMP_DB_PATH . '/' . $file . '.*');
   }
 }
 
@@ -194,18 +193,18 @@ function _msgdump_register($file, $serial, $type) {
   while ($value = db_fetch_object($values)) {
 
     $config = 
-      'DB_FILE: "'       . MSGDUMP_DB_ABS_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
+      'DB_FILE: "'       . MSGDUMP_DB_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
       'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
       'ACCESS_TOKEN: "'  . $value->token . '"' . PHP_EOL .
       'SENSOR_ID: "'     . $value->meter . '"' . PHP_EOL .
       'BASE_URL: "'      . $base_url . '/sensor' . '"' . PHP_EOL;
   }
 
-  $out = fopen(MSGDUMP_DB_ABS_PATH . "/$file.flukso4rrc", 'w');
+  $out = fopen(MSGDUMP_DB_PATH . "/$file.flukso4rrc", 'w');
   fwrite($out, $config);
   fclose($out);
 
-  exec("flukso_create_db -c " . MSGDUMP_DB_ABS_PATH . "/$file.flukso4rrc");
+  exec("flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
 function _msgdump_limit_year($form_element, $form_values) {
@@ -248,7 +247,7 @@ function theme_msgdump_setup($form) {
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
     $row[] = $device->type;
-    $row[] = l(t('Download'), MSGDUMP_DB_REL_PATH . '/' . $device->file . '.sqlite');
+    $row[] = l(t('Download'), MSGDUMP_DB_PATH . '/' . $device->file . '.sqlite');
 
     $rows[] = $row;
   }
@@ -277,13 +276,13 @@ function msgdump_cron() {
 
     if ($data->stop + 2629743 < $now) {
       //delete dumps older then 3 months
-      exec("rm -f " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".*");
+      exec("rm -f " . MSGDUMP_DB_PATH . "/" . $data->file . ".*");
 
       $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
       db_query($sql, $data->file);
 
     } elseif ($data->stop > $now) {
-      $res = exec("flukso_archive_watts -c " . MSGDUMP_DB_ABS_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
+      $res = exec("flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
       watchdog("cron", "[msgdump_cron] " . $data->file . ": " . $res);
 
     } else {
