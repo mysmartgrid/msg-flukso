@@ -21,6 +21,8 @@
  */
 
 define('MSGDUMP_DB_PATH', drupal_get_path('module', 'msgdump') . '/db');
+define('MSGDUMP_BIN', drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
+
 
 function msgdump_perm() {
   return array('data dump');
@@ -204,7 +206,7 @@ function _msgdump_register($file, $serial, $type) {
   fwrite($out, $config);
   fclose($out);
 
-  exec("flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
+  exec(MSGDUMP_BIN . "/flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
 function _msgdump_limit_year($form_element, $form_values) {
@@ -266,6 +268,7 @@ function msgdump_cron() {
 
   $now = new DateTime('now');
   $now = $now->format('U');
+  $time_limit = 3 * 30 * 24 * 60 * 60; //3 months
 
   //get requested dumps from database
   $sql = "SELECT stop, file FROM {msgdump} WHERE start <= %d";
@@ -274,7 +277,8 @@ function msgdump_cron() {
 
   while($data = db_fetch_object($result)) {
 
-    if ($data->stop + 2629743 < $now) {
+    if ($now - $data->stop > $time_limit) {
+
       //delete dumps older then 3 months
       exec("rm -f " . MSGDUMP_DB_PATH . "/" . $data->file . ".*");
 
@@ -282,7 +286,9 @@ function msgdump_cron() {
       db_query($sql, $data->file);
 
     } elseif ($data->stop > $now) {
-      $res = exec("flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc"); //otherwise execute dump
+
+      //otherwise execute dump
+      $res = exec(MSGDUMP_BIN . "/flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc");
       watchdog("cron", "[msgdump_cron] " . $data->file . ": " . $res);
 
     } else {
