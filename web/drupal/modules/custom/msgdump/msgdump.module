@@ -73,7 +73,7 @@ function msgdump_setup_form(&$form_state) {
   $form['flukso'] = array(
     '#type'         => 'select',
     '#options'      => $fluksos,
-    '#title'        => t('Flukso'),
+    '#title'        => t('Device'),
     '#description'  => t('Flukso to use for recording'),
   );
 
@@ -105,7 +105,7 @@ function msgdump_setup_form(&$form_state) {
     '#value' => t("Submit"),
   );
 
-  $form['#theme'] = 'magdump_setup';
+  $form['#theme'] = 'msgdump_setup';
 
   return $form;
 }
@@ -235,7 +235,18 @@ function theme_msgdump_setup($form) {
   global $user;
   $rows = array();
 
-  $sql = "SELECT * FROM {msgdump} WHERE uid = %d";
+  //TODO: rename field meter
+  $sql = "
+    SELECT
+      d.meter AS serial,
+      d.start,
+      d.stop,
+      d.file
+    FROM
+      {msgdump} d
+    WHERE
+      d.uid = %d";
+
   $result = db_query($sql, $user->uid);
 
   while ($device = db_fetch_object($result)) {
@@ -248,7 +259,6 @@ function theme_msgdump_setup($form) {
     $row[] = $device->serial;
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
-    $row[] = $device->type;
     $row[] = l(t('Download'), MSGDUMP_DB_PATH . '/' . $device->file . '.sqlite');
 
     $rows[] = $row;
@@ -260,7 +270,7 @@ function theme_msgdump_setup($form) {
 
 function theme_msgdump_setup_list($items) {
 
-  $headers = array('',t('Flukso'), t('Startdate'), t('Stopdate'), t('File'));
+  $headers = array('', t('Device'), t('Startdate'), t('Stopdate'), t('File'));
   return theme('table', $headers, $items);
 }
 
