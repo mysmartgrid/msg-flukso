@@ -14,7 +14,7 @@ start_link() ->
   supervisor:start_link(mysql_sup, []).
 
 init([]) -> 
-  MysqlConfig = [pool, "localhost", "flukso", "xpsCcVsbecJMVCYF", "flukso"],
+  MysqlConfig = [pool, "localhost", "flukso", "53n50r!m5gD82", "flukso"],
   Mysql = {mysql,
              {mysql, start_link, MysqlConfig},
              permanent, 3000, worker, [mysql]},
