@@ -88,14 +88,14 @@ function deployment_menu() {
 
   $items['deployment/list/file'] = array(
     'title'            => 'Downloads a deployment list file',
-    'page callback'    => '_deployment_download_list_file',
+    'page callback'    => 'deployment_download_list_file',
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
 
   $items['deployment/chart/file'] = array(
     'title'            => 'Downloads a deployment chart file',
-    'page callback'    => '_depolyment_download_chart_file',
+    'page callback'    => 'depolyment_download_chart_file',
     'access callback'  => TRUE,
     'type'             => MENU_CALLBACK
   );
@@ -124,7 +124,7 @@ function deployment_list_page($id = NULL) {
   );
 
   $limit = 15;
-  $data = _deployment_get_devices($state_id, $headers, $limit);
+  $data = deployment_get_devices($state_id, $headers, $limit);
   foreach ($data as &$device) {
     $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
     $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
@@ -198,7 +198,7 @@ function deployment_overview_page() {
 /**
  * Downloads a deployment summary chart file.
  */
-function _depolyment_download_chart_file() {
+function depolyment_download_chart_file() {
 
   global $user;
   $sql = "SELECT * FROM {deployment_summary} ORDER BY time, state_id";
@@ -225,7 +225,7 @@ function _depolyment_download_chart_file() {
 /**
  * Downloads a deployment list file.
  */
-function _deployment_download_list_file() {
+function deployment_download_list_file() {
 
   $header = t('Device') . ',' . t('User') . ',' . t('E-mail') . ',' . t('Latest') . ',' . t('State');
   
@@ -243,7 +243,7 @@ function _deployment_download_list_file() {
  *
  * @return an array of device states.
  */
-function _deployment_get_all_states() {
+function deployment_get_all_states() {
 
   $states = array();
   $sql = "SELECT SQL_CACHE id, name FROM {deployment_state}";
@@ -264,12 +264,12 @@ function _deployment_get_all_states() {
  * @param $serial    The serial number for selecting a single device (optionally).
  * @return the array of user devices.
  */
-function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15, $serial = NULL) {
+function deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15, $serial = NULL) {
 
   global $user;
   $now = time();
 
-  $sql = _deployment_create_devices_query($now, $state_id, $serial);
+  $sql = deployment_create_devices_query($now, $state_id, $serial);
 
   if ($headers) {
     $count_sql = "SELECT SQL_NO_CACHE COUNT(*) FROM ($sql) d ";
@@ -280,7 +280,7 @@ function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15,
     $result = db_query($sql);
   }
 
-  $states = _deployment_get_all_states();
+  $states = deployment_get_all_states();
 
   $data = array();
   while($device = db_fetch_array($result)) {
@@ -294,7 +294,7 @@ function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15,
   return $data;
 }
 
-function _deployment_create_devices_query($now, $state_id, $serial) {
+function deployment_create_devices_query($now, $state_id, $serial) {
 
   //If parameters are used in this SQL query, pager_query does not count rows correctly
 
@@ -417,7 +417,7 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
 
 function deployment_listfilter_form(&$form_state, $state_id) {
 
-  $states = _deployment_get_all_states();
+  $states = deployment_get_all_states();
   $states[0] = t('All');
 
   $form['state_id'] = array(
@@ -481,7 +481,7 @@ function deployment_listfilter_form_submit($form, &$form_state) {
 function deployment_checkup_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
-  $result = _deployment_get_devices(NULL, NULL, 1, $serial);
+  $result = deployment_get_devices(NULL, NULL, 1, $serial);
 
   if (empty($result)) {
     drupal_set_message(t('No device was found with such serial number.'));
@@ -592,10 +592,10 @@ function deployment_printcode_form_submit($form, &$form_state) {
 
 function deployment_cron() {
   exec('rm -f ' . DEPLOYMENT_PATH . '/pdf/*');
-  _deployment_create_summary();
+  deployment_create_summary();
 }
 
-function _deployment_create_summary() {
+function deployment_create_summary() {
 
   $now = time();
   $now = $now - ($now % 3600);
@@ -605,14 +605,14 @@ function _deployment_create_summary() {
 
   if ($result == 0) {
     $totals = array();
-    $devices = _deployment_get_devices();
+    $devices = deployment_get_devices();
 
     foreach ($devices as $device) {
       $state_id = $device['state_id'];
       $totals[$state_id]++;
     }
 
-    $states = _deployment_get_all_states();
+    $states = deployment_get_all_states();
 
     foreach (array_keys($states) as $state_id) {
       $total = $totals[$state_id];

@@ -38,9 +38,9 @@ define('METER', 'meter');
 function logger_rrd_base_create($meter) {
 
   $step = 1 * MINUTE;
-  $archives = _logger_rrd_get_storage_periods();
+  $archives = logger_rrd_get_storage_periods();
 
-  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
+  return logger_rrd_create($meter, $step, 'DERIVE', $archives);
 }
 
 /**
@@ -48,7 +48,7 @@ function logger_rrd_base_create($meter) {
  *
  * @return the array of storage periods.
  */
-function _logger_rrd_get_storage_periods() {
+function logger_rrd_get_storage_periods() {
   return array(
      //resolution   storage period
      1 * MINUTE =>  1 * WEEK,
@@ -64,7 +64,7 @@ function _logger_rrd_get_storage_periods() {
  * @return the storage period.
  */
 function logger_rrd_get_storage_period($step) {
-  $periods = _logger_rrd_get_storage_periods();
+  $periods = logger_rrd_get_storage_periods();
   return $periods[$step];
 }
 
@@ -77,13 +77,13 @@ function logger_rrd_get_storage_period($step) {
  * @param $archives  An array of RRD archives' properties formatted as (resolution => storage period).
  * @return the creation command execution code.
  */
-function _logger_rrd_create($meter, $step, $ds_type, $archives) {
+function logger_rrd_create($meter, $step, $ds_type, $archives) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter);
+  $file_path = logger_rrd_file($meter);
   $start = 1199487600; //Fri, 04 Jan 2008 23:00:00 GMT
 
-  $ds = _logger_rrd_meter_ds($ds_type);
+  $ds = logger_rrd_meter_ds($ds_type);
 
   if (!file_exists($file_path)) {
 
@@ -91,7 +91,7 @@ function _logger_rrd_create($meter, $step, $ds_type, $archives) {
       "--start $start " .
       "--step $step " .
       "$ds " .
-      _logger_rrd_rras($step, $archives);
+      logger_rrd_rras($step, $archives);
   }
   return $return;
 }
@@ -102,7 +102,7 @@ function _logger_rrd_create($meter, $step, $ds_type, $archives) {
  * @param $type  The DS type.
  * @return the DS definition.
  */
-function _logger_rrd_meter_ds($type) {
+function logger_rrd_meter_ds($type) {
 
   $name = METER;
   $timeout = 100 * DAY;
@@ -119,7 +119,7 @@ function _logger_rrd_meter_ds($type) {
  * @param $archives  The array of RRD archives' properties formatted as (resolution => storage period).
  * @return the list of RRD archives' definitions.
  */
-function _logger_rrd_rras($step, $archives) {
+function logger_rrd_rras($step, $archives) {
   
   $rras = '';
   foreach($archives as $resolution => $storage_period) {
@@ -142,7 +142,7 @@ function _logger_rrd_rras($step, $archives) {
 function logger_rrd_update($meter, $values) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter);
+  $file_path = logger_rrd_file($meter);
 
   $command = RRDTOOL . " update $file_path ";
 
@@ -171,11 +171,11 @@ function logger_rrd_update($meter, $values) {
 function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step) {
 
   $series_id = METER;
-  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
+  $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
 
-  $latest = _logger_rrd_latest_timestamp($interval, $sensor);
+  $latest = logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, TRUE, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, $latest, $offset, TRUE, $period, $step);
 }
 
 /**
@@ -185,9 +185,9 @@ function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $s
  * @param $sensor    The sensor.
  * @return the latest update timestamp.
  */
-function _logger_rrd_latest_timestamp($interval, $sensor) {
+function logger_rrd_latest_timestamp($interval, $sensor) {
 
-  $file_path = _logger_rrd_file($sensor->meter);
+  $file_path = logger_rrd_file($sensor->meter);
 
   $command = RRDTOOL . " last $file_path";
   exec($command, $lines);
@@ -218,7 +218,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
 
     $sensor_cdef = METER . $i;
 
-    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
+    $def .= logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
 
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
@@ -237,7 +237,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, time(), $offset, false, $period, $step);
 }
 
 /**
@@ -274,15 +274,15 @@ function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $
  * @param $unit        The unit.
  * @return the DEF tag.
  */
-function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
+function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
   global $user;
-  $factor = _logger_rrd_get_unit_factor($unit, $sensor->price);
+  $factor = logger_rrd_get_unit_factor($unit, $sensor->price);
 
   if($sensor->private > 0 && $sensor->uid != $user->uid) {
     return null;
   }
-  $file_path = _logger_rrd_file($sensor->meter);
+  $file_path = logger_rrd_file($sensor->meter);
 
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
     "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
@@ -294,7 +294,7 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
  * @param $meter     The sensor id.
  * @return the RRD file path.
  */
-function _logger_rrd_file($meter) {
+function logger_rrd_file($meter) {
 
   return RRDTOOL_PATH . "/data/base/$meter.rrd";
 }
@@ -311,7 +311,7 @@ function _logger_rrd_file($meter) {
  * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
+function logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();
@@ -343,7 +343,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   exec($command, $lines);
 
-  return _logger_rrd_parse_exported_lines($lines, $offset);
+  return logger_rrd_parse_exported_lines($lines, $offset);
 }
 
 /**
@@ -353,7 +353,7 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
  * @param $offset  The user timezone offset.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_parse_exported_lines($lines, $offset) {
+function logger_rrd_parse_exported_lines($lines, $offset) {
 
   $data = array();
 
@@ -377,7 +377,7 @@ function _logger_rrd_parse_exported_lines($lines, $offset) {
   return $data;
 }
 
-function _logger_rrd_get_unit_factor($unit, $price = NULL) {
+function logger_rrd_get_unit_factor($unit, $price = NULL) {
 
   $factors['eur'] = 0.018; // € 0.18 / kWh
   $factors['Wh']  = 1;

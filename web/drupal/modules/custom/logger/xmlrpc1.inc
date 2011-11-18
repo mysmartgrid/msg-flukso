@@ -31,28 +31,28 @@ function logger_xmlrpc() {
   return array(
     array(
       'logger.auth',            // External method name.
-      '_logger_auth',           // Drupal callback function to run + api version 1
+      'logger_auth',           // Drupal callback function to run + api version 1
       array('string', 'array'), // Return value's type, then any parameter types (accept, auth)
       'Authenticate a device'   // Description.
     ),
 
     array(
       'logger.heartbeat',               // External method name.
-      '_logger_heartbeat',              // Drupal callback function to run  + api version 1
+      'logger_heartbeat',              // Drupal callback function to run  + api version 1
       array('array', 'array', 'array'), // Return value's type, then any parameter types (return, auth, monitor)
       'Send a heartbeat to the logger.' // Description.
     ),
 
     array(
       'logger.measurementAdd',             // External method name.
-      '_logger_measurement_add',           // Drupal callback function to run + api version 1
+      'logger_measurement_add',           // Drupal callback function to run + api version 1
       array('string', 'array', 'array'),   // Return value's type, then any parameter types (return, auth, logs)
       'Submit measurements to the logger.' // Description.
     ),
 
     array(
       'logger.brownout',                       // External method name.
-      '_logger_brownout',                      // Drupal callback function to run  + api version 1
+      'logger_brownout',                      // Drupal callback function to run  + api version 1
       array('string', 'array', 'array'),       // Return value's type, then any parameter types (return, auth, message)
       'Send a brownout message to the logger.' // Description.
     ),
@@ -62,9 +62,9 @@ function logger_xmlrpc() {
 /**
  * Callback functions registered in the logger_xmlrpc section
  */
-function _logger_auth($auth) {
+function logger_auth($auth) {
 
-  if (_logger_authenticate_hmac_sha1($auth)) {
+  if (logger_authenticate_hmac_sha1($auth)) {
     return 'authenticated!';
   
   } else {
@@ -72,11 +72,11 @@ function _logger_auth($auth) {
   }
 }
 
-function _logger_heartbeat($auth, $monitor) {
+function logger_heartbeat($auth, $monitor) {
 
   require_once(XMLRPC_PATH . "/notification/notification.module");
 
-  if (_logger_authenticate_hmac_sha1($auth, $monitor)) {
+  if (logger_authenticate_hmac_sha1($auth, $monitor)) {
 
     notification_log_heartbeat_received($auth['device']);
 
@@ -133,12 +133,12 @@ function _logger_heartbeat($auth, $monitor) {
   }
 }
 
-function _logger_measurement_add($auth, $logs) {
+function logger_measurement_add($auth, $logs) {
 
   require_once(XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc");
   require_once(XMLRPC_PATH . "/notification/notification.module");
 
-  if (_logger_authenticate_hmac_sha1($auth, $logs)) {
+  if (logger_authenticate_hmac_sha1($auth, $logs)) {
 
     notification_log_measurement_received($auth['device']);
 
@@ -187,11 +187,11 @@ function _logger_measurement_add($auth, $logs) {
   }
 }
 
-function _logger_brownout($auth, $message) {
+function logger_brownout($auth, $message) {
 
   require_once(XMLRPC_PATH . "/notification/notification.module");
 
-  if (_logger_authenticate_hmac_sha1($auth, $message)) {
+  if (logger_authenticate_hmac_sha1($auth, $message)) {
 
     notification_log_brownout($auth['device']);
 
@@ -203,12 +203,12 @@ function _logger_brownout($auth, $message) {
   }
 }
 
-function _logger_authenticate_hmac_sha1($auth, $message) {
+function logger_authenticate_hmac_sha1($auth, $message) {
 
   $sql = "SELECT sha FROM {logger_devices} WHERE device = '%s'";
   $auth['key'] = db_result(db_query($sql, $auth['device']));
 
-  if (hash_hmac('sha1', $auth['timestamp'] .':'. _logger_serialise($message) .':'. $auth['key'], $auth['key']) == $auth['signature'] && $auth['timestamp'] > time() - 300) {
+  if (hash_hmac('sha1', $auth['timestamp'] .':'. logger_serialise($message) .':'. $auth['key'], $auth['key']) == $auth['signature'] && $auth['timestamp'] > time() - 300) {
     //watchdog_xmlrpc('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
     return TRUE;
 
@@ -219,13 +219,13 @@ function _logger_authenticate_hmac_sha1($auth, $message) {
   }
 }
 
-function _logger_serialise($data) {
+function logger_serialise($data) {
 
   if (is_array($data)) {
 
     $sequence = '';
     foreach ($data as $key => $value) {
-      $sequence .= (string)$key . _logger_serialise($value);
+      $sequence .= (string)$key . logger_serialise($value);
     }
     return $sequence;
 

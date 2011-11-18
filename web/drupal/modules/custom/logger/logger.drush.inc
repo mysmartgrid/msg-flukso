@@ -27,7 +27,7 @@ function logger_drush_command() {
   $items = array();
 
   $items['logger create node'] = array(
-    'callback'    => '_logger_create_node',
+    'callback'    => 'logger_create_node',
     'description' => 'Create a new sensor node entry.',
     'arguments'   => array(
       'serial'    => 'Sensor node serial number.',
@@ -40,7 +40,7 @@ function logger_drush_command() {
   );
 
   $items['logger assign node'] = array(
-    'callback'    => '_logger_assign_node',
+    'callback'    => 'logger_assign_node',
     'description' => 'Assign a sensor node to a user.',
     'arguments'   => array(
       'serial'    => 'Sensor node serial number.',
@@ -49,7 +49,7 @@ function logger_drush_command() {
   );
 
   $items['logger config meter'] = array(
-    'callback'    => '_logger_config_meter',
+    'callback'    => 'logger_config_meter',
     'description' => 'Configure a specific meter.',
     'arguments'   => array(
       'meter'     => 'Meter ID.',
@@ -64,7 +64,7 @@ function logger_drush_command() {
   );
 
   $items['logger token'] = array(
-    'callback'      => '_logger_token',
+    'callback'      => 'logger_token',
     'description'   => 'Create tokens for meter/sensorIDs.',
     'arguments'     => array(
       'meter'       => 'Create a token for one specific meterID.',
@@ -75,7 +75,7 @@ function logger_drush_command() {
   return $items;
 }
 
-function _logger_create_node($serial, $country ="", $uid = 0) {
+function logger_create_node($serial, $country ="", $uid = 0) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -153,7 +153,7 @@ function _logger_create_node($serial, $country ="", $uid = 0) {
   }
 }
 
-function _logger_assign_node($serial, $country, $uid) {
+function logger_assign_node($serial, $country, $uid) {
 
   $sql = "SELECT device FROM {logger_devices} WHERE serial = %d";
   $device = db_result(db_query($sql, $serial));
@@ -183,11 +183,11 @@ function _logger_assign_node($serial, $country, $uid) {
   }
 }
 
-function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
+function logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
 
   module_load_include('inc', 'logger', 'logger.admin');
 
-  if (_logger_sensor_function_validate($function, $meter)) {
+  if (logger_sensor_function_validate($function, $meter)) {
 
     $sql = "
       UPDATE
@@ -214,7 +214,7 @@ function _logger_config_meter($meter, $type, $function, $phase, $constant, $unit
   }
 }
 
-function _logger_tokens($meter = "", $permissions = 62) {
+function logger_tokens($meter = "", $permissions = 62) {
 
   if ($meter == "") {
 

@@ -85,14 +85,14 @@ function msgdump_setup_form(&$form_state) {
   $form['from'] = array(
     '#type'         => 'date',
     '#title'        => t("From"),
-    '#after_build'  => array('_msgdump_limit_year'),
+    '#after_build'  => array('msgdump_limit_year'),
     '#description'  => t('The date dumping should start on'),
   );
 
   $form['to'] = array(
     '#type'          => 'date',
     '#title'         => t("Until"),
-    '#after_build'   => array('_msgdump_limit_year'),
+    '#after_build'   => array('msgdump_limit_year'),
     '#description'   => t('The date dumping should stop on'),
     '#default_value' => array(
       'year'  => $newdate->format("Y"),
@@ -130,7 +130,7 @@ function msgdump_setup_form_submit($form, &$form_state) {
 
     db_query($sql, $serial, $user->uid, $from, $to, $file);
 
-    _msgdump_register($file, $serial, $type);
+    msgdump_register($file, $serial, $type);
 
   } else {
 
@@ -174,7 +174,7 @@ function msgdump_setup_form_validate($form, &$form_state) {
   }
 }
 
-function _msgdump_register($file, $serial, $type) {
+function msgdump_register($file, $serial, $type) {
 
   global $base_url;
 
@@ -209,7 +209,7 @@ function _msgdump_register($file, $serial, $type) {
   exec(MSGDUMP_BIN . "/flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
-function _msgdump_limit_year($form_element, $form_values) {
+function msgdump_limit_year($form_element, $form_values) {
   
   $now = date('Y');
   $form_element['year']['#options'] = drupal_map_assoc(range($now, 2037));

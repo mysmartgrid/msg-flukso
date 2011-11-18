@@ -31,21 +31,21 @@ function logger_xmlrpc() {
   return array(
     array(
       'logger.heartbeat', // External method name.
-      '_logger_heartbeat', // Drupal callback function to run.
+      'logger_heartbeat', // Drupal callback function to run.
       array('int', 'string', 'int', 'int', 'int'), // Return value's type, then any parameter types (upgrade, device, version, resets, uptime)
       'Send a heartbeat to the logger.' // Description.
       ),
 
     array(
       'logger.measurementAdd', // External method name.
-      '_logger_measurement_add', // Drupal callback function to run.
+      'logger_measurement_add', // Drupal callback function to run.
       array('string', 'array'), // Return value's type, then any parameter types (return, measurements)
       'Submit measurements to the logger.' // Description.
       ),
   );
 }
 
-function _logger_heartbeat($device, $version, $resets, $uptime) {
+function logger_heartbeat($device, $version, $resets, $uptime) {
 
   $dev = db_fetch_object(db_query("
     SELECT
@@ -73,7 +73,7 @@ function _logger_heartbeat($device, $version, $resets, $uptime) {
   return $dev->upgrade;
 }
 
-function _logger_measurement_add($logs) {
+function logger_measurement_add($logs) {
 
   require_once(XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc");
 

@@ -27,7 +27,7 @@
  *
  * @return the user sensors page.
  */
-function _logger_user_sensors_page() {
+function logger_user_sensors_page() {
 
   global $user;
   $rows = array();
@@ -85,7 +85,7 @@ function _logger_user_sensors_page() {
  * @param $meter  The sensor id.
  * @return the sensor edition page.
  */
-function _logger_sensor_edition_page($meter) {
+function logger_sensor_edition_page($meter) {
 
   $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = '%s'";
   $sensor = db_fetch_object(db_query($sql, $meter));
@@ -196,7 +196,7 @@ function logger_sensor_form_validate($form, &$form_state) {
   $function = $form_state['values']['function'];
   $meter = $form_state['values']['meter'];
 
-  if (!_logger_sensor_function_validate($function, $meter)) {
+  if (!logger_sensor_function_validate($function, $meter)) {
 
     form_set_error('function', t('Another sensor was found with the function name: %function_name. ' .
       'Please inform another name which has not yet been used.', array('%function_name' => $function)));
@@ -218,7 +218,7 @@ function logger_userdevices_form_submit($form, &$form_state) {
     $function = $sensor->function;
 
     //Find an unique name for 'function'
-    while ($function && !_logger_sensor_function_validate($function, $sensor->meter)) {
+    while ($function && !logger_sensor_function_validate($function, $sensor->meter)) {
       $function = "Sensor $i";
       $i++;
     }
@@ -275,7 +275,7 @@ function logger_userprivacy_form_submit($form, &$form_state) {
  *
  * @param $device  The device id.
  */
-function _logger_device_deactivate($device) {
+function logger_device_deactivate($device) {
 
   global $user;
 
@@ -302,7 +302,7 @@ function _logger_device_deactivate($device) {
  *
  * @param $meter  The sensor id.
  */
-function _logger_sensor_deactivate($meter) {
+function logger_sensor_deactivate($meter) {
 
   global $user;
 
@@ -319,7 +319,7 @@ function _logger_sensor_deactivate($meter) {
  * @param $meter    The meter which currently has the function.
  * @return TRUE if it is unique; FALSE otherwise.
  */
-function _logger_sensor_function_validate($function, $meter) {
+function logger_sensor_function_validate($function, $meter) {
 
   global $user;
   $count = 0;
@@ -444,6 +444,6 @@ function theme_logger_usersensors_list($items) {
 /**
  * Define the administration settings form for the logger module
  */
-function _logger_admin_settings() {
+function logger_admin_settings() {
   //TODO
 }
