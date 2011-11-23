@@ -1,25 +1,25 @@
-  ; --------------------------------------------------------------------------
-  ; Basic information about the theme.
-  ; --------------------------------------------------------------------------
 name        = mySmartGrid
-description = "Fixed width theme derived from Fraunhofer CD"
+description = "The mySmartGrid website theme"
 screenshot  = screenshot.png
-core        = 6.x
-engine      = phptemplate
+core        = 7.x
+version     = 7.x-0.1
 
-  ; --------------------------------------------------------------------------
-  ; Theme features.
-  ; --------------------------------------------------------------------------
 stylesheets[all][] = style/fraunhofer.css
 stylesheets[handheld][] = style/fraunhofer-handheld.css
+
+scripts[] = flash-replace-1.01.js
+scripts[] = jquery-1.2.6.min.js
+scripts[] = shBrushCss.js
+scripts[] = shBrushPhp.js
+scripts[] = shBrushXml.js
+scripts[] = shCore.js
 
 features[] = name
 features[] = slogan
 features[] = search
 features[] = favicon
-features[] = primary_links
-features[] = secondary_links
-features[] = mission
+features[] = main_menu
+features[] = secondary_menu
 features[] = node_user_picture
 features[] = comment_user_picture
 features[] = logo

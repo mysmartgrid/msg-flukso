@@ -1,53 +1,58 @@
 <?php
 
+/**
+ * @file
+ * Install, update and uninstall functions for the msgdump module.
+ */
+
 function msgdump_schema() {
 
   $schema['msgdump'] = array(
-    'description' => t('Stores the dumps.'),
+    'description' => 'Stores the dumps.',
     'fields' => array(
       'id' => array(
-        'type'       => 'serial',
-        'unsigned'   => FALSE,
-        'not null'   => TRUE,
+        'type' => 'serial',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
         'disp-width' => '11',
       ),
       'meter' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
         'disp-width' => '10',
       ),
       'uid' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
         'disp-width' => '10',
       ),
       'start' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
         'disp-width' => '10',
       ),
       'stop' => array(
-        'type'       => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
         'disp-width' => '10',
       ),
       'file' => array(
-        'type'     => 'varchar',
-        'length'   => '32',
+        'type' => 'varchar',
+        'length' => '32',
         'not null' => TRUE,
-        'default'  => '0',
+        'default' => '0',
       ),
       'type' => array(
-        'type'     => 'varchar',
-        'length'   => '32'
+        'type' => 'varchar',
+        'length' => '32',
       ),
     ),
     'primary key' => array(
-      'id'
+      'id',
     ),
   );
   return $schema;
@@ -55,25 +60,17 @@ function msgdump_schema() {
 
 function msgdump_install() {
 
-  drupal_install_schema('msgdump');
-  drupal_set_message(t('Created msgdump module table.'));
+  drupal_set_message(st('Created msgdump module table.'));
 }
 
 function msgdump_uninstall() {
-  drupal_uninstall_schema('msgdump');
+
   drupal_set_message(t('Deleted msgdump module table.'));
 }
 
-function msgdump_update_4() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("INSERT INTO {msgdump} (meter, uid, start, stop, file, type) SELECT meter, uid, start, stop, file, type FROM {msg_dump}");
-      $items[] = update_sql("DROP TABLE {msg_dump}");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
+function msgdump_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
 }

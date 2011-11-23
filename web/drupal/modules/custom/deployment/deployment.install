@@ -1,147 +1,143 @@
 <?php
 
+/**
+ * @file
+ * Install, update and uninstall functions for the deployment module.
+ */
+
 function deployment_schema() {
 
   $schema['deployment_state'] = array(
-    'description' => t('Stores the device states.'),
+    'description' => 'Stores the device states.',
     'fields' => array(
       'id' => array(
-        'type'      => 'int',
-        'not null'  => TRUE,
-        'unasigned' => TRUE
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
       ),
       'name' => array(
         'type' => 'varchar',
-        'length'   => '30',
-        'not null' => TRUE
+        'length' => '30',
+        'not null' => TRUE,
       ),
       'description' => array(
         'type' => 'varchar',
-        'length'   => '200',
-        'not null' => TRUE
+        'length' => '200',
+        'not null' => TRUE,
       ),
     ),
     'primary key' => array(
-      'id'
-    )
+      'id',
+    ),
   );
 
   $schema['deployment_summary'] = array(
-    'description' => t('Stores deployment summaries.'),
+    'description' => 'Stores deployment summaries.',
     'fields' => array(
       'time' => array(
         'type' => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
-        'default'    => 0,
-        'disp-width' => '10'
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
       ),
       'state_id' => array(
-        'type'      => 'int',
-        'not null'  => TRUE,
-        'unasigned' => TRUE
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
       ),
       'total' => array(
         'type' => 'int',
-        'unsigned'   => TRUE,
-        'not null'   => TRUE,
-        'default'    => 0,
-        'disp-width' => '10'
-      )
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
     ),
     'primary key' => array(
-      'time', 'state_id'
-    )
+      'time',
+      'state_id',
+    ),
   );
   return $schema;
 }
 
 function deployment_install() {
 
-  drupal_install_schema('deployment');
-  drupal_set_message(t('Created deployment module tables.'));
+  drupal_set_message(st('Created deployment module tables.'));
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (1, 'Uninstalled',
-  'The device has not yet been registered (activated) by any user, neither has it sent any heartbeat during the past 3 days.')";
-  db_query($sql);
-  
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (2, 'Unregistered',
-  'The device has sent a heartbeat during the past 3 days, although it is still unregistered.')";
-  db_query($sql);
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Uninstalled',
+      'description' => "The device has not yet been registered (activated) by any user, neither has it sent any heartbeat during the past 3 days.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (3, 'No Communication',
-  'The device is registered, but has not sent any message during the past 2 hours.')";
-  db_query($sql);
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Unregistered',
+      'description' => "The device has sent a heartbeat during the past 3 days, although it is still unregistered.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (4, 'Corrupted Message',
-  'The device is registered, but the latest heartbeat or measurement received from it contained invalid times or non numeric values.')";
-  db_query($sql);
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'No Communication',
+      'description' => "The device is registered, but has not sent any message during the past 2 hours.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (5, 'Working',
-  'The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.')";
-  db_query($sql);
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Corrupted Message',
+      'description' => "The device is registered, but the latest heartbeat or measurement received from it contained invalid times or non numeric values.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (6, 'Offline',
-  'The device is registered, but has not sent any message during the past 24 hours.')";
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Working',
+      'description' => "The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (7, 'No Measurement',
-  'The device is registered, but has not sent any measurement during the past 24 hours.')";
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Offline',
+      'description' => "The device is registered, but has not sent any message during the past 24 hours.",
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {deployment_state} (id, name, description) VALUES (8, 'No Heartbeat',
-  'The device is registered, but has not sent any heartbeat during the past 24 hours.')";
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 7,
+      'name' => 'No Measurement',
+      'description' => "The device is registered, but has not sent any measurement during the past 24 hours.",
+    ))
+    ->execute();
 
-  db_query($sql);
-}
-
-function deployment_update_6001() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("INSERT INTO {deployment_state} (id, name, description) VALUES (6, 'Offline',
-        'The device is registered, but has not sent any message during the past 24 hours.')");
-
-      $items[] = update_sql("UPDATE {deployment_summary} SET state_id = 6 WHERE state_id = 3");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function deployment_update_6002() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("INSERT INTO {deployment_state} (id, name, description) VALUES (7, 'No Measurement',
-        'The device is registered, but has not sent any measurement during the past 24 hours.')");
-
-      $items[] = update_sql("INSERT INTO {deployment_summary} (time, state_id, total) SELECT time, 7, 0 FROM {deployment_summary} GROUP BY time");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function deployment_update_6003() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("INSERT INTO {deployment_state} (id, name, description) VALUES (8, 'No Heartbeat',
-        'The device is registered, but has not sent any heartbeat during the past 24 hours.')");
-
-      $items[] = update_sql("INSERT INTO {deployment_summary} (time, state_id, total) SELECT time, 8, 0 FROM {deployment_summary} GROUP BY time");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 8,
+      'name' => 'No Heartbeat',
+      'description' => "The device is registered, but has not sent any heartbeat during the past 24 hours.",
+    ))
+    ->execute();
 }
 
 function deployment_uninstall() {
-  drupal_uninstall_schema('deployment');
   drupal_set_message(t('Deleted deployment module tables.'));
+}
+
+function deployment_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
 }

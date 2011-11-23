@@ -40,13 +40,13 @@
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
 
-  <div class="node-headline clear-block">
+  <div class="node-headline clearfix">
     <span class="timestamp"><?php print $mysmartgrid_node_timestamp; ?></span>
     <span class="node-author"> – <?php print $mysmartgrid_node_author; ?></span>
     <br><br>
   </div>
 
-  <div class="content clear-block">
+  <div class="content clearfix">
     <?php print $picture; ?>
     <?php print $content; ?>
   </div>

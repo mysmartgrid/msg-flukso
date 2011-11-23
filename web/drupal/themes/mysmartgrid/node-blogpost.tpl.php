@@ -41,7 +41,7 @@
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
 
-  <div class="node-headline clear-block">
+  <div class="node-headline clearfix">
   <?php if ($page == 0): ?>
     <h3><a href="<?php print $node_url; ?>" rel="bookmark" title="<?php print $mysmartgrid_perma_title; ?>"><?php print $title; ?></a></h3>
   <?php endif; ?>
@@ -55,7 +55,7 @@
     <?php endif; ?>
   </div>
 
-  <div class="content clear-block">
+  <div class="content clearfix">
     
     <?php print $picture; ?>
     <?php print $content; ?>

@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * This module dumps data from Flukso devices in high resolution
  * to a sqlite database and provides the possibility to download this data.
  *
@@ -21,87 +22,93 @@
  */
 
 define('MSGDUMP_DB_PATH', drupal_get_path('module', 'msgdump') . '/db');
-define('MSGDUMP_BIN', drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
+define('MSGDUMP_BIN_PATH', drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
 
 
-function msgdump_perm() {
-  return array('data dump');
+function msgdump_permission() {
+  return array(
+    'data dump' => array(
+      'title' => t('data dump'),
+      'description' => t('TODO Add a description for \'data dump\''),
+    ),
+  );
 }
 
 function msgdump_menu() {
 
   $items['dump/%user_uid_optional/setup'] = array(
-    'title'            => "Dump values",
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('msgdump_setup_form'),
+    'title' => "Dump values",
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('msgdump_setup_form'),
     'access arguments' => array('data dump'),
-    'type'             => MENU_NORMAL_ITEM,
+    'type' => MENU_NORMAL_ITEM,
   );
   return $items;
 }
 
-function msgdump_setup_form(&$form_state) {
+function msgdump_setup_form($form, &$form_state) {
 
   global $user;
   $newdate = new DateTime('now');
   $newdate->setTime(0, 0);
   $newdate->modify('+1 week');
 
-  $sql = 'SELECT serial FROM {logger_devices} WHERE uid = %d';
-  $result = db_query($sql, $user->uid);
+  $sql = 'SELECT serial FROM {logger_devices} WHERE uid = :uid';
+  $result = db_query($sql, array(':uid' => $user->uid));
 
   $fluksos = array();
-  while($device = db_fetch_object($result)) {
+  foreach ($result as $device) {
     $fluksos[$device->serial] = $device->serial;
   }
 
-  $sql = 'SELECT file FROM {msgdump} WHERE uid = %d';
-  $result = db_query($sql, $user->uid);
+  $sql = 'SELECT file FROM {msgdump} WHERE uid = :uid';
+  $result = db_query($sql, array(':uid' => $user->uid));
 
-  while($file = db_fetch_object($result)) {
+  foreach ($result as $file) {
 
     $form[$file->file] = array(
-      '#type'       => 'submit',
-      '#value'      => 'X',
-      '#name'       => $file->file,
+      '#type' => 'submit',
+      '#value' => 'X',
+      '#name' => $file->file,
       '#attributes' => array(
-        'style' => 'background-color: transparent; color:#ff0000;'
-      )
+        'style' => 'background-color: transparent; color:#ff0000;',
+      ),
     );
   }
 
   $form['flukso'] = array(
-    '#type'         => 'select',
-    '#options'      => $fluksos,
-    '#title'        => t('Device'),
-    '#description'  => t('Flukso to use for recording'),
+    '#type' => 'select',
+    '#options' => $fluksos,
+    '#title' => t('Device'),
+    '#description' => t('Flukso to use for recording'),
   );
 
   $form['type'] = array(
-    '#type'         => 'hidden',
-    '#value'        => CONSUMPTION_SENSOR_TYPE,
+    '#type' => 'hidden',
+    '#value' => CONSUMPTION_SENSOR_TYPE,
   );
 
   $form['from'] = array(
-    '#type'         => 'date',
-    '#title'        => t("From"),
-    '#after_build'  => array('msgdump_limit_year'),
-    '#description'  => t('The date dumping should start on'),
+    '#type' => 'date',
+    '#title' => t("From"),
+    '#after_build' => array('msgdump_limit_year'),
+    '#description' => t('The date dumping should start on'),
   );
 
   $form['to'] = array(
-    '#type'          => 'date',
-    '#title'         => t("Until"),
-    '#after_build'   => array('msgdump_limit_year'),
-    '#description'   => t('The date dumping should stop on'),
+    '#type' => 'date',
+    '#title' => t("Until"),
+    '#after_build' => array('msgdump_limit_year'),
+    '#description' => t('The date dumping should stop on'),
     '#default_value' => array(
-      'year'  => $newdate->format("Y"),
+      'year' => $newdate->format("Y"),
       'month' => $newdate->format("n"),
-      'day'   => $newdate->format("d")),
+      'day' => $newdate->format("d"),
+    ),
   );
 
   $form['submit'] = array(
-    '#type'  => 'submit',
+    '#type' => 'submit',
     '#value' => t("Submit"),
   );
 
@@ -122,29 +129,33 @@ function msgdump_setup_form_submit($form, &$form_state) {
     $serial = $form_state['values']['flukso'];
     $type = $form_state['values']['type'];
 
-    $sql = "
-      INSERT INTO
-        {msgdump} (meter, uid, start, stop, file)
-      VALUES
-        ('%s', %d, %d, %d, '%s')";
-
-    db_query($sql, $serial, $user->uid, $from, $to, $file);
+    db_insert('msgdump')
+    ->fields(array(
+      'meter' => $serial,
+      'uid' => $user->uid,
+      'start' => $from,
+      'stop' => $to,
+      'file' => $file
+    ))
+    ->execute();
 
     msgdump_register($file, $serial, $type);
 
-  } else {
+  }
+  else {
 
     $file = $form_state['clicked_button']['#name'];
 
-    $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
-    db_query($sql, $file);
+    db_delete('msgdump')
+      ->condition('file', $file)
+      ->execute();
 
     exec('rm -f ' . MSGDUMP_DB_PATH . '/' . $file . '.*');
   }
 }
 
 function msgdump_setup_form_validate($form, &$form_state) {
-  
+
   global $user;
 
   if (strcmp($form_state['clicked_button']['#value'], t('Submit')) == 0) {
@@ -153,21 +164,21 @@ function msgdump_setup_form_validate($form, &$form_state) {
     $to = strtotime(implode('-', $form_state['values']['to']) . ' 23:59');
 
     $now = new DateTime("now");
-    $now->setTime(0,0);
+    $now->setTime(0, 0);
     $now = $now->format("U");
 
     if ($now > $from) {
       form_set_error('from', t('Can\'t record values in the past.'));
     }
-    
+
     if ($from > $to) {
       form_set_error('to', t('Time to stop has to be after time to start.'));
     }
-    
+
     if (!$from) {
       form_set_error('from', t('Invalid date.'));
     }
-    
+
     if (!$to) {
       form_set_error('to', t('Invalid date.'));
     }
@@ -187,30 +198,30 @@ function msgdump_register($file, $serial, $type) {
         LEFT JOIN {logger_meters} m ON t.meter = m.meter
         LEFT JOIN {logger_devices} d  ON m.device = d.device
     WHERE
-      d.serial = '%s' AND
-      m.type = %d";
+      d.serial = :serial AND
+      m.type = :type";
 
-  $values = db_query($sql, $serial, $type);
+  $values = db_query($sql, array(':serial' => $serial, ':type' => $type));
 
-  while ($value = db_fetch_object($values)) {
+  foreach ($values as $value) {
 
-    $config = 
-      'DB_FILE: "'       . MSGDUMP_DB_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
+    $config =
+      'DB_FILE: "' . MSGDUMP_DB_PATH . '/' . $file . '.sqlite' . '"' . PHP_EOL .
       'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
-      'ACCESS_TOKEN: "'  . $value->token . '"' . PHP_EOL .
-      'SENSOR_ID: "'     . $value->meter . '"' . PHP_EOL .
-      'BASE_URL: "'      . $base_url . '/sensor' . '"' . PHP_EOL;
+      'ACCESS_TOKEN: "' . $value->token . '"' . PHP_EOL .
+      'SENSOR_ID: "' . $value->meter . '"' . PHP_EOL .
+      'BASE_URL: "' . $base_url . '/sensor' . '"' . PHP_EOL;
   }
 
   $out = fopen(MSGDUMP_DB_PATH . "/$file.flukso4rrc", 'w');
   fwrite($out, $config);
   fclose($out);
 
-  exec(MSGDUMP_BIN . "/flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
+  exec(MSGDUMP_BIN_PATH . "/flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
 function msgdump_limit_year($form_element, $form_values) {
-  
+
   $now = date('Y');
   $form_element['year']['#options'] = drupal_map_assoc(range($now, 2037));
 
@@ -221,16 +232,16 @@ function msgdump_theme() {
 
   return array(
     'msgdump_setup' => array(
-      'arguments' => array('form' => NULL)
+      'render element' => 'form',
     ),
-
     'msgdump_setup_list' => array(
-      'arguments' => array('items' => NULL)
+      'variables' => array('items' => NULL),
     ),
   );
 }
 
-function theme_msgdump_setup($form) {
+function theme_msgdump_setup($variables) {
+  $form = $variables['form'];
 
   global $user;
   $rows = array();
@@ -245,11 +256,11 @@ function theme_msgdump_setup($form) {
     FROM
       {msgdump} d
     WHERE
-      d.uid = %d";
+      d.uid = :uid";
 
-  $result = db_query($sql, $user->uid);
+  $result = db_query($sql, array(':uid' => $user->uid));
 
-  while ($device = db_fetch_object($result)) {
+  foreach ($result as $device) {
 
     $startdate = new DateTime('@' . $device->start);
     $stopdate = new DateTime('@' . $device->stop);
@@ -264,14 +275,15 @@ function theme_msgdump_setup($form) {
     $rows[] = $row;
   }
 
-  return drupal_render($form) .
-    theme('msgdump_setup_list', $rows);
+  return drupal_render_children($form) .
+    theme('msgdump_setup_list', array('items' => $rows));
 }
 
-function theme_msgdump_setup_list($items) {
+function theme_msgdump_setup_list($variables) {
+  $items = $variables['items'];
 
   $headers = array('', t('Device'), t('Startdate'), t('Stopdate'), t('File'));
-  return theme('table', $headers, $items);
+  return theme_table(array('header' => $headers, 'rows' => $items));
 }
 
 function msgdump_cron() {
@@ -281,27 +293,31 @@ function msgdump_cron() {
   $time_limit = 3 * 30 * 24 * 60 * 60; //3 months
 
   //get requested dumps from database
-  $sql = "SELECT stop, file FROM {msgdump} WHERE start <= %d";
-  $result = db_query($sql, $now);
+  $sql = "SELECT stop, file FROM {msgdump} WHERE start <= :start";
+  $result = db_query($sql, array(':start' => $now));
+
   //watchdog("cron", "[msgdump_cron] Running: " . mysqli_num_rows($result));
 
-  while($data = db_fetch_object($result)) {
+  foreach ($result as $data) {
 
     if ($now - $data->stop > $time_limit) {
 
       //delete dumps older then 3 months
       exec("rm -f " . MSGDUMP_DB_PATH . "/" . $data->file . ".*");
 
-      $sql = "DELETE FROM {msgdump} WHERE file = '%s'";
-      db_query($sql, $data->file);
+      db_delete('msgdump')
+        ->condition('file', $data->file)
+        ->execute();
 
-    } elseif ($data->stop > $now) {
+    }
+    elseif ($data->stop > $now) {
 
       //otherwise execute dump
-      $res = exec(MSGDUMP_BIN . "/flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc");
+      $res = exec(MSGDUMP_BIN_PATH . "/flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc");
       watchdog("cron", "[msgdump_cron] " . $data->file . ": " . $res);
 
-    } else {
+    }
+    else {
       watchdog("cron", "[msgdump_cron] Nothing to do for " . $data->file);
     }
   }

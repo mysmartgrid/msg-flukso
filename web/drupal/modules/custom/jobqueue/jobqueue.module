@@ -1,7 +1,8 @@
 <?php
 
 /**
- * This module manages Flukso devices' event notifications.
+ * @file
+ * This module interfaces the JobQueue System.
  *
  * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
  *
@@ -19,19 +20,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#function jobqueue_perm() {
-#  return array(
-#    'list event notifications',
-#    'view event notifications',
-#    'save event notifications',
-#    'delete event notifications',
-#    'list event logs',
-#    'delete event logs'
-#  );
-#}
-
 function jobqueue_produce($algorithm, $data) {
   $str = "/usr/bin/producer.rb -v -c /usr/lib/msg-qworker/etc/qproducerrc -a $algorithm";
-  if($data != null) $str .= " -p $data";
+  if ($data != NULL) {
+    $str .= " -p $data";
+  }
   system($str);
 }

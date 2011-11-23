@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * Data and management plane xmlrpc methods for logging metering data alpha
  * version API
  *
@@ -23,7 +24,7 @@
  */
 
 /**
- * Implementation of hook_xmlrpc().
+ * Implements hook_xmlrpc().
  * Mapping external XML-RPC methods to callback functions.
  * API versioning; logger.flukso.net/xmlrpc.php maps to xmlrpc.inc
  */
@@ -33,15 +34,14 @@ function logger_xmlrpc() {
       'logger.heartbeat', // External method name.
       'logger_heartbeat', // Drupal callback function to run.
       array('int', 'string', 'int', 'int', 'int'), // Return value's type, then any parameter types (upgrade, device, version, resets, uptime)
-      'Send a heartbeat to the logger.' // Description.
-      ),
-
+      'Send a heartbeat to the logger.', // Description.
+    ),
     array(
       'logger.measurementAdd', // External method name.
       'logger_measurement_add', // Drupal callback function to run.
       array('string', 'array'), // Return value's type, then any parameter types (return, measurements)
-      'Submit measurements to the logger.' // Description.
-      ),
+      'Submit measurements to the logger.', // Description.
+    ),
   );
 }
 
@@ -68,14 +68,14 @@ function logger_heartbeat($device, $version, $resets, $uptime) {
       resets = %d,
       uptime = %d
     WHERE
-      device = '%s'", time(), $version, 0, $dev->resets, $uptime, $device);
+      device = '%s'", REQUEST_TIME, $version, 0, $dev->resets, $uptime, $device);
 
   return $dev->upgrade;
 }
 
 function logger_measurement_add($logs) {
 
-  require_once(XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc");
+  require_once DRUPAL_ROOT . '/' . XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc";
 
   $info = 'added 5min interval measurements to the log';
 
@@ -83,10 +83,9 @@ function logger_measurement_add($logs) {
 
     //load the normalisation factor, relative to 1pulse = 1Wh
     $sql = "SELECT uid, device, factor FROM {logger_meters} WHERE meter = '%s'";
-    $meterdata = db_fetch_object(db_query($sql, $meter));
+    $meterdata = db_fetch_object(db_query("SELECT uid, device, factor FROM {logger_meters} WHERE meter = :meter", array(':meter' => $meter)));
 
     if ($meterdata->uid < 5) { // only alpha users are allowed to call this API
-
       ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
 
       foreach ($measurements as $timestamp => $value) {
@@ -94,7 +93,8 @@ function logger_measurement_add($logs) {
         if (is_numeric($timestamp) and is_numeric($value)) {
           $values[$timestamp] = $value * $meterdata->factor;
 
-        } else {
+        }
+        else {
           watchdog_xmlrpc('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
           notification_log_corrupted_message($meterdata->device);
         }
@@ -106,10 +106,19 @@ function logger_measurement_add($logs) {
         watchdog_xmlrpc('logger.measurementAdd', 'successful update for base rrd: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
 
         $sql = "UPDATE {logger_meters} SET access = %d, value = %d WHERE meter = '%s'";
-        db_query($sql, time(), $value, $meter);//Gets the latest value stored in $value
+        // TODO Please review the conversion of this statement to the D7 database API syntax.
+        /* db_query($sql, REQUEST_TIME, $value, $meter) */
+        db_update('logger_meters')
+  ->fields(array(
+    'access' => REQUEST_TIME,
+    'value' => $value,
+  ))
+  ->condition('meter', $meter)
+  ->execute(); //Gets the latest value stored in $value
         //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
 
-      } else {
+      }
+      else {
         watchdog_xmlrpc('logger.measurementAdd', 'error updating base rrd. meter: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
       }
     }

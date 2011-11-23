@@ -41,7 +41,7 @@
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
 
   <?php if ($page == 0): ?>
-    <div class="node-headline clear-block">
+    <div class="node-headline clearfix">
       <h3><a href="<?php print $node_url; ?>" rel="bookmark" title="<?php print $mysmartgrid_perma_title; ?>"><?php print $title; ?></a></h3>
       <?php if (isset($mysmartgrid_node_timestamp)): ?>
           <span class="timestamp"><?php print $mysmartgrid_node_timestamp; ?></span>
@@ -54,7 +54,7 @@
     </div>
   <?php endif; ?>
 
-  <div class="content clear-block">
+  <div class="content clearfix">
     <?php print $picture; ?>
     <?php print $content; ?>
   </div>

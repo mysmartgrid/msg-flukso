@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * Callbacks for logger account and admin pages.
  *
  * Copyright (c) 2008-2009 jokamajo.org
@@ -44,13 +45,13 @@ function logger_user_sensors_page() {
       INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
       LEFT JOIN {logger_meter_type} st ON lm.type = st.id
     WHERE
-      lm.uid = %d
+      lm.uid = :uid
     ORDER BY
       lm.function DESC";
 
-  $result = db_query($sql, $user->uid);
+  $result = db_query($sql, array(':uid' => $user->uid));
 
-  while ($sensor = db_fetch_object($result)) {
+  foreach ($result as $sensor) {
 
     $row = array();
     $row[] = substr($sensor->meter, 0, 15) . '<br>' . substr($sensor->meter, 15);
@@ -64,19 +65,20 @@ function logger_user_sensors_page() {
       $row[] = '';
       $operations = l(t('Activate'), 'sensor/activate/' . $sensor->meter);
 
-    } else {
+    }
+    else {
       $row[] = t('Active');
       $row[] = t($sensor->type);
       $row[] = $sensor->function;
       $operations .=
-	      l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
-	      l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
+        l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
+        l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
 
     $row[] = $operations;
     $rows[] = $row;
   }
-  return theme('logger_usersensors_list', $rows);
+  return theme('logger_usersensors_list', array('items' => $rows));
 }
 
 /**
@@ -87,82 +89,82 @@ function logger_user_sensors_page() {
  */
 function logger_sensor_edition_page($meter) {
 
-  $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = '%s'";
-  $sensor = db_fetch_object(db_query($sql, $meter));
+  $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = :meter";
+  $sensor = db_query($sql, array(':meter' => $meter))->fetchObject();
 
   return drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
 }
 
-function logger_userdevices_form() {
+function logger_userdevices_form($form, &$form_state) {
 
   $form['#theme'] = 'logger_userdevices';
 
   $form['code'] = array(
-    '#title'        => t('Activation Code'),
-    '#type'         => 'textfield',
-    '#description'  => t('Please, inform the activation code of the device to be added. This code is found in the device installation guide.'),
-    '#size'         => 10,
-    '#maxlength'    => 10,
-    '#required'     => TRUE,
+    '#title' => t('Activation Code'),
+    '#type' => 'textfield',
+    '#description' => t('Please, inform the activation code of the device to be added. This code is found in the device installation guide.'),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#required' => TRUE,
   );
 
   $form['submit'] = array(
-    '#type'   => 'submit',
-    '#value'  => t('Add device'),
+    '#type' => 'submit',
+    '#value' => t('Add device'),
   );
   return $form;
 }
 
-function logger_sensor_form(&$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main') {
+function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main') {
 
   $form['meter'] = array(
-    '#type'          => 'textfield',
-    '#description'   => t("The sensor meter id."),
-    '#maxlength'     => 32,
-    '#size'          => 32,
-    '#required'      => TRUE,
+    '#type' => 'textfield',
+    '#description' => t("The sensor meter id."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE,
     '#default_value' => $meter,
-    '#attributes'    => array('readonly' => 'readonly')
+    '#attributes' => array('readonly' => 'readonly'),
   );
 
   $form['type'] = array(
-    '#type'          => 'select',
-    '#description'   => t('The sensor type.'),
-    '#options'       => logger_get_sensor_types_options(),
+    '#type' => 'select',
+    '#description' => t('The sensor type.'),
+    '#options' => logger_get_sensor_types_options(),
     '#default_value' => $type,
-    '#required'      => TRUE,
-    '#attributes'    => array('readonly' => 'readonly')
+    '#required' => TRUE,
+    '#attributes' => array('readonly' => 'readonly'),
   );
 
   $form['function'] = array(
-    '#type'          => 'textfield',
-    '#description'   => t("Enter the sensor's function name."),
-    '#maxlength'     => 16,
-    '#size'          => 16,
-    '#required'      => TRUE,
-    '#default_value' => $function
+    '#type' => 'textfield',
+    '#description' => t("Enter the sensor's function name."),
+    '#maxlength' => 16,
+    '#size' => 16,
+    '#required' => TRUE,
+    '#default_value' => $function,
   );
 
   $form['submit'] = array(
-    '#type'  => 'submit',
-    '#value' => t("Save")
+    '#type' => 'submit',
+    '#value' => t("Save"),
   );
   return $form;
 }
 
-function logger_userprivacy_form() {
+function logger_userprivacy_form($form, &$form_state) {
 
   global $user;
 
-  $sql = "SELECT private FROM {logger_users} WHERE uid = %d";
-  $private = db_result(db_query($sql, $user->uid));
+  $sql = "SELECT private FROM {logger_users} WHERE uid = :uid";
+  $private = db_query($sql, array(':uid' => $user->uid))->fetchField();
 
   $form['privacy'] = array(
-    '#title'         => t('Set your preferred privacy mode'),
-    '#type'          => 'radios',
-    '#description'   => t("When selecting Private mode, your data stream will not be drawn on other people's graph and all statistics will be marked as 'prv'. Conversely, nobody else's data stream will be drawn on your chart."),
+    '#title' => t('Set your preferred privacy mode'),
+    '#type' => 'radios',
+    '#description' => t("When selecting Private mode, your data stream will not be drawn on other people's graph and all statistics will be marked as 'prv'. Conversely, nobody else's data stream will be drawn on your chart."),
     '#default_value' => $private,
-    '#options'       => array(
+    '#options' => array(
       t('Shared within Flukso'),
       t('Private'),
     ),
@@ -180,13 +182,14 @@ function logger_userdevices_form_validate($form, &$form_state) {
   $code = $form_state['values']['code'];
   if (strlen($code) == 10) {
 
-    $count = db_result(db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE '%s%' AND uid = %d", $code, 0));
+    $count = db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE :device AND uid = :uid", array(':device' => "$code%", ':uid' => 0))->fetchField();
 
     if ($count != 1) {
       form_set_error('code', t('Please specify a valid activation code.'));
     }
 
-  } else {
+  }
+  else {
     form_set_error('code', t('Please specify a proper 10-character activation code.'));
   }
 }
@@ -208,12 +211,17 @@ function logger_userdevices_form_submit($form, &$form_state) {
   global $user;
   $code = $form_state['values']['code'];
 
-  db_query("UPDATE {logger_devices} SET uid = %d WHERE device LIKE '%s%'", $user->uid, $code);
+  db_update('logger_devices')
+    ->fields(array(
+      'uid' => $user->uid,
+    ))
+    ->condition('device', "$code%", 'LIKE')
+    ->execute();
 
-  $result = db_query("SELECT meter, function FROM {logger_meters} WHERE device LIKE '%s%'", $code);
+  $result = db_query("SELECT meter, function FROM {logger_meters} WHERE device LIKE ':code'", "$code%");
   $i = 2;
 
-  while($sensor = db_fetch_object($result)) {
+  foreach ($result as $sensor) {
 
     $function = $sensor->function;
 
@@ -224,20 +232,44 @@ function logger_userdevices_form_submit($form, &$form_state) {
     }
 
     if ($function) {
-      db_query("UPDATE {logger_meters} SET uid = %d, function = '%s' WHERE meter = '%s'", $user->uid, $function, $sensor->meter);
-    } else {
-      db_query("UPDATE {logger_meters} SET function = '%s' WHERE meter = '%s'", $function, $sensor->meter);
+      db_update('logger_meters')
+      ->fields(array(
+        'uid' => $user->uid,
+        'function' => $function,
+      ))
+      ->condition('meter', $sensor->meter)
+      ->execute();
+    }
+    else {
+        
+      db_update('logger_meters')
+        ->fields(array(
+          'function' => $function,
+        ))
+        ->condition('meter', $sensor->meter)
+        ->execute();
     }
   }
 
-  $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+  $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'fluksonian'))->fetchField();
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
   if (empty($user->roles[$rid])) {
 
-    db_query("INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)", $user->uid, $rid);
-    db_query("INSERT INTO {logger_users} (uid, private) VALUES (%d, %d)", $user->uid, 0);
+    db_insert('users_roles')
+      ->fields(array(
+        'uid' => $user->uid,
+        'rid' => $rid
+      ))
+      ->execute();
+    
+    db_insert('logger_users')
+      ->fields(array(
+        'uid' => $user->uid,
+        'private' => 0
+      ))
+      ->execute();
   }
 
   drupal_set_message(t("The device is now associated with your account."));
@@ -251,8 +283,13 @@ function logger_sensor_form_submit($form, &$form_state) {
   $type = $form_state['values']['type'];
   $meter = $form_state['values']['meter'];
 
-  $sql = "UPDATE {logger_meters} SET function = '%s', type = %d WHERE meter = '%s'";
-  db_query($sql, $function, $type, $meter);
+  db_update('logger_meters')
+    ->fields(array(
+      'function' => $function,
+      'type' => $type,
+    ))
+    ->condition('meter', $meter)
+    ->execute();
 
   $form_state['redirect'] = "user/" . $user->uid . "/sensors";
 }
@@ -261,10 +298,12 @@ function logger_userprivacy_form_submit($form, &$form_state) {
 
   global $user;
 
-  $private = $form_state['values']['privacy'];
-
-  $sql = "UPDATE {logger_users} SET private = %d WHERE uid = %d";
-  db_query($sql, $private, $user->uid);
+  db_update('logger_users')
+    ->fields(array(
+      'private' => $form_state['values']['privacy']
+    ))
+    ->condition('uid', $user->uid)
+    ->execute();
 
   // page redirection to the home page after form submission
   $form_state['redirect'] = 'logger';
@@ -279,19 +318,39 @@ function logger_device_deactivate($device) {
 
   global $user;
 
-  db_query("UPDATE {logger_devices} SET uid = %d WHERE device = '%s'", 0, $device);
-  db_query("UPDATE {logger_meters}  SET uid = %d WHERE device = '%s'", 0, $device);
+  db_update('logger_devices')
+    ->fields(array(
+      'uid' => 0,
+    ))
+    ->condition('device', $device)
+    ->execute();
+  
+  db_update('logger_meters')
+    ->fields(array(
+      'uid' => 0,
+    ))
+    ->condition('device', $device)
+    ->execute();
 
-  $count = db_result(db_query("SELECT count(*) FROM {logger_devices} WHERE uid = %d", $user->uid));
+  $sql = "SELECT count(*) FROM {logger_devices} WHERE uid = :uid";
+  $count = db_query($sql, array(':uid' => $user->uid))->fetchField();
 
   // check whether the user is still a fluksonian
   // if not, remove entries in {users_roles} and {logger_users}
   if ($count == 0) {
 
-    $rid = db_result(db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = '%s'", 'fluksonian'));
+    $sql = "SELECT SQL_CACHE rid FROM {role} WHERE name = :name";
+    $rid = db_query($sql, array(':name' => 'fluksonian'))->fetchField();
 
-    db_query("DELETE FROM {users_roles} WHERE uid = %d AND rid = %d", $user->uid, $rid);
-    db_query("DELETE FROM {logger_users} WHERE uid = %d AND private = 0", $user->uid);
+    db_delete('users_roles')
+      ->condition('uid', $user->uid)
+      ->condition('rid', $rid)
+      ->execute();
+    
+    db_delete('logger_users')
+      ->condition('uid', $user->uid)
+      ->condition('private', 0)
+      ->execute();
   }
 
   drupal_goto("user/$user->uid/devices");
@@ -306,8 +365,13 @@ function logger_sensor_deactivate($meter) {
 
   global $user;
 
-  $sql = "UPDATE {logger_meters} SET function = NULL, type = NULL WHERE meter = '%s'";
-  db_query($sql, $meter);
+  db_update('logger_meters')
+    ->fields(array(
+      'function' =>  NULL,
+      'type' =>  NULL,
+    ))
+    ->condition('meter', $meter)
+    ->execute();
 
   drupal_goto("user/$user->uid/sensors");
 }
@@ -332,13 +396,25 @@ function logger_sensor_function_validate($function, $meter) {
       FROM
         {logger_meters}
       WHERE
-        function = '%s' AND
-        uid = %d AND
-        meter <> '%s'";
+        function = :function AND
+        uid = :uid AND
+        meter <> :meter";
 
-    $count = db_result(db_query($sql, $function, $user->uid, $meter));
+    $count = db_query($sql, array(':function' => $function, ':uid' => $user->uid, ':meter' => $meter))->fetchField();
   }
   return $count == 0;
+}
+
+function logger_unix_to_userlocaltime($unix) {
+  global $user;
+  $unix_local = gmdate('r', $unix + $user->timezone);
+  return substr($unix_local, 0, strlen($unix_local) - 6);
+}
+
+function logger_seconds_to_dayshours($seconds) {
+  $days    = intval($seconds / DAY);
+  $hours   = intval(($seconds % DAY) / HOUR);
+  return sprintf('%d days %d hours', $days, $hours);
 }
 
 /**
@@ -347,7 +423,8 @@ function logger_sensor_function_validate($function, $meter) {
  * @param $form The device form array.
  * @return the themed devices form.
  */
-function theme_logger_userdevices($form) {
+function theme_logger_userdevices($variables) {
+  $form = $variables['form'];
 
   global $user;
   $rows = array();
@@ -361,48 +438,36 @@ function theme_logger_userdevices($form) {
       d.uptime,
       r.requested AS support_requested
     FROM
-      {logger_devices} d LEFT JOIN 
+      {logger_devices} d LEFT JOIN
       {device_support_request} r ON d.device = r.device
     WHERE
-      d.uid = %d
+      d.uid = :uid
     ORDER BY
       d.serial";
-  $result = db_query($sql, $user->uid);
+  $result = db_query($sql, array(':uid' => $user->uid));
 
-  function unix_to_userlocaltime($unix) {
-    global $user;
-    $unix_local = gmdate('r', $unix + $user->timezone);
-    return substr($unix_local, 0, strlen($unix_local) - 6);
-  }
-
-  function seconds_to_dayshours($seconds) {
-    $days    = intval($seconds / DAY);
-    $hours   = intval(($seconds % DAY) / HOUR);
-    return sprintf('%d days %d hours', $days, $hours);
-  }
-
-  while ($device = db_fetch_object($result)) {
+  foreach ($result as $device) {
 
     $support_link = $device->support_requested ?
       l(t('Suspend Support'), "device/support/suspend/$device->device") :
       l(t('Request Support'), "device/support/confirm/$device->device");
-    
+
     //FIXME: Use $device->device instead of $device->serial
-    
+
     $row = array();
     $row[] = $device->serial;
     $row[] = $device->resets;
-    $row[] = unix_to_userlocaltime($device->access);
-    $row[] = seconds_to_dayshours($device->uptime);
-    $row[] = l(t('Remove'),  "device/deactivate/$device->device") . '<br>' .
+    $row[] = logger_unix_to_userlocaltime($device->access);
+    $row[] = logger_seconds_to_dayshours($device->uptime);
+    $row[] = l(t('Remove'),   "device/deactivate/$device->device") . '<br>' .
              l(t('History'), "event/log/list/$device->serial") . '<br>' .
              $support_link;
 
     $rows[] = $row;
   }
 
-  return drupal_render($form) .
-    theme('logger_userdevices_list', $rows);
+  return drupal_render_children($form) .
+    theme('logger_userdevices_list', array('items' => $rows));
 }
 
 /**
@@ -411,14 +476,16 @@ function theme_logger_userdevices($form) {
  * @param $items  An array of table rows.
  * @return the themed list of devices.
  */
-function theme_logger_userdevices_list($items) {
-      
+function theme_logger_userdevices_list($variables) {
+  $items = $variables['items'];
+
   if (count($items) > 0) {
 
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
-    return theme('table', $headers, $items);
+    return theme_table(array('header' => $headers, 'rows' => $items));
 
-  } else {
+  }
+  else {
     return t('No devices available.');
   }
 }
@@ -429,14 +496,16 @@ function theme_logger_userdevices_list($items) {
  * @param $items An array of table rows.
  * @return the themed list of sensors.
  */
-function theme_logger_usersensors_list($items) {
+function theme_logger_usersensors_list($variables) {
+  $items = $variables['items'];
 
   if (count($items) > 0) {
 
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
-    return theme('table', $headers, $items);
+    return theme_table(array('header' => $headers, 'rows' => $items));
 
-  } else {
+  }
+  else {
     return t('No sensors available.');
   }
 }
@@ -444,6 +513,6 @@ function theme_logger_usersensors_list($items) {
 /**
  * Define the administration settings form for the logger module
  */
-function logger_admin_settings() {
+function logger_admin_settings($form, &$form_state) {
   //TODO
 }

@@ -1,10 +1,11 @@
 <?php
 
-function jobqueue_install() {
-}
+/**
+ * @file
+ * Install, update and uninstall functions for the jobqueue module.
+ */
 
-function jobqueue_uninstall() {
-}
+function jobqueue_install() { }
 
-#function jobqueue_schema() {
-#}
+function jobqueue_uninstall() { }
+
