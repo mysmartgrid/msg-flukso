@@ -1,92 +1,100 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
 
-<HTML xmlns="http://www.w3.org/1999/xhtml" xml:lang="<?php print $language->language ?>" dir="<?php print $language->dir ?>"
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="<?php print $language->language ?>" dir="<?php print $language->dir ?>"
   <?php print $rdf_namespaces ?>>
-<HEAD profile="<?php print $grddl_profile ?>">
+<head profile="<?php print $grddl_profile ?>">
 
-  <META http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-  <META http-equiv="X-UA-Compatible" content="IE=EmulateIE7"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7"/>
 
-  <TITLE><?php print $head_title." - ".$title.$node->title ?></TITLE>
-  <META http-equiv="content-language" content="<?php print $language->language ?>"/>
-  <META http-equiv="imagetoolbar" content="no"/>
-  <META name="robots" content="index, follow"/>
+  <title><?php print $head_title." - ".$title.$node->title ?></title>
+  <meta http-equiv="content-language" content="<?php print $language->language ?>"/>
+  <meta http-equiv="imagetoolbar" content="no"/>
+  <meta name="robots" content="index, follow"/>
   <?php print $styles ?>
-  <SCRIPT type="text/javascript" src="/<?php print path_to_theme(); ?>/style/flash-replace-1.01.js"></SCRIPT>
+  <script type="text/javascript" src="/<?php print path_to_theme(); ?>/style/flash-replace-1.01.js"></script>
   <?php print $scripts ?>
   <?php print $head ?>
-</HEAD>
+</head>
 
-<BODY <?php print theme("onload_attribute"); ?>>
+<body <?php print theme("onload_attribute"); ?>>
 
-  <DIV id="page">
+  <div id="page">
 
       <!-- HEADER include start -->
-      <DIV id="header" role="banner">
+      <div id="header" role="banner">
 
-        <DIV class="wrapper">
+        <div class="wrapper">
 
           <!-- Logo with facility name, linked to start page, except on the start page itself! -->
-          <H1 id="logo"><A href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></A></H1>
-          <H2>Service-Navigation</H2>
+          <h1 id="logo"><a href="/" tabindex="1" title="zur Startseite" rel="start"><img src="<?php print $logo ?>" alt="mySmartGrid" /></a></h1>
+          <h2>Service-Navigation</h2>
 
-          <DIV class="section">
+          <div class="section">
             <?php if ($header != ""): ?><div id="header"><?php print $header ?></div><?php endif; ?>
 
             <ul id="meta-nav"></ul>
-          </DIV>
-        </DIV>
-      </DIV><!-- #header -->
+          </div>
+        </div>
+      </div><!-- #header -->
       <!-- HEADER include end -->
       
 
       <!-- Main content section -->
-      <DIV id="doc">
-        <IMG src="/<?php print path_to_theme(); ?>/style/bg-vorlage.jpg" id="doc-bg" alt="" width="997" height="400" />
+      <div id="doc">
+        <img src="/<?php print path_to_theme(); ?>/style/bg-vorlage.jpg" id="doc-bg" alt="" width="997" height="400" />
 
         <!-- Text content -->
-        <DIV id="main" role="main">
-          <DIV id="breadcrumb"><?php print $breadcrumb ?></DIV>
+        <div id="main" role="main">
+          <div id="breadcrumb"><?php print $breadcrumb ?></div>
 
-          <DIV role="section">
-            <DIV class="headings">
+          <div role="section">
+            <div class="headings">
               <?php if ($title != "") { ?><h2 class="content-title"><?php print $title ?></h2><?php } else { ?>
               <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title ?></h2><?php endif; } ?>
-            </DIV>
-          </DIV>
+            </div>
+          </div>
 
-          <DIV class="section" role="section">
+          <div class="section" role="section">
 
               
             <?php if ($tabs != ""): ?><?php print render($tabs); ?><?php endif; ?>
             
             <?php if ($help != ""): ?><p id="help"><?php render($page['help']); ?></p><?php endif; ?>
-            <?php if ($messages != ""): ?><DIV id="message"><?php print $messages ?></DIV><?php endif; ?>
+            <?php if ($messages != ""): ?><div id="message"><?php print $messages ?></div><?php endif; ?>
 
             <!-- start main content -->
-            <DIV class="clearfix">
+            <div class="clearfix">
               <?php print render($page['content']); ?>
-            </DIV>
+            </div>
             <!-- end main content -->
-          </DIV>
+          </div>
           
-        </DIV><!-- #main -->
+        </div><!-- #main -->
 
         <!-- NAVIGATION include start -->
-        <DIV id="nav" class="nav-fhg">
-          <H2>Menü</H2>
-          <H3>Hauptmenü</H3>
-          <?php if (isset($main_menu)) { ?><DIV id="primary"><?php print theme('links', $main_menu) ?></DIV><?php } ?><!-- #nav-direct-first -->
-        </DIV>
+        <div id="nav" class="nav-fhg">
+          <h2>Menü</h2>
+          <h3>Hauptmenü</h3>
+          <?php if (isset($main_menu)) { ?>
+            <div id="primary">
+              <?php print theme('links', $main_menu) ?>
+            </div>
+          <?php } ?><!-- #nav-direct-first -->
+        </div>
 
-        <?php if ($sidebar_first) { ?> <DIV id="contentboxes"><?php print $sidebar_first ?></DIV> <?php } ?>
+        <?php if ($sidebar_first) { ?>
+          <div id="contentboxes">
+            <?php print $sidebar_first ?>
+          </div>
+        <?php } ?>
 
-      </DIV><!-- #doc -->
+      </div><!-- #doc -->
 
 
       <!-- FOOTER include start -->
-      <DIV id="footer">
-        <DIV class="wrapper">
+      <div id="footer">
+        <div class="wrapper">
 
           <!-- Footer navigation -->
           <ul id="footer-nav" role="contentinfo">
@@ -97,24 +105,24 @@
           </ul>
 
           <!-- Hidden input element to force an update of the screenreader buffer via JavaScript -->
-          <FORM method="get" action="http://ve-166.bi.server.de/">
-            <FIELDSET>
-              <INPUT type="hidden" name="bufferUpdater" id="bufferUpdater" disabled="disabled" value=""/>
-            </FIELDSET>
-          </FORM>
-        </DIV>
-      </DIV><!-- #footer -->
+          <form method="get" action="http://ve-166.bi.server.de/">
+            <fieldset>
+              <input type="hidden" name="bufferUpdater" id="bufferUpdater" disabled="disabled" value=""/>
+            </fieldset>
+          </form>
+        </div>
+      </div><!-- #footer -->
 
       <!-- Print footer -->
-      <DIV id="print-footer">
-        <P>
-          <STRONG>Quelle: Fraunhofer-Gesellschaft – T2 Übersichts-/Indexseite - Forschungsthemen</STRONG><BR/>
-            Online im Internet; URL http://ve-166.bi.server.de/international/seitentypen/t2uebersichtseite1<BR/>
-            [Stand: 26.02.2011, 08:39 Uhr]<BR/>
-        </P>
-      </DIV><!-- #print-footer -->
+      <div id="print-footer">
+        <p>
+          <strong>Quelle: Fraunhofer-Gesellschaft – T2 Übersichts-/Indexseite - Forschungsthemen</strong><br/>
+            Online im Internet; URL http://ve-166.bi.server.de/international/seitentypen/t2uebersichtseite1<br/>
+            [Stand: 26.02.2011, 08:39 Uhr]<br/>
+        </p>
+      </div><!-- #print-footer -->
       <!-- FOOTER include end -->
 
-    </DIV>
-</BODY>
-</HTML>
+    </div>
+</body>
+</html>
