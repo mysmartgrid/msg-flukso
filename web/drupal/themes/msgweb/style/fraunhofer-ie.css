@@ -1,0 +1,266 @@
+@charset "UTF-8";
+
+/**
+ * FraunhoferB CSS for Internet Explorer
+ * Copyright (c) 2008, namics (deutschland) gmbh. All rights reserved.
+ * Code licensed under the MIT License:
+ * http://www.opensource.org/licenses/mit-license.php
+ */
+
+/* Reset */
+body {
+	font-size: 13px;
+}
+button {
+	overflow: visible;
+}
+input, textarea, select {
+	font-size: 100%;
+}
+pre, code, kbd, samp, tt {
+	font-size: 108%;
+}
+.clearfix, #page, #doc, #header, #search, #nav, #nav-2, #nav-direct, #main, #main .section, #main .section .file, #main .tablist, #page #servicenav .linklist .file, .vcard, #footer, .vignette, .yui-skin-sam {
+	height: 1%;
+	position: relative;
+}
+#nav ul, #nav li {
+	height: 1%;
+}
+#header #skiplinks {
+	position: relative;
+	width: 20em;
+}
+
+/**************************************
+ * html, body, main document elements *
+ **************************************/
+#doc, #header .wrapper, #footer .wrapper {
+	max-width: 77em; /* 996/13 */
+}
+#header {
+	z-index: 1000;
+}
+#header .section, #main {
+	width: 40.5em; /* 526px / 13px = 40.4615 */
+}
+#main dl.image img, #main .image img {
+	width: auto;
+}
+#main li.with-img div {
+	float: left;
+	margin-left: 0;
+}
+#main ul.linklist li {
+	padding-left: 1.3em;
+	vertical-align: middle;
+}
+#main ul.tablist li {
+	zoom: 1;
+}
+#main li li, #main ul.bulletpointlist li li, #main ul.advantagelist li li {
+	background: url(../img/icons.gif) no-repeat 0 -7091px;
+}
+#main ul.linklist li, #main .vcard ul.linklist li {
+	padding-left: 20px; /* fix for correct position of background-image 'arrow' in lists */
+}
+#main #social-bookmarks li {
+	margin-left: 0.5em;
+}
+#main div.section ol, #shadowbox ol {
+	margin-left:0;
+	padding-left: 2em;
+}
+#main div.dp-highlighter ol {
+	margin-left: 45px;
+	padding-left: 0;
+}
+
+
+#main .section a.close, #servicenav #contentboxes a.close {
+	background-position: left -2995px; /* fix for correct position of minus icon */
+}
+
+#main a.slide-control, #contentboxes a.slide-control, #main .linklist a.slide-control {
+	background-position: left -2695px;
+}
+
+
+
+#main ul.sitemap li,
+#main ul.sitemap li a,
+#main ul.contentnav li,
+#main ul.contentnav li a,
+div#contentboxes div.contentbox,
+div#contentboxes div.contentbox div.section {
+	zoom: 1;
+}
+
+#nav {
+	min-width: 15.384em;
+}
+#nav span, #nav .direct canvas, #nav div.direct span, #nav div.direct canvas {
+	filter: alpha(opacity=80);
+}
+#nav .direct span {
+	filter: alpha(opacity=70);
+}
+#nav .direct a span, #nav-2 span {
+	filter: alpha(opacity=100);
+}
+#nav a {
+	margin-bottom: 0;
+	position: relative;
+}
+#nav-direct-second {
+	position: relative;
+	z-index: 1000;
+}
+#search button span, #search-staff button span {
+	top:-1px;
+}
+a.external {
+	display: inline-block;
+}
+#page #servicenav {
+	margin-left: 1.5em; /* fix for correct margin of contentboxes */
+}
+
+/* Navigation IE7 __________________________________________________________ */
+#nav li { margin-bottom: 0; }
+
+/* 1st level */
+#nav-first li.nav-first-current {
+	margin-bottom: 0.27em !important;
+}
+/* if 1st level nav has no sub navigation */
+#nav-first li.blank { margin-bottom: 0 !important; }
+#nav-first li.blank a.active { margin-bottom: 0 !important; }
+#nav-first li.blank a.current { margin-bottom: 0 !important; }
+#nav-first li.nav-first-current a.active { margin-bottom: 0.27em; }
+#nav-first li.nav-first-current #nav-second { margin-top: -0.27em !important; }
+#nav-first li.nav-first-current #nav-second a.current { margin-top: 0; margin-bottom: -0.27em; }
+#nav-first li.nav-first-current #nav-second #nav-third { margin-top: 0.27em !important; }
+#nav-first li.nav-first-current #nav-second #nav-third a.current { margin-bottom: -0.27em; }
+#nav-third li.children #nav-forth { margin-top: -0.27em !important; padding-top: 0.27em; }
+#nav-forth { margin-top: -0.27em !important; padding-top: 0.27em; }
+
+
+/* Formulare _______________________________________________________________ */
+#main ul.cat li {
+	margin-bottom: 0;
+}
+ul.cat label {
+	display: inline;
+	margin: 0 0 0.2em 0.5em;
+}
+#main ul.cat li input,
+#main ul.cat li input.checkbox,
+#main ul.cat li input.radio {
+	border: none;
+	display: inline;
+	float: none;
+	margin-top: 0.2em;
+}
+
+/** SEARCH **/
+#contentboxes div.search ul.cat {
+	margin-top: 1em;
+}
+#contentboxes div.search ul.cat input {
+	clear: both;
+	float: left;
+	display: block;
+	margin: 0 0 0 -4px;
+}
+#contentboxes div.search label {
+	display: block;
+	float: left;
+	margin-left: 0.5em;
+}
+
+#shadowbox .tabcontent fieldset ul {
+	float: left;
+	width: 30%;
+}
+
+#shadowbox .tabcontent fieldset ul.cat li {
+	clear: both;
+	display: block;
+}
+#shadowbox .tabcontent fieldset ul.cat li input {
+	background-color: transparent;
+	float: left;
+}
+#shadowbox .tabcontent fieldset ul.cat li label {
+	float: left;
+	margin: 0.35em 0 0 0.5em;
+}
+
+
+/* Calendar */
+#main .datepicker {
+	top: 0.1em !important;
+}
+#main .datepicker {
+	top: 0;
+}
+.datepicker table {
+	width: 8em;
+}
+.datepicker_control {
+	vertical-align: 0;
+}
+div.after-calendar {
+	z-index: -1;
+}
+
+
+/*************
+ * Shadowbox *
+ *************/
+div.shadowbox_clear {
+	clear: none;
+}
+
+/************
+ * Vignette *
+ ************/
+div#vignettes {
+	border: none;
+}
+v\: * {
+	behavior: url(#default#VML);
+	display: inline-block;
+	height: 98% !important;
+	left: 0;
+	position: absolute;
+	top: 0;
+	width: 100%;
+	z-index: 0;
+}
+#vignettes .first {
+	left: 2.3em;
+}
+#vignettes .second {
+	left: -0.4em;
+}
+#vignettes .top span {
+	filter: alpha(opacity=90);
+}
+#vignettes .bottom span {
+	filter: alpha(opacity=70);
+}
+div#vignettes {
+	width: 14em;
+}
+.vignette ul.fisheye li { font-size: 100%; }
+@media print {
+	v\: * {
+		display: none;
+	}
+}
+
+.vignette form input.submit  {
+	overflow:visible;
+}

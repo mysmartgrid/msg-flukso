@@ -1,0 +1,8 @@
+name = MSGWeb
+description = The mySmartGrid website theme.
+package = mySmartGrid
+version = "7.x-1"
+core = 7.x
+
+stylesheets[all][] = style/fraunhofer.css 
+stylesheets[handheld][] = style/fraunhofer-handheld.css
