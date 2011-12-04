@@ -162,7 +162,7 @@ thead td {
 	color: #fff;
 }
 #nav-third, #main form.context fieldset {
-	background-color: #deeef1 ;
+	background-color: #deeef1;
 }
 form input.reset {
 	background-color: #a5d2d9;
@@ -331,7 +331,7 @@ body.font-xl {
 
 .form-item,
 #nav a,#main h4, #main h5, #main div.context h3, #main dl, #main p, #main ul, #main ol, #main td, #main th, #main ul.pager a, #main p.pager , #main dl.image dd, #ibox_footer_wrapper a,
-#contentboxes h4,
+#contentboxes h2,
 #contentboxes h5,
 #contentboxes div.context h3,
 #contentboxes dl,
@@ -2379,10 +2379,10 @@ a.carousel-button {
 }
 
 /* Contentbox(en) __________________________________________________________ */
-#contentboxes .section {
+#contentboxes .content {
 	padding: 1.3em 0.95em; /* general padding */
 }
-#contentboxes .vcards .section {
+#contentboxes .vcards .content {
 	padding: 0.95em; /* padding vor vcards */
 }
 #contentboxes {
@@ -2394,12 +2394,12 @@ a.carousel-button {
 	padding-top: 20px;
 }
 
-#contentboxes .section {
-  background-color: rgb(255,255,255);
-  background-color: rgba(255,255,255,0.8);
+#contentboxes .content {
+	background-color: rgb(255,255,255);
+	background-color: rgba(255,255,255,0.8);
 }
 
-.contentbox h4 {
+.region h2.title {
 	background-color: #a5d2d9;
 	background-color: rgba(158,212,218,0.8);
 	color:#fff;
@@ -2409,12 +2409,16 @@ a.carousel-button {
 	padding:0.2em 0.83em;
 }
 
-.contentbox .section h4{
-	background-color:transparent;
-	color:#000;
-	font-stretch:normal;
-	line-height:1.32;
-	padding:0;
+.region .content h2 {
+        background-color: transparent;
+        color: #000;
+        font-stretch: normal;
+        line-height: 1.32;
+        padding: 0;
+}
+
+#contentboxes .region div.block {
+	padding-bottom: 1.5em;
 }
 
 /* Contentbox: Tagcloud ____________________________________________________ */

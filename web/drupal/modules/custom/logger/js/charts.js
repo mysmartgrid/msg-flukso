@@ -64,17 +64,41 @@ function formatCVSTimeStamp(d) {
  * Look through stylesheets in reverse order that they appear in the document.
  */
 function getStyleBySelector(selector) {
+
   var sheets = document.styleSheets;
-  var rules, s, r;
+  var rules, imported, rule, style, s, r, i;
+  var isIE = sheets[0].cssRules == undefined;
 
   for (s = sheets.length - 1; s >= 0; s--) {
-    rules = sheets[s].cssRules == undefined ? sheets[s].rules : sheets[s].cssRules;
+    rules = isIE ? sheets[s].rules : sheets[s].cssRules;
+
+    style = findStyle(rules, selector);
+    if (style != null) {
+      return style;
+    }
+ 
+    rules = isIE ? sheets[s].imports : rules;
 
     for (r = 0; r < rules.length; r++){
+      var imported = isIE ? rules[r].rules : rules[r].styleSheet.cssRules;
 
-      if (rules[r].selectorText && rules[r].selectorText.toLowerCase() == selector){
-        return rules[r].style;
+      style = findStyle(imported, selector);
+      if (style != null) {
+        return style;
       }
+    }
+  }
+  return null;
+}
+
+function findStyle(rules, selector) {
+
+  var r, rule;
+  for (r = 0; r < rules.length; r++) {
+    rule = rules[r];
+
+    if (rule.selectorText && rule.selectorText.toLowerCase() == selector){
+      return rule.style;
     }
   }
   return null;
