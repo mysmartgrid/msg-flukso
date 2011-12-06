@@ -380,8 +380,11 @@ function logger_rrd_parse_exported_lines($lines, $offset) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Returns the unit conversion factor.
+ * 
+ * @param $unit  the unit.
+ * @param $price the price (if the unit is Euro).
+ * @return the unit conversion factor.
  */
 function logger_rrd_get_unit_factor($unit, $price = NULL) {
 

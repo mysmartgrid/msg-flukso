@@ -166,6 +166,8 @@ function notification_install() {
 
   global $user;
 
+  drupal_set_message(st('Created notification module tables.'));
+  
   //event
   db_insert('event')
     ->fields(array(
@@ -383,8 +385,7 @@ function notification_install() {
 }
 
 function notification_uninstall() {
-  // TODO The drupal_(un)install_schema functions are called automatically in D7.
-  // drupal_uninstall_schema('notification')
+  drupal_set_message(st('Deleted notification module tables.'));
 }
 
 function notification_update_7000() {

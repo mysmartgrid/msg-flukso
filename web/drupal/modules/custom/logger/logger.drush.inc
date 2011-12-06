@@ -23,10 +23,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_drush_command() {
 
   $items = array();
@@ -82,8 +78,11 @@ function logger_drush_command() {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Registers a new device. 
+ * 
+ * @param $serial  The device serial number.
+ * @param $country The user country code.
+ * @param $uid     The user id.
  */
 function logger_create_node($serial, $country = "", $uid = 0) {
 
@@ -98,8 +97,7 @@ function logger_create_node($serial, $country = "", $uid = 0) {
       'LOGGER_CREATE_SERIAL_DUPLICATE',
       dt('The S/N: @serial already exists.', array('@serial' => $serial)));
 
-  }
-  else {
+  } else {
 
     if ($uid > 0) {
 
@@ -188,8 +186,11 @@ function logger_create_node($serial, $country = "", $uid = 0) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Assigns a flukso device to a user.
+ * 
+ * @param $serial  The device serial number.
+ * @param $country The user country code.
+ * @param $uid     The user id.
  */
 function logger_assign_node($serial, $country, $uid) {
 
@@ -200,8 +201,7 @@ function logger_assign_node($serial, $country, $uid) {
   if ($device == '') {
     drush_set_error('LOGGER_ASSIGN_SERIAL_NON_EXISTENT', dt('The S/N: @serial does not exist.', array('@serial' => $serial)));
 
-  }
-  else {
+  } else {
 
     db_update('logger_devices')
       ->fields(array(
@@ -236,8 +236,14 @@ function logger_assign_node($serial, $country, $uid) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Updates a sensor.
+ * 
+ * @param $meter     The sensor id.
+ * @param $type      The sensor type.
+ * @param $function  The sensor function name.
+ * @param $phase     The sensor phase.
+ * @param $constant  The sensor constant.
+ * @param $unit      The sensor unit.
  */
 function logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
 
@@ -259,8 +265,7 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
     drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');
     drush_print_pipe('ok');
 
-  }
-  else {
+  } else {
     drush_set_error(
       'LOGGER_NON_UNIQUE_METER_FUNCTION',
       dt('The function name: @function is already been used by another sensor.',
@@ -269,8 +274,10 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Creates sensor tokens.
+ * 
+ * @param $meter       The sensor id.
+ * @param $permissions The user permissions.
  */
 function logger_tokens($meter = "", $permissions = 62) {
 
@@ -299,8 +306,7 @@ function logger_tokens($meter = "", $permissions = 62) {
         if (!$insert) {
           drush_set_error('LOGGER_CREATE_TOKEN_ENTRY', dt('Error creating token entry for @meter.', array('@meter' => $meter->meter)));
 
-        }
-        else {
+        } else {
           drush_log(dt('Created an entry in {logger_tokens} with token: @token and meter: @meter', array('@token' => $token, '@meter' => $meter->meter)), 'ok');
         }
       }

@@ -369,6 +369,14 @@ function deployment_get_devices($state_id = NULL, $serial = NULL) {
   return $data;
 }
 
+/**
+ * Creates a device query.
+ * 
+ * @param $now      The current time.
+ * @param $state_id The device state (optional).
+ * @param $serial   The device serial number (optional).
+ * @return the array of devices with the specified state and serial number.
+ */
 function deployment_create_devices_query($now, $state_id, $serial) {
 
   //If parameters are used in this SQL query, pager_query does not count rows correctly
@@ -629,6 +637,9 @@ function deployment_cron() {
   deployment_create_summary();
 }
 
+/**
+ * Creates a periodic deployment summary.
+ */
 function deployment_create_summary() {
 
   $now = REQUEST_TIME;

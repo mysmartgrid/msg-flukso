@@ -42,10 +42,7 @@ define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
+
 function logger_init() {
 
   //If IE
@@ -68,10 +65,6 @@ function logger_init() {
   drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.js');
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_permission() {
   return array(
     'view logger charts' => array(
@@ -109,10 +102,6 @@ function logger_permission() {
   );
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_menu() {
 
   // Main operations
@@ -354,17 +343,59 @@ function logger_home_page($arg = NULL) {
   if (user_access('view logger charts')) {
     return logger_energy_page('week');
 
-  }
-  else {
+  } else {
     return logger_overview_page('hour');
   }
 }
 
 /**
-* @todo Please document this function.
-* @see http://drupal.org/node/1354
-*/
-function logger_create_icon($image, $label, $target) {
+ * Builds the mobile application home page.
+ * 
+ * @return the mobile home page.
+ */
+function logger_mobile_page() {
+
+  global $user;
+
+  if ($user->uid) {
+    $output =
+      logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
+      logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
+      logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
+      logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
+      logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
+      logger_create_mobile_page_icon('dump.png',        t('Dump values'),      '/dump/116/setup') .
+      logger_create_mobile_page_icon('myaccount.png',   t('My Account'),        "/users/$user->name");
+
+  } else {
+    $output .=
+      logger_create_mobile_page_icon('join.png',        t('Join mySmartGrid'), '/content/werden-sie-teilnehmer');
+  }
+
+  $output .=
+    logger_create_mobile_page_icon('project.png',       t('The Project'),       '/content/das-projekt') .
+    logger_create_mobile_page_icon('overview.png',      t('Overview'),          '/overview') .
+    logger_create_mobile_page_icon('question.png',      t('FAQ'),               '/content/h%C3%A4ufige-fragen-und-antworten') .
+    logger_create_mobile_page_icon('installation.png',  t('Installation'),      '/content/installationsanleitung-des-fluksos') .
+    logger_create_mobile_page_icon('forum.png',         t('Forums'),            '/forum') .
+    logger_create_mobile_page_icon('blog.png',          t('Blog'),              '/blog') .
+    logger_create_mobile_page_icon('newsletter.png',    t('Newsletter'),        '/newsletter') .
+    logger_create_mobile_page_icon('developer.png',     t('Developer'),         '/content/seiten-f%C3%BCr-entwickler') .
+    logger_create_mobile_page_icon('contact.png',       t('Contact'),           '/kontakt');
+
+  return $output;
+}
+
+/**
+ * Creates a mobile page icon.
+ * 
+ * @param $image  The icon image file.
+ * @param $label  The icon label.
+ * @param $target The icon target URL.
+ * @return the icon.
+ */
+function logger_create_mobile_page_icon($image, $label, $target) {
   return '
     <div class="menu-icon">
       <a href="' . $target . '">
@@ -375,48 +406,9 @@ function logger_create_icon($image, $label, $target) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
-function logger_mobile_page() {
-
-  global $user;
-
-  if ($user->uid) {
-    $output =
-      logger_create_icon('energy.png',      t('Energy'),            '/energy') .
-      logger_create_icon('power.png',       t('Power'),             '/power') .
-      logger_create_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
-      logger_create_icon('event.png',       t('Events'),            '/notification/list') .
-      logger_create_icon('addnode.png',     t('Add Node'),          '/node/add') .
-      logger_create_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
-      logger_create_icon('dump.png',        t('Dump values'),      '/dump/116/setup') .
-      logger_create_icon('myaccount.png',   t('My Account'),        "/users/$user->name");
-
-  }
-  else {
-    $output .=
-      logger_create_icon('join.png',        t('Join mySmartGrid'), '/content/werden-sie-teilnehmer');
-  }
-
-  $output .=
-    logger_create_icon('project.png',       t('The Project'),       '/content/das-projekt') .
-    logger_create_icon('overview.png',      t('Overview'),          '/overview') .
-    logger_create_icon('question.png',      t('FAQ'),               '/content/h%C3%A4ufige-fragen-und-antworten') .
-    logger_create_icon('installation.png',  t('Installation'),      '/content/installationsanleitung-des-fluksos') .
-    logger_create_icon('forum.png',         t('Forums'),            '/forum') .
-    logger_create_icon('blog.png',          t('Blog'),              '/blog') .
-    logger_create_icon('newsletter.png',    t('Newsletter'),        '/newsletter') .
-    logger_create_icon('developer.png',     t('Developer'),         '/content/seiten-f%C3%BCr-entwickler') .
-    logger_create_icon('contact.png',       t('Contact'),           '/kontakt');
-
-  return $output;
-}
-
-/**
  * Checks if the client is a mobile device.
  *
- * @return true if it is; false otherwise.
+ * @return TRUE if it is; FALSE otherwise.
  */
 function logger_is_mobile_device() {
 
@@ -425,8 +417,10 @@ function logger_is_mobile_device() {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Builds the power consumption page of a single user.
+ * 
+ * @param $uid The user id.
+ * @return the power consumption page. 
  */
 function logger_user_power_page($uid) {
   logger_set_variable('selected_users', array($uid));
@@ -489,8 +483,7 @@ function logger_overview_page($interval) {
   if (isset($cache->data)) {
     $output = $cache->data;
 
-  }
-  else {
+  } else {
 
     //General explanation
     $output = theme('logger_overview_topic', array('title' => NULL, 'body' =>
@@ -614,8 +607,7 @@ function logger_energy_page($interval) {
     $start = mktime(0, 0, 0, date('n') - 11, 1);
     $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
 
-  }
-  else {
+  } else {
     $sub_interval = logger_get_sub_interval($interval);
     $sub_time_window = logger_get_default_time_window($sub_interval);
 
@@ -780,8 +772,7 @@ function logger_download_chart_data_file($cache_id) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Downloads a chart data file.
  */
 function logger_download_file($file_name, $header, $lines) {
 
@@ -874,8 +865,12 @@ function logger_get_relative_chart_data($chart) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Formats a period of time array for exhibition.
+ * 
+ * @param $interval  The time interval name.
+ * @param $period    The pair of timestamps (start, end) that define the period.
+ * @param $offset    The timezone offset.
+ * @return the period of time as a string.
  */
 function logger_format_period($interval, $period, $offset) {
 
@@ -887,13 +882,13 @@ function logger_format_period($interval, $period, $offset) {
       return date('H:i', $start);
 
     case 'dayquarter':
-      return logger_format_period_line($start, $end, 'H:i');
+      return logger_format_long_period($start, $end, 'H:i');
 
     case 'day':
       return date('d/m', $start);
 
     case 'week':
-      return logger_format_period_line($start, $end, 'd/m');
+      return logger_format_long_period($start, $end, 'd/m');
 
     case 'month':
       return t(date('F', $start));
@@ -904,17 +899,22 @@ function logger_format_period($interval, $period, $offset) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Formats a long period of time for exhibition.
+ * 
+ * @param $start   The timestamp when the period begins.
+ * @param $end     The timestamp when the period ends.
+ * @param $format  The timestamp format to be used.
+ * @return the long period of time as a string.
  */
-function logger_format_period_line($start, $end, $format) {
+function logger_format_long_period($start, $end, $format) {
   return t('from:') . '&nbsp;&nbsp;' . date($format, $start) . '<br>' .
          t('to:') . '&nbsp;&nbsp;' . date($format, $end);
 }
 
 /**
  * Returns an array containing all energy consumption chart data.
- *
+ * 
+ * @param $chart  The chart object with the parameters for the data query.
  * @return the chart data.
  */
 function logger_get_energy_chart_data(&$chart) {
@@ -1024,39 +1024,54 @@ function logger_get_energy_chart_data(&$chart) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Creates a line for the energy consumption chart legend.
+ * 
+ * @param $sensor      The sensor object.
+ * @param $min         The minimum value on the period.
+ * @param $max         The maximum value on the period.
+ * @param $total       The number of values.
+ * @param $sum         The total consumption on the period.
+ * @param $min_time    The sub period (eg. day of the week) with the minimum consumption.
+ * @param $max_time    The sub period (eg. day of the week) with the maximum consumption.
+ * @param $interval    The chart time interval name.
+ * @return the legend line.
  */
-function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_day, $max_day, $interval) {
+function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_record, $max_time, $interval) {
 
   return array(
     t('User') => $sensor->username,
     t('Sensor') => $sensor->function,
     t('Type') => t($sensor->type),
-    t('Min') => $total > 0 ? logger_format_energy_legend_day($min, $min_day, $interval) : '',
-    t('Max') => $total > 0 ? logger_format_energy_legend_day($max, $max_day, $interval) : '',
+    t('Min') => $total > 0 ? logger_format_energy_legend_record($min, $min_time, $interval) : '',
+    t('Max') => $total > 0 ? logger_format_energy_legend_record($max, $max_time, $interval) : '',
     t('Avg') => $total > 0 ? $sum / $total : '',
     t('Sum') => $total > 0 ? $sum : '',
   );
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Formats a record consumption (either min or max) to be shown on a cell of 
+ * the energy consumption chart legend.
+ *  
+ * @param $min         The record value.
+ * @param $record_time The record time.
+ * @param $interval    The chart time interval name.
+ * @return the formatted record.
  */
-function logger_format_energy_legend_day($value, $formatted_time, $interval) {
+function logger_format_energy_legend_record($value, $record_time, $interval) {
 
   $prep = $interval == 'year' ? 'in' : 'am';
 
   return t("%value $prep %day", array(
     '%value' => number_format($value, 2, '.', ''),
-    '%day' => $formatted_time,
+    '%day' => $record_time,
   ));
 }
 
 /**
  * Returns an array containing all power consumption chart data.
  *
+ * @param $chart  The chart object with the parameters for the data query.
  * @return the chart data.
  */
 function logger_get_power_chart_data($chart) {
@@ -1093,6 +1108,7 @@ function logger_get_power_chart_data($chart) {
 /**
  * Returns an array containing all overview chart data.
  *
+ * @param $chart  The chart object with the parameters for the data query.
  * @return the chart data.
  */
 function logger_get_overview_chart_data($chart) {
@@ -1111,8 +1127,11 @@ function logger_get_overview_chart_data($chart) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Formats power consumption chart data series.
+ * 
+ * @param $measurements  The array of timestamp / value that form the data series.
+ * @param $chart         The chart object with the format parameters.
+ * @return the formatted data series.
  */
 function logger_format_power_series_data($chart, $measurements) {
 
@@ -1133,8 +1152,14 @@ function logger_format_power_series_data($chart, $measurements) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Creates a line for the power consumption chart legend.
+ * 
+ * @param $sensor      The sensor object.
+ * @param $username    The sensor user name.
+ * @param $type        The sensor type.
+ * @param $i           The line index.
+ * @param $operations  The list of links that affect the sensor.
+ * @return the legend line.
  */
 function logger_create_power_legend_line($username, $sensor, $type, $i, $operations = NULL) {
 
@@ -1330,10 +1355,6 @@ function logger_get_timezone_offset() {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_theme() {
 
   return array(
@@ -1680,9 +1701,6 @@ function logger_get_series_colors($chart_id) {
   return $user_palette;
 }
 
-/**
- * Implements hook_block_info().
- */
 function logger_block_info() {
   $blocks['posts']['info'] = t('Recent blog posts');
   $blocks['posts']['status'] = TRUE;
@@ -1693,59 +1711,43 @@ function logger_block_info() {
   return $blocks;
 }
 
-/**
- * Implements hook_block_view().
- */
 function logger_block_view($delta) {
-  if ($delta == 'posts' && user_access('access content')) {
-    $block = logger_create_recent_blogs_block();
-  }
-  return $block;
-}
-
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
-function logger_create_recent_blogs_block() {
-
+  
   $block = array();
+  if ($delta == 'posts' && user_access('access content')) {
 
-  $sql = "
-    SELECT
-      n.nid,
-      n.title,
-      n.created
-    FROM
-      {node} n
-    WHERE
-      n.type = :type AND
-      n.status = :status
-    ORDER BY
-      n.created DESC";
+    $sql = "
+      SELECT
+        n.nid,
+        n.title,
+        n.created
+      FROM
+        {node} n
+      WHERE
+        n.type = :type AND
+        n.status = :status
+      ORDER BY
+        n.created DESC";
 
-  $result = db_query_range($sql, 0, 5, array('type' => 'blogpost', ':status' => 1));
+    $result = db_query_range($sql, 0, 5, array('type' => 'blogpost', ':status' => 1));
+    
+    $node_title_list = node_title_list($result);
 
-  $node_title_list = node_title_list($result);
-
-  if ($node_title_list) {
-    $block['subject'] = t('Recent blog posts');
-    $block['content'] = $node_title_list;
-    $block['content'] .= theme('more_link', array('url' => url('blog'), 'title' => t('Read the latest blog entries.')));
+    if ($node_title_list) {
+      $block['subject'] = t('Recent blog posts');
+      $block['content'] = $node_title_list;
+      $block['content'] .= theme('more_link', array('url' => url('blog'), 'title' => t('Read the latest blog entries.')));
+    }
   }
-
   return $block;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_form_contact_mail_page_alter(&$form, $form_state) {
 
   $devices = logger_get_devices_options();
   $options = array_flip($devices);
 
+  //Adds the list of user devices on the contact form as a hidden field.
   $form['devices'] = array(
     '#type' => 'select',
     '#options' => $options,
@@ -1756,10 +1758,6 @@ function logger_form_contact_mail_page_alter(&$form, $form_state) {
   );
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_mail_alter(&$message) {
 
   switch ($message['id']) {
@@ -1768,16 +1766,14 @@ function logger_mail_alter(&$message) {
       $devices = $message['params']['devices'];
 
       if (count($devices) > 0) {
+        
+        //Completes the user contact email with his list of devices
         $message['body'][] = t("User Devices:") . implode(', ', $devices);
       }
       break;
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_energychart_form($form, &$form_state, $chart) {
 
   global $user;
@@ -1850,10 +1846,6 @@ function logger_energychart_form($form, &$form_state, $chart) {
   return $form;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_relativechart_form($form, &$form_state, $chart) {
 
   $meter_options = logger_get_meters_options($chart->types);
@@ -1901,10 +1893,6 @@ function logger_relativechart_form($form, &$form_state, $chart) {
   return $form;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_powerchart_form($form, &$form_state, $chart) {
 
   global $base_path;
@@ -2007,18 +1995,9 @@ function logger_powerchart_form($form, &$form_state, $chart) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
-function logger_operation_button($field_id, $caption, $step) {
-  return '<input type="button" value="' . $caption . '" ' .
-    'onClick="javascript: return updateSmoothingLevel(' . "'$field_id', " . $step . ');"/>';
-}
-  
-/**
- * Builds the Smoothing Level field.
+ * Builds the smoothing level field.
  *
- * @param $element  The Drupal form field element.
+ * @param $variables  The theme variables, containing the field element.
  * @return the field HTML code.
  */
 function theme_logger_smoothing_level($variables) {
@@ -2028,19 +2007,32 @@ function theme_logger_smoothing_level($variables) {
   $value = check_plain($element['#value']);
 
   return
-    logger_operation_button($id, '<<', -10) .
-    logger_operation_button($id, '<',   -1) .
+    logger_create_smoothing_button($id, '<<', -10) .
+    logger_create_smoothing_button($id, '<',   -1) .
 
     logger_create_custom_field($element, '', $value) .
 
-    logger_operation_button($id, '>',    1) .
-    logger_operation_button($id, '>>',   10);
+    logger_create_smoothing_button($id, '>',    1) .
+    logger_create_smoothing_button($id, '>>',   10);
+}
+
+/**
+ * Creates a button to update the chart smoothing level.
+ *
+ * @param $field_id  The smoothing level field id.
+ * @param $caption   The button caption text.
+ * @param $step      The smoothing steps to be triggered when the button is pressed.
+ * @return the button HTML code.
+ */
+function logger_create_smoothing_button($field_id, $caption, $step) {
+  return '<input type="button" value="' . $caption . '" ' .
+    'onClick="javascript: return updateSmoothingLevel(' . "'$field_id', " . $step . ');"/>';
 }
 
 /**
  * Builds the group of fields for informing value range.
  *
- * @param $element  The Drupal form field element.
+ * @param $variables  The theme variables, containing the field element.
  * @return the field HTML code.
  */
 function theme_logger_value_range($variables) {
@@ -2055,7 +2047,7 @@ function theme_logger_value_range($variables) {
 /**
  * Builds the group of fields for informing a time period.
  *
- * @param $element  The Drupal form field element.
+ * @param $variables  The theme variables, containing the field element.
  * @return the field HTML code.
  */
 function theme_logger_time_period($variables) {
@@ -2122,7 +2114,7 @@ function logger_create_time_fields($element, $suffix) {
 }
 
 /**
- * Arrange fields to represent a range.
+ * Arranges fields to represent a range.
  *
  * @param $element  The Drupal form field element.
  * @param $field1   The field that contains the lowest value.
@@ -2138,7 +2130,7 @@ function logger_compose_range_fields($element, $field1, $field2) {
 }
 
 /**
- * Create a customized form field.
+ * Creates a customized form field.
  *
  * @param $element     The Drupal form field element.
  * @param $suffix       A suffix for the field id and name.
@@ -2167,10 +2159,6 @@ function logger_create_custom_field($element, $suffix, $value, $size = 0, $maxle
     $attributes . ' />';
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_powerchart_form_validate($form, &$form_state) {
 
   $smoothing_level = $form_state['values']['smoothing_level'];
@@ -2202,10 +2190,6 @@ function logger_powerchart_form_validate($form, &$form_state) {
   logger_chartform_validate($form, $form_state);
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_chartform_validate($form, &$form_state) {
 
   $price1 = $form_state['values']['price1'];
@@ -2219,10 +2203,6 @@ function logger_chartform_validate($form, &$form_state) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_energychart_form_submit($form, &$form_state) {
 
   $aggregate = $form_state['values']['aggregate_sensors'];
@@ -2243,10 +2223,6 @@ function logger_energychart_form_submit($form, &$form_state) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_powerchart_form_submit($form, &$form_state) {
 
   global $_REQUEST;
@@ -2274,10 +2250,6 @@ function logger_powerchart_form_submit($form, &$form_state) {
   $form_state['redirect'] = array($_GET['q'], $_REQUEST);
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_relativechart_form_submit($form, &$form_state) {
 
   $meters = $form_state['values']['selected_meters'];
@@ -2294,7 +2266,8 @@ function logger_relativechart_form_submit($form, &$form_state) {
 
 /**
  * Returns a list of all sensor types.
- *
+ * 
+ * @param $uid  The user id.
  * @return an array of sensor types.
  */
 function logger_get_sensor_types_options($uid = NULL) {
@@ -2351,8 +2324,7 @@ function logger_get_power_units_options() {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Returns an array of energy units to be used as options of HTML select fields.
  */
 function logger_get_energy_units_options() {
 
@@ -2462,8 +2434,10 @@ function logger_get_default_time_window($interval) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Returns the sub parts that compose a time interval.
+ * 
+ * @param $interval  The time interval.
+ * @return the sub interval name.
  */
 function logger_get_sub_interval($interval) {
   $windows = array(
@@ -2657,10 +2631,6 @@ function logger_set_variable($id, $value) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_form_alter(&$form, &$form_state, $form_id) {
 
   if ($form_id == 'user_login') {
@@ -2670,10 +2640,6 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_account_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
@@ -2726,10 +2692,6 @@ function logger_query_device_measurements($interval, $device, $offset) {
   return $measurements;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function logger_cron() {
 
   logger_remove_expired_support_requests();

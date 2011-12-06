@@ -59,13 +59,11 @@ function msgdump_schema() {
 }
 
 function msgdump_install() {
-
   drupal_set_message(st('Created msgdump module table.'));
 }
 
 function msgdump_uninstall() {
-
-  drupal_set_message(t('Deleted msgdump module table.'));
+  drupal_set_message(st('Deleted msgdump module table.'));
 }
 
 function msgdump_update_7000() {

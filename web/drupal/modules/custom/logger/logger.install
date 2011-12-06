@@ -294,9 +294,7 @@ function logger_install() {
 }
 
 function logger_uninstall() {
-  // TODO The drupal_(un)install_schema functions are called automatically in D7.
-  // drupal_uninstall_schema('logger')
-  drupal_set_message(t('Deleted logger module tables.'));
+  drupal_set_message(st('Deleted logger module tables.'));
 }
 
 function logger_update_7000() {

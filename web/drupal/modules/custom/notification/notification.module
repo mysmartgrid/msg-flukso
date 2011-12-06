@@ -45,18 +45,10 @@ define('NOTIFICATION_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('NOTIFICATION_TIMESTAMP_FORMAT_PHP', 'd-m-Y H:i');
 
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_init() {
   drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js');
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_permission() {
   return array(
     'list event notifications' => array(
@@ -86,18 +78,10 @@ function notification_permission() {
   );
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_menu() {
 
   $items['notification/list'] = array(
@@ -263,7 +247,7 @@ function notification_list_page() {
     array('data' => t('Operation')),
   );
 
-  //TODO: use db_select
+  //TODO: sort table
   //$sql .= tablesort_sql($headers);
 
   global $user;
@@ -497,10 +481,6 @@ function notification_newsletter_page() {
   return $output;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_registration_form($form, &$form_state) {
 
   global $user;
@@ -567,8 +547,13 @@ function notification_registration_form($form, &$form_state) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Creates the group of fields used to specify properties of an event.
+ * 
+ * @param $event_id              The event id.
+ * @param $default_limit_up      The default limit up.
+ * @param $default_unit_id       The default unit id.
+ * @param $limit_up_description  The limit up description.
+ * @return the array of fields. 
  */
 function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description) {
 
@@ -583,7 +568,7 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
     ),
     "limit_up$event_id" => array(
       '#type' => 'textfield',
-      '#theme' => 'notification_event_limit',
+      '#theme' => 'notification_event_limit_up',
       '#description' => t($limit_up_description),
       '#maxlength' => 9,
       '#size' => 12,
@@ -598,10 +583,6 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
   );
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_edition_form($form, &$form_state, $notification) {
 
   $form['device'] = array(
@@ -656,7 +637,7 @@ function notification_edition_form($form, &$form_state, $notification) {
 
     $form['limit_up'] = array(
       '#type' => 'textfield',
-      '#theme' => 'notification_event_limit',
+      '#theme' => 'notification_event_limit_up',
       '#required' => TRUE,
       '#maxlength' => 9,
       '#size' => 12,
@@ -707,10 +688,6 @@ function notification_edition_form($form, &$form_state, $notification) {
   return $form;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_newsletter_form($form) {
 
   $form['email'] = array(
@@ -748,20 +725,12 @@ function notification_newsletter_form($form) {
   return $form;
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_email_validate($field, $form_state) {
   if (!valid_email_address($form_state['values']['email'])) {
     form_error($field, t('Invalid e-mail address.'));
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_emails_validate($field, $form_state) {
 
   $emails = notification_tokenize_emails($form_state['values']['emails']);
@@ -780,10 +749,6 @@ function notification_emails_validate($field, $form_state) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_limit_up_validate($field, $form_state) {
 
   //Check if it has just one field event_id, or multiple
@@ -816,10 +781,6 @@ function notification_limit_up_validate($field, $form_state) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_registration_form_validate($form, &$form_state) {
 
   if (!user_access('save event notifications')) {
@@ -827,18 +788,10 @@ function notification_registration_form_validate($form, &$form_state) {
   }
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_edition_form_validate($form, &$form_state) {
   notification_registration_form_validate($form, $form_state);
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_registration_form_submit($form, &$form_state) {
 
   notification_register_event($_REQUEST, NO_COMMUNICATION_EVENT_ID);
@@ -850,10 +803,6 @@ function notification_registration_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'notification/list';
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_edition_form_submit($form, &$form_state) {
 
   notification_edit_event($_REQUEST);
@@ -861,10 +810,6 @@ function notification_edition_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'notification/list';
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_newsletter_form_submit($form, &$form_state) {
 
   $email     = $form_state['values']['email'];
@@ -899,8 +844,10 @@ function notification_newsletter_form_submit($form, &$form_state) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Registers an event notification.
+ * 
+ * @param $values    the array of field values describing the event notification.
+ * @param $event_id  the event id.
  */
 function notification_register_event($values, $event_id) {
 
@@ -921,8 +868,9 @@ function notification_register_event($values, $event_id) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Updates an event notification.
+ * 
+ * @param the array of field values describing the new state of the event notification.
  */
 function notification_edit_event($values) {
 
@@ -975,8 +923,8 @@ function notification_get_event_name($event_id) {
 
 /**
  * Returns an array of units associated with the informed event, indexed by their respective ids.
+ * 
  * @param $event_id The event id.
- *
  * @return the array of units.
  */
 function notification_get_units_options($event_id) {
@@ -1085,24 +1033,22 @@ function notification_update($device, $event_id, $limit_up, $unit_id, $time_fiel
     ->execute();  
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_theme() {
 
   return array(
-    'notification_event_limit' => array(
+    'notification_event_limit_up' => array(
       'render element' => 'element',
     ),
   );
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Builds the event limit up field.
+ * 
+ * @param $variables  The theme variables, containing the field element.
+ * @return the field HTML code. 
  */
-function theme_notification_event_limit($variables) {
+function theme_notification_event_limit_up($variables) {
   $element = $variables['element'];
 
   //TODO: make this theme more generic
@@ -1125,10 +1071,6 @@ function theme_notification_event_limit($variables) {
   return "&nbsp;&nbsp; $field1 &nbsp;&nbsp;&nbsp;$field2";
 }
 
-/**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
- */
 function notification_cron() {
 
   $now = REQUEST_TIME;
@@ -1502,8 +1444,13 @@ function notification_send_summary_report_emails($now) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Composes the summary report table.
+ * 
+ * @param $type         The sensor type.
+ * @param $lines        The table lines.
+ * @param $total_cost   The total cost to be shown on the bottom line.
+ * @param $total_energy The total consumption/production to be shown on the bottom line.
+ * @return the summary report table.
  */
 function notification_compose_summary_report_table($type, $lines, $total_cost, $total_energy) {
 
