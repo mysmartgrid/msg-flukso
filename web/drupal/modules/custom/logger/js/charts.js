@@ -505,7 +505,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
   chart.options = options;
 
   chart.plot = function() {
-    var plot = $.plot($('#' + id), data, options);
+    var plot = jQuery.plot(jQuery('#' + id), data, options);
     showBarDataLabels(plot, stacked, dataLabels, barWidth);
   };
   chart.plot();

@@ -279,9 +279,9 @@ function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $
 function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
   global $user;
-  $factor = logger_rrd_get_unit_factor($unit, $sensor->price);
+  $factor = logger_rrd_get_unit_factor($unit, isset($sensor->price) ? $sensor->price : 0);//FIXME
 
-  if ($sensor->private > 0 && $sensor->uid != $user->uid) {
+  if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid) {
     return NULL;
   }
   $file_path = logger_rrd_file($sensor->meter);
@@ -379,6 +379,10 @@ function logger_rrd_parse_exported_lines($lines, $offset) {
   return $data;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_rrd_get_unit_factor($unit, $price = NULL) {
 
   $factors['eur'] = 0.018; // € 0.18 / kWh

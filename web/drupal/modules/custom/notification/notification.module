@@ -45,10 +45,18 @@ define('NOTIFICATION_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('NOTIFICATION_TIMESTAMP_FORMAT_PHP', 'd-m-Y H:i');
 
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_init() {
   drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js');
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_permission() {
   return array(
     'list event notifications' => array(
@@ -78,10 +86,18 @@ function notification_permission() {
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_menu() {
 
   $items['notification/list'] = array(
@@ -190,7 +206,9 @@ function notification_edition_page($device, $event_id, $limit_up, $unit_id) {
 
   $notification = db_query($sql, array(':device' => $device, ':event_id' => $event_id, ':limit_up' => $limit_up, ':unit_id' => $unit_id))->fetchObject();
 
-  return drupal_get_form('notification_edition_form', $notification);
+  $form = drupal_get_form('notification_edition_form', $notification);
+
+  return drupal_render($form);
 }
 
 /**
@@ -228,7 +246,7 @@ function notification_list_page() {
     array(
       'data' => t('Device'),
       'field' => 'serial',
-      'sort' => 'ASC',
+      //'sort' => 'ASC',
     ),
     array(
       'data' => t('Event'),
@@ -245,7 +263,8 @@ function notification_list_page() {
     array('data' => t('Operation')),
   );
 
-  $sql .= tablesort_sql($headers);
+  //TODO: use db_select
+  //$sql .= tablesort_sql($headers);
 
   global $user;
   $result = db_query($sql, array(':time_format' => NOTIFICATION_TIMESTAMP_FORMAT_SQL, ':uid' => $user->uid));
@@ -278,7 +297,7 @@ function notification_list_page() {
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
-  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => 'resizable'), 'caption' => $caption));
+  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => 'resizable'), 'caption' => $caption, 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
 }
 
 /**
@@ -309,23 +328,7 @@ function notification_eventlog_page($serial) {
 
   $args = array(':time_format' => NOTIFICATION_TIMESTAMP_FORMAT_SQL, ':serial' => $serial);
 
-  $headers = array(
-    array('data' => t('Time')),
-    array('data' => t('Event')),
-  );
-
-  $sql_count = "
-    SELECT
-      COUNT(*)
-    FROM
-      {logger_devices} d,
-      {event_log} l
-    WHERE
-      l.device = d.device AND
-      d.serial = :serial";
-
-  $limit = 20;
-  $result = pager_query($sql, $limit, 0, $sql_count, $args);
+  $result = db_query($sql, $args);
   $rows = array();
 
   foreach ($result as $entry) {
@@ -335,11 +338,18 @@ function notification_eventlog_page($serial) {
     );
   }
 
+  $headers = array(
+    array('data' => t('Time')),
+    array('data' => t('Event')),
+  );
+
   $caption = '<p>' . t('Serial Number') . ': ' . $serial . '</p>' . '<p>' .
     l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
 
-  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array(), 'caption' => $caption)) .
-    theme_pager(array('tags' => NULL, 'element' => 0));
+  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array(), 'caption' => $caption,
+    'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) .
+
+    theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => 100));
 }
 
 /**
@@ -448,7 +458,8 @@ function notification_newsletter_page() {
     t('We would also like to keep up to date via email. Please use the form below to sign up for our newsletter.') .
     '<br><br></p></div>';
 
-  $output .= drupal_get_form('notification_newsletter_form');
+  $form = drupal_get_form('notification_newsletter_form');
+  $output .= drupal_render($form);
 
   $output .= '<div><p><br><br><br>' .
     t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
@@ -486,6 +497,10 @@ function notification_newsletter_page() {
   return $output;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_registration_form($form, &$form_state) {
 
   global $user;
@@ -551,6 +566,10 @@ function notification_registration_form($form, &$form_state) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description) {
 
   return array(
@@ -579,6 +598,10 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_edition_form($form, &$form_state, $notification) {
 
   $form['device'] = array(
@@ -684,6 +707,10 @@ function notification_edition_form($form, &$form_state, $notification) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_newsletter_form($form) {
 
   $form['email'] = array(
@@ -721,12 +748,20 @@ function notification_newsletter_form($form) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_email_validate($field, $form_state) {
   if (!valid_email_address($form_state['values']['email'])) {
     form_error($field, t('Invalid e-mail address.'));
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_emails_validate($field, $form_state) {
 
   $emails = notification_tokenize_emails($form_state['values']['emails']);
@@ -745,6 +780,10 @@ function notification_emails_validate($field, $form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_limit_up_validate($field, $form_state) {
 
   //Check if it has just one field event_id, or multiple
@@ -777,6 +816,10 @@ function notification_limit_up_validate($field, $form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_registration_form_validate($form, &$form_state) {
 
   if (!user_access('save event notifications')) {
@@ -784,10 +827,18 @@ function notification_registration_form_validate($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_edition_form_validate($form, &$form_state) {
   notification_registration_form_validate($form, $form_state);
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_registration_form_submit($form, &$form_state) {
 
   notification_register_event($_REQUEST, NO_COMMUNICATION_EVENT_ID);
@@ -799,6 +850,10 @@ function notification_registration_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'notification/list';
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_edition_form_submit($form, &$form_state) {
 
   notification_edit_event($_REQUEST);
@@ -806,6 +861,10 @@ function notification_edition_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'notification/list';
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_newsletter_form_submit($form, &$form_state) {
 
   $email     = $form_state['values']['email'];
@@ -839,6 +898,10 @@ function notification_newsletter_form_submit($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_register_event($values, $event_id) {
 
   $selected = $values["event_id$event_id"];
@@ -857,6 +920,10 @@ function notification_register_event($values, $event_id) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_edit_event($values) {
 
   $device       = $values['device'];
@@ -1018,6 +1085,10 @@ function notification_update($device, $event_id, $limit_up, $unit_id, $time_fiel
     ->execute();  
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_theme() {
 
   return array(
@@ -1027,6 +1098,10 @@ function notification_theme() {
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function theme_notification_event_limit($variables) {
   $element = $variables['element'];
 
@@ -1047,11 +1122,13 @@ function theme_notification_event_limit($variables) {
 
   $field2 = '<select name="unit_id' . $event_id . '" id="edit-unit-id' . $event_id . '">' . $options . '</select>';
 
-  $element['#value'] = "&nbsp;&nbsp; $field1 &nbsp;&nbsp;&nbsp;$field2";
-  
-  return theme_form_element(array('element' => $element));
+  return "&nbsp;&nbsp; $field1 &nbsp;&nbsp;&nbsp;$field2";
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_cron() {
 
   $now = REQUEST_TIME;
@@ -1424,6 +1501,10 @@ function notification_send_summary_report_emails($now) {
   notification_send_emails($message, $notifiables);
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function notification_compose_summary_report_table($type, $lines, $total_cost, $total_energy) {
 
   if (!isset($lines[$type])) {

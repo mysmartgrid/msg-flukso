@@ -23,6 +23,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_drush_command() {
 
   $items = array();
@@ -77,6 +81,10 @@ function logger_drush_command() {
   return $items;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_create_node($serial, $country = "", $uid = 0) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
@@ -179,6 +187,10 @@ function logger_create_node($serial, $country = "", $uid = 0) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_assign_node($serial, $country, $uid) {
 
   $sql = "SELECT device FROM {logger_devices} WHERE serial = :serial";
@@ -223,6 +235,10 @@ function logger_assign_node($serial, $country, $uid) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
 
   module_load_include('inc', 'logger', 'logger.admin');
@@ -252,6 +268,10 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_tokens($meter = "", $permissions = 62) {
 
   if ($meter == "") {

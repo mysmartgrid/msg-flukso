@@ -208,19 +208,19 @@ function chumby_image_form_submit($form, &$form_state) {
       fclose($daemonconfig);
       $profile = fopen($path . '/profile.xml', 'w');
 
-      require CHUMBY_PATH . '/' . 'profile-head.php';
+      require DRUPAL_ROOT . '/' . 'profile-head.php';
 
       fwrite($profile, $profile_head);
       foreach ($form_state['values']['visualization'] as $key => $value) {
 
         if ( $value != '0' ) {
 
-          require CHUMBY_PATH . '/' . $key . '_widget.php';
+          require DRUPAL_ROOT . '/' . $key . '_widget.php';
           fwrite($profile, $widget);
         }
       }
 
-      require CHUMBY_PATH . '/' . 'profile-tail.php';
+      require DRUPAL_ROOT . '/' . 'profile-tail.php';
       fwrite($profile, $profile_tail);
       fclose($profile);
     }

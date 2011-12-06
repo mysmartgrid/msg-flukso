@@ -45,6 +45,10 @@ function logger_xmlrpc() {
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_heartbeat($device, $version, $resets, $uptime) {
 
   $dev = db_fetch_object(db_query("
@@ -73,6 +77,10 @@ function logger_heartbeat($device, $version, $resets, $uptime) {
   return $dev->upgrade;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_measurement_add($logs) {
 
   require_once DRUPAL_ROOT . '/' . XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc";

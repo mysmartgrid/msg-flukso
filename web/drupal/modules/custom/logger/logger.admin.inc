@@ -92,9 +92,13 @@ function logger_sensor_edition_page($meter) {
   $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = :meter";
   $sensor = db_query($sql, array(':meter' => $meter))->fetchObject();
 
-  return drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
+  return drupal_render( drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function));
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_userdevices_form($form, &$form_state) {
 
   $form['#theme'] = 'logger_userdevices';
@@ -115,6 +119,10 @@ function logger_userdevices_form($form, &$form_state) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main') {
 
   $form['meter'] = array(
@@ -152,6 +160,10 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_userprivacy_form($form, &$form_state) {
 
   global $user;
@@ -177,6 +189,10 @@ function logger_userprivacy_form($form, &$form_state) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_userdevices_form_validate($form, &$form_state) {
 
   $code = $form_state['values']['code'];
@@ -194,6 +210,10 @@ function logger_userdevices_form_validate($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_sensor_form_validate($form, &$form_state) {
 
   $function = $form_state['values']['function'];
@@ -206,6 +226,10 @@ function logger_sensor_form_validate($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_userdevices_form_submit($form, &$form_state) {
 
   global $user;
@@ -275,6 +299,10 @@ function logger_userdevices_form_submit($form, &$form_state) {
   drupal_set_message(t("The device is now associated with your account."));
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_sensor_form_submit($form, &$form_state) {
 
   global $user;
@@ -294,6 +322,10 @@ function logger_sensor_form_submit($form, &$form_state) {
   $form_state['redirect'] = "user/" . $user->uid . "/sensors";
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_userprivacy_form_submit($form, &$form_state) {
 
   global $user;
@@ -405,12 +437,20 @@ function logger_sensor_function_validate($function, $meter) {
   return $count == 0;
 }
 
+/**
+* @todo Please document this function.
+* @see http://drupal.org/node/1354
+*/
 function logger_unix_to_userlocaltime($unix) {
   global $user;
   $unix_local = gmdate('r', $unix + $user->timezone);
   return substr($unix_local, 0, strlen($unix_local) - 6);
 }
 
+/**
+* @todo Please document this function.
+* @see http://drupal.org/node/1354
+*/
 function logger_seconds_to_dayshours($seconds) {
   $days    = intval($seconds / DAY);
   $hours   = intval(($seconds % DAY) / HOUR);

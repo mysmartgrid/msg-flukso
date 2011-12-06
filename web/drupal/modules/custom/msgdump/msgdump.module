@@ -25,6 +25,10 @@ define('MSGDUMP_DB_PATH', drupal_get_path('module', 'msgdump') . '/db');
 define('MSGDUMP_BIN_PATH', drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
 
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_permission() {
   return array(
     'data dump' => array(
@@ -34,6 +38,10 @@ function msgdump_permission() {
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_menu() {
 
   $items['dump/%user_uid_optional/setup'] = array(
@@ -46,6 +54,10 @@ function msgdump_menu() {
   return $items;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_setup_form($form, &$form_state) {
 
   global $user;
@@ -117,6 +129,10 @@ function msgdump_setup_form($form, &$form_state) {
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_setup_form_submit($form, &$form_state) {
 
   global $user;
@@ -154,6 +170,10 @@ function msgdump_setup_form_submit($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_setup_form_validate($form, &$form_state) {
 
   global $user;
@@ -185,6 +205,10 @@ function msgdump_setup_form_validate($form, &$form_state) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_register($file, $serial, $type) {
 
   global $base_url;
@@ -220,6 +244,10 @@ function msgdump_register($file, $serial, $type) {
   exec(MSGDUMP_BIN_PATH . "/flukso_create_db -c " . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_limit_year($form_element, $form_values) {
 
   $now = date('Y');
@@ -228,6 +256,10 @@ function msgdump_limit_year($form_element, $form_values) {
   return $form_element;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_theme() {
 
   return array(
@@ -240,6 +272,10 @@ function msgdump_theme() {
   );
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function theme_msgdump_setup($variables) {
   $form = $variables['form'];
 
@@ -279,6 +315,10 @@ function theme_msgdump_setup($variables) {
     theme('msgdump_setup_list', array('items' => $rows));
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function theme_msgdump_setup_list($variables) {
   $items = $variables['items'];
 
@@ -286,6 +326,10 @@ function theme_msgdump_setup_list($variables) {
   return theme_table(array('header' => $headers, 'rows' => $items));
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function msgdump_cron() {
 
   $now = new DateTime('now');

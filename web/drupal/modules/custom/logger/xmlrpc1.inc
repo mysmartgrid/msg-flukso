@@ -71,6 +71,10 @@ function logger_auth($auth) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_heartbeat($auth, $monitor) {
 
   require_once DRUPAL_ROOT . '/' . XMLRPC_PATH . "/notification/notification.module";
@@ -130,6 +134,10 @@ function logger_heartbeat($auth, $monitor) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_measurement_add($auth, $logs) {
 
   require_once DRUPAL_ROOT . '/' . XMLRPC_PATH . '/' . XMLRPC_MODULE . "/logger.rrd.inc";
@@ -194,6 +202,10 @@ function logger_measurement_add($auth, $logs) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_brownout($auth, $message) {
 
   require_once DRUPAL_ROOT . '/' . XMLRPC_PATH . "/notification/notification.module";
@@ -211,6 +223,10 @@ function logger_brownout($auth, $message) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_authenticate_hmac_sha1($auth, $message) {
 
   $sql = "SELECT sha FROM {logger_devices} WHERE device = '%s'";
@@ -228,6 +244,10 @@ function logger_authenticate_hmac_sha1($auth, $message) {
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function logger_serialise($data) {
 
   if (is_array($data)) {

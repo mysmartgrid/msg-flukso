@@ -20,6 +20,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function jobqueue_produce($algorithm, $data) {
   $str = "/usr/bin/producer.rb -v -c /usr/lib/msg-qworker/etc/qproducerrc -a $algorithm";
   if ($data != NULL) {

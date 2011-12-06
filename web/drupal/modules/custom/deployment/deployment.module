@@ -80,12 +80,14 @@ function deployment_menu() {
 
   $items['deployment/checkup'] = array(
     'title' => 'Device Check Up',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('deployment_checkup_form'),
+    'page callback' => 'deployment_checkup_page',
+    'page arguments' => array(2),
     'access arguments' => array('device deployment overview'),
     'type' => MENU_NORMAL_ITEM,
   );
 
+  //FIXME: update the libraries to D7
+  /*
   $items['deployment/print'] = array(
     'title' => "Print Code",
     'page callback' => 'drupal_get_form',
@@ -93,7 +95,7 @@ function deployment_menu() {
     'access arguments' => array('print activation code'),
     'type' => MENU_NORMAL_ITEM,
   );
-
+  */
   $items['deployment/list/file'] = array(
     'title' => 'Downloads a deployment list file',
     'page callback' => 'deployment_download_list_file',
@@ -111,6 +113,65 @@ function deployment_menu() {
 }
 
 /**
+ * Builds the device checkup page.
+ *  
+ * @return the device checkup page.
+ */
+function deployment_checkup_page($serial = NULL) {
+
+  $form = drupal_get_form('deployment_checkup_form');
+  $output = drupal_render($form);
+
+  if ($serial) {
+
+    $result = deployment_get_devices(NULL, $serial);
+
+    if (empty($result)) {
+      $output .= '<br><br>' . t('No device was found with such serial number.');
+    }
+    else {
+      $device = $result[0];
+      $latest = array('%latest' => $device['latest']);
+      $message = ''; 
+
+      switch ($device['state_id']) {
+
+        case UNINSTALLED_STATE_ID:
+          $message = t('This device has not yet been installed.');
+          break;
+
+        case UNREGISTERED_STATE_ID:
+          $message = t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest);
+          break;
+
+        case NO_COMMUNICATION_STATE_ID:
+        case OFFLINE_STATE_ID:
+          $message = t('No message has been received from this device since %latest.', $latest);
+          break;
+
+        case NO_MEASUREMENT_STATE_ID:
+          $message = t('No measurement has been received from this device since %latest.', $latest);
+          break;
+
+        case NO_HEARTBEAT_STATE_ID:
+          $message = t('No heartbeat has been received from this device since %latest.', $latest);
+          break;
+
+        case CORRUPTED_STATE_ID:
+          $message = t('This device has sent a message with corrupted data at %latest.', $latest);
+          break;
+
+        case WORKING_STATE_ID:
+          $message = t('This device is working fine. Latest message received at %latest.', $latest);
+          break;
+      }
+      $output .= '<br><br>' . t('Status:') . $device['state'] . "<br>$message<br><br>" . l(t('Device History'), "event/log/list/$serial");
+    }
+  }
+  return $output;
+}
+
+/**
  * Builds the device list page.
  *
  * @return the device list page.
@@ -121,40 +182,45 @@ function deployment_list_page($id = NULL) {
 
   $state_id = $id > 0 ? $id : (isset($_SESSION['state_id']) ? $_SESSION['state_id'] : 0);
 
-  $output = drupal_get_form('deployment_listfilter_form', $state_id);
+  $form = drupal_get_form('deployment_listfilter_form', $state_id);
+  $output = drupal_render($form);
 
-  $headers = array(
-    array(
-      'data' => t('Device'),
-      'field' => 'serial',
-      'sort' => 'asc',
-    ),
-    array(
-      'data' => t('User'),
-      'field' => 'name',
-    ),
-    array(
-      'data' => t('E-mail'),
-      'field' => 'email',
-    ),
-    array(
-      'data' => t('Latest Update'),
-      'field' => 'latest',
-    ),
-    array('data' => t('State')),
-  );
-
-  $limit = 15;
-  $data = deployment_get_devices($state_id, $headers, $limit);
+  $data = deployment_get_devices($state_id);
   foreach ($data as &$device) {
     $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
     $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
     unset($device['uid']);
+    unset($device['state_id']);
   }
   $_SESSION['deployment_list'] = $data;
 
   if ($data) {
-    $output .= theme_table(array('header' => $headers, 'rows' => $data)) . theme_pager(array('tags' => NULL, 'element' => 0)) .
+
+    $headers = array(
+      array(
+        'data' => t('Device'),
+        'field' => 'serial',
+        'sort' => 'asc',
+      ),
+      array(
+        'data' => t('User'),
+        'field' => 'name',
+      ),
+      array(
+        'data' => t('E-mail'),
+        'field' => 'email',
+      ),
+      array(
+        'data' => t('Latest Update'),
+        'field' => 'latest',
+      ),
+      array('data' => t('State')),
+    );
+
+    $output .= theme_table(array('header' => $headers, 'rows' => $data, 'attributes' => array(),
+      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) .
+      
+      theme_pager(array('tags' => NULL, 'element' => 0, 'parameters'=> array(), 'quantity' => (sizeof($data)/15))) .
       '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
   }
   return $output;
@@ -166,7 +232,7 @@ function deployment_list_page($id = NULL) {
  * @return the deployment overview page.
  */
 function deployment_overview_page() {
-
+  
   global $user;
   $legend = array();
   $state_title = t('State');
@@ -223,6 +289,8 @@ function deployment_download_chart_file() {
   global $user;
   $sql = "SELECT * FROM {deployment_summary} ORDER BY time, state_id";
   $result = db_query($sql);
+  $header = '';
+  $lines = '';
 
   $time = 0;
   foreach ($result as $summary) {
@@ -266,7 +334,7 @@ function deployment_download_list_file() {
 function deployment_get_all_states() {
 
   $sql = "SELECT SQL_CACHE id, name FROM {deployment_state}";
-  $result = db_query($sql, $user->uid);
+  $result = db_query($sql);
 
   $states = array();
   foreach ($result as $state) {
@@ -279,37 +347,23 @@ function deployment_get_all_states() {
  * Returns the list of user devices.
  *
  * @param $state_id  The device state id (optional).
- * @param $headers   The field headers (optional).
- * @param $limit     The number of items in a table page (optional).
  * @param $serial    The serial number for selecting a single device (optionally).
  * @return the array of user devices.
  */
-function deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15, $serial = NULL) {
+function deployment_get_devices($state_id = NULL, $serial = NULL) {
 
   global $user;
+
   $now = REQUEST_TIME;
+  $states = deployment_get_all_states();
+  $data = array();
 
   $sql = deployment_create_devices_query($now, $state_id, $serial);
-
-  if ($headers) {
-    $count_sql = "SELECT SQL_NO_CACHE COUNT(*) FROM ($sql) d ";
-    $sql .= tablesort_sql($headers);
-    $result = pager_query($sql, $limit, 0, $count_sql);
-
-  }
-  else {
-    $result = db_query($sql);
-  }
-
-  $states = deployment_get_all_states();
-
-  $data = array();
+  $result = db_query($sql);
+ 
   while ($device = $result->fetchAssoc()) {
 
     $device['state'] = $states[$device['state_id']];
-    if ($headers) {
-      unset($device['state_id']);
-    }
     $data[] = $device;
   }
   return $data;
@@ -325,6 +379,7 @@ function deployment_create_devices_query($now, $state_id, $serial) {
   $registration_timeout  = $now - 3 * 24 * 3600; //3 days
   $offline_timeout       = $now - 24 * 3600; //24 hours
   $communication_timeout = $now - 2 * 3600; //2 hours
+  $filters = '';
 
   $latest_field = "IF(d.access > 0, d.access, d.created)";
   $state_id_field = $state_id;
@@ -502,52 +557,7 @@ function deployment_listfilter_form_submit($form, &$form_state) {
 function deployment_checkup_form_submit($form, &$form_state) {
 
   $serial = $form_state['values']['serial'];
-  $result = deployment_get_devices(NULL, NULL, 1, $serial);
-
-  if (empty($result)) {
-    drupal_set_message(t('No device was found with such serial number.'));
-
-  }
-  else {
-    $device = $result[0];
-    $latest = array('%latest' => $device['latest']);
-
-    drupal_set_message(check_plain(t('Status:') . $device['state']));
-
-    switch ($device['state_id']) {
-
-      case UNINSTALLED_STATE_ID:
-        drupal_set_message(t('This device has not yet been installed.'));
-        break;
-
-      case UNREGISTERED_STATE_ID:
-        drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
-        break;
-
-      case NO_COMMUNICATION_STATE_ID:
-      case OFFLINE_STATE_ID:
-        drupal_set_message(t('No message has been received from this device since %latest.', $latest));
-        break;
-
-      case NO_MEASUREMENT_STATE_ID:
-        drupal_set_message(t('No measurement has been received from this device since %latest.', $latest));
-        break;
-
-      case NO_HEARTBEAT_STATE_ID:
-        drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
-        break;
-
-      case CORRUPTED_STATE_ID:
-        drupal_set_message(t('This device has sent a message with corrupted data at %latest.', $latest));
-        break;
-
-      case WORKING_STATE_ID:
-        drupal_set_message(t('This device is working fine. Latest message received at %latest.', $latest));
-        break;
-    }
-  }
-
-  drupal_set_message(check_plain('<br>' . l(t('Device History'), "event/log/list/$serial")));
+  $form_state['redirect'] = "deployment/checkup/$serial";
 }
 
 function deployment_printcode_form_submit($form, &$form_state) {
