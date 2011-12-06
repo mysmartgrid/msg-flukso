@@ -69,35 +69,35 @@ function logger_permission() {
   return array(
     'view logger charts' => array(
       'title' => t('view logger charts'),
-      'description' => t('TODO Add a description for \'view logger charts\''),
+      'description' => t('View logger charts.'),
     ),
     'set user preferences' => array(
       'title' => t('set user preferences'),
-      'description' => t('TODO Add a description for \'set user preferences\''),
+      'description' => t('Set user preferences.'),
     ),
     'list devices' => array(
       'title' => t('list devices'),
-      'description' => t('TODO Add a description for \'list devices\''),
+      'description' => t('Access the list of user devices.'),
     ),
     'deactivate devices' => array(
       'title' => t('deactivate devices'),
-      'description' => t('TODO Add a description for \'deactivate devices\''),
+      'description' => t('Deactivate a device.'),
     ),
     'list sensors' => array(
       'title' => t('list sensors'),
-      'description' => t('TODO Add a description for \'list sensors\''),
+      'description' => t('Access the list of user device sensors.'),
     ),
     'manage sensors' => array(
       'title' => t('manage sensors'),
-      'description' => t('TODO Add a description for \'manage sensors\''),
+      'description' => t('Edit sensor properties.'),
     ),
     'request device remote support' => array(
       'title' => t('request device remote support'),
-      'description' => t('TODO Add a description for \'request device remote support\''),
+      'description' => t('Request device remote support.'),
     ),
     'attend device remote support requests' => array(
       'title' => t('attend device remote support requests'),
-      'description' => t('TODO Add a description for \'attend device remote support requests\''),
+      'description' => t('Attend remote support requests.'),
     ),
   );
 }

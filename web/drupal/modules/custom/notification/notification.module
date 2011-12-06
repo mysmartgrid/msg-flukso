@@ -53,27 +53,27 @@ function notification_permission() {
   return array(
     'list event notifications' => array(
       'title' => t('list event notifications'),
-      'description' => t('TODO Add a description for \'list event notifications\''),
+      'description' => t('Access the event notifications list page.'),
     ),
     'view event notifications' => array(
       'title' => t('view event notifications'),
-      'description' => t('Allow the Event Notifications List page to be visited.'),
+      'description' => t('Access the event notification edition page.'),
     ),
     'save event notifications' => array(
       'title' => t('save event notifications'),
-      'description' => t('Allow an Event Notification to be either edited or saved.'),
+      'description' => t('Either edit or save an event notification.'),
     ),
     'delete event notifications' => array(
       'title' => t('delete event notifications'),
-      'description' => t('TODO Add a description for \'delete event notifications\''),
+      'description' => t('Delete an event notification.'),
     ),
     'list event logs' => array(
       'title' => t('list event logs'),
-      'description' => t('TODO Add a description for \'list event logs\''),
+      'description' => t('Access the device event logs page.'),
     ),
     'delete event logs' => array(
       'title' => t('delete event logs'),
-      'description' => t('TODO Add a description for \'delete event logs\''),
+      'description' => t('Delete device event log entries.'),
     ),
   );
 }

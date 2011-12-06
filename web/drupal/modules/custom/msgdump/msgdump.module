@@ -29,7 +29,7 @@ function msgdump_permission() {
   return array(
     'data dump' => array(
       'title' => t('data dump'),
-      'description' => t('TODO Add a description for \'data dump\''),
+      'description' => t('Request device high resolution data dump.'),
     ),
   );
 }

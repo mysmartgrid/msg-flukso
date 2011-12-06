@@ -28,7 +28,7 @@ function chumby_permission() {
   return array(
     'chumby image' => array(
       'title' => t('chumby image'),
-      'description' => t('TODO Add a description for \'chumby image\''),
+      'description' => t('Generate chumby image.'),
     ),
   );
 }

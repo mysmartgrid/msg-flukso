@@ -41,11 +41,11 @@ function deployment_permission() {
   return array(
     'device deployment overview' => array(
       'title' => t('device deployment overview'),
-      'description' => t('TODO Add a description for \'device deployment overview\''),
+      'description' => t('Access the Deployment Overview page.'),
     ),
     'print activation code' => array(
-      'title' => t('print activation code'),
-      'description' => t('TODO Add a description for \'print activation code\''),
+      'title' => t('print activation code.'),
+      'description' => t('Print device activation code.'),
     )
   );
 }
