@@ -342,8 +342,8 @@ function logger_home_page($arg = NULL) {
 
   if (user_access('view logger charts')) {
     return logger_energy_page('week');
-
-  } else {
+  }
+  else {
     return logger_overview_page('hour');
   }
 }
@@ -367,8 +367,8 @@ function logger_mobile_page() {
       logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
       logger_create_mobile_page_icon('dump.png',        t('Dump values'),      '/dump/116/setup') .
       logger_create_mobile_page_icon('myaccount.png',   t('My Account'),        "/users/$user->name");
-
-  } else {
+  }
+  else {
     $output .=
       logger_create_mobile_page_icon('join.png',        t('Join mySmartGrid'), '/content/werden-sie-teilnehmer');
   }
@@ -482,8 +482,8 @@ function logger_overview_page($interval) {
 
   if (isset($cache->data)) {
     $output = $cache->data;
-
-  } else {
+  }
+  else {
 
     //General explanation
     $output = theme('logger_overview_topic', array('title' => NULL, 'body' =>
@@ -606,8 +606,8 @@ function logger_energy_page($interval) {
   if ($interval == 'year') {
     $start = mktime(0, 0, 0, date('n') - 11, 1);
     $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
-
-  } else {
+  }
+  else {
     $sub_interval = logger_get_sub_interval($interval);
     $sub_time_window = logger_get_default_time_window($sub_interval);
 
@@ -2277,7 +2277,7 @@ function logger_get_sensor_types_options($uid = NULL) {
   if (isset($uid)) {
     $query->join('logger_meters', 'm', 't.id = m.type');
 
-    $query->condition('uid', $uid,'=');
+    $query->condition('uid', $uid, '=');
   }
 
   $result = $query->fields('t', array('id', 'name'))
@@ -3071,5 +3071,249 @@ function _download_serial_numbers() {
         $device = strtok(" \n\t");
       }
     }
+  }
+}
+
+function logger_xmlrpc() {
+  return array(
+    array(
+      'logger.auth', // External method name.
+      'logger_auth', // Drupal callback function to run + api version 1
+      array('string', 'array'), // Return value's type, then any parameter types (accept, auth)
+      'Authenticate a device'   , // Description.
+    ),
+    array(
+      'logger.heartbeat',
+      'logger_heartbeat',
+      array('array', 'array', 'array'),
+      'Send a heartbeat to the logger.',
+    ),
+    array(
+      'logger.measurementAdd',
+      'logger_measurement_add',
+      array('string', 'array', 'array'),
+      'Submit measurements to the logger.',
+    ),
+    array(
+      'logger.brownout',
+      'logger_brownout',
+      array('string', 'array', 'array'),
+      'Send a brownout message to the logger.',
+    ),
+  );
+}
+
+/**
+ * Authenticates a device.
+ * 
+ * @return the authentication response.
+ */
+function logger_auth($auth) {
+
+  return logger_authenticate_hmac_sha1($auth) ? 'authenticated!' :
+
+    xmlrpc_error(-31000, t('Authentication failed.'));
+}
+
+/**
+ * Processes the heartbeat message.
+ *
+ * @param $auth    The authentication data.
+ * @param $monitor The device properties.
+ * @return the heartbeat response.
+ */
+function logger_heartbeat($auth, $monitor) {
+
+  require_once NOTIFICATION_PATH . "/notification.module";
+
+  if (logger_authenticate_hmac_sha1($auth, $monitor)) {
+
+    notification_log_heartbeat_received($auth['device']);
+
+    $device = db_select('logger_devices', 'd')
+      ->fields('d', array('device', 'sha', 'upgrade', 'resets'))
+      ->condition('device', $auth['device'], '=')
+      ->execute()
+      ->fetchObject();
+
+    $device->resets += $monitor['reset'];
+
+    db_update('logger_devices')
+      ->fields(array(
+        'access' => REQUEST_TIME,
+        'version' => $monitor['version'],
+        'upgrade' => 0,
+        'resets' => $device->resets,
+        'uptime' => $monitor['uptime'],
+        'memtotal' => $monitor['memtotal'],
+        'memfree' => $monitor['memfree'],
+        'memcached' => $monitor['memcached'],
+        'membuffers' => $monitor['membuffers'],
+        'uart_oe' => $monitor['uart_oe'],
+      ))
+      ->condition('device', $auth['device'], '=')
+      ->execute();
+
+    $action['upgrade'] = (int) $device->upgrade;
+    if ($action['upgrade']) {
+
+      $action['timestamp'] = REQUEST_TIME;
+      $action['signature'] = hash_hmac('sha1',
+          $action['timestamp'] . ':' . $action['upgrade'] . ':' .
+          $device->sha, $device->sha);
+    }
+
+    watchdog('logger.heartbeat', 'heardbeat received: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
+
+    return $action;
+  }
+  else {
+    return xmlrpc_error(-31000, t('Authentication failed.'));
+  }
+}
+
+/**
+ * Processes device measurement messages.
+ * 
+ * @param $auth  The authentication data.
+ * @param $logs  The measurements array.
+ * @return the measurement response.
+ */
+function logger_measurement_add($auth, $logs) {
+
+  require_once LOGGER_PATH . "/logger.rrd.inc";
+  require_once NOTIFICATION_PATH . "/notification.module";
+
+  if (logger_authenticate_hmac_sha1($auth, $logs)) {
+
+    notification_log_measurement_received($auth['device']);
+
+    $info = 'added 5min interval measurements to the log';
+
+    foreach ($logs as $meter => $measurements) {
+
+      //load the normalisation factor, relative to 1pulse = 1Wh
+      $meterdata = db_select('logger_meters', 'm')
+        ->fields('m', array('device', 'factor'))
+        ->condition('meter', $meter, '=')
+        ->execute()
+        ->fetchObject();
+
+      if ($meterdata->device == $auth['device']) { // extra security check
+        ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
+
+        foreach ($measurements as $timestamp => $value) {
+
+          if (is_numeric($timestamp) and is_numeric($value)) {
+            $values[$timestamp] = $value * $meterdata->factor;
+          }
+          else {
+            watchdog('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
+
+            notification_log_corrupted_message($meterdata->device);
+          }
+        }
+
+        $return = logger_rrd_update($meter, $values);
+
+        if ($return == 0) {
+          watchdog('logger.measurementAdd', 'successful update of base rrd. meter: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
+
+          //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
+          db_update('logger_meters')
+            ->fields(array(
+              'access' => REQUEST_TIME,
+              'value' => $value, //Gets the latest value stored in $value
+            ))
+            ->condition('meter', $meter)
+            ->execute();
+        }
+        else {
+          watchdog('logger.measurementAdd', 'error updating base rrd. meter: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
+        }
+      }
+    }
+    return $info;
+  }
+  else {
+
+    return xmlrpc_error(-31000, t('Authentication failed.'));
+  }
+}
+
+/**
+ * Processes brownout event messages.
+ *
+ * @param $auth     The authentication data.
+ * @param $message  The event message.
+ * @return the event response.
+ */
+function logger_brownout($auth, $message) {
+
+  require_once NOTIFICATION_PATH . "/notification.module";
+
+  if (logger_authenticate_hmac_sha1($auth, $message)) {
+
+    notification_log_brownout($auth['device']);
+
+    return 'Brownout message has been received.';
+  }
+  else {
+
+    return xmlrpc_error(-31000, t('Authentication failed.'));
+  }
+}
+
+/**
+ * Authenticates a device.
+ *
+ * @param $auth     The authentication data.
+ * @param $message  The message string.
+ * @return TRUE if the authentication succeeds, FALSE otherwise.
+ */
+function logger_authenticate_hmac_sha1($auth, $message) {
+
+  //Check API version
+  if ($_REQUEST['version'] != 1) {
+    xmlrpc_error(-32601, t('Server error. Requested method version (@version) not specified.', array("@version" => $_REQUEST['version'])));
+    return FALSE;
+  }    
+
+  $auth['key'] = db_select('logger_devices', 'd')
+    ->fields('d', array('sha'))
+    ->condition('device', $auth['device'], '=')
+    ->execute()
+    ->fetchField();
+
+  if (hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']) == $auth['signature'] && $auth['timestamp'] > REQUEST_TIME - 300) {
+
+    //watchdog('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
+    return TRUE;
+  }
+  else {
+
+    watchdog('logger.auth', 'HMAC-SHA1 authentication failed for device: %device', array('%device' => $auth['device']), WATCHDOG_ERROR);
+    return FALSE;
+  }
+}
+
+/**
+ * Converts an array into a string.
+ * 
+ * @param data The data to be serialized.
+ * @return the resulting string.
+ */
+function logger_serialise($data) {
+
+  if (is_array($data)) {
+
+    $sequence = '';
+    foreach ($data as $key => $value) {
+      $sequence .= (string) $key . logger_serialise($value);
+    }
+    return $sequence;
+  }
+  else {
+    return (string) $data;
   }
 }

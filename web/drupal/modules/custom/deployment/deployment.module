@@ -220,7 +220,7 @@ function deployment_list_page($id = NULL) {
     $output .= theme_table(array('header' => $headers, 'rows' => $data, 'attributes' => array(),
       'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) .
       
-      theme_pager(array('tags' => NULL, 'element' => 0, 'parameters'=> array(), 'quantity' => (sizeof($data)/15))) .
+      theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => (sizeof($data)/15))) .
       '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
   }
   return $output;

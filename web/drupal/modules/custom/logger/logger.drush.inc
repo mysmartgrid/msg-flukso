@@ -96,8 +96,8 @@ function logger_create_node($serial, $country = "", $uid = 0) {
     drush_set_error(
       'LOGGER_CREATE_SERIAL_DUPLICATE',
       dt('The S/N: @serial already exists.', array('@serial' => $serial)));
-
-  } else {
+  }
+  else {
 
     if ($uid > 0) {
 
@@ -200,8 +200,8 @@ function logger_assign_node($serial, $country, $uid) {
   //check the existence of S/N
   if ($device == '') {
     drush_set_error('LOGGER_ASSIGN_SERIAL_NON_EXISTENT', dt('The S/N: @serial does not exist.', array('@serial' => $serial)));
-
-  } else {
+  }
+  else {
 
     db_update('logger_devices')
       ->fields(array(
@@ -264,8 +264,8 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
     
     drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');
     drush_print_pipe('ok');
-
-  } else {
+  }
+  else {
     drush_set_error(
       'LOGGER_NON_UNIQUE_METER_FUNCTION',
       dt('The function name: @function is already been used by another sensor.',
@@ -305,8 +305,8 @@ function logger_tokens($meter = "", $permissions = 62) {
 
         if (!$insert) {
           drush_set_error('LOGGER_CREATE_TOKEN_ENTRY', dt('Error creating token entry for @meter.', array('@meter' => $meter->meter)));
-
-        } else {
+        }
+        else {
           drush_log(dt('Created an entry in {logger_tokens} with token: @token and meter: @meter', array('@token' => $token, '@meter' => $meter->meter)), 'ok');
         }
       }
