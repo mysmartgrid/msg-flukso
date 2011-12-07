@@ -285,7 +285,7 @@ function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
     return NULL;
   }
   $file_path = logger_rrd_file($sensor->meter);
-
+  
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
     "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
 }

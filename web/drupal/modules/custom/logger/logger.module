@@ -777,7 +777,7 @@ function logger_download_chart_data_file($cache_id) {
 function logger_download_file($file_name, $header, $lines) {
 
   drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
-  drupal_add_http_header('Content-disposition', 'attachment; filename=$file_name.txt');
+  drupal_add_http_header('Content-disposition', "attachment; filename=$file_name.txt");
 
   print $header . PHP_EOL . $lines;
   exit(0);
