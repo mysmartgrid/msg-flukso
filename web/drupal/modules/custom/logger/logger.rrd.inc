@@ -165,19 +165,18 @@ function logger_rrd_update($meter, $values) {
  * @param $interval     The time interval. This argument is used to select the RRA.
  * @param $sensor       The sensor.
  * @param $unit         The power unit.
- * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step) {
+function logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step) {
 
   $series_id = METER;
   $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
 
   $latest = logger_rrd_latest_timestamp($interval, $sensor);
 
-  return logger_rrd_export($interval, $def, $series_id, $latest, $offset, TRUE, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, $latest, TRUE, $period, $step);
 }
 
 /**
@@ -203,15 +202,14 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
  * @param $interval     The time interval.
  * @param $sensors      The array of sensors.
  * @param $unit         The power unit.
- * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $step) {
+function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = REQUEST_TIME - 15 * MINUTE;
+  $end_time = time() - 15 * MINUTE;
   $def = "";
   $variables = "";
 
@@ -239,7 +237,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return logger_rrd_export($interval, $def, $series_id, REQUEST_TIME, $offset, FALSE, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, time(), FALSE, $period, $step);
 }
 
 /**
@@ -248,17 +246,16 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
  * @param $sensors    The sensors whose measurements are to be summed up.
  * @param $unit       The energy unit.
  * @param $interval   The time interval menu option.
- * @param $offset     The user timezone offset.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
  * @return the summed power consumption.
  */
-function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $step) {
+function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step) {
 
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step);
+    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step);
 
     foreach ($measurements as $timestamp => $value) {
       $total += $value * $step;
@@ -285,7 +282,7 @@ function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
     return NULL;
   }
   $file_path = logger_rrd_file($sensor->meter);
-  
+
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
     "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
 }
@@ -307,13 +304,12 @@ function logger_rrd_file($meter) {
  * @param $def           The rrd def tag.
  * @param $exported_cdef The exported cdef.
  * @param $latest        The latest update time.
- * @param $offset        The user timezone offset.
  * @param $include_nan   Whether NaN values should be included in the result.
  * @param $period        An array containing a period of time to be queried.
  * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
+function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();
@@ -328,7 +324,7 @@ function logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $i
 
   $storage_period = logger_rrd_get_storage_period($step);
 
-  if ((REQUEST_TIME - $end) > $storage_period) {
+  if ((time() - $end) > $storage_period) {
     return array();
   }
 
@@ -345,17 +341,16 @@ function logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $i
 
   exec($command, $lines);
 
-  return logger_rrd_parse_exported_lines($lines, $offset);
+  return logger_rrd_parse_exported_lines($lines);
 }
 
 /**
  * Parses output of command rrdtool xport into an array.
  *
  * @param $lines   The lines to be exported.
- * @param $offset  The user timezone offset.
  * @return the array of sensors' measurements.
  */
-function logger_rrd_parse_exported_lines($lines, $offset) {
+function logger_rrd_parse_exported_lines($lines) {
 
   $data = array();
 
@@ -368,7 +363,7 @@ function logger_rrd_parse_exported_lines($lines, $offset) {
       $line = str_replace('</t><v>', ':', $line);
       $div_pos = strpos($line, ':');
 
-      $timestamp = trim(substr($line, 0, $div_pos)) + $offset;
+      $timestamp = trim(substr($line, 0, $div_pos));
       $value = trim(substr($line, $div_pos + 1));
 
       if ($value != 'nan') {

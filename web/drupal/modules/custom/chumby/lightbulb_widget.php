@@ -1,4 +1,5 @@
 <?php
+  $id = isset($id)? $id : '';
   $widget = "  <widget_instance id=\"$id\">
     <name>Gluehlampe</name>
     <widget>

@@ -45,6 +45,8 @@ define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
 
 function logger_init() {
 
+  global $_SERVER;
+
   //If IE
   if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
     drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
@@ -562,7 +564,7 @@ function logger_relative_energy_consumption_page() {
   $sensors = array();
   foreach ($all_sensors as $sensor) {
     $all_meters[] = $sensor->meter;
-    if ($meters[$sensor->meter]) {
+    if (isset($meters[$sensor->meter])) {
       $sensors[] = $sensor;
     }
   }
@@ -612,7 +614,8 @@ function logger_energy_page($interval) {
     $sub_time_window = logger_get_default_time_window($sub_interval);
 
     $now = REQUEST_TIME;
-    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - $now % $sub_time_window;
+    //The offset is subtracted here to assure the hour 00:00 on the user timezone, and not on UTC
+    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - ($now % $sub_time_window) - logger_get_timezone_offset();
     $start -= $interval == 'month' ? 3 * DAY : 0;
     $end = $start + round($window / $sub_time_window) * $sub_time_window;
   }
@@ -795,8 +798,8 @@ function logger_get_relative_chart_data($chart) {
 
   $now = getdate();
   $extra_days['month'] = $now['mday'] - 1; //Days since 1st day of the month
-  $extra_days['year']  = $now['yday']; //Days since 1st day of the year
-  $extra_days['week']  = $now['wday'] > 0 ? $now['wday'] - 1 : 6; //Days since last Monday
+  $extra_days['year'] = $now['yday']; //Days since 1st day of the year
+  $extra_days['week'] = $now['wday'] > 0 ? $now['wday'] - 1 : 6; //Days since last Monday
 
   $intervals = array(
     'hour' => t('Hour'),
@@ -815,7 +818,9 @@ function logger_get_relative_chart_data($chart) {
   foreach ($intervals as $interval => $label) {
 
     $resolution = logger_get_resolution($interval);
-    $adjustment = $extra_days[$interval] * DAY + ($now[0] % ($interval == 'hour' ? HOUR : DAY));
+    $adjustment = isset($extra_days[$interval]) ? $extra_days[$interval] * DAY : 0;
+    //offset is used here to assure hour 00:00 on the user timezone and not on UTC.
+    $adjustment += (($now[0] + $chart->offset) % ($interval == 'hour' ? HOUR : DAY));
 
     if ($interval == 'month') {
       $last_day = getdate($now[0] - $adjustment - 12 * HOUR);
@@ -838,8 +843,8 @@ function logger_get_relative_chart_data($chart) {
       'end' => $time3 - 1,
     ); //Until the last second
 
-    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $chart->offset, $period2, $resolution);
-    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $chart->offset, $period1, $resolution);
+    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period2, $resolution);
+    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period1, $resolution);
 
     $so_far    = min($previous, $current);
     $remaining = max($previous - $current, 0);
@@ -853,9 +858,9 @@ function logger_get_relative_chart_data($chart) {
     $data_labels['previous'][0][$label] = $previous;
     $data_labels['excess'][0][$label]   = $excess ? $previous + $excess : 0;
 
-    $legend[0][$label] = logger_format_period($interval, $period2, $chart->offset);
-    $legend[1][$label] = logger_format_period($interval, $period1, $chart->offset);
-    $legend[2][$label] = logger_format_period($interval, $period2, $chart->offset);
+    $legend[0][$label] = logger_format_period($interval, $period2);
+    $legend[1][$label] = logger_format_period($interval, $period1);
+    $legend[2][$label] = logger_format_period($interval, $period2);
   }
   $data['series'][$user->uid][$user->name][] = $series;
   $data['labels'] = $data_labels;
@@ -869,13 +874,12 @@ function logger_get_relative_chart_data($chart) {
  * 
  * @param $interval  The time interval name.
  * @param $period    The pair of timestamps (start, end) that define the period.
- * @param $offset    The timezone offset.
  * @return the period of time as a string.
  */
-function logger_format_period($interval, $period, $offset) {
+function logger_format_period($interval, $period) {
 
-  $start = $period['start'] + $offset;
-  $end   = $period['end'] + $offset;
+  $start = $period['start'];
+  $end   = $period['end'];
 
   switch ($interval) {
     case 'hour':
@@ -949,25 +953,21 @@ function logger_get_energy_chart_data(&$chart) {
     for ($time = $from; $time <= $to; $time += $sub_time_window) {
 
       if ($chart->interval == 'year') {
-        $start = mktime(0, 0, 0, date('n', $time + WEEK),      1, date('Y', $time + WEEK));
+        $start = mktime(0, 0, 0, date('n', $time + WEEK),     1, date('Y', $time + WEEK));
         $end   = mktime(0, 0, 0, date('n', $time + WEEK) + 1, 1, date('Y', $time + WEEK)) - 1;
-
       }
       else {
         $start = $time;
         $end = $time + $sub_time_window - 1;
       }
 
-      $period = array(
-        'start' => $start,
-        'end' => $end,
-      ); //from 00:00:00 until 23:59:59
-      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $chart->offset, $period, $chart->resolution);
+      $period = array('start' => $start, 'end' => $end); //from 00:00:00 until 23:59:59
+      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $period, $chart->resolution);
 
       switch ($chart->interval) {
         case 'day':
           $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
-          $complement = logger_format_period('dayquarter', $period, 0);
+          $complement = logger_format_period('dayquarter', $period);
           break;
         case 'week':
           $formatted_time = t(date("l", $start));
@@ -975,7 +975,7 @@ function logger_get_energy_chart_data(&$chart) {
           break;
         case 'month':
           $formatted_time = t('Week') . ' ' . date("W", $start);
-          $complement = logger_format_period('week', $period, 0);
+          $complement = logger_format_period('week', $period);
           break;
         case 'year':
           $formatted_time = t(date("M", $start));
@@ -1036,7 +1036,7 @@ function logger_get_energy_chart_data(&$chart) {
  * @param $interval    The chart time interval name.
  * @return the legend line.
  */
-function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_record, $max_time, $interval) {
+function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_time, $max_time, $interval) {
 
   return array(
     t('User') => $sensor->username,
@@ -1086,7 +1086,7 @@ function logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $sensor->price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
-    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution);
 
     $values = logger_format_power_series_data($chart, $measurements);
 
@@ -1115,7 +1115,7 @@ function logger_get_overview_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->offset, $chart->period, $chart->resolution);
+  $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->period, $chart->resolution);
 
   $values = logger_format_power_series_data($chart, $measurements);
   $type = $chart->sensors[0]->type; //For instance, just consumption
@@ -1135,8 +1135,8 @@ function logger_get_overview_chart_data($chart) {
  */
 function logger_format_power_series_data($chart, $measurements) {
 
-  $start = $chart->period['start'] + $chart->offset - $chart->period['start'] % $chart->resolution;
-  $end   = $chart->period['end']   + $chart->offset - $chart->period['end']   % $chart->resolution;
+  $start = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
+  $end   = $chart->period['end']   - $chart->period['end']   % $chart->resolution;
 
   $diff = $chart->offset / HOUR;
   $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
@@ -1214,7 +1214,7 @@ function logger_get_user_sensors($types) {
       ORDER BY
         lm.function";
 
-    $result = db_query($sql, array(':username' => $user->name, ':uid' => $user->uid, ':sensor_types' => implode(',', $types)));
+    $result = db_query($sql, array(':username' => $user->name, ':uid' => $user->uid, ':sensor_types' => $types));
 
     foreach ($result as $sensor) {
       $sensors[] = $sensor;
@@ -1269,7 +1269,7 @@ function logger_get_subscribed_sensors($types) {
         u.name,
         lm.function";
 
-    $result = db_query($sql, array(':selected_users' => implode(',', $selected_users), ':sensor_types' => implode(',', $types)));
+    $result = db_query($sql, array(':selected_users' => $selected_users, ':sensor_types' => $types));
 
     foreach ($result as $sensor) {
       $sensors[] = $sensor;
@@ -1304,7 +1304,7 @@ function logger_get_active_sensors($types) {
         lm.type IN (:sensor_types) AND
         lm.function IS NOT NULL";
 
-    $result = db_query($sql, array(':sensor_types' => implode(',', $types)));
+    $result = db_query($sql, array(':sensor_types' => $types));
 
     foreach ($result as $sensor) {
       $sensors[] = $sensor;
@@ -1345,14 +1345,8 @@ function logger_get_timezone_offset() {
 
   global $user;
 
-  if (isset($user->timezone)) {
-    return $user->timezone;
-
-  }
-  else {
-    //TODO: Returns timezone used in the browser. Auto Timezone option must be turned on. $_SESSION['timezone'];
-    return 'Europe/Berlin';
-  }
+  $tz = new DateTimeZone( isset($user->timezone)? $user->timezone : date_default_timezone_get());
+  return $tz->getOffset(new DateTime);
 }
 
 function logger_theme() {
@@ -1788,7 +1782,6 @@ function logger_energychart_form($form, &$form_state, $chart) {
     '#description' => t('Do you want to sum up all sensors?'),
     '#default_value' => logger_get_variable('aggregate_sensors', 1),
     '#return_value' => 1,
-    '#required' => TRUE,
     '#attributes' => array('onclick' => 'submitEnergyChartForm(this)'), //In IE, onchange does not work
   );
 
@@ -1945,7 +1938,6 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#description' => t('Do you want the chart series to use stepped lines?'),
     '#default_value' => logger_get_variable('step_plot', 0),
     '#return_value' => 1,
-    '#required' => TRUE,
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
 
@@ -2107,7 +2099,7 @@ function logger_create_time_fields($element, $suffix) {
       monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
     }";
 
-  drupal_add_js('$(document).ready(function(){$("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', array('type' => 'inline', 'scope' => JS_DEFAULT));
+  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', array('type' => 'inline', 'scope' => JS_DEFAULT));
 
   return logger_create_custom_field($element, $suffix . 'date', '', 10, 10) .
     logger_create_custom_field($element, $suffix . 'time', '', 5, 5);
@@ -2161,15 +2153,11 @@ function logger_create_custom_field($element, $suffix, $value, $size = 0, $maxle
 
 function logger_powerchart_form_validate($form, &$form_state) {
 
-  $smoothing_level = $form_state['values']['smoothing_level'];
-
-  if ($smoothing_level < 1) {
+  if ($form_state['values']['smoothing_level'] < 1) {
     form_set_error('smoothing_level', t('The smoothing level must be greater than 0.'));
   }
 
-  $step_plot = $form_state['values']['step_plot'];
-
-  if ($step_plot != 1 && $step_plot != 0) {
+  if ($form_state['values']['step_plot'] != 1 && $form_state['values']['step_plot'] != 0) {
     form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
   }
 
@@ -2192,75 +2180,59 @@ function logger_powerchart_form_validate($form, &$form_state) {
 
 function logger_chartform_validate($form, &$form_state) {
 
-  $price1 = $form_state['values']['price1'];
-  if ($price1 && !is_numeric($price1)) {
+  if (isset($form_state['values']['price1']) && !is_numeric($form_state['values']['price1'])) {
     form_set_error('price1', t('The price is invalid.'));
   }
 
-  $price2 = $form_state['values']['price2'];
-  if ($price2 && !is_numeric($price2)) {
+  if (isset($form_state['values']['price2']) && !is_numeric($form_state['values']['price2'])) {
     form_set_error('price2', t('The price is invalid.'));
   }
 }
 
 function logger_energychart_form_submit($form, &$form_state) {
 
-  $aggregate = $form_state['values']['aggregate_sensors'];
-  $types     = $form_state['values']['selected_sensor_types'];
-  $unit      = $form_state['values']['unit'];
-  $price1    = $form_state['values']['price1'];
-  $price2    = $form_state['values']['price2'];
+  logger_set_variable('aggregate_sensors', $form_state['values']['aggregate_sensors']);
+  logger_set_variable('selected_sensor_types', $form_state['values']['selected_sensor_types']);
+  logger_set_variable('energychart_unit', $form_state['values']['unit']);
 
-  logger_set_variable('aggregate_sensors', $aggregate);
-  logger_set_variable('selected_sensor_types', $types);
-  logger_set_variable('energychart_unit', $unit);
-
-  if ($price1) {
-    logger_set_variable('price1', $price1);
+  if (isset($form_state['values']['price1'])) {
+    logger_set_variable('price1', $form_state['values']['price1']);
   }
-  if ($price2) {
-    logger_set_variable('price2', $price2);
+  if (isset($form_state['values']['price2'])) {
+    logger_set_variable('price2', $form_state['values']['price2']);
   }
 }
 
 function logger_powerchart_form_submit($form, &$form_state) {
 
   global $_REQUEST;
-  $new_user        = $form_state['values']['new_user'];
-  $step_plot       = $form_state['values']['step_plot'];
-  $smoothing_level = $form_state['values']['smoothing_level'];
-  $unit            = $form_state['values']['unit'];
-  $price1          = $form_state['values']['price1'];
-  $price2          = $form_state['values']['price2'];
+  global $_GET;
 
-  if ($new_user > 0) {
-    logger_add_user($new_user);
+  if ($form_state['values']['new_user'] > 0) {
+    logger_add_user($form_state['values']['new_user']);
   }
-  if ($price1) {
-    logger_set_variable('price1', $price1);
+  if (isset($form_state['values']['price1'])) {
+    logger_set_variable('price1', $form_state['values']['price1']);
   }
-  if ($price2) {
-    logger_set_variable('price2', $price2);
+  if (isset($form_state['values']['price2'])) {
+    logger_set_variable('price2', $form_state['values']['price2']);
   }
 
-  logger_set_variable('powerchart_unit', $unit);
-  logger_set_variable('step_plot', $step_plot);
-  logger_set_variable('smooting_level', $smoothing_level);
+  logger_set_variable('powerchart_unit', $form_state['values']['unit']);
+  logger_set_variable('step_plot', $form_state['values']['step_plot']);
+  logger_set_variable('smooting_level', $form_state['values']['smoothing_level']);
 
-  $form_state['redirect'] = array($_GET['q'], $_REQUEST);
+  //FIXME: get rid of this redirection
+  $form_state['redirect'] = array($_GET['q'], array('query' => $_REQUEST));
 }
 
 function logger_relativechart_form_submit($form, &$form_state) {
 
-  $meters = $form_state['values']['selected_meters'];
-  $unit   = $form_state['values']['unit'];
-  $price1 = $form_state['values']['price1'];
+  logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
+  logger_set_variable('relativechart_unit', $form_state['values']['unit']);
 
-  logger_set_variable('selected_meters', $meters);
-  logger_set_variable('relativechart_unit', $unit);
-
-  if ($price1) {
-    logger_set_variable('price1', $price1);
+  if (isset($form_state['values']['price1'])) {
+    logger_set_variable('price1', $form_state['values']['price1']);
   }
 }
 
@@ -2276,7 +2248,6 @@ function logger_get_sensor_types_options($uid = NULL) {
 
   if (isset($uid)) {
     $query->join('logger_meters', 'm', 't.id = m.type');
-
     $query->condition('uid', $uid, '=');
   }
 
@@ -2355,7 +2326,7 @@ function logger_get_xvalue($index) {
 
   global $_REQUEST;
 
-  //FIXME: simplify
+  //Both need to be set
   if (!(isset($_REQUEST['xvalue' . $index . 'date']) && isset($_REQUEST['xvalue' . $index . 'time']))) {
     return 0;
   }
@@ -2516,7 +2487,7 @@ function logger_get_users_options() {
     ORDER BY " .
       ($is_visitor ? 'u.uid' : 'u.name');
 
-  $fluksonians = db_query($sql, array(':selected_users' => implode(',', $selected_users)));
+  $fluksonians = db_query($sql, array(':selected_users' => $selected_users));
 
   $options = array(0 => '');
   foreach ($fluksonians as $fluksonian) {
@@ -2537,8 +2508,10 @@ function logger_add_user($uid) {
 
   global $user;
   $selected_users = logger_get_variable('selected_users', array($user->uid));
-  $selected_users[] = $uid;
-  logger_set_variable('selected_users', $selected_users);
+  if (!in_array($uid, $selected_users)) {
+    $selected_users[] = $uid;
+    logger_set_variable('selected_users', $selected_users);
+  }
 }
 
 /**
@@ -2550,14 +2523,11 @@ function logger_remove_user($uid) {
 
   $selected_users = logger_get_variable('selected_users', array());
   for ($i = 0; $i < count($selected_users); $i++) {
-
     if ($selected_users[$i] == $uid) {
       unset($selected_users[$i]);
-
-      logger_set_variable('selected_users', array_values($selected_users));
-      return;
     }
   }
+  logger_set_variable('selected_users', array_values($selected_users));
 }
 
 /**
@@ -2570,6 +2540,8 @@ function logger_remove_user($uid) {
 function logger_get_variable($id, $default_value) {
 
   global $user;
+  global $_SESSION;
+  global $_COOKIE;
   $id = "logger_$id";
 
   if ($user->uid) {
@@ -2580,12 +2552,10 @@ function logger_get_variable($id, $default_value) {
     if ($user->roles[$rid]) {
       $id .= '_' . $user->uid;
       return variable_get($id, $default_value);
-
     }
     else {
       return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
     }
-
   }
   else {
 
@@ -2605,6 +2575,7 @@ function logger_get_variable($id, $default_value) {
  */
 function logger_set_variable($id, $value) {
 
+  global $_SESSION;
   global $user;
   $id = "logger_$id";
 
@@ -2616,12 +2587,10 @@ function logger_set_variable($id, $value) {
     if ($user->roles[$rid]) {
       $id .= '_' . $user->uid;
       variable_set($id, $value);
-
     }
     else {
       $_SESSION[$id] = $value;
     }
-
   }
   else {
     if (is_array($value)) {
@@ -2649,6 +2618,8 @@ function logger_account_access($permission, $account) {
  */
 function logger_sensor_access($permission, $meter) {
 
+  global $GLOBALS;
+
   $sql = "SELECT uid FROM {logger_meters} WHERE meter = :meter";
   $uid = db_query($sql, array(':meter' => $meter))->fetchField();
 
@@ -2659,6 +2630,8 @@ function logger_sensor_access($permission, $meter) {
  * Access callback ensuring the device is accessible only to the owner.
  */
 function logger_device_access($permission, $device) {
+
+  global $GLOBALS;
 
   $sql = "SELECT uid FROM {logger_devices} WHERE device = :device";
   $uid = db_query($sql, array(':device' => $device))->fetchField();
@@ -2671,10 +2644,9 @@ function logger_device_access($permission, $device) {
  *
  * @param $interval The time interval.
  * @param $device   The device's hash code.
- * @param $offset   The user timezone offset.
  * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
  */
-function logger_query_device_measurements($interval, $device, $offset) {
+function logger_query_device_measurements($interval, $device) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -2687,7 +2659,7 @@ function logger_query_device_measurements($interval, $device, $offset) {
   $measurements = array();
   foreach ($sensors as $sensor) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $offset, $period, $resolution);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $period, $resolution);
   }
   return $measurements;
 }
@@ -2698,8 +2670,6 @@ function logger_cron() {
   $bindings = logger_bind_support_ports();
 
   logger_update_support_authorized_keys($bindings);
-
-  _download_serial_numbers();
 }
 
 /**
@@ -2923,7 +2893,7 @@ function logger_request_support($device) {
   db_insert('device_support_request')
     ->fields(array(
       'device' => $device,
-      'requested' => REQUEST_TIME
+      'requested' => REQUEST_TIME 
     ))
     ->execute();
 
@@ -3031,46 +3001,6 @@ function logger_update_support_authorized_keys($bindings) {
 
   foreach ($bindings as $host => $username) {
     system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $host $username");
-  }
-}
-
-/**
- * This function updates temporary serial numbers generated upon device
- * registration. The association between devices and their real SN is
- * retrieved from a remote data file provided by flukso.net.
- *
- * Data format assumed: <device_id> <serial_number> \n
- * Possible token separators: space, \t, \n
- */
-function _download_serial_numbers() {
-
-  $url = variable_get('device_serial_number_update_url', FALSE); //Test: , 'file:///tmp/original.txt'
-
-  if ($url) {
-    $lines = file_get_contents($url);
-
-    if ($lines) {
-
-      $device = strtok($lines, " \n\t");
-
-      while ($device != FALSE) {
-
-        $serial = strtok(" \n\t");
-
-        //If device and serial number are valid
-        if (strlen($device) == 32 && $serial > 99999999 && $serial <= 9999999999) {
-
-          db_update('device_support_slot')
-            ->fields(array(
-              'serial' => $serial,
-            ))
-            ->condition('device', $device)
-            ->execute();          
-        }
-
-        $device = strtok(" \n\t");
-      }
-    }
   }
 }
 
@@ -3272,6 +3202,8 @@ function logger_brownout($auth, $message) {
  * @return TRUE if the authentication succeeds, FALSE otherwise.
  */
 function logger_authenticate_hmac_sha1($auth, $message) {
+
+  global $_REQUEST;
 
   //Check API version
   if ($_REQUEST['version'] != 1) {

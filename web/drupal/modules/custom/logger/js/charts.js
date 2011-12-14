@@ -217,7 +217,7 @@ function removePowerSeries(uid, i, username, tableId) {
   }
 
   if (!found) {
-    $.get('/logger/remove/user/' + uid);
+    jQuery.get('/logger/remove/user/' + uid);
 
     //IE makes it necessary to use an auxiliary array
     var sorted = new Array(field.length + 1);
@@ -256,7 +256,7 @@ function updateSmoothingLevel(fieldId, step) {
     sliderChart.updateOptions({rollPeriod: level});
   }
 
-  $.get('/logger/setvariable/smoothing_level/' + level);
+  jQuery.get('/logger/setvariable/smoothing_level/' + level);
 
   return true;
 }
@@ -563,7 +563,7 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
 
   for (var d = 0; d < series.length; d++) {
 
-    $.each(series[d].data,
+    jQuery.each(series[d].data,
 
       function(i, point) {
 
@@ -613,7 +613,7 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
             display: 'none'
           };
 
-        $(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
+        jQuery(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
     });
   }
 }
@@ -637,7 +637,7 @@ function setSeriesColor(chartId, i, color) {
     }
   }
 
-  $.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
+  jQuery.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
 }
 
 function updateDygraphColor(chart, i, color) {

@@ -41,8 +41,7 @@ define('MONTH_UNIT_ID',  7);
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
 
-define('NOTIFICATION_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
-define('NOTIFICATION_TIMESTAMP_FORMAT_PHP', 'd-m-Y H:i');
+define('NOTIFICATION_TIMESTAMP_FORMAT', 'd-m-Y H:i');
 
 
 function notification_init() {
@@ -207,7 +206,7 @@ function notification_list_page() {
       d.serial,
       e.name AS event_name,
       n.emails,
-      IF(n.last_sent = 0, NULL, FROM_UNIXTIME(n.last_sent + u.timezone, :time_format)) AS last_sent,
+      n.last_sent,
       n.limit_up,
       un.id AS unit_id,
       un.symbol AS unit,
@@ -251,7 +250,7 @@ function notification_list_page() {
   //$sql .= tablesort_sql($headers);
 
   global $user;
-  $result = db_query($sql, array(':time_format' => NOTIFICATION_TIMESTAMP_FORMAT_SQL, ':uid' => $user->uid));
+  $result = db_query($sql, array(':uid' => $user->uid));
 
   $rows = array();
   foreach ($result as $object) {
@@ -266,7 +265,7 @@ function notification_list_page() {
     $row = array();
     $row['serial'] = $object->serial;
     $row['event_name'] = $event_name;
-    $row['last_sent'] = $object->last_sent;
+    $row['last_sent'] = $object->last_sent > 0 ? date(NOTIFICATION_TIMESTAMP_FORMAT, $object->last_sent) : NULL;
     $row['emails'] = $emails;
     $row[] = l(t('Remove'), "notification/delete/$id") . '<br>' .
              l(t('Edit'),    "notification/edit/$id");
@@ -295,7 +294,7 @@ function notification_eventlog_page($serial) {
 
   $sql = "
     SELECT
-      FROM_UNIXTIME(l.time + u.timezone, :time_format) AS time,
+      l.time,
       e.name
     FROM
       {users} u,
@@ -310,14 +309,14 @@ function notification_eventlog_page($serial) {
     ORDER BY
       l.time DESC";
 
-  $args = array(':time_format' => NOTIFICATION_TIMESTAMP_FORMAT_SQL, ':serial' => $serial);
+  $args = array(':serial' => $serial);
 
   $result = db_query($sql, $args);
   $rows = array();
 
   foreach ($result as $entry) {
     $rows[] = array(
-      'time' => $entry->time,
+      'time' => date(NOTIFICATION_TIMESTAMP_FORMAT, $entry->time),
       'name' => t($entry->name)
     );
   }
@@ -752,13 +751,13 @@ function notification_emails_validate($field, $form_state) {
 function notification_limit_up_validate($field, $form_state) {
 
   //Check if it has just one field event_id, or multiple
-  $event_id = $_REQUEST["event_id"];
+  $event_id = isset($_REQUEST["event_id"]) ? $_REQUEST["event_id"] : NULL;
 
   if (!$event_id) {
     $related_event_id = $field['#related_event_id'];
     $event_id = $related_event_id;
   }
-  $selected = $_REQUEST["event_id$related_event_id"];
+  $selected = isset($_REQUEST["event_id$related_event_id"]) ? $_REQUEST["event_id$related_event_id"] : NULL;
 
   //If selected
   if ($selected) {
@@ -851,7 +850,7 @@ function notification_newsletter_form_submit($form, &$form_state) {
  */
 function notification_register_event($values, $event_id) {
 
-  $selected = $values["event_id$event_id"];
+  $selected = isset($values["event_id$event_id"]) ? $values["event_id$event_id"] : NULL;
 
   if ($selected) {
 
@@ -1052,18 +1051,24 @@ function theme_notification_event_limit_up($variables) {
   $element = $variables['element'];
 
   //TODO: make this theme more generic
-  $event_id = $element['#related_event_id'];
-  if ($event_id) {
+  $event_id = '';
+  if (isset($element['#related_event_id'])) {
+    $event_id = $element['#related_event_id'];
     $attributes = drupal_attributes(array('onfocus' => "changeLimitUp($event_id, this)"));
   }
   _form_set_class($element, array('form-select'));
 
-  $field1 = '<input type="text" name="limit_up' . $event_id . '" size="10" id="edit-limit-up' . $event_id . '"' .
-    'value="' . $element['#default_value'] . '" style="text-align: right;" ' . $attributes . ' />';
+  $default_value = isset($element['#default_value']) ? $element['#default_value'] : '';
 
-  foreach ($element['#unit_options'] as $key => $choice) {
-    $selected = ($element['#unit_id'] == $key) ? ' selected="selected"' : '';
-    $options .= '<option value="' . $key . '"' . $selected . '>' . $choice . '</option>';
+  $field1 = '<input type="text" name="limit_up' . $event_id . '" size="10" id="edit-limit-up' . $event_id . '"' .
+    'value="' . $default_value . '" style="text-align: right;" ' . $attributes . ' />';
+
+  $options = '';
+  if (isset($element['#unit_options'])) {
+    foreach ($element['#unit_options'] as $key => $choice) {
+      $selected = ($element['#unit_id'] == $key) ? ' selected="selected"' : '';
+      $options .= '<option value="' . $key . '"' . $selected . '>' . $choice . '</option>';
+    }
   }
 
   $field2 = '<select name="unit_id' . $event_id . '" id="edit-unit-id' . $event_id . '">' . $options . '</select>';
@@ -1255,6 +1260,7 @@ function notification_send_communication_restored_emails($now) {
  */
 function notification_send_corrupted_message_emails($now) {
 
+  //FIXME! m.corrupted reference
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
@@ -1279,6 +1285,8 @@ function notification_send_corrupted_message_emails($now) {
 
   $args = array(':event_id' => CORRUPTED_MESSAGE_EVENT_ID, ':event_time' => $now);
 
+  //FIXME
+  /*
   $notifiables = notification_query_notifiables($sql, $args);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
@@ -1287,6 +1295,7 @@ function notification_send_corrupted_message_emails($now) {
     "measurement or a heartbeat with corrupted data at %event_time.");
 
   notification_send_emails($message, $notifiables);
+  */
 }
 
 /**
@@ -1331,7 +1340,7 @@ function notification_send_peak_consumption_emails($now) {
     if ($violations) {
 
       $notifiable['violations'] = $violations['list'];
-      $base_time = $violations['timestamp'] - $notifiable['timezone'];
+      $base_time = $violations['timestamp'];
       $notifiables[] = $notifiable;
 
       notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $base_time);
@@ -1366,8 +1375,8 @@ function notification_send_summary_report_emails($now) {
       n.unit_id,
       d.serial,
       n.emails,
-      (:event_time - (:event_time % :day) - u.timezone - 1) AS event_time,
-      (n.base_time - (n.base_time % :day) - u.timezone) AS since_time,
+      (:event_time - (:event_time % :day) - 1) AS event_time,
+      (n.base_time - (n.base_time % :day)) AS since_time,
       un.name AS unit_name,
       u.timezone
     FROM
@@ -1413,7 +1422,7 @@ function notification_send_summary_report_emails($now) {
 
     foreach ($results as $sensor) {
 
-      $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $notifiable['timezone'], $period, DAY), 2, '.', '');
+      $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $period, DAY), 2, '.', '');
       $cost = number_format($energy * $prices[$sensor->type], 2, '.', '');
 
       $lines[$sensor->type] = '<tr>' .
@@ -1635,8 +1644,9 @@ function notification_send_emails($message, $notifiables) {
 
   foreach ($notifiables as $notifiable) {
 
-    $notifiable['since_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $notifiable['since_time'] + $notifiable['timezone']);
-    $notifiable['event_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $notifiable['event_time'] + $notifiable['timezone']);
+    //FIXME: use user timezone $notifiable['timezone'];
+    $notifiable['since_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT, $notifiable['since_time']);
+    $notifiable['event_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT, $notifiable['event_time']);
 
     foreach ($notifiable as $key => $value) {
 
@@ -1665,7 +1675,7 @@ function notification_send_emails($message, $notifiables) {
 function notification_query_peak_consumption_violations($notifiable) {
 
   $list = NULL;
-  $measurements = logger_query_device_measurements('hour', $notifiable['device'], $notifiable['timezone']);
+  $measurements = logger_query_device_measurements('hour', $notifiable['device']);
 
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {
@@ -1673,10 +1683,11 @@ function notification_query_peak_consumption_violations($notifiable) {
 
       foreach ($values as $timestamp => $value) {
 
-        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time'] + $notifiable['timezone']) {
+        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time']) {
 
+          //FIXME: $notifiable['timezone'];
           $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
-          $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT_PHP, $timestamp) . ' - ' .
+          $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
             number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
         }
       }
@@ -1708,7 +1719,6 @@ function notification_send_email($email, $subject, $body) {
     "Content-Transfer-Encoding: quoted-printable\n" .
     "\n" .
     $body;
-
 
   $header = "Content-Type: multipart/alternative; boundary=\"nextPart_0000_001\"";
   $emailstring = "Header::" . $header . "|From::mySmartGrid <noreply@mysmartgrid.de>|To::" . $email . "|Subject::" . $subject . "|Body::" . $body;
@@ -1744,3 +1754,4 @@ function notification_html2txt($html) {
 
   return $text;
 }
+

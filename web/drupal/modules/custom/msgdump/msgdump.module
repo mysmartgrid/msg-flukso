@@ -21,8 +21,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('MSGDUMP_DB_PATH', drupal_get_path('module', 'msgdump') . '/db');
-define('MSGDUMP_BIN_PATH', drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
+define('MSGDUMP_DB_PATH', DRUPAL_ROOT . '/' . drupal_get_path('module', 'msgdump') . '/db');
+define('MSGDUMP_BIN_PATH', DRUPAL_ROOT . '/' . drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
 
 
 function msgdump_permission() {
@@ -304,7 +304,8 @@ function theme_msgdump_setup_list($variables) {
   $items = $variables['items'];
 
   $headers = array('', t('Device'), t('Startdate'), t('Stopdate'), t('File'));
-  return theme_table(array('header' => $headers, 'rows' => $items));
+  return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array(),
+      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
 }
 
 function msgdump_cron() {

@@ -27,9 +27,30 @@
  * @param $data      The execution data.
  */
 function jobqueue_produce($algorithm, $data) {
-  $str = "/usr/bin/producer.rb -v -c /usr/lib/msg-qworker/etc/qproducerrc -a $algorithm";
-  if ($data != NULL) {
-    $str .= " -p $data";
+
+  $command = "export HOME=/tmp; /usr/bin/producer.rb -v -c /usr/local/lib/msg-qworker/etc/qproducerrc -a $algorithm";
+  if ($data) {
+    $command .= " -p $data";
   }
-  system($str);
+
+  //Debug
+  //Redirect error output to default output
+  //$command .= " 2>&1";
+  //exec($command, $output, $return);
+
+  exec($command);
+
+  /*
+  //Debug
+  $file = "/tmp/jobqueue.txt";
+  $fh = fopen($file, 'w');
+  fwrite($fh, $command);
+
+  foreach($output as $line) {
+    fwrite($fh, "\n$line");
+  }
+
+  fwrite($fh, "\n return: $return \n");
+  fclose($fh);
+  */
 }

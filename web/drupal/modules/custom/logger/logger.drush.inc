@@ -116,7 +116,7 @@ function logger_create_node($serial, $country = "", $uid = 0) {
     //create an entry in the {logger_devices} table
     $device  = md5(uniqid(rand(), TRUE));
     $sha     = md5(uniqid(rand(), TRUE));
-    $created = REQUEST_TIME;
+    $created = time();
 
     $result = $id = db_insert('logger_devices')
       ->fields(array(

@@ -354,11 +354,10 @@ function deployment_get_devices($state_id = NULL, $serial = NULL) {
 
   global $user;
 
-  $now = REQUEST_TIME;
   $states = deployment_get_all_states();
   $data = array();
 
-  $sql = deployment_create_devices_query($now, $state_id, $serial);
+  $sql = deployment_create_devices_query(REQUEST_TIME, $state_id, $serial);
   $result = db_query($sql);
  
   while ($device = $result->fetchAssoc()) {
@@ -382,7 +381,10 @@ function deployment_create_devices_query($now, $state_id, $serial) {
   //If parameters are used in this SQL query, pager_query does not count rows correctly
 
   global $user;
-  $tzdif = $user->timezone / 3600; //divided by 1 hour
+
+  //FIXME: test this block, when called from drupal cron
+  $tz = new DateTimeZone( isset($user->timezone)? $user->timezone : date_default_timezone_get());
+  $tzdif = $tz->getOffset(new DateTime) / 3600; //divided by 1 hour
   $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
   $registration_timeout  = $now - 3 * 24 * 3600; //3 days
   $offline_timeout       = $now - 24 * 3600; //24 hours
@@ -596,7 +598,6 @@ function deployment_printcode_form_submit($form, &$form_state) {
 
         $sql = "SELECT * FROM {logger_devices} WHERE serial = :serial";
         $result = db_query($sql, array(':serial' => $serial));
-
       }
       else {
         preg_match_all('/([\d]*)-([\d]*)/', $serial, $match);
@@ -619,7 +620,6 @@ function deployment_printcode_form_submit($form, &$form_state) {
           $pdf->Write(0, 'Seriennummer: WA' . $device->serial);
           $pdf->setXY(43, 175);
           $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device, 0, 10));
-
         }
       }
       else {
@@ -654,13 +654,13 @@ function deployment_create_summary() {
 
     foreach ($devices as $device) {
       $state_id = $device['state_id'];
-      $totals[$state_id]++;
+      $totals[$state_id] = isset($totals[$state_id]) ? $totals[$state_id] + 1 : 1;
     }
 
     $states = deployment_get_all_states();
 
     foreach (array_keys($states) as $state_id) {
-      $total = $totals[$state_id];
+      $total = isset($totals[$state_id]) ? $totals[$state_id] : 0;
       $total = $total > 0 ? $total : 0;
 
       db_insert('deployment_summary')
