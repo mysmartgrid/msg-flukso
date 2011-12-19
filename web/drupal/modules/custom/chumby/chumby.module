@@ -185,7 +185,7 @@ function chumby_image_form_validate($form, &$form_state) {
   if ($form_state['values']['normal'] == "" || filter_var($form_state['values']['normal']) == FALSE) {
     form_set_error('normal', t('Please enter a number value.'));
   }
-  elseif ($form_state['values']['normal'] < $form_state['values']['low']) {
+  else if ($form_state['values']['normal'] < $form_state['values']['low']) {
     form_set_error('normal', t('The normal value should be higher than the low value.'));
   }
 
@@ -193,7 +193,7 @@ function chumby_image_form_validate($form, &$form_state) {
   if ($form_state['values']['high'] == "" || filter_var($form_state['values']['high']) == FALSE) {
     form_set_error('high', t('Please enter a number value.'));
   }
-  elseif ($form_state['values']['high'] < $form_state['values']['normal']) {
+  else if ($form_state['values']['high'] < $form_state['values']['normal']) {
     form_set_error('normal', t('The high value should be higher than the normal value.'));
   }
 }
@@ -202,37 +202,30 @@ function chumby_image_form_submit($form, &$form_state) {
 
   $image_id = md5(uniqid(rand(), TRUE));
   $tmp_path = CHUMBY_PATH . "/tmp/$image_id";
-  $success = FALSE;
 
-  if (!file_exists($tmp_path)) {
+  $success = 
+    file_exists($tmp_path) &&
+    mkdir($tmp_path, 0777, TRUE) &&
+    rcopy(CHUMBY_PATH . '/template', $tmp_path) &&
 
-    mkdir($tmp_path, 0777, TRUE);
+    chumby_create_daemonconfig($form_state['values'], $tmp_path) &&
+    chumby_create_profile($form_state['values']['visualization'], $tmp_path) &&
+    rzip($tmp_path, CHUMBY_PATH . "/files/$image_id.zip");
 
-    $success =
-      rcopy(CHUMBY_PATH . '/template', $tmp_path) &&
-
-      chumby_create_daemonconfig($form_state['values'], $tmp_path) &&
-
-      chumby_create_profile($form_state['values']['visualization'], $tmp_path) &&
-
-      rzip($tmp_path, CHUMBY_PATH . "/files/$image_id.zip");
-
-    rrmdir($tmp_path);
-  }
-
-  $form_state['redirect'] = "chumby/$image_id" ;
+  rrmdir($tmp_path);
 
   if (!$success) {
     drupal_set_message(t("Operation failed! Please try again later!"));
   }
+  $form_state['redirect'] = "chumby/$image_id";
 }
 
 /**
- * Creates a lua deamon config file.
+ * Creates the config file of the Chumby daemon.
  *
- * @param $values    Daemon configuration properties.
- * @param $tmp_path  The directory where the daemonconfig file will be created.
- * @return  TRUE on success, FALSE on failure.
+ * @param  $values    The daemon configuration properties.
+ * @param  $tmp_path  The directory where the daemon config file will be created.
+ * @return TRUE on success, FALSE on failure.
  */
 function chumby_create_daemonconfig($values, $tmp_path) {
 
@@ -257,22 +250,24 @@ function chumby_create_daemonconfig($values, $tmp_path) {
 }
 
 /**
- * Creates a chumby image profile.
+ * Creates the chumby image profile.
  *
- * @param $widgets   The array of selected widgets.
- * @param $tmp_path  The directory where the profile file will be created.
- * @return  TRUE on success, FALSE on failure.
+ * @param  $widgets   The array of selected widgets.
+ * @param  $tmp_path  The directory where the profile file will be created.
+ * @return TRUE on success, FALSE on failure.
  */
 function chumby_create_profile($widgets, $tmp_path) {
 
-  $profile = fopen($tmp_path . '/profile.xml', 'w');
+  $profile = fopen("$tmp_path/profile.xml", 'w');
   if ($profile) {
 
     require CHUMBY_PATH . '/profile-head.php';
     fwrite($profile, $profile_head);
 
+    $id = 0;
     foreach ($widgets as $key => $value) {
 
+      $id++;
       if ($value != '0') {
 
         require CHUMBY_PATH . "/$key" . '_widget.php';
@@ -280,7 +275,7 @@ function chumby_create_profile($widgets, $tmp_path) {
       }
     }
 
-    require CHUMBY_PATH . '/' . 'profile-tail.php';
+    require CHUMBY_PATH . '/profile-tail.php';
     fwrite($profile, $profile_tail);
     fclose($profile);
     return TRUE;
@@ -291,9 +286,9 @@ function chumby_create_profile($widgets, $tmp_path) {
 /**
  * Copies a file or directory recursively.
  *
- * @param   $source       The source path
- * @param   $destination  The destination path
- * @return  TRUE on success, FALSE on failure.
+ * @param  $source       The source path
+ * @param  $destination  The destination path
+ * @return TRUE on success, FALSE on failure.
  */
 function rcopy($source, $destination) {
   
@@ -333,10 +328,12 @@ function rrmdir($dir) {
     $objects = scandir($dir);
     foreach ($objects as $object) {
       if ($object != "." && $object != "..") {
-        if (filetype($dir."/".$object) == "dir") 
+        if (filetype($dir."/".$object) == "dir") {
           rrmdir($dir."/".$object);
-        else
+        }
+        else {
           unlink($dir."/".$object);
+        }
       }
     }
     reset($objects);
