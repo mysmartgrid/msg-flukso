@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the chumby module.
+ */
+
+function chumby_install() {
+  $file_path = drupal_get_path('module', 'chumby') . '/files';
+  mkdir($file_path);
+}
+
+function chumby_uninstall() { }
