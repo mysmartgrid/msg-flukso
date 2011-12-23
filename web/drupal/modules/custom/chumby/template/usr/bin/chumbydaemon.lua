@@ -73,7 +73,6 @@ end
 
 function updateCommand()
 	setIP()
-        port = "8080"
 
 	log("Using " .. ip)
 
@@ -81,7 +80,7 @@ function updateCommand()
 	if ip ~= "" then
 		command['last_reading'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. ":" .. port .. 
+									" -l " .. ip .. ":" .. config.PORT ..
 									" -s " .. config.SENSOR ..
 									" -n " .. config.DATADIR .. "/last_reading" ..
 									" -f chumby-current -o file -u watt -i minute -V 1.0",
@@ -89,7 +88,7 @@ function updateCommand()
 					}
 		command['last_minute'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. ":" .. port .. 
+									" -l " .. ip .. ":" .. config.PORT ..
 									" -s " .. config.SENSOR ..
 									" -n " .. config.DATADIR .. "/last_minute" ..
 									" -f chumby-lastminute -o file -u watt -i minute -V 1.0",
@@ -97,11 +96,11 @@ function updateCommand()
 					}
 		command['last_hour'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. ":" .. port .. 
+									" -l " .. ip .. ":" .. config.PORT ..
 									" -s " .. config.SENSOR ..
 									" -t " .. config.TOKEN ..
 									" -n " .. config.DATADIR .. "/last_hour" ..
-									" -f chumby-lasthour -o file -i hour -u watt -i hour -V 1.0",
+									" -f chumby-lasthour -o file -u watt -i hour -V 1.0",
 						interval = 11
 					}
 	else
