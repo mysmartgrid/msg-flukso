@@ -2,6 +2,7 @@
 -- This file is part of libflukso.
 --
 -- (c) Mathias Dalheimer <md@gonium.net>, 2010
+--     Ely de Oliveira   <ely.oliveira@itwm.fraunhofer.de>, 2011
 --
 -- libflukso is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -72,6 +73,7 @@ end
 
 function updateCommand()
 	setIP()
+        port = "8080"
 
 	log("Using " .. ip)
 
@@ -79,27 +81,27 @@ function updateCommand()
 	if ip ~= "" then
 		command['last_reading'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. 
+									" -l " .. ip .. ":" .. port .. 
 									" -s " .. config.SENSOR ..
 									" -n " .. config.DATADIR .. "/last_reading" ..
-									" -f chumby-current -o file",
+									" -f chumby-current -o file -u watt -i minute -V 1.0",
 						interval = 2
 					}
 		command['last_minute'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. 
+									" -l " .. ip .. ":" .. port .. 
 									" -s " .. config.SENSOR ..
 									" -n " .. config.DATADIR .. "/last_minute" ..
-									" -f chumby-lastminute -o file",
+									" -f chumby-lastminute -o file -u watt -i minute -V 1.0",
 						interval = 10
 					}
 		command['last_hour'] = {
 						cmd = config.BINPATH .. config.CMD .. 
-									" -l " .. ip .. 
+									" -l " .. ip .. ":" .. port .. 
 									" -s " .. config.SENSOR ..
 									" -t " .. config.TOKEN ..
 									" -n " .. config.DATADIR .. "/last_hour" ..
-									" -f chumby-lasthour -o file -i hour",
+									" -f chumby-lasthour -o file -i hour -u watt -i hour -V 1.0",
 						interval = 11
 					}
 	else
