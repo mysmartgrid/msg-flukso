@@ -82,8 +82,11 @@ function chumby_image_form($form, &$form_state) {
 
   global $user;
 
-  $sql = 'SELECT meter, function FROM {logger_meters} WHERE uid = :uid AND function IS NOT NULL';
-  $result = db_query($sql, array(':uid' => $user->uid));
+  $result = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'function'))
+    ->condition('m.uid', $user->uid, '=')
+    ->isNotNull('m.function')
+    ->execute();
 
   $sensors = array();
   foreach ($result as $flukso) {
@@ -93,10 +96,10 @@ function chumby_image_form($form, &$form_state) {
   $form['visualization'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
-      'text' => t('currentpower'),
-      'tacho' => t('energietacho'),
-      'lightbulb' => t('Gluehlampe'),
-      'graph' => t('EnergyGraph'),
+      'text-view' => t('Curent Power'),
+      'speedometer' => t('Speedometer'),
+      'light-bulb' => t('Light Bulb'),
+      'energy-graph' => t('Energy Graph'),
     ),
     '#title' => t('Visualizations'),
     '#description' => t('Visualizations that should be available'),
@@ -110,18 +113,24 @@ function chumby_image_form($form, &$form_state) {
   );
 
   $form['auto'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Autoconfigure IP'),
+    '#type' => 'checkboxes',
+    '#title' => t('Flukso IP Address'),
     '#description' => t('Automatically find the flukso in the local network. Normally this is the way you want to go.'),
-    '#default_value' => '1',
-    '#attributes' => array('onChange' => 'document.getElementById("edit-ip").disabled = document.getElementById("edit-auto").checked'),
+    '#options' => array(
+      '1' => t('Autoconfigure'),
+    ),
+    '#default_value' => array('1'),
+    '#attributes' => array('onChange' => '
+      var ip = document.getElementById("edit-ip");
+      ip.disabled = document.getElementById("edit-auto-1").checked;
+      ip.value = ip.disabled ? "" : ip.value;'),
   );
 
   $form['ip'] = array(
     '#type' => 'textfield',
-    '#title' => t('ip address'),
+    '#field_prefix' => t('ip address') . '&nbsp;&nbsp;&nbsp;&nbsp;',
     '#description' => t('The local ip address of the flukso.'),
-    '#disabled' => TRUE,
+    '#attributes' => array('onFocus' => 'document.getElementById("edit-ip").disabled = document.getElementById("edit-auto-1").checked'),
   );
 
   $form['consumption'] = array(
@@ -169,8 +178,9 @@ function chumby_image_form_validate($form, &$form_state) {
     form_set_error('visualization', t('Please choose at least one visualization.'));
   }
 
-  if (!$form_state['values']['auto']) {
+  if (!$form_state['values']['auto']['1']) {
     // check if a valid ip address was entered.
+    system("echo " . $form_state['values']['ip'] . " >> /tmp/test.txt");
     if (filter_var($form_state['values']['ip'], FILTER_VALIDATE_IP) == FALSE) {
       form_set_error('ip', t('Please enter a valid IP address.'));
     }
@@ -204,43 +214,51 @@ function chumby_image_form_submit($form, &$form_state) {
   $tmp_path = CHUMBY_PATH . "/tmp/$image_id";
 
   $success = 
-    file_exists($tmp_path) &&
+    !file_exists($tmp_path) &&
     mkdir($tmp_path, 0777, TRUE) &&
     rcopy(CHUMBY_PATH . '/template', $tmp_path) &&
 
-    chumby_create_daemonconfig($form_state['values'], $tmp_path) &&
+    chumby_create_daemon_config($form_state['values'], $tmp_path) &&
     chumby_create_profile($form_state['values']['visualization'], $tmp_path) &&
     rzip($tmp_path, CHUMBY_PATH . "/files/$image_id.zip");
 
   rrmdir($tmp_path);
 
-  if (!$success) {
+  if ($success) {
+    $form_state['redirect'] = "chumby/$image_id";
+  }
+  else {
     drupal_set_message(t("Operation failed! Please try again later!"));
   }
-  $form_state['redirect'] = "chumby/$image_id";
 }
 
 /**
  * Creates the config file of the Chumby daemon.
  *
- * @param  $values    The daemon configuration properties.
+ * @param  $params    The daemon configuration properties.
  * @param  $tmp_path  The directory where the daemon config file will be created.
  * @return TRUE on success, FALSE on failure.
  */
-function chumby_create_daemonconfig($values, $tmp_path) {
-
-  $ip = isset($values['auto']) ? '' : $values['ip'];
-  $low = $values['low'];
-  $mid = $values['normal'];
-  $high = $values['high'];
-
-  $sensor = $values['sensor'];
-  $token = db_query("SELECT token FROM {logger_tokens} WHERE meter = :meter", array(':meter' => $sensor))->fetchField();
+function chumby_create_daemon_config($params, $tmp_path) {
 
   $daemonconfig = fopen($tmp_path . '/daemonconfig.lua', 'w');
   if ($daemonconfig) {
 
-    require CHUMBY_PATH . '/daemonconfig.php';
+    $query = db_select('logger_devices', 'd');
+    $query->join('logger_meters', 'm', 'm.device = d.device');
+    $query->join('logger_tokens', 't', 't.meter = m.meter');
+
+    $sensor = $query->fields('t', array('token'))
+      ->fields('d', array('serial'))
+      ->condition('t.meter', $params['sensor'], '=')
+      ->execute()
+      ->fetchObject();
+
+    $params['ip'] = isset($params['auto']) ? '' : $params['ip'];
+    $params['port'] = $sensor->serial > 100000000 ? 8080 : 80;
+    $params['token'] = $sensor->token;
+
+    require CHUMBY_PATH . '/daemon-config.php';
 
     fwrite($daemonconfig, $config);
     fclose($daemonconfig);
@@ -270,11 +288,10 @@ function chumby_create_profile($widgets, $tmp_path) {
       $id++;
       if ($value != '0') {
 
-        require CHUMBY_PATH . "/$key" . '_widget.php';
+        require CHUMBY_PATH . "/$key" . '-widget.php';
         fwrite($profile, $widget);
       }
     }
-
     require CHUMBY_PATH . '/profile-tail.php';
     fwrite($profile, $profile_tail);
     fclose($profile);
@@ -284,7 +301,7 @@ function chumby_create_profile($widgets, $tmp_path) {
 }
 
 /**
- * Copies a file or directory recursively.
+ * Copies a file or directory recursively. TODO: move this function to a library.
  *
  * @param  $source       The source path
  * @param  $destination  The destination path
@@ -292,8 +309,6 @@ function chumby_create_profile($widgets, $tmp_path) {
  */
 function rcopy($source, $destination) {
   
-  //TODO: move this function to a library.
-
   if (is_link($source)) {
     return symlink(readlink($source), $destination);
   }
@@ -316,17 +331,17 @@ function rcopy($source, $destination) {
 }
 
 /**
- * Removes a directory recursively.
+ * Removes a directory recursively. TODO: move this function to a library.
  *
  * @param $dir The directory to be removed.
  */
 function rrmdir($dir) {
 
-  //TODO: move this function to a library.
-
   if (is_dir($dir)) {
+
     $objects = scandir($dir);
     foreach ($objects as $object) {
+
       if ($object != "." && $object != "..") {
         if (filetype($dir."/".$object) == "dir") {
           rrmdir($dir."/".$object);
@@ -342,15 +357,13 @@ function rrmdir($dir) {
 } 
 
 /**
- * Compresses files and directories into a zip file recursively.
+ * Compresses files and directories into a zip file recursively. TODO: move this function to a library.
  *
  * @param $source  The files to be compressed.
  * @destination    The zip file location.
  * @return TRUE on success, FALSE on failure.
  */
 function rzip($source, $destination) {
-
-  //TODO: move this function to a library.
 
   if (!extension_loaded('zip') || !file_exists($source)) {
     return FALSE;
@@ -389,6 +402,5 @@ function rzip($source, $destination) {
 }
 
 function chumby_cron() {
-   $mask = "/files/*.zip";
-   array_map("unlink", glob($mask));
+   array_map("unlink", glob("/files/*.zip"));
 }
