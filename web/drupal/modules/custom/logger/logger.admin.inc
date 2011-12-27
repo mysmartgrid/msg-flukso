@@ -494,7 +494,8 @@ function theme_logger_userdevices_list($variables) {
   if (count($items) > 0) {
 
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
-    return theme_table(array('header' => $headers, 'rows' => $items));
+    return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
+    'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
 
   }
   else {
@@ -514,17 +515,11 @@ function theme_logger_usersensors_list($variables) {
   if (count($items) > 0) {
 
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
-    return theme_table(array('header' => $headers, 'rows' => $items));
+    return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
+    'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
 
   }
   else {
     return t('No sensors available.');
   }
-}
-
-/**
- * Define the administration settings form for the logger module
- */
-function logger_admin_settings($form, &$form_state) {
-  //TODO
 }

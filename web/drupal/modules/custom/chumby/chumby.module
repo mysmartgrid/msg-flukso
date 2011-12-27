@@ -20,8 +20,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-define('CHUMBY_REL_PATH', drupal_get_path('module', 'chumby'));
-define('CHUMBY_PATH', DRUPAL_ROOT . '/' . CHUMBY_REL_PATH);
+define('CHUMBY_PATH', DRUPAL_ROOT . '/' . drupal_get_path('module', 'chumby'));
 
 
 function chumby_permission() {
@@ -33,45 +32,75 @@ function chumby_permission() {
   );
 }
 
-function chumby_settings_access($permission, $account) {
-  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
+/**
+ * Access callback ensuring the device is accessible only to the owner.
+ */
+function chumby_device_access($permission, $serial) {
+
+  global $GLOBALS;
+  $access = TRUE;
+
+  if ($serial) {
+    $uid = db_select('logger_devices', 'd')
+      ->fields('d', array('uid'))
+      ->condition('d.serial', $serial, '=')
+      ->execute()
+      ->fetchField();
+
+    $access = $uid == $GLOBALS['user']->uid;
+  }
+  return $access && user_access($permission);
 }
 
 function chumby_menu() {
 
   $items['chumby'] = array(
     'title' => "Download chumby image",
-    'description' => 'Shows the chumby image page.',
+    'description' => 'Shows the chumby image download page.',
     'page callback' => 'chumby_image_page',
-    'page arguments' => array(1),
-    'access arguments' => array('chumby image'),
-    'type' => MENU_NORMAL_ITEM,
+    'page arguments' => array(1, 2, 3),
+    'access callback' => 'chumby_device_access',
+    'access arguments' => array('chumby image', 2),
+    'type' => MENU_NORMAL_ITEM
   );
 
+  $items['chumby/file'] = array(
+    'title' => 'Download chumby image',
+    'description' => 'Downloads the chumby compressed image file.',
+    'page callback' => 'chumby_download_file',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK
+  );
   return $items;
 }
 
 /**
  * Builds the chumby image page.
- * @param $filename  The image file name.
- * @param $sensor    The sensor function name.
+ *
+ * @param $image_id  The image id.
+ * @param $serial    The device serial number.
+ * @param $function  The sensor function.
  * @return the chumby image page.
  */
-function chumby_image_page($filename = NULL) {
+function chumby_image_page($image_id = NULL, $serial = NULL, $function = NULL) {
 
   $form = drupal_get_form('chumby_image_form');
   $output = drupal_render($form);
+
+  if ($image_id) {
  
-  if ($filename) {
- 
+    $headers = array(
+      t('Serial Number'),
+      t('Sensor'),
+      t('Image File'));
+
     $lines = array(
       array(
-        'time' => date('d-m-Y H:i'),
-        'file' => "$filename.zip",
-        'operations' => l(t('Download'), CHUMBY_REL_PATH . "/files/$filename.zip"))
-    );
+        $serial, 
+        $function,
+        l(t('Download'), "chumby/file/$image_id")));
 
-    $headers = array(t('Generation Time'), t('Image File'), t('Operations'));
     $output .= theme_table(array('header' => $headers, 'rows' => $lines, '', 'attributes' => array(),
       'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
   }
@@ -93,14 +122,18 @@ function chumby_image_form($form, &$form_state) {
     $sensors[$flukso->meter] = $flukso->function;
   }
 
+  $result = db_select('chumby_widget', 'w')
+    ->fields('w')
+    ->execute();
+
+  $widgets = array();
+  foreach ($result as $widget) {
+    $widgets[$widget->id] = $widget->name;  
+  }
+
   $form['visualization'] = array(
     '#type' => 'checkboxes',
-    '#options' => array(
-      'text-view' => t('Curent Power'),
-      'speedometer' => t('Speedometer'),
-      'light-bulb' => t('Light Bulb'),
-      'energy-graph' => t('Energy Graph'),
-    ),
+    '#options' => $widgets,
     '#title' => t('Visualizations'),
     '#description' => t('Visualizations that should be available'),
   );
@@ -195,7 +228,7 @@ function chumby_image_form_validate($form, &$form_state) {
   if ($form_state['values']['normal'] == "" || filter_var($form_state['values']['normal']) == FALSE) {
     form_set_error('normal', t('Please enter a number value.'));
   }
-  else if ($form_state['values']['normal'] < $form_state['values']['low']) {
+  elseif ($form_state['values']['normal'] < $form_state['values']['low']) {
     form_set_error('normal', t('The normal value should be higher than the low value.'));
   }
 
@@ -203,7 +236,7 @@ function chumby_image_form_validate($form, &$form_state) {
   if ($form_state['values']['high'] == "" || filter_var($form_state['values']['high']) == FALSE) {
     form_set_error('high', t('Please enter a number value.'));
   }
-  else if ($form_state['values']['high'] < $form_state['values']['normal']) {
+  elseif ($form_state['values']['high'] < $form_state['values']['normal']) {
     form_set_error('normal', t('The high value should be higher than the normal value.'));
   }
 }
@@ -213,19 +246,30 @@ function chumby_image_form_submit($form, &$form_state) {
   $image_id = md5(uniqid(rand(), TRUE));
   $tmp_path = CHUMBY_PATH . "/tmp/$image_id";
 
+  $query = db_select('logger_devices', 'd');
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $query->join('logger_tokens', 't', 't.meter = m.meter');
+
+  $sensor = $query->fields('t', array('token'))
+    ->fields('d', array('serial'))
+    ->fields('m', array('function'))
+    ->condition('t.meter', $form_state['values']['sensor'], '=')
+    ->execute()
+    ->fetchObject();
+
   $success = 
     !file_exists($tmp_path) &&
     mkdir($tmp_path, 0777, TRUE) &&
     rcopy(CHUMBY_PATH . '/template', $tmp_path) &&
 
-    chumby_create_daemon_config($form_state['values'], $tmp_path) &&
+    chumby_create_daemon_config($form_state['values'], $sensor, $tmp_path) &&
     chumby_create_profile($form_state['values']['visualization'], $tmp_path) &&
     rzip($tmp_path, CHUMBY_PATH . "/files/$image_id.zip");
 
   rrmdir($tmp_path);
 
   if ($success) {
-    $form_state['redirect'] = "chumby/$image_id";
+    $form_state['redirect'] = "chumby/image/$image_id/$sensor->serial/$sensor->function";
   }
   else {
     drupal_set_message(t("Operation failed! Please try again later!"));
@@ -236,23 +280,14 @@ function chumby_image_form_submit($form, &$form_state) {
  * Creates the config file of the Chumby daemon.
  *
  * @param  $params    The daemon configuration properties.
+ * @param  $sensor    The sensor.
  * @param  $tmp_path  The directory where the daemon config file will be created.
  * @return TRUE on success, FALSE on failure.
  */
-function chumby_create_daemon_config($params, $tmp_path) {
+function chumby_create_daemon_config($params, $sensor, $tmp_path) {
 
   $daemonconfig = fopen($tmp_path . '/daemonconfig.lua', 'w');
   if ($daemonconfig) {
-
-    $query = db_select('logger_devices', 'd');
-    $query->join('logger_meters', 'm', 'm.device = d.device');
-    $query->join('logger_tokens', 't', 't.meter = m.meter');
-
-    $sensor = $query->fields('t', array('token'))
-      ->fields('d', array('serial'))
-      ->condition('t.meter', $params['sensor'], '=')
-      ->execute()
-      ->fetchObject();
 
     $params['ip'] = isset($params['auto']) ? '' : $params['ip'];
     $params['port'] = $sensor->serial > 100000000 ? 8080 : 80;
@@ -274,7 +309,7 @@ function chumby_create_daemon_config($params, $tmp_path) {
  * @param  $tmp_path  The directory where the profile file will be created.
  * @return TRUE on success, FALSE on failure.
  */
-function chumby_create_profile($widgets, $tmp_path) {
+function chumby_create_profile($selected_widgets, $tmp_path) {
 
   $profile = fopen("$tmp_path/profile.xml", 'w');
   if ($profile) {
@@ -282,13 +317,17 @@ function chumby_create_profile($widgets, $tmp_path) {
     require CHUMBY_PATH . '/profile-head.php';
     fwrite($profile, $profile_head);
 
-    $id = 0;
-    foreach ($widgets as $key => $value) {
+    foreach ($selected_widgets as $id => $selected) {
 
-      $id++;
-      if ($value != '0') {
+      if ($selected != '0') {
 
-        require CHUMBY_PATH . "/$key" . '-widget.php';
+        $widget = db_select('chumby_widget', 'w')
+          ->fields('w')
+          ->condition('w.id', $id, '=')
+          ->execute()
+          ->fetchObject();
+
+        require CHUMBY_PATH . '/widget.php';
         fwrite($profile, $widget);
       }
     }
@@ -300,107 +339,18 @@ function chumby_create_profile($widgets, $tmp_path) {
   return FALSE;
 }
 
-/**
- * Copies a file or directory recursively. TODO: move this function to a library.
- *
- * @param  $source       The source path
- * @param  $destination  The destination path
- * @return TRUE on success, FALSE on failure.
- */
-function rcopy($source, $destination) {
-  
-  if (is_link($source)) {
-    return symlink(readlink($source), $destination);
-  }
-  if (is_file($source)) {
-    return copy($source, $destination);
-  }
-  if (!is_dir($destination)) {
-    mkdir($destination);
-  }
- 
-  $dir = dir($source);
-  while (false !== $entry = $dir->read()) {
-    if ($entry == '.' || $entry == '..') {
-      continue;
-    }
-    rcopy("$source/$entry", "$destination/$entry");
-  }
-  $dir->close();
-  return TRUE;
-}
+function chumby_download_file($image_id) {
 
-/**
- * Removes a directory recursively. TODO: move this function to a library.
- *
- * @param $dir The directory to be removed.
- */
-function rrmdir($dir) {
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-disposition', "attachment; filename=chumby-image.zip");
 
-  if (is_dir($dir)) {
+  $file_path = CHUMBY_PATH . "/files/$image_id.zip";
+  readfile($file_path, FALSE, $content);
 
-    $objects = scandir($dir);
-    foreach ($objects as $object) {
-
-      if ($object != "." && $object != "..") {
-        if (filetype($dir."/".$object) == "dir") {
-          rrmdir($dir."/".$object);
-        }
-        else {
-          unlink($dir."/".$object);
-        }
-      }
-    }
-    reset($objects);
-    rmdir($dir);
-  }
-} 
-
-/**
- * Compresses files and directories into a zip file recursively. TODO: move this function to a library.
- *
- * @param $source  The files to be compressed.
- * @destination    The zip file location.
- * @return TRUE on success, FALSE on failure.
- */
-function rzip($source, $destination) {
-
-  if (!extension_loaded('zip') || !file_exists($source)) {
-    return FALSE;
-  }
-
-  $zip = new ZipArchive();
-  if (!$zip->open($destination, ZIPARCHIVE::CREATE)) {
-    return FALSE;
-  }
-
-  $source = str_replace('\\', '/', realpath($source));
-
-  if (is_dir($source) === TRUE) {
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
-
-    foreach ($files as $file) {
-        $file = str_replace('\\', '/', realpath($file));
-
-        if (is_dir($file) === TRUE) {
-          $dir = str_replace($source . '/', '', $file . '/');
-
-          //FIXME: remove this test
-          if (strpos($dir, '/') > 0) {
-            $zip->addEmptyDir($dir);
-          }
-        }
-        else if (is_file($file) === TRUE) {
-          $zip->addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
-        }
-    }
-  }
-  else if (is_file($source) === TRUE) {
-    $zip->addFromString(basename($source), file_get_contents($source));
-  }
-  return $zip->close();
+  print $content;
+  exit(0);
 }
 
 function chumby_cron() {
-   array_map("unlink", glob("/files/*.zip"));
+  cleardir(CHUMBY_PATH . '/files');
 }

@@ -1,0 +1,177 @@
+<?php
+
+/**
+ * @file
+ * This module provides common functions shared by other MSG modules.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * Forwards a remote execution to a JobQueue System.
+ * 
+ * @param $algorithm The JobQueue target algorithm.
+ * @param $data      The execution data.
+ */
+function jobqueue_produce($algorithm, $data) {
+
+  $command = "export HOME=/tmp; /usr/bin/producer.rb -v -c /usr/local/lib/msg-qworker/etc/qproducerrc -a $algorithm";
+  if ($data) {
+    $command .= " -p $data";
+  }
+
+  //Debug
+  //Redirect error output to default output
+  //$command .= " 2>&1";
+  //exec($command, $output, $return);
+
+  exec($command);
+
+  /*
+  //Debug
+  $file = "/tmp/jobqueue.txt";
+  $fh = fopen($file, 'w');
+  fwrite($fh, $command);
+
+  foreach($output as $line) {
+    fwrite($fh, "\n$line");
+  }
+
+  fwrite($fh, "\n return: $return \n");
+  fclose($fh);
+  */
+}
+
+/**
+ * Copies a file or directory recursively.
+ *
+ * @param  $source       The source path
+ * @param  $destination  The destination path
+ * @return TRUE on success, FALSE on failure.
+ */
+function rcopy($source, $destination) {
+
+  if (is_link($source)) {
+    return symlink(readlink($source), $destination);
+  }
+  if (is_file($source)) {
+    return copy($source, $destination);
+  }
+  if (!is_dir($destination)) {
+    mkdir($destination);
+  }
+
+  $dir = dir($source);
+  while (false !== $entry = $dir->read()) {
+    if ($entry == '.' || $entry == '..') {
+      continue;
+    }
+    rcopy("$source/$entry", "$destination/$entry");
+  }
+  $dir->close();
+  return TRUE;
+}
+
+/**
+ * Removes a directory recursively.
+ *
+ * @param $dir The directory to be removed.
+ */
+function rrmdir($dir) {
+
+  if (is_dir($dir)) {
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype($dir."/".$object) == "dir") {
+          rrmdir($dir."/".$object);
+        }
+        else {
+          unlink($dir."/".$object);
+        }
+      }
+    }
+    reset($objects);
+    rmdir($dir);
+  }
+}
+
+/**
+ * Removes the content of a directory.
+ *
+ * @param $path The directory to be cleared.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function cleardir($path) {
+  rmfiles("$path/*");
+}
+
+/**
+ * Removes files that match the informed pattern.
+ *
+ * @param $path The directory where the files are.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function rmfiles($path) {
+  array_map("unlink", glob($path));
+}
+
+/**
+ * Compresses files and directories into a zip file recursively.
+ *
+ * @param $source       The files to be compressed.
+ * @param $destination  The zip file location.
+ * @return TRUE on success, FALSE on failure.
+ */
+function rzip($source, $destination) {
+
+  if (!extension_loaded('zip') || !file_exists($source)) {
+    return FALSE;
+  }
+
+  $zip = new ZipArchive();
+  if (!$zip->open($destination, ZIPARCHIVE::CREATE)) {
+    return FALSE;
+  }
+
+  $source = str_replace('\\', '/', realpath($source));
+
+  if (is_dir($source) === TRUE) {
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
+
+    foreach ($files as $file) {
+        $file = str_replace('\\', '/', realpath($file));
+
+        if (is_dir($file) === TRUE) {
+          $dir = str_replace($source . '/', '', $file . '/');
+
+          //FIXME: remove this test
+          if (strpos($dir, '/') > 0) {
+            $zip->addEmptyDir($dir);
+          }
+        }
+        else if (is_file($file) === TRUE) {
+          $zip->addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
+        }
+    }
+  }
+  else if (is_file($source) === TRUE) {
+    $zip->addFromString(basename($source), file_get_contents($source));
+  }
+  return $zip->close();
+}

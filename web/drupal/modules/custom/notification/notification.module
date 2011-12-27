@@ -363,13 +363,11 @@ function notification_eventlog_clear($serial) {
 
 /**
  * Removes log entries older than 1 week.
- *
- * @param $now The event checkup time.
  */
-function notification_eventlog_clear_old($now) {
+function notification_eventlog_clear_old() {
 
   db_delete('event_log')
-    ->condition('time', $now - (2 * DAY), '<')
+    ->condition('time', REQUEST_TIME - (2 * DAY), '<')
     ->execute();
 }
 
@@ -827,15 +825,12 @@ function notification_newsletter_form_submit($form, &$form_state) {
   if ($response == "RECORD_CREATED") {
 
     drupal_set_message(t('Almost Finished... We need to confirm your email address. To complete the subscription process, please click the link in the email we just sent you.'));
-
   }
   elseif ($response == "RECORD_UPDATED") {
 
     drupal_set_message(t('The e-mail address was already present in the database. The user data has been updated.'));
-
   }
   else {
-
     drupal_set_message(t('Our apologies. The newsletter subscription is temporarily unavailable. Please, try again later.'));
 
     notification_send_system_error_email('newsletter', $response, $url);
@@ -1078,32 +1073,26 @@ function theme_notification_event_limit_up($variables) {
 
 function notification_cron() {
 
-  $now = REQUEST_TIME;
-  notification_send_no_communication_emails($now);
-  notification_send_corrupted_message_emails($now);
-  notification_send_communication_restored_emails($now);
-  notification_send_peak_consumption_emails($now);
-
-  notification_send_summary_report_emails($now);
-
-  notification_eventlog_clear_old($now);
+  notification_send_no_communication_emails();
+  notification_send_corrupted_message_emails();
+  notification_send_communication_restored_emails();
+  notification_send_peak_consumption_emails();
+  notification_send_summary_report_emails();
+  notification_eventlog_clear_old();
 }
 
 /**
  * Sends e-mails notifying users of "No Communication" events.
- *
- * @param $now The event checkup time.
  */
-function notification_send_no_communication_emails($now) {
+function notification_send_no_communication_emails() {
 
-  $e_time = $now - 15 * MINUTE;
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      :event_time AS event_time,
+      :now AS event_time,
       n.access AS since_time,
       n.serial,
       n.emails,
@@ -1137,7 +1126,7 @@ function notification_send_no_communication_emails($now) {
           d.uid = u.uid AND
           NOT EXISTS
           (
-            SELECT 1 FROM {event_log} e WHERE d.device = e.device AND e.event_id = " . CORRUPTED_MESSAGE_EVENT_ID . " AND e.time > $e_time
+            SELECT 1 FROM {event_log} e WHERE d.device = e.device AND e.event_id = :corrupted_id AND e.time > n.base_time AND e.time > n.last_sent
           )
         GROUP BY
           n.device,
@@ -1145,16 +1134,15 @@ function notification_send_no_communication_emails($now) {
           n.unit_id
       ) n
     WHERE
-      :event_time > (n.access + n.limit_up * n.factor) AND
-      :event_time > (n.last_sent + n.limit_up * n.factor) AND
-      :event_time > (n.last_sent + n.min_interval)";
+      :now > (n.access + n.limit_up * n.factor) AND
+      :now > (n.last_sent + n.limit_up * n.factor) AND
+      :now > (n.last_sent + n.min_interval)";
 
-  $args = array(':event_id' => NO_COMMUNICATION_EVENT_ID, ':event_time' => $now);
+  $args = array(':event_id' => NO_COMMUNICATION_EVENT_ID, ':now' => REQUEST_TIME, ':corrupted_id' => CORRUPTED_MESSAGE_EVENT_ID);
 
   $notifiables = notification_query_notifiables($sql, $args);
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
-
   $message = notification_compose_error_email(
     "Your Flukso device (serial number: %serial) has not been sending " .
     "data for more than %limit_up %unit_name, since %since_time.",
@@ -1168,10 +1156,8 @@ function notification_send_no_communication_emails($now) {
 
 /**
  * Sends e-mails notifying users of "Communication Restored" events.
- *
- * @param $now The event checkup time.
  */
-function notification_send_communication_restored_emails($now) {
+function notification_send_communication_restored_emails() {
 
   $sql = "
     SELECT SQL_NO_CACHE
@@ -1181,7 +1167,8 @@ function notification_send_communication_restored_emails($now) {
       n.unit_id,
       d.serial,
       n.emails,
-      n.base_time,
+      n.base_time AS since_time,
+      l.time AS event_time,
       n.last_sent,
       un.name AS unit_name,
       un.factor,
@@ -1190,57 +1177,28 @@ function notification_send_communication_restored_emails($now) {
       {unit} un,
       {users} u,
       {logger_devices} d,
-      {notification} n
+      {notification} n,
+      {event_log} l
     WHERE
+      d.uid = u.uid AND
+      n.device = d.device AND
       n.event_id = :event_id AND
       n.unit_id = un.id AND
-      n.device = d.device AND
-      d.uid = u.uid AND
-      :event_time > (n.base_time + n.limit_up * un.factor) AND
-      :event_time > (n.last_sent + n.min_interval)";
+      :now > n.base_time + n.limit_up * un.factor AND
+      :now > n.last_sent + n.min_interval AND
+      l.time > n.base_time + n.limit_up * un.factor AND
+      l.device = d.device AND
+      l.event_id > :message_received_id";
 
-  $args = array(':event_id' => COMMUNICATION_RESTORED_EVENT_ID, ':event_time' => $now);
-  $notifiables = array();
+  $args = array(':event_id' => COMMUNICATION_RESTORED_EVENT_ID, ':now' => REQUEST_TIME, ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID);
 
-  foreach (notification_query_notifiables($sql, $args) as $notifiable) {
+  $notifiables = notification_query_notifiables($sql, $args);
 
-    $sql = "
-      SELECT SQL_NO_CACHE
-        time
-      FROM
-        {event_log}
-      WHERE
-        device = :device AND
-        time > :time AND
-        event_id > :event_id
-      ORDER BY
-        time";
-
-    $args = array(':device' => $notifiable['device'], ':time' => $notifiable['base_time'], ':event_id' => MESSAGE_RECEIVED_EVENT_ID);
-    $result = db_query($sql, $args);
-    $last_time = 0;
-    $limit_up = $notifiable['limit_up'] * $notifiable['factor'];
-
-    foreach ($result as $event) {
-
-      //First event time
-      $last_time = $last_time == 0 ? $event->time : $last_time;
-
-      if ($event->time - $last_time > $limit_up) {
-        $notifiable['since_time'] = $last_time;
-        $notifiable['event_time'] = $event->time;
-      }
-      $last_time = $event->time;
-    }
-
-    if (isset($notifiable['event_time'])) {
-      $notifiables[] = $notifiable;
-      notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $last_time - 1);
-    }
+  foreach($notifiables as $notifiable) {
+    notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', REQUEST_TIME);
   }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
-
   $message = notification_compose_email(
     "A message has finally been received from your Flukso device " .
     "(serial number: %serial) at %event_time.  It had not been sending data " .
@@ -1255,39 +1213,39 @@ function notification_send_communication_restored_emails($now) {
 
 /**
  * Sends e-mails notifying users of "Corrupted Message" events.
- *
- * @param $now The event checkup time.
  */
-function notification_send_corrupted_message_emails($now) {
+function notification_send_corrupted_message_emails() {
 
-  //FIXME! m.corrupted reference
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
       n.event_id,
       n.limit_up,
       n.unit_id,
-      m.corrupted AS event_time,
+      l.time AS event_time,
       d.serial,
       n.emails
     FROM
       {users} u,
       {notification} n,
       {logger_devices} d,
-      {logger_meters} m
+      {event_log} l
     WHERE
       n.event_id = :event_id AND
-      :event_time > (n.last_sent + n.min_interval) AND
+      :now > (n.last_sent + n.min_interval) AND
       d.device = n.device AND
       d.uid = u.uid AND
-      m.device = d.device AND
-      m.corrupted <> 0";
+      l.event_id = n.event_id AND
+      l.device = d.device AND
+      l.time > n.base_time";
 
-  $args = array(':event_id' => CORRUPTED_MESSAGE_EVENT_ID, ':event_time' => $now);
+  $args = array(':event_id' => CORRUPTED_MESSAGE_EVENT_ID, ':now' => REQUEST_TIME);
 
-  //FIXME
-  /*
   $notifiables = notification_query_notifiables($sql, $args);
+
+  foreach($notifiables as $notifiable) {
+    notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', REQUEST_TIME);
+  }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_error_email(
@@ -1295,15 +1253,12 @@ function notification_send_corrupted_message_emails($now) {
     "measurement or a heartbeat with corrupted data at %event_time.");
 
   notification_send_emails($message, $notifiables);
-  */
 }
 
 /**
  * Sends e-mails notifying users of the occurrence of Peak Consumption events.
- *
- * @param $now The event checkup time.
  */
-function notification_send_peak_consumption_emails($now) {
+function notification_send_peak_consumption_emails() {
 
   $sql = "
     SELECT SQL_NO_CACHE
@@ -1327,11 +1282,11 @@ function notification_send_peak_consumption_emails($now) {
       d.device = n.device AND
       n.event_id = :event_id AND
       n.unit_id = un.id AND
-      :event_time > (n.last_sent + n.min_interval) AND
+      :now > (n.last_sent + n.min_interval) AND
       m.device = d.device AND
       m.type = :sensor_type";
 
-  $args = array(':event_id' => PEAK_CONSUMPTION_EVENT_ID, ':event_time' => $now, ':sensor_type' => CONSUMPTION_SENSOR_TYPE);
+  $args = array(':event_id' => PEAK_CONSUMPTION_EVENT_ID, ':now' => REQUEST_TIME, ':sensor_type' => CONSUMPTION_SENSOR_TYPE);
 
   $notifiables = array();
   foreach (notification_query_notifiables($sql, $args) as $notifiable) {
@@ -1350,9 +1305,9 @@ function notification_send_peak_consumption_emails($now) {
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_email(
     "Your Flukso device (serial number: %serial) has registered peaks of " .
-    "power consumption above the limit of %limit_up %unit_name.<br><br> " .
+    "power consumption above the limit of %limit_up %unit_name.<br><br>" .
 
-    "The following list shows the measurements above the limit.<br><br> " .
+    "The following list shows the measurements above the limit.<br><br>" .
     "!violations <br><br>");
 
   notification_send_emails($message, $notifiables);
@@ -1360,10 +1315,8 @@ function notification_send_peak_consumption_emails($now) {
 
 /**
  * Sends summary report e-mails.
- *
- * @param $now The event checkup time.
  */
-function notification_send_summary_report_emails($now) {
+function notification_send_summary_report_emails() {
 
   require_once LOGGER_PATH . "/logger.rrd.inc";
 
@@ -1375,7 +1328,7 @@ function notification_send_summary_report_emails($now) {
       n.unit_id,
       d.serial,
       n.emails,
-      (:event_time - (:event_time % :day) - 1) AS event_time,
+      (:now - (:now % :day) - 1) AS event_time,
       (n.base_time - (n.base_time % :day)) AS since_time,
       un.name AS unit_name,
       u.timezone
@@ -1389,10 +1342,10 @@ function notification_send_summary_report_emails($now) {
       n.unit_id = un.id AND
       n.device = d.device AND
       d.uid = u.uid AND
-      :event_time > (n.base_time + n.limit_up * un.factor) AND
-      :event_time > (n.last_sent + n.min_interval)";
+      :now > (n.base_time + n.limit_up * un.factor) AND
+      :now > (n.last_sent + n.min_interval)";
 
-  $args = array(':event_time' => $now, ':day' => DAY, ':event_id' => SUMMARY_REPORT_EVENT_ID);
+  $args = array(':now' => REQUEST_TIME, ':day' => DAY, ':event_id' => SUMMARY_REPORT_EVENT_ID);
 
   //FIXME Use user defined prices
   $prices = array(
@@ -1437,16 +1390,16 @@ function notification_send_summary_report_emails($now) {
 
     $notifiable['tables'] =
       notification_compose_summary_report_table(CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
-      notification_compose_summary_report_table(PRODUCTION_SENSOR_TYPE,   $lines, $total_cost, $total_energy);
+      notification_compose_summary_report_table(PRODUCTION_SENSOR_TYPE, $lines, $total_cost, $total_energy);
 
     $notifiables[] = $notifiable;
-    notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', $now);
+    notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], 'base_time', REQUEST_TIME);
   }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_email(
     "This is a summary report of your energy consumption and production " .
-    "for the period between %since_time and %event_time.<br><br> " .
+    "for the period between %since_time and %event_time.<br><br>" .
     '!tables');
 
   notification_send_emails($message, $notifiables);
@@ -1525,7 +1478,6 @@ function notification_query_notifiables($sql, $args) {
 function notification_send_system_error_email($context, $error_code, $url) {
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
-
   $error_descriptions['newsletter']['ERROR_INVALID_DATA'] =
     'Invalid e-mail address.';
 
@@ -1537,14 +1489,14 @@ function notification_send_system_error_email($context, $error_code, $url) {
 
   $message =
     "<p>Dear Administrator " .
-    "<br> &nbsp;<br></p> " .
+    "<br> &nbsp;<br></p>" .
 
-    "<p>The following system error has been reported.</p> " .
-    "<p>Error code: %error_code<br> " .
-    "Description: %description<br> " .
-    "Related URL: %url</p> " .
+    "<p>The following system error has been reported.</p>" .
+    "<p>Error code: %error_code<br>" .
+    "Description: %description<br>" .
+    "Related URL: %url</p>" .
 
-    "<p>&nbsp;<br> " .
+    "<p>&nbsp;<br>" .
     "<p>mySmartGrid System</p>";
 
   $variables['%error_code'] = $error_code;
@@ -1570,8 +1522,7 @@ function notification_compose_email($description, $complement = NULL) {
   $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
-
-  $complement = $complement == NULL ? "" : "<p>$complement</p> ";
+  $complement = $complement == NULL ? "" : "<p>$complement</p>";
 
   return "<body>
       <style type='text/css'>$css</style>" .
@@ -1580,17 +1531,17 @@ function notification_compose_email($description, $complement = NULL) {
         "<table class='email-box'><tr><td>" .
         "<p class='logo'>!logo</p>" .
 
-        "<p class='highlight'>Dear user<br><br></p> " .
+        "<p class='highlight'>Dear user<br><br></p>" .
 
-        "<p>$description</p> " .
+        "<p>$description</p>" .
 
         $complement .
 
         "<p>If you want to stop receiving this notification, please remove it from your " .
-        "<a href='!base_url/notification/list'>event notifications list</a>.</p> " .
+        "<a href='!base_url/notification/list'>event notifications list</a>.</p>" .
 
         "<p><br><br>" .
-        "Best Regards,<br><br> " .
+        "Best Regards,<br><br>" .
         "mySmartGrid Team</p>" .
 
         "</td></tr></table></p>" .
@@ -1611,21 +1562,21 @@ function notification_compose_error_email($description, $recommendation = NULL) 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   return notification_compose_email($description,
 
-    "<p>In order to identify and solve the problem, please take the following actions.<br></p> " .
-    "<ul> " .
+    "<p>In order to identify and solve the problem, please take the following actions.<br></p>" .
+    "<ul>" .
       $recommendation .
       "<li><p>Click " .
       "<a href='!base_url/event/log/list/!serial '>here</a> " .
-      "to check the latest events of your Flukso device.</p> " .
+      "to check the latest events of your Flukso device.</p>" .
 
       "<li><p>Check if the device complies with the " .
       "<a href='!base_url/content/installationsanleitung-des-fluksos'>Flukso installation instructions</a>. " .
-      "It might be improperly installed or misconfigured.</p> " .
+      "It might be improperly installed or misconfigured.</p>" .
 
       "<li><p>Visit our <a href='!base_url/content/h&#228;ufige-fragen-und-antworten'>FAQ</a>, " .
-      "and read the answers to questions made by other users in similar situations.</p> " .
+      "and read the answers to questions made by other users in similar situations.</p>" .
 
-      "<li><p>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de.</p> " .
+      "<li><p>In case the problem persists, please send an e-mail to msg-support@itwm.fhg.de.</p>" .
     "</ul>");
 }
 
@@ -1723,6 +1674,7 @@ function notification_send_email($email, $subject, $body) {
   $header = "Content-Type: multipart/alternative; boundary=\"nextPart_0000_001\"";
   $emailstring = "Header::" . $header . "|From::mySmartGrid <noreply@mysmartgrid.de>|To::" . $email . "|Subject::" . $subject . "|Body::" . $body;
   $emailstring = base64_encode($emailstring);
+
   // Needs the qworker running, add control mechanism in order to check and restart if not running
   jobqueue_produce("mail", $emailstring);
 }
@@ -1734,21 +1686,29 @@ function notification_send_email($email, $subject, $body) {
  * @return plain text
  */
 function notification_html2txt($html) {
+
   $text = "";
+
   //extract relevant part from email
   preg_match("/.*?<\/p>(.*?)<\/table>/m", $html, $text);
 
   //find link tags ..
   $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
-          //.. and replace them with the actual link
-          create_function(
-                  '$treffer',
-                  'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $ret);
-                   return "\'" . $ret[1] . "\'";'),
-          $text[1]);
+    //.. and replace them with the actual link
+    create_function('$treffer',
+      'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $link);
+       preg_match("/(<a.*?>(.*?)<\/a.*?>)/", $treffer[1], $txt);
+       return $txt[1] . " \'" . $link[1] . "\'";'
+    ),
+    $text[1]);
+
   //replace <br> and </p> with linebreaks
   $text = preg_replace("/<br.*?>/", "\n", $text);
-  $text = preg_replace("/<\/p>/", "\n", $text);
+  $text = preg_replace("/<\/p>/", "\n\n", $text);
+
+  //replace list items with *
+  $text = preg_replace("/<li.*?>/", "* ", $text);
+
   //remove all other tags
   $text = preg_replace("/<.*?>/", "", $text);
 

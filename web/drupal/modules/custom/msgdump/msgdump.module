@@ -140,7 +140,6 @@ function msgdump_setup_form_submit($form, &$form_state) {
     ->execute();
 
     msgdump_register($file, $serial, $type);
-
   }
   else {
 
@@ -150,7 +149,7 @@ function msgdump_setup_form_submit($form, &$form_state) {
       ->condition('file', $file)
       ->execute();
 
-    exec('rm -f ' . MSGDUMP_DB_PATH . '/' . $file . '.*');
+    rmfiles(MSGDUMP_DB_PATH . '/' . $file . '.*');
   }
 }
 
@@ -170,15 +169,12 @@ function msgdump_setup_form_validate($form, &$form_state) {
     if ($now > $from) {
       form_set_error('from', t('Can\'t record values in the past.'));
     }
-
     if ($from > $to) {
       form_set_error('to', t('Time to stop has to be after time to start.'));
     }
-
     if (!$from) {
       form_set_error('from', t('Invalid date.'));
     }
-
     if (!$to) {
       form_set_error('to', t('Invalid date.'));
     }
@@ -325,22 +321,20 @@ function msgdump_cron() {
     if ($now - $data->stop > $time_limit) {
 
       //delete dumps older then 3 months
-      exec("rm -f " . MSGDUMP_DB_PATH . "/" . $data->file . ".*");
+      unlink(MSGDUMP_DB_PATH . '/' . $data->file . '.*');
 
       db_delete('msgdump')
         ->condition('file', $data->file)
         ->execute();
-
     }
     elseif ($data->stop > $now) {
 
       //otherwise execute dump
-      $res = exec(MSGDUMP_BIN_PATH . "/flukso_archive_watts -c " . MSGDUMP_DB_PATH . "/" . $data->file . ".flukso4rrc");
-      watchdog("cron", "[msgdump_cron] " . $data->file . ": " . $res);
-
+      $res = exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $data->file . '.flukso4rrc');
+      watchdog('cron', '[msgdump_cron] ' . $data->file . ': ' . $res);
     }
     else {
-      watchdog("cron", "[msgdump_cron] Nothing to do for " . $data->file);
+      watchdog('cron', '[msgdump_cron] Nothing to do for ' . $data->file);
     }
   }
 }

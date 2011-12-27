@@ -501,7 +501,8 @@ function logger_overview_page($interval) {
       $blog = node_load($nid);
 
       //TODO: show only the blog teaser
-      $output .= theme('logger_overview_topic', array('title' => t('Blog:') . $blog->title, 'body' => $blog->body['und'][0]['safe_value'], 'link' => 'blog'));
+      $output .= theme('logger_overview_topic', array('title' => t('Blog:') . $blog->title,
+        'body' => $blog->body['und'][0]['safe_value'], 'link' => 'blog'));
     }
 
     //Counters
@@ -2544,12 +2545,12 @@ function logger_get_variable($id, $default_value) {
   global $_COOKIE;
   $id = "logger_$id";
 
-  if ($user->uid) {
+  if (isset($user->uid)) {
 
     //Visitors must use cookies
     $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'fluksonian'))->fetchField();
 
-    if ($user->roles[$rid]) {
+    if (isset($user->roles[$rid])) {
       $id .= '_' . $user->uid;
       return variable_get($id, $default_value);
     }
@@ -2988,7 +2989,7 @@ function logger_create_support_key($host, $device) {
  * @param $device The device id.
  */
 function logger_remove_support_key($device) {
-  system("rm -f " . LOGGER_DEVICE_CERT_PATH . "/*/$device*");
+  rmfiles(LOGGER_DEVICE_CERT_PATH . "/*/$device*");
 }
 
 /**
@@ -3089,8 +3090,8 @@ function logger_heartbeat($auth, $monitor) {
 
       $action['timestamp'] = REQUEST_TIME;
       $action['signature'] = hash_hmac('sha1',
-          $action['timestamp'] . ':' . $action['upgrade'] . ':' .
-          $device->sha, $device->sha);
+        $action['timestamp'] . ':' . $action['upgrade'] . ':' .
+        $device->sha, $device->sha);
     }
 
     watchdog('logger.heartbeat', 'heardbeat received: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
@@ -3217,7 +3218,9 @@ function logger_authenticate_hmac_sha1($auth, $message) {
     ->execute()
     ->fetchField();
 
-  if (hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']) == $auth['signature'] && $auth['timestamp'] > REQUEST_TIME - 300) {
+  $hash = hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']);
+
+  if ($auth['signature'] == $hash && $auth['timestamp'] > REQUEST_TIME - 300) {
 
     //watchdog('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
     return TRUE;
