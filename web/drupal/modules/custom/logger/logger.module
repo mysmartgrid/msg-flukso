@@ -616,7 +616,7 @@ function logger_energy_page($interval) {
 
     $now = REQUEST_TIME;
     //The offset is subtracted here to assure the hour 00:00 on the user timezone, and not on UTC
-    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - ($now % $sub_time_window) - logger_get_timezone_offset();
+    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - ($now % $sub_time_window) - get_timezone_offset();
     $start -= $interval == 'month' ? 3 * DAY : 0;
     $end = $start + round($window / $sub_time_window) * $sub_time_window;
   }
@@ -700,7 +700,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $chart->price2 = $price2;
   $chart->stacked = $stacked;
   $chart->resolution = logger_get_resolution($interval);
-  $chart->offset = logger_get_timezone_offset();
+  $chart->offset = get_timezone_offset();
   $chart->colors = logger_get_series_colors($context);
   $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->sensors = $sensors;
@@ -1335,19 +1335,6 @@ function logger_get_devices_options() {
     }
   }
   return $devices;
-}
-
-/**
- * Returns the user timezone offset.
- *
- * @return the user timezone offset.
- */
-function logger_get_timezone_offset() {
-
-  global $user;
-
-  $tz = new DateTimeZone( isset($user->timezone)? $user->timezone : date_default_timezone_get());
-  return $tz->getOffset(new DateTime);
 }
 
 function logger_theme() {
@@ -2340,7 +2327,7 @@ function logger_get_xvalue($index) {
   $m = strtok('/');
   $r = strtok('/');
   $timestamp = strtotime("$m/$d/$r");
-  $timestamp -= logger_get_timezone_offset();
+  $timestamp -= get_timezone_offset();
 
   return $timestamp > 0 ? $timestamp : 0;
 }

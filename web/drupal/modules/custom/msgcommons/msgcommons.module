@@ -177,3 +177,26 @@ function rzip($source, $destination) {
   }
   return $zip->close();
 }
+
+/**
+ * Returns the timezone offset.
+ *
+ * @param $name The timezone name.
+ * @return the timezone offset.
+ */
+function get_timezone_offset($name = NULL) {
+
+  global $user;
+
+  if (!isset($name)) {
+    if (isset($user) && isset($user->timezone)) {
+      $name = $user->timezone;
+    }
+    else {
+      $name = date_default_timezone_get();
+    }
+  }
+
+  $tz = new DateTimeZone($name);
+  return $tz->getOffset(new DateTime);
+}
