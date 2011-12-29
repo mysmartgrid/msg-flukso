@@ -2833,8 +2833,19 @@ fieldset.collapsible {
   float: right;
 }
 
-ul.links li {
+.node-blogpost h2 {
+  font-size: 18px;
+  margin-bottom: 10px;
+  margin-top: 5px;
+}
+
+.node-blogpost a {
+  text-decoration: none;
+}
+
+ul.links li a {
   padding: 0;
+  text-decoration: underline;
 }
 
 /* Forum (24/08/2010) */
