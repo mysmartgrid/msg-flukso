@@ -121,11 +121,11 @@ function rrmdir($dir) {
     foreach ($objects as $object) {
 
       if ($object != "." && $object != "..") {
-        if (filetype($dir."/".$object) == "dir") {
-          rrmdir($dir."/".$object);
+        if (filetype("$dir/$object") == "dir") {
+          rrmdir("$dir/$object");
         }
         else {
-          unlink($dir."/".$object);
+          unlink("$dir/$object");
         }
       }
     }
@@ -188,12 +188,12 @@ function rzip($source, $destination) {
             $zip->addEmptyDir($dir);
           }
         }
-        else if (is_file($file) === TRUE) {
+        elseif (is_file($file) === TRUE) {
           $zip->addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
         }
     }
   }
-  else if (is_file($source) === TRUE) {
+  elseif (is_file($source) === TRUE) {
     $zip->addFromString(basename($source), file_get_contents($source));
   }
   return $zip->close();

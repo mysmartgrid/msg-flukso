@@ -67,7 +67,7 @@ function msgdump_install() {
   $file_path = drupal_get_path('module', 'msgdump') . '/flukso4r';
   mkdir($file_path);
 
-  drupal_set_message(st('Please install flukso4r on:') . " $file_path.");
+  drupal_set_message(check_plain(st('Please install flukso4r on:') . " $file_path."));
 }
 
 function msgdump_uninstall() {
