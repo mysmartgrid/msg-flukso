@@ -1,15 +1,10 @@
 ; $Id$
-name = Deployment Overview
-description =  Allows the user to see devices' statuses.
+name = Flukso Deployment Overview
+description =  Allows the user to see flukso devices' statuses.
 package = mySmartGrid
 core = 7.x
 version = 7.x-0.1
-dependencies[] = logger
+php = 5.3
 
-files[] = fpdf/fpdf.php
-files[] = fpdi/fpdf_tpl.php
-files[] = fpdi/fpdi.php
-files[] = fpdi/fpdi2tcpdf_bridge.php
-files[] = fpdi/fpdi_pdf_parser.php
-files[] = fpdi/pdf_context.php
-files[] = fpdi/pdf_parser.php
+dependencies[] = msgcommons
+dependencies[] = logger
