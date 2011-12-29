@@ -21,17 +21,14 @@
  */
 
 //Device states
-define('UNINSTALLED_STATE_ID',         1);
-define('UNREGISTERED_STATE_ID',        2);
-define('NO_COMMUNICATION_STATE_ID',    3);
-define('CORRUPTED_STATE_ID',           4);
-define('WORKING_STATE_ID',             5);
-define('OFFLINE_STATE_ID',             6);
-define('NO_MEASUREMENT_STATE_ID',      7);
-define('NO_HEARTBEAT_STATE_ID',        8);
-
-//FIXME get value from notification.module
-define('CORRUPTED_MESSAGE_EVENT_ID_', 103);
+define('UNINSTALLED_STATE_ID',        1);
+define('UNREGISTERED_STATE_ID',       2);
+define('NO_COMMUNICATION_STATE_ID',   3);
+define('CORRUPTED_STATE_ID',          4);
+define('WORKING_STATE_ID',            5);
+define('OFFLINE_STATE_ID',            6);
+define('NO_MEASUREMENT_STATE_ID',     7);
+define('NO_HEARTBEAT_STATE_ID',       8);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_PATH', DRUPAL_ROOT . '/' . DEPLOYMENT_REL_PATH);
@@ -96,6 +93,7 @@ function deployment_menu() {
     'type' => MENU_NORMAL_ITEM,
   );
   */
+
   $items['deployment/list/file'] = array(
     'title' => 'Downloads a deployment list file',
     'page callback' => 'deployment_download_list_file',
@@ -185,7 +183,29 @@ function deployment_list_page($id = NULL) {
   $form = drupal_get_form('deployment_listfilter_form', $state_id);
   $output = drupal_render($form);
 
-  $data = deployment_get_devices($state_id);
+  $header = array(
+    array(
+      'data' => t('Device'),
+      'field' => 'serial',
+      'sort' => 'asc',
+    ),
+    array(
+      'data' => t('User'),
+      'field' => 'name',
+    ),
+    array(
+      'data' => t('E-mail'),
+      'field' => 'email',
+    ),
+    array(
+      'data' => t('Latest Update'),
+      'field' => 'latest',
+    ),
+    array('data' => t('State')),
+  );
+
+  $page_limit = 20;
+  $data = deployment_get_devices($state_id, NULL, $header, $page_limit);
   foreach ($data as &$device) {
     $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
     $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
@@ -194,35 +214,13 @@ function deployment_list_page($id = NULL) {
   }
   $_SESSION['deployment_list'] = $data;
 
-  if ($data) {
+  $output .= theme_table(array('header' => $header, 'rows' => $data, 'attributes' => array(),
+    'caption' => '', 'colgroups' => array(), 'sticky' => TRUE, 'empty' => '')) .
 
-    $headers = array(
-      array(
-        'data' => t('Device'),
-        'field' => 'serial',
-        'sort' => 'asc',
-      ),
-      array(
-        'data' => t('User'),
-        'field' => 'name',
-      ),
-      array(
-        'data' => t('E-mail'),
-        'field' => 'email',
-      ),
-      array(
-        'data' => t('Latest Update'),
-        'field' => 'latest',
-      ),
-      array('data' => t('State')),
-    );
+    theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => ceil(sizeof($data)/$page_limit))) .
 
-    $output .= theme_table(array('header' => $headers, 'rows' => $data, 'attributes' => array(),
-      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) .
-      
-      theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => (sizeof($data)/15))) .
-      '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
-  }
+    '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
+
   return $output;
 }
 
@@ -234,6 +232,7 @@ function deployment_list_page($id = NULL) {
 function deployment_overview_page() {
   
   global $user;
+
   $legend = array();
   $state_title = t('State');
   $total_title = t('Total');
@@ -286,28 +285,25 @@ function deployment_overview_page() {
  */
 function deployment_download_chart_file() {
 
-  global $user;
-  $sql = "SELECT * FROM {deployment_summary} ORDER BY time, state_id";
-  $result = db_query($sql);
+  $result = db_query("SELECT * FROM {deployment_summary} ORDER BY time, state_id");
   $header = '';
   $lines = '';
-
+  $offset = get_timezone_offset();
   $time = 0;
+
   foreach ($result as $summary) {
 
     if ($summary->time != $time) {
       $lines .= $time ? "\r\n" : '';
       $time = $summary->time;
 
-      $lines .= date('d-M-Y H:i', $time + $user->timezone);
+      $lines .= date('d-M-Y H:i', $time + $offset);
       $header = t('Time');
     }
-
     $header .= ',S' . $summary->state_id;
     $lines .= ',' . $summary->total;
   }
-
-  logger_download_file('chart-data-file', $header, $lines);
+  download_chart_data_file('chart-data-file', $header, $lines);
 }
 
 /**
@@ -323,7 +319,7 @@ function deployment_download_list_file() {
   $lines = preg_replace("/<\/a>/", '', $lines);
   $lines = preg_replace("/<a href=(.*)>/", '', $lines);
 
-  logger_download_file('deployment-list', $header, $lines);
+  download_chart_data_file('deployment-list', $header, $lines);
 }
 
 /**
@@ -333,8 +329,7 @@ function deployment_download_list_file() {
  */
 function deployment_get_all_states() {
 
-  $sql = "SELECT SQL_CACHE id, name FROM {deployment_state}";
-  $result = db_query($sql);
+  $result = db_query("SELECT SQL_CACHE id, name FROM {deployment_state}");
 
   $states = array();
   foreach ($result as $state) {
@@ -346,20 +341,18 @@ function deployment_get_all_states() {
 /**
  * Returns the list of user devices.
  *
- * @param $state_id  The device state id (optional).
- * @param $serial    The serial number for selecting a single device (optionally).
+ * @param $state_id    The device state id (optional).
+ * @param $serial      The serial number for selecting a single device (optional).
+ * @param $header      The table header, used for sorting the result (optional).
+ * @param $page_limit  The number of rows in a table page  (optional).
  * @return the array of user devices.
  */
-function deployment_get_devices($state_id = NULL, $serial = NULL) {
-
-  global $user;
+function deployment_get_devices($state_id = NULL, $serial = NULL, $header = NULL, $page_limit = NULL) {
 
   $states = deployment_get_all_states();
-  $data = array();
+  $result = deployment_query_devices($state_id, $serial, $header, $page_limit);
 
-  $sql = deployment_create_devices_query(REQUEST_TIME, $state_id, $serial);
-  $result = db_query($sql);
- 
+  $data = array(); 
   while ($device = $result->fetchAssoc()) {
 
     $device['state'] = $states[$device['state_id']];
@@ -369,65 +362,119 @@ function deployment_get_devices($state_id = NULL, $serial = NULL) {
 }
 
 /**
- * Creates a device query.
- * 
- * @param $now      The current time.
- * @param $state_id The device state (optional).
- * @param $serial   The device serial number (optional).
+ * Queries devices by state and serial number.
+ *
+ * @param $state_id    The device state (optional).
+ * @param $serial      The device serial number (optional).
+ * @param $header      The table header, used for sorting the result (optional).
+ * @param $page_limit  The number of rows in a table page  (optional).
  * @return the array of devices with the specified state and serial number.
  */
-function deployment_create_devices_query($now, $state_id, $serial) {
+function deployment_query_devices($state_id = NULL, $serial = NULL, $header = NULL, $page_limit = NULL) {
 
-  //If parameters are used in this SQL query, pager_query does not count rows correctly
+  $now = REQUEST_TIME;
+  $corrupted_events_query = db_select('event_log', 'l');
+  $corrupted_events_query->groupBy('l.device');
+  $corrupted_events_query->addExpression('MAX(l.time)', 'corrupted');
+  $corrupted_events_query->fields('l', array('device'))
+    ->condition('l.event_id', CORRUPTED_MESSAGE_EVENT_ID, '=')
+    ->condition('l.time', $now - 15 * MINUTE, '>');
 
-  global $user;
+  $corrupted_query = db_select('logger_meters', 'm');
+  $corrupted_query->leftJoin($corrupted_events_query, 'e', 'm.device = e.device');
+  $corrupted_query->groupBy('m.device');
+  $corrupted_query->fields('m', array('device'));
+  $corrupted_query->addExpression('MAX(m.access)', 'access');
+  $corrupted_query->addExpression('MAX(e.corrupted)', 'corrupted');
 
-  //FIXME: test this block, when called from drupal cron
-  $tz = new DateTimeZone( isset($user->timezone)? $user->timezone : date_default_timezone_get());
-  $tzdif = $tz->getOffset(new DateTime) / 3600; //divided by 1 hour
-  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $registration_timeout  = $now - 3 * 24 * 3600; //3 days
-  $offline_timeout       = $now - 24 * 3600; //24 hours
-  $communication_timeout = $now - 2 * 3600; //2 hours
-  $filters = '';
+  $query = db_select('logger_devices', 'd');
+  $query->leftJoin('users', 'u', 'u.uid = d.uid');
+  $query->join($corrupted_query, 'm', 'm.device = d.device');
+  $query->groupBy('d.uid');
+  $query->groupBy('d.serial');
+  $query->fields('d', array('serial'))
+    ->fields('u', array('name', 'uid'))
+    ->addField('u', 'mail', 'email');
 
-  $latest_field = "IF(d.access > 0, d.access, d.created)";
-  $state_id_field = $state_id;
+  if ($serial) {
+    $query->condition('d.serial', $serial, '=');
+  }
+
+  $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
+  $result = db_query($visitor_sql, array(':name' => 'Visitor'));
+  foreach ($result as $visitor) {
+    $query->condition('d.uid', $visitor->uid, '<>');
+  }
+
+  //FIXME: pager is still not working
+  if ($page_limit > 1) {
+    $query->extend('PagerDefault')
+      ->limit($page_limit);
+  }
+
+  if ($header) {
+    $query->extend('TableSort')->orderByHeader($header);
+  }
+
+  $registration_timeout = $now - 3 * DAY;
+  $offline_timeout = $now - DAY;
+  $communication_timeout = $now - 2 * HOUR;
+  $latest_field = NULL;
+  $state_id_field = NULL;
 
   switch ($state_id) {
     case UNINSTALLED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access  < $registration_timeout";
+      $query->condition('d.uid', 0, '=')
+        ->condition('d.access', $registration_timeout, '<');
       break;
 
     case UNREGISTERED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access >= $registration_timeout";
+      $query->condition('d.uid', 0, '=')
+        ->condition('d.access', $registration_timeout, '>=');
       break;
 
     case CORRUPTED_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NOT NULL";
+      $query->condition('d.uid', 0, '>')
+        ->isNotNull('m.corrupted');
       $latest_field = "m.corrupted";
       break;
 
     case OFFLINE_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access < $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '<')
+        ->condition('m.access', $offline_timeout, '<');
       break;
 
     case NO_HEARTBEAT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access >= $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '<')
+        ->condition('m.access', $offline_timeout, '>=');
       $latest_field = "m.access";
       break;
 
     case NO_COMMUNICATION_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $offline_timeout AND d.access < $communication_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '>=')
+        ->condition('m.access', $communication_timeout, '<');
       break;
 
     case NO_MEASUREMENT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', 0, '>')
+        ->condition('m.access', $offline_timeout, '<');
       $latest_field = "m.access";
       break;
 
     case WORKING_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access >= $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', $offline_timeout, '>=');
       break;
 
     default:
@@ -451,54 +498,17 @@ function deployment_create_devices_query($now, $state_id, $serial) {
           )
         )";
   }
-  $filters .= $serial ? " AND d.serial = $serial" : '';
 
-  $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
-  $result = db_query($visitor_sql, array(':name' => 'Visitor'));
+  $tzdif = get_timezone_offset() / HOUR;
+  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
+  $state_id_field = $state_id_field ? $state_id_field : $state_id;
+  $latest_field = $latest_field ? $latest_field : "IF(d.access > 0, d.access, d.created)";
+  $latest_field = "CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz')";
 
-  foreach ($result as $visitor) {
-    $filters .= " AND d.uid <> $visitor->uid ";
-  }
+  $query->addExpression($state_id_field, 'state_id');
+  $query->addExpression($latest_field, 'latest');
 
-  $min_time = $now - 15 * MINUTE;
-  return "
-    SELECT SQL_NO_CACHE
-      d.serial,
-      u.name,
-      u.uid,
-      u.mail AS email,
-      CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz') AS latest,
-      ($state_id_field) AS state_id
-    FROM
-      {logger_devices} d
-      LEFT OUTER JOIN {users} u ON u.uid = d.uid,
-      (
-        SELECT
-          m.device,
-          MAX(m.access) AS access,
-          MAX(e.corrupted) AS corrupted
-        FROM
-          {logger_meters} m LEFT JOIN
-          (
-            SELECT
-            l.device,
-            MAX(l.time) AS corrupted
-            FROM
-              {event_log} l
-            WHERE
-              l.event_id = " . CORRUPTED_MESSAGE_EVENT_ID_ . " AND l.time > $min_time
-            GROUP BY
-              l.device
-          ) e ON m.device = e.device
-        GROUP BY
-          m.device
-      ) m
-    WHERE
-      m.device = d.device
-      $filters
-    GROUP BY
-      d.uid,
-      d.serial";
+  return $query->execute();
 }
 
 function deployment_listfilter_form($form, &$form_state, $state_id) {
@@ -572,15 +582,13 @@ function deployment_checkup_form_submit($form, &$form_state) {
 
 function deployment_printcode_form_submit($form, &$form_state) {
 
-  exec('mkdir -p ' . DEPLOYMENT_PATH . '/pdf');
-
   $file_name = substr(md5(uniqid(rand(), TRUE)), 0, 10);
   $output_file_path = "/pdf/$file_name.pdf";
 
-  require_once DRUPAL_ROOT . '/' . 'fpdf/fpdf.php';
-  require_once DRUPAL_ROOT . '/' . 'fpdi/fpdi.php';
+  require_once DRUPAL_ROOT . '/sites/all/libraries/fpdf/fpdf.php';
+  require_once DRUPAL_ROOT . '/sites/all/libraries/fpdi/fpdi.php';
 
-  define('FPDF_FONTPATH',    DEPLOYMENT_PATH . '/fpdf/font/');
+  define('FPDF_FONTPATH', DRUPAL_ROOT . '/sites/all/libraries/fpdf/font/');
   define('PDF_SOURCE_FILE', DEPLOYMENT_PATH . '/Beipackzettel.pdf');
   define('PDF_OUTPUT_FILE', DEPLOYMENT_PATH . $output_file_path);
 
@@ -612,11 +620,9 @@ function deployment_printcode_form_submit($form, &$form_state) {
 
           $pdf->AddPage();
           $pdf->useTemplate($tplidx, 10, 10, 190);
-
           $pdf->SetFont('Arial', '', 12);
           $pdf->SetTextColor(0, 0, 0);
           $pdf->SetXY(43, 165);
-
           $pdf->Write(0, 'Seriennummer: WA' . $device->serial);
           $pdf->setXY(43, 175);
           $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device, 0, 10));
@@ -643,7 +649,7 @@ function deployment_cron() {
 function deployment_create_summary() {
 
   $now = REQUEST_TIME;
-  $now = $now - ($now % 3600);
+  $now = $now - ($now % HOUR);
 
   $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = :time";
   $result = db_query($sql, array(':time' => $now))->fetchField();
@@ -673,7 +679,7 @@ function deployment_create_summary() {
     }
 
     db_delete('deployment_summary')
-      ->condition('time', $now - 3 * 30 * 24 * 3600, '<')
-      ->execute(); //90 days
+      ->condition('time', $now - 3 * MONTH, '<')
+      ->execute(); //3 months
   }
 }

@@ -53,16 +53,20 @@ function msgdump_setup_form($form, &$form_state) {
   $newdate->setTime(0, 0);
   $newdate->modify('+1 week');
 
-  $sql = 'SELECT serial FROM {logger_devices} WHERE uid = :uid';
-  $result = db_query($sql, array(':uid' => $user->uid));
+  $result = db_select('logger_devices', 'd')
+    ->fields('d', array('serial'))
+    ->condition('d.uid', $user->uid, '=')
+    ->execute();
 
   $fluksos = array();
   foreach ($result as $device) {
     $fluksos[$device->serial] = $device->serial;
   }
 
-  $sql = 'SELECT file FROM {msgdump} WHERE uid = :uid';
-  $result = db_query($sql, array(':uid' => $user->uid));
+  $result = db_select('msgdump', 'd')
+    ->fields('d', array('file'))
+    ->condition('d.uid', $user->uid, '=')
+    ->execute();
 
   foreach ($result as $file) {
 
@@ -192,19 +196,16 @@ function msgdump_register($file, $serial, $type) {
 
   global $base_url;
 
-  $sql = "
-    SELECT
-      t.token,
-      m.meter
-    FROM
-      {logger_tokens} t
-        LEFT JOIN {logger_meters} m ON t.meter = m.meter
-        LEFT JOIN {logger_devices} d  ON m.device = d.device
-    WHERE
-      d.serial = :serial AND
-      m.type = :type";
-
-  $values = db_query($sql, array(':serial' => $serial, ':type' => $type));
+  $query = db_select('logger_tokens', 't');
+  $query->leftJoin('logger_meters', 'm', 'm.meter = t.meter');
+  $query->leftJoin('logger_devices', 'd', 'd.device = m.device');
+  
+  $values = $query
+    ->fields('t', array('token'))
+    ->fields('m', array('meter'))
+    ->condition('d.serial', $serial, '=')
+    ->condition('m.type', $type, '=')
+    ->execute();
 
   foreach ($values as $value) {
 
@@ -257,18 +258,10 @@ function theme_msgdump_setup($variables) {
   $rows = array();
 
   //TODO: rename field meter
-  $sql = "
-    SELECT
-      d.meter AS serial,
-      d.start,
-      d.stop,
-      d.file
-    FROM
-      {msgdump} d
-    WHERE
-      d.uid = :uid";
-
-  $result = db_query($sql, array(':uid' => $user->uid));
+  $result = db_select('msgdump', 'd')
+    ->fields('d', array('meter', 'start', 'stop', 'file'))
+    ->condition('d.uid', $user->uid, '=')
+    ->execute();
 
   foreach ($result as $device) {
 
@@ -277,7 +270,7 @@ function theme_msgdump_setup($variables) {
 
     $row = array();
     $row[] = drupal_render($form[$device->file]);
-    $row[] = $device->serial;
+    $row[] = $device->meter;//serial
     $row[] = $startdate->format("Y-m-d");
     $row[] = $stopdate->format("Y-m-d");
     $row[] = l(t('Download'), MSGDUMP_DB_PATH . '/' . $device->file . '.sqlite');
@@ -308,11 +301,13 @@ function msgdump_cron() {
 
   $now = new DateTime('now');
   $now = $now->format('U');
-  $time_limit = 3 * 30 * 24 * 60 * 60; //3 months
+  $time_limit = 3 * MONTH;
 
   //get requested dumps from database
-  $sql = "SELECT stop, file FROM {msgdump} WHERE start <= :start";
-  $result = db_query($sql, array(':start' => $now));
+  $result = db_select('msgdump', 'd')
+    ->fields('d', array('stop', 'file'))
+    ->condition('d.start', $now, '<=')
+    ->execute();
 
   //watchdog("cron", "[msgdump_cron] Running: " . mysqli_num_rows($result));
 

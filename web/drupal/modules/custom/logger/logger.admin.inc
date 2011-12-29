@@ -92,7 +92,8 @@ function logger_sensor_edition_page($meter) {
   $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = :meter";
   $sensor = db_query($sql, array(':meter' => $meter))->fetchObject();
 
-  return drupal_render( drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function));
+  $form = drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
+  return drupal_render($form);
 }
 
 function logger_userdevices_form($form, &$form_state) {
@@ -156,8 +157,11 @@ function logger_userprivacy_form($form, &$form_state) {
 
   global $user;
 
-  $sql = "SELECT private FROM {logger_users} WHERE uid = :uid";
-  $private = db_query($sql, array(':uid' => $user->uid))->fetchField();
+  $private = db_select('logger_users', 'u')
+    ->fields('u', array('private'))
+    ->condition('u.uid', $user->uid, '=')
+    ->execute()
+    ->fetchField();
 
   $form['privacy'] = array(
     '#title' => t('Set your preferred privacy mode'),
@@ -187,7 +191,6 @@ function logger_userdevices_form_validate($form, &$form_state) {
     if ($count != 1) {
       form_set_error('code', t('Please specify a valid activation code.'));
     }
-
   }
   else {
     form_set_error('code', t('Please specify a proper 10-character activation code.'));
@@ -386,6 +389,7 @@ function logger_sensor_deactivate($meter) {
 function logger_sensor_function_validate($function, $meter) {
 
   global $user;
+
   $count = 0;
 
   if ($function) {
@@ -412,9 +416,10 @@ function logger_sensor_function_validate($function, $meter) {
  * @return the themed devices form.
  */
 function theme_logger_userdevices($variables) {
-  $form = $variables['form'];
 
   global $user;
+
+  $form = $variables['form'];
   $rows = array();
 
   $sql = "
@@ -466,6 +471,7 @@ function theme_logger_userdevices($variables) {
  */
 function logger_unix_to_userlocaltime($unix) {
   global $user;
+
   $unix_local = gmdate('r', $unix + $user->timezone);
   return substr($unix_local, 0, strlen($unix_local) - 6);
 }
@@ -496,7 +502,6 @@ function theme_logger_userdevices_list($variables) {
     $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
     return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
-
   }
   else {
     return t('No devices available.');
@@ -517,7 +522,6 @@ function theme_logger_usersensors_list($variables) {
     $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
     return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
-
   }
   else {
     return t('No sensors available.');

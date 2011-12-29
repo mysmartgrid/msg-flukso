@@ -23,15 +23,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-//Constants
-define('SECOND', 1);
-define('MINUTE', 60);
-define('HOUR',    60 * MINUTE);
-define('DAY',     24 * HOUR);
-define('WEEK',     7 * DAY);
-define('MONTH',   30 * DAY);
-define('YEAR',    52 * WEEK);
-
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',   2);
 
@@ -772,19 +763,7 @@ function logger_download_chart_data_file($cache_id) {
     }
   }
 
-  logger_download_file('chart-data-file', $header, $lines);
-}
-
-/**
- * Downloads a chart data file.
- */
-function logger_download_file($file_name, $header, $lines) {
-
-  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
-  drupal_add_http_header('Content-disposition', "attachment; filename=$file_name.txt");
-
-  print $header . PHP_EOL . $lines;
-  exit(0);
+  download_chart_data_file('chart-data-file', $header, $lines);
 }
 
 /**

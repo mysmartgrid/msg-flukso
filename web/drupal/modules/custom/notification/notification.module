@@ -345,20 +345,15 @@ function notification_eventlog_page($serial) {
  */
 function notification_eventlog_clear($serial) {
 
-  $sql = "
-    DELETE FROM
-      {event_log}
-    WHERE
-      device = (
-        SELECT
-          d.device
-        FROM
-          {logger_devices} d
-        WHERE
-          d.serial = :serial
-      )";
+  $device = db_select('logger_devices', 'd')
+    ->fields('d', array('device'))
+    ->condition('d.serial', $serial, '=')
+    ->execute()
+    ->fetchField();
 
-  db_query($sql, array(':serial' => $serial));
+  db_delete('event_log')
+    ->condition('device', $device)
+    ->execute();
 
   return notification_eventlog_page($serial);
 }
@@ -853,11 +848,11 @@ function notification_register_event($values, $event_id) {
 
   if ($selected) {
 
-    $device   = $values['device'];
+    $device = $values['device'];
     $limit_up = isset($values["limit_up$event_id"]) ? $values["limit_up$event_id"] : 0;
-    $unit_id  = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
+    $unit_id = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
 
-    $emails       = $values['emails'];
+    $emails = $values['emails'];
     $min_interval = $values['min_interval'];
 
     notification_delete($device, $event_id, $limit_up, $unit_id);
@@ -872,14 +867,14 @@ function notification_register_event($values, $event_id) {
  */
 function notification_edit_event($values) {
 
-  $device       = $values['device'];
-  $event_id     = $values["event_id"];
+  $device = $values['device'];
+  $event_id = $values["event_id"];
   $old_limit_up = $values["old_limit_up"];
-  $old_unit_id  = $values["old_unit_id"];
+  $old_unit_id = $values["old_unit_id"];
 
-  $limit_up     = $values["limit_up"];
-  $unit_id      = $values["unit_id"];
-  $emails       = $values['emails'];
+  $limit_up = $values["limit_up"];
+  $unit_id = $values["unit_id"];
+  $emails = $values['emails'];
   $min_interval = $values['min_interval'];
 
   notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
@@ -914,8 +909,12 @@ function notification_tokenize_emails($str) {
  */
 function notification_get_event_name($event_id) {
 
-  $sql = "SELECT name FROM {event} WHERE id = :id";
-  $name = db_query($sql, array(':id' => $event_id))->fetchField();
+  $name = db_select('event', 'e')
+    ->fields('e', array('name'))
+    ->condition('e.id', $event_id, '=')
+    ->execute()
+    ->fetchField();
+
   return t($name);
 }
 
@@ -1474,15 +1473,15 @@ function notification_send_system_error_email($context, $error_code, $url) {
     'Error while updating the record in mySQL database.';
 
   $message =
-    "<p>Dear Administrator " .
-    "<br> &nbsp;<br></p>" .
+    "<p>Dear Administrator" .
+    "<br><br></p>" .
 
     "<p>The following system error has been reported.</p>" .
     "<p>Error code: %error_code<br>" .
     "Description: %description<br>" .
     "Related URL: %url</p>" .
 
-    "<p>&nbsp;<br>" .
+    "<p><br>" .
     "<p>mySmartGrid System</p>";
 
   $variables['%error_code'] = $error_code;
@@ -1511,17 +1510,17 @@ function notification_compose_email($description, $complement = "") {
   }
 
   return 
-        "<p class='logo'>!logo</p>" .
-        "<p class='highlight'>Dear user<br></p>" .
+    "<p class='logo'>!logo</p>" .
+    "<p class='highlight'>Dear user<br></p>" .
 
-        "<p>$description</p>" .
-        $complement .
+    "<p>$description</p>" .
+    $complement .
 
-        "<p>If you want to stop receiving this notification, please remove it from your " .
-        "<a href='!base_url/notification/list'>event notifications list</a>.</p>" .
-        "<p><br>" .
-        "Best Regards,<br><br>" .
-        "mySmartGrid Team</p>";
+    "<p>If you want to stop receiving this notification, please remove it from your " .
+    "<a href='!base_url/notification/list'>event notifications list</a>.</p>" .
+    "<p><br>" .
+    "Best Regards,<br><br>" .
+    "mySmartGrid Team</p>";
 }
 
 /**
@@ -1541,6 +1540,7 @@ function notification_compose_error_email($description, $recommendation = NULL) 
     "<p>In order to identify and solve the problem, please take the following actions.</p>" .
     "<ul>" .
       $recommendation .
+
       "<li><p>Click " .
       "<a href='!base_url/event/log/list/!serial '>here</a> " .
       "to check the latest events of your Flukso device.</p>" .
