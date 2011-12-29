@@ -60,10 +60,24 @@ function msgdump_schema() {
 
 function msgdump_install() {
   drupal_set_message(st('Created msgdump module table.'));
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/db';
+  mkdir($file_path);
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/flukso4r';
+  mkdir($file_path);
+
+  drupal_set_message(st('Please install flukso4r on:') . " $file_path.");
 }
 
 function msgdump_uninstall() {
   drupal_set_message(st('Deleted msgdump module table.'));
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/db';
+  rrmdir($file_path);
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/flukso4r';
+  rrmdir($file_path);
 }
 
 function msgdump_update_7000() {
@@ -72,3 +86,4 @@ function msgdump_update_7000() {
   // nothing or a translated string indicating the update ran successfully.
   // See http://drupal.org/node/224333#update_sql.
 }
+

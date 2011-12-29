@@ -129,10 +129,18 @@ function deployment_install() {
       'description' => "The device is registered, but has not sent any heartbeat during the past 24 hours.",
     ))
     ->execute();
+
+  //FIXME: PDF generation libraries
+
+  $file_path = drupal_get_path('module', 'deployment') . '/pdf';
+  mkdir($file_path);
 }
 
 function deployment_uninstall() {
   drupal_set_message(t('Deleted deployment module tables.'));
+
+  $file_path = drupal_get_path('module', 'deployment') . '/pdf';
+  rrmdir($file_path);
 }
 
 function deployment_update_7000() {
