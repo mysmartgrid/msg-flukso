@@ -24,38 +24,80 @@
  */
 
 /**
+ * Builds the user devices page.
+ *
+ * @return the user devices page.
+ */
+function logger_userdevices_page() {
+
+  global $user;
+
+  $query = db_select('logger_devices', 'd')
+    ->fields('d', array('device', 'serial', 'access', 'resets', 'uptime'))
+    ->condition('d.uid', $user->uid, '=')
+    ->orderBy('d.serial');
+  $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
+  $query->addField('r', 'requested', 'support_requested');
+
+  $devices = $query->execute();
+
+  $rows = array();
+  foreach ($devices as $device) {
+
+    $support_link = $device->support_requested ?
+      l(t('Suspend Support'), "device/support/suspend/$device->device") :
+      l(t('Request Support'), "device/support/confirm/$device->device");
+
+    $row = array();
+    $row[] = $device->serial;
+    $row[] = format_hashcode($device->device);
+    $row[] = $device->resets;
+    $row[] = unixtime_to_localtime($device->access);
+    $row[] = seconds_to_dayshours($device->uptime);
+    $row[] = l(t('Remove'), "device/deactivate/$device->device") . '<br>' .
+             l(t('History'), "event/log/list/$device->device") . '<br>' .
+             "<span style='white-space: nowrap;'>$support_link</span>";
+
+    $rows[] = $row;
+  }
+
+  $header = array(t('Serial'), t('Device Id'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
+
+  $form = drupal_get_form('logger_deviceactivation_form');
+  return drupal_render($form) .
+
+    theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+      'empty' => t('No devices available.'), 'sticky' => FALSE, 'colgroups' => array(),
+      'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
+}
+
+/**
  * Builds the user sensors page.
  *
  * @return the user sensors page.
  */
-function logger_user_sensors_page() {
+function logger_usersensors_page() {
 
   global $user;
+
+  $query = db_select('logger_meters', 'lm');
+  $query->innerJoin('logger_tokens', 'lt', 'lm.meter = lt.meter');
+  $query->join('logger_meter_type', 'st', 'lm.type = st.id');
+  $query->addField('st', 'name', 'type');
+
+  $sensors = $query
+    ->fields('lm', array('meter', 'function'))
+    ->fields('lt', array('token', 'permissions'))
+    ->condition('lm.uid', $user->uid, '=')
+    ->orderBy('lm.function', 'DESC')
+    ->execute();
+
   $rows = array();
-
-  $sql = "
-    SELECT
-      lm.meter,
-      lm.function,
-      st.name AS type,
-      lt.token,
-      lt.permissions
-    FROM
-      {logger_meters} lm
-      INNER JOIN {logger_tokens} lt ON lm.meter = lt.meter
-      LEFT JOIN {logger_meter_type} st ON lm.type = st.id
-    WHERE
-      lm.uid = :uid
-    ORDER BY
-      lm.function DESC";
-
-  $result = db_query($sql, array(':uid' => $user->uid));
-
-  foreach ($result as $sensor) {
+  foreach ($sensors as $sensor) {
 
     $row = array();
-    $row[] = substr($sensor->meter, 0, 15) . '<br>' . substr($sensor->meter, 15);
-    $row[] = substr($sensor->token, 0, 15) . '<br>' . substr($sensor->token, 15);
+    $row[] = format_hashcode($sensor->meter);
+    $row[] = format_hashcode($sensor->token);
 
     $operations = '';
 
@@ -64,7 +106,6 @@ function logger_user_sensors_page() {
       $row[] = '';
       $row[] = '';
       $operations = l(t('Activate'), 'sensor/activate/' . $sensor->meter);
-
     }
     else {
       $row[] = t('Active');
@@ -78,7 +119,12 @@ function logger_user_sensors_page() {
     $row[] = $operations;
     $rows[] = $row;
   }
-  return theme('logger_usersensors_list', array('items' => $rows));
+
+  $header = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
+
+  return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+   'empty' => t('No sensors available.'), 'sticky' => FALSE, 'colgroups' => array(),
+   'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
 }
 
 /**
@@ -89,16 +135,17 @@ function logger_user_sensors_page() {
  */
 function logger_sensor_edition_page($meter) {
 
-  $sql = "SELECT meter, type, function FROM {logger_meters} WHERE meter = :meter";
-  $sensor = db_query($sql, array(':meter' => $meter))->fetchObject();
+  $sensor = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'type', 'function'))
+    ->condition('m.meter', $meter, '=')
+    ->execute()
+    ->fetchObject();
 
   $form = drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
   return drupal_render($form);
 }
 
-function logger_userdevices_form($form, &$form_state) {
-
-  $form['#theme'] = 'logger_userdevices';
+function logger_deviceactivation_form($form, &$form_state) {
 
   $form['code'] = array(
     '#title' => t('Activation Code'),
@@ -181,12 +228,19 @@ function logger_userprivacy_form($form, &$form_state) {
   return $form;
 }
 
-function logger_userdevices_form_validate($form, &$form_state) {
+function logger_deviceactivation_form_validate($form, &$form_state) {
 
   $code = $form_state['values']['code'];
   if (strlen($code) == 10) {
 
-    $count = db_query("SELECT COUNT(*) FROM {logger_devices} WHERE device LIKE :device AND uid = :uid", array(':device' => "$code%", ':uid' => 0))->fetchField();
+    $query = db_select('logger_devices', 'd');
+    $query->addExpression('COUNT(*)', 'count');
+
+    $count = $query
+      ->condition('d.device', "$code%", 'LIKE')
+      ->condition('d.uid', 0, '=')
+      ->execute()
+      ->fetchField();
 
     if ($count != 1) {
       form_set_error('code', t('Please specify a valid activation code.'));
@@ -209,9 +263,10 @@ function logger_sensor_form_validate($form, &$form_state) {
   }
 }
 
-function logger_userdevices_form_submit($form, &$form_state) {
+function logger_deviceactivation_form_submit($form, &$form_state) {
 
   global $user;
+
   $code = $form_state['values']['code'];
 
   db_update('logger_devices')
@@ -221,10 +276,13 @@ function logger_userdevices_form_submit($form, &$form_state) {
     ->condition('device', "$code%", 'LIKE')
     ->execute();
 
-  $result = db_query("SELECT meter, function FROM {logger_meters} WHERE device LIKE ':code'", "$code%");
-  $i = 2;
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'function'))
+    ->condition('m.device', "$code%", 'LIKE')
+    ->execute();
 
-  foreach ($result as $sensor) {
+  $i = 2;
+  foreach ($sensors as $sensor) {
 
     $function = $sensor->function;
 
@@ -254,7 +312,7 @@ function logger_userdevices_form_submit($form, &$form_state) {
     }
   }
 
-  $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'fluksonian'))->fetchField();
+  $rid = get_role_id('fluksonian');
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
@@ -274,7 +332,6 @@ function logger_userdevices_form_submit($form, &$form_state) {
       ))
       ->execute();
   }
-
   drupal_set_message(t("The device is now associated with your account."));
 }
 
@@ -335,28 +392,70 @@ function logger_device_deactivate($device) {
     ->condition('device', $device)
     ->execute();
 
+  logger_check_fluksonian();
+
+  drupal_goto("user/$user->uid/devices");
+}
+
+/**
+ * Removes a device and all its sensors, tokens, and logs.
+ *
+ * @param $device  The device id.
+ */
+function logger_device_remove($device) {
+
+  db_delete('event_log')
+    ->condition('device', $device)
+    ->execute();
+ 
+  $sensors = db_select('logger_meters', 'm')
+    ->condition('device', $device)
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    db_delete('logger_tokens')
+      ->condition('meter', $sensor->meter)
+      ->execute();
+
+    db_delete('logger_meters')
+      ->condition('meter', $sensor->meter)
+      ->execute();
+
+    logger_rrd_remove($sensor->meter);
+  }
+
+  db_delete('logger_devices')
+    ->condition('device', $device)
+    ->execute();
+
+  logger_check_fluksonian();
+}
+
+/**
+ * Checks whether the user is still a fluksonian. If not, remove entries in users_roles and logger_users.
+ */
+function logger_check_fluksonian() {
+
+  global $user;
+
   $sql = "SELECT count(*) FROM {logger_devices} WHERE uid = :uid";
   $count = db_query($sql, array(':uid' => $user->uid))->fetchField();
 
-  // check whether the user is still a fluksonian
-  // if not, remove entries in {users_roles} and {logger_users}
   if ($count == 0) {
 
-    $sql = "SELECT SQL_CACHE rid FROM {role} WHERE name = :name";
-    $rid = db_query($sql, array(':name' => 'fluksonian'))->fetchField();
+    $rid = get_role_id('fluksonian');
 
     db_delete('users_roles')
       ->condition('uid', $user->uid)
       ->condition('rid', $rid)
       ->execute();
-    
+
     db_delete('logger_users')
       ->condition('uid', $user->uid)
       ->condition('private', 0)
       ->execute();
   }
-
-  drupal_goto("user/$user->uid/devices");
 }
 
 /**
@@ -393,137 +492,14 @@ function logger_sensor_function_validate($function, $meter) {
   $count = 0;
 
   if ($function) {
-
-    $sql = "
-      SELECT
-        count(*)
-      FROM
-        {logger_meters}
-      WHERE
-        function = :function AND
-        uid = :uid AND
-        meter <> :meter";
-
-    $count = db_query($sql, array(':function' => $function, ':uid' => $user->uid, ':meter' => $meter))->fetchField();
+    $query = db_select('logger_meters', 'm');
+    $query->addExpression('COUNT(*)', 'count');
+    $count = $query
+      ->condition('m.function', $function, '=')
+      ->condition('m.uid', $user->uid, '=')
+      ->condition('m.meter', $meter, '<>')
+      ->execute()
+      ->fetchField();
   }
   return $count == 0;
-}
-
-/**
- * Theme for displaying the devices form.
- *
- * @param $form The device form array.
- * @return the themed devices form.
- */
-function theme_logger_userdevices($variables) {
-
-  global $user;
-
-  $form = $variables['form'];
-  $rows = array();
-
-  $sql = "
-    SELECT
-      d.device,
-      d.serial,
-      d.access,
-      d.resets,
-      d.uptime,
-      r.requested AS support_requested
-    FROM
-      {logger_devices} d LEFT JOIN
-      {device_support_request} r ON d.device = r.device
-    WHERE
-      d.uid = :uid
-    ORDER BY
-      d.serial";
-  $result = db_query($sql, array(':uid' => $user->uid));
-
-  foreach ($result as $device) {
-
-    $support_link = $device->support_requested ?
-      l(t('Suspend Support'), "device/support/suspend/$device->device") :
-      l(t('Request Support'), "device/support/confirm/$device->device");
-
-    //FIXME: Use $device->device instead of $device->serial
-
-    $row = array();
-    $row[] = $device->serial;
-    $row[] = $device->resets;
-    $row[] = logger_unix_to_userlocaltime($device->access);
-    $row[] = logger_seconds_to_dayshours($device->uptime);
-    $row[] = l(t('Remove'),   "device/deactivate/$device->device") . '<br>' .
-             l(t('History'), "event/log/list/$device->serial") . '<br>' .
-             $support_link;
-
-    $rows[] = $row;
-  }
-
-  return drupal_render_children($form) .
-    theme('logger_userdevices_list', array('items' => $rows));
-}
-
-/**
- * Converts unix timestamp to user local time.
- * 
- * @param $unix The unix timestamp.
- * @return the converted time.
- */
-function logger_unix_to_userlocaltime($unix) {
-  global $user;
-
-  $unix_local = gmdate('r', $unix + $user->timezone);
-  return substr($unix_local, 0, strlen($unix_local) - 6);
-}
-
-/**
- * Formats timestamp as a readable string informing days and hours.
- * 
- * @param $seconds The timestamp in seconds.
- * @return the converted string.
- */
-function logger_seconds_to_dayshours($seconds) {
-  $days    = intval($seconds / DAY);
-  $hours   = intval(($seconds % DAY) / HOUR);
-  return sprintf('%d days %d hours', $days, $hours);
-}
-
-/**
- * Theme for displaying the list of devices.
- *
- * @param $items  An array of table rows.
- * @return the themed list of devices.
- */
-function theme_logger_userdevices_list($variables) {
-  $items = $variables['items'];
-
-  if (count($items) > 0) {
-
-    $headers = array(t('Serial'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
-    return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
-    'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
-  }
-  else {
-    return t('No devices available.');
-  }
-}
-
-/**
- * Theme for displaying the list of user's sensors.
- *
- * @param $items An array of table rows.
- * @return the themed list of sensors.
- */
-function theme_logger_usersensors_list($variables) {
-  $items = $variables['items'];
-
-  if (count($items) > 0) {
-
-    $headers = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
-    return theme_table(array('header' => $headers, 'rows' => $items, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
-    'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
-  }
-  else {
-    return t('No sensors available.');
-  }
 }

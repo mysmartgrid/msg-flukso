@@ -221,3 +221,53 @@ function get_timezone_offset($name = NULL) {
   $tz = new DateTimeZone($name);
   return $tz->getOffset(new DateTime);
 }
+
+/**
+ * Converts unix timestamp to user local time.
+ * 
+ * @param $unix The unix timestamp.
+ * @return the converted time.
+ */
+function unixtime_to_localtime($unixtime) {
+
+  $offset = get_timezone_offset();
+  $localtime = gmdate('r', $unixtime + $offset);
+  return substr($localtime, 0, strlen($localtime) - 6);
+}
+
+/**
+ * Formats timestamp as a readable string informing days and hours.
+ * 
+ * @param $seconds The timestamp in seconds.
+ * @return the converted string.
+ */
+function seconds_to_dayshours($seconds) {
+  $days = intval($seconds / DAY);
+  $hours = intval(($seconds % DAY) / HOUR);
+  return sprintf('%d days %d hours', $days, $hours);
+}
+
+/**
+ * Formats a hashcode for exhibition in a table.
+ *
+ * @param $hash The hashcode to be formatted.
+ * @return the formatted code.
+ */
+function format_hashcode($hash) {
+  $length = floor(strlen($hash) / 2);
+  return substr($hash, 0, $length) . '<br>' . substr($hash, $length);
+}
+
+/**
+ * Finds a role by name, and returns its id.
+ * 
+ * @param $name  The role name.
+ * @return the role id.
+ */
+function get_role_id($name) {
+  return db_select('role', 'r')
+    ->fields('r', array('rid'))
+    ->condition('r.name', $name, '=')
+    ->execute()
+    ->fetchField();
+}

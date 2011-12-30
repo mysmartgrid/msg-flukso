@@ -24,8 +24,6 @@
  */
 
 //Constants
-//Some constants need to be redefined because this file can be called from xmlrpc.php
-//drupal_get_path does not work, because xmlrpc.php is called from xmlrpc.php.
 define('RRDTOOL_PATH', DRUPAL_ROOT . '/sites/all/modules/logger');
 define('RRDTOOL', RRDTOOL_PATH . '/rrdtool');
 define('METER', 'meter');
@@ -96,6 +94,17 @@ function logger_rrd_create($meter, $step, $ds_type, $archives) {
       logger_rrd_rras($step, $archives);
   }
   return $return;
+}
+
+/**
+ * Removes an RRD file.
+ *
+ * @param $meter     The sensor's id.
+ * @return TRUE if successful, FALSE otherwise. 
+ */
+function logger_rrd_remove($meter) {
+  $file_path = logger_rrd_file($meter);
+  unlink($file_path);
 }
 
 /**

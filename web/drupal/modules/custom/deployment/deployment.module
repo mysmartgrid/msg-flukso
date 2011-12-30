@@ -163,7 +163,7 @@ function deployment_checkup_page($serial = NULL) {
           $message = t('This device is working fine. Latest message received at %latest.', $latest);
           break;
       }
-      $output .= '<br><br>' . t('Status:') . $device['state'] . "<br>$message<br><br>" . l(t('Device History'), "event/log/list/$serial");
+      $output .= '<br><br>' . t('Status:') . $device['state'] . "<br>$message<br><br>" . l(t('Device History'), 'event/log/list/' . $device['device']);
     }
   }
   return $output;
@@ -185,9 +185,13 @@ function deployment_list_page($id = NULL) {
 
   $header = array(
     array(
-      'data' => t('Device'),
+      'data' => t('Serial'),
       'field' => 'serial',
       'sort' => 'asc',
+    ),
+    array(
+      'data' => t('Device Id'),
+      'field' => 'device',
     ),
     array(
       'data' => t('User'),
@@ -207,12 +211,14 @@ function deployment_list_page($id = NULL) {
   $page_limit = 20;
   $data = deployment_get_devices($state_id, NULL, $header, $page_limit);
   foreach ($data as &$device) {
-    $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
+    $device['serial'] = l($device['serial'], 'event/log/list/' . $device['device']);
+    $device['device'] = format_hashcode($device['device']);
     $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
+    $device['email'] = preg_replace("/@/", '@<br>', $device['email']);
     unset($device['uid']);
     unset($device['state_id']);
   }
-  $_SESSION['deployment_list'] = $data;
+  $_SESSION['deployment_list_lines'] = $data;
 
   $output .= theme_table(array('header' => $header, 'rows' => $data, 'attributes' => array(),
     'caption' => '', 'colgroups' => array(), 'sticky' => TRUE, 'empty' => '')) .
@@ -275,7 +281,7 @@ function deployment_overview_page() {
 
   drupal_set_title(t('Deployment Overview'));
 
-  return '<div>' . t($chart->unit) . '</div>' . '<br>' .
+  return '<div>' . t($chart->unit) . '</div><br>' .
     logger_create_dygraph($chart, TRUE) . '<br>' .
     logger_create_chart_legend($chart);
 }
@@ -285,13 +291,13 @@ function deployment_overview_page() {
  */
 function deployment_download_chart_file() {
 
-  $result = db_query("SELECT * FROM {deployment_summary} ORDER BY time, state_id");
   $header = '';
   $lines = '';
   $offset = get_timezone_offset();
   $time = 0;
 
-  foreach ($result as $summary) {
+  $summaries = db_query("SELECT * FROM {deployment_summary} ORDER BY time, state_id");
+  foreach ($summaries as $summary) {
 
     if ($summary->time != $time) {
       $lines .= $time ? "\r\n" : '';
@@ -311,13 +317,15 @@ function deployment_download_chart_file() {
  */
 function deployment_download_list_file() {
 
-  $header = t('Device') . ',' . t('User') . ',' . t('E-mail') . ',' . t('Latest') . ',' . t('State');
+  $header = t('Serial') . ',' . t('Device Id') . ',' . t('User') . ',' . t('E-mail') . ',' . t('Latest') . ',' . t('State');
+  $lines = '';
 
-  foreach ($_SESSION['deployment_list'] as $entry) {
+  foreach ($_SESSION['deployment_list_lines'] as $entry) {
     $lines .= implode(',', $entry) . PHP_EOL;
   }
+  $lines = preg_replace("/<br>/", '', $lines);
   $lines = preg_replace("/<\/a>/", '', $lines);
-  $lines = preg_replace("/<a href=(.*)>/", '', $lines);
+  $lines = preg_replace("/<a.*?>/", '', $lines);
 
   download_chart_data_file('deployment-list', $header, $lines);
 }
@@ -392,7 +400,7 @@ function deployment_query_devices($state_id = NULL, $serial = NULL, $header = NU
   $query->join($corrupted_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
-  $query->fields('d', array('serial'))
+  $query->fields('d', array('serial', 'device'))
     ->fields('u', array('name', 'uid'))
     ->addField('u', 'mail', 'email');
 

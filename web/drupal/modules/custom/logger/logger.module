@@ -76,6 +76,10 @@ function logger_permission() {
       'title' => t('deactivate devices'),
       'description' => t('Deactivate a device.'),
     ),
+    'remove devices' => array(
+      'title' => t('remove devices'),
+      'description' => t('Remove a device and all related data.'),
+    ),
     'list sensors' => array(
       'title' => t('list sensors'),
       'description' => t('Access the list of user device sensors.'),
@@ -180,8 +184,7 @@ function logger_menu() {
 
   $items['user/%user_uid_optional/devices'] = array(
     'title' => 'Devices',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('logger_userdevices_form'),
+    'page callback' => 'logger_userdevices_page',
     'access callback' => 'logger_account_access',
     'access arguments' => array('list devices', 1),
     'type' => MENU_LOCAL_TASK,
@@ -195,6 +198,16 @@ function logger_menu() {
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
     'access arguments' => array('deactivate devices', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['device/remove'] = array(
+    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'page callback' => 'logger_device_remove',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('remove devices', 2),
     'type' => MENU_CALLBACK,
     'file' => 'logger.admin.inc',
   );
@@ -256,7 +269,7 @@ function logger_menu() {
 
   $items['user/%user_uid_optional/sensors'] = array(
     'title' => 'Sensors',
-    'page callback' => 'logger_user_sensors_page',
+    'page callback' => 'logger_usersensors_page',
     'access callback' => 'logger_account_access',
     'access arguments' => array('list sensors', 1),
     'type' => MENU_LOCAL_TASK,
@@ -735,11 +748,14 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
  */
 function logger_download_chart_data_file($cache_id) {
 
+  $header = '';
+  $lines = '';
+
   $cache = cache_get($cache_id, 'cache_page');
   if ($cache->data) {
     $values = array();
-    $header = t('Serie');
     $s = 1;
+    $header = t('Serie');
 
     foreach ($cache->data['series'] as $uid => $userdata) {
       foreach ($userdata as $username => $sensors) {
@@ -756,13 +772,11 @@ function logger_download_chart_data_file($cache_id) {
       }
     }
 
-    $lines = '';
     foreach ($values as $timestamp => $values_list) {
       $lines .= str_replace(array('&nbsp;', '<br>'), ' ', $timestamp); //Removes HTML tags
       $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
-
   download_chart_data_file('chart-data-file', $header, $lines);
 }
 
@@ -1057,11 +1071,13 @@ function logger_format_energy_legend_record($value, $record_time, $interval) {
 function logger_get_power_chart_data($chart) {
 
   global $user;
+
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'Visitor'))->fetchField();
+  $rid = get_role_id('Visitor');
   $is_visitor = !empty($user->roles[$rid]);
 
+  $data = array();
   $i = 0;
   foreach ($chart->sensors as &$sensor) {
 
@@ -1121,6 +1137,7 @@ function logger_format_power_series_data($chart, $measurements) {
   $diff = $chart->offset / HOUR;
   $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
 
+  $formatted = array();
   for ($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
 
     $key = date('Y-m-d H:i', $timestamp) . " $tz";
@@ -1168,6 +1185,7 @@ function logger_create_power_legend_line($username, $sensor, $type, $i, $operati
 function logger_get_user_sensors($types) {
 
   global $user;
+
   $sensors = array();
 
   if (!empty($types)) {
@@ -1212,6 +1230,7 @@ function logger_get_user_sensors($types) {
 function logger_get_subscribed_sensors($types) {
 
   global $user;
+
   $selected_users = logger_get_variable('selected_users', array());
 
   if (empty($selected_users)) {
@@ -1335,22 +1354,6 @@ function logger_theme() {
         'body' => NULL,
         'link' => NULL,
       ),
-    ),
-    'logger_userdevices' => array(
-      'render element' => 'form',
-      'file' => 'logger.admin.inc',
-    ),
-    'logger_userdevices_list' => array(
-      'variables' => array(
-        'items' => NULL,
-      ),
-      'file' => 'logger.admin.inc',
-    ),
-    'logger_usersensors_list' => array(
-      'variables' => array(
-        'items' => NULL,
-      ),
-      'file' => 'logger.admin.inc',
     ),
     'logger_smoothing_level' => array(
       'render element' => 'element',
@@ -1577,10 +1580,10 @@ function logger_create_interval_menu($context) {
  */
 function logger_create_chart_legend($chart) {
 
-  $data = $chart->data['legend'];
-  if (!$data) {
+  if (!isset($chart->data['legend'])) {
     return '';
   }
+  $data = $chart->data['legend'];
 
   $header = array(
     array('data' => ''),
@@ -1738,6 +1741,7 @@ function logger_mail_alter(&$message) {
 function logger_energychart_form($form, &$form_state, $chart) {
 
   global $user;
+
   $types_options = logger_get_sensor_types_options($user->uid);
   $selected_types = logger_get_variable('selected_sensor_types', array_keys($types_options));
 
@@ -2100,10 +2104,10 @@ function logger_compose_range_fields($element, $field1, $field2) {
  */
 function logger_create_custom_field($element, $suffix, $value, $size = 0, $maxlength = 0) {
 
-  $name      = $element['#name'] . $suffix;
-  $id        = $element['#id'] . $suffix;
-  $align     = $element['#text-align'] . ';';
-  $size      = $size > 0 ? $size : $element['#size'];
+  $name = $element['#name'] . $suffix;
+  $id = $element['#id'] . $suffix;
+  $align = $element['#text-align'] . ';';
+  $size = $size > 0 ? $size : $element['#size'];
   $maxlength = $maxlength > 0 ? $maxlength : $element['#maxlength'];
 
   $attributes = isset($element['#attributes']) ? drupal_attributes($element['#attributes']) : '';
@@ -2227,7 +2231,6 @@ function logger_get_sensor_types_options($uid = NULL) {
   foreach ($result as $type) {
     $options[$type->id] = t($type->name);
   }
-  
   return $options;
 }
 
@@ -2280,6 +2283,7 @@ function logger_get_energy_units_options() {
  */
 function logger_get_yvalue($index) {
   global $_REQUEST;
+
   return isset($_REQUEST['yvalue' . $index]) ? $_REQUEST['yvalue' . $index] : 0;
 }
 
@@ -2290,7 +2294,6 @@ function logger_get_yvalue($index) {
  * @return the value.
  */
 function logger_get_xvalue($index) {
-
   global $_REQUEST;
 
   //Both need to be set
@@ -2318,8 +2321,8 @@ function logger_get_xvalue($index) {
  * @return the chart resolution.
  */
 function logger_get_resolution($interval) {
-
   global $_REQUEST;
+
   $resolution = isset($_REQUEST['resolution']) ? $_REQUEST['resolution'] : 0;
   if ($resolution > 0) {
     return $resolution;
@@ -2432,9 +2435,10 @@ function logger_get_period($interval, $resolution, $start = 0, $end = 0) {
 function logger_get_users_options() {
 
   global $user;
+
   $selected_users = logger_get_variable('selected_users', array($user->uid));
 
-  $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'Visitor'))->fetchField();
+  $rid = get_role_id('Visitor');
   $is_visitor = !empty($user->roles[$rid]);
 
   $sql = "
@@ -2474,6 +2478,7 @@ function logger_get_users_options() {
 function logger_add_user($uid) {
 
   global $user;
+
   $selected_users = logger_get_variable('selected_users', array($user->uid));
   if (!in_array($uid, $selected_users)) {
     $selected_users[] = $uid;
@@ -2509,12 +2514,13 @@ function logger_get_variable($id, $default_value) {
   global $user;
   global $_SESSION;
   global $_COOKIE;
+
   $id = "logger_$id";
 
   if (isset($user->uid)) {
 
     //Visitors must use cookies
-    $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'fluksonian'))->fetchField();
+    $rid = get_role_id('Visitor');
 
     if (isset($user->roles[$rid])) {
       $id .= '_' . $user->uid;
@@ -2544,14 +2550,15 @@ function logger_set_variable($id, $value) {
 
   global $_SESSION;
   global $user;
+
   $id = "logger_$id";
 
   if ($user->uid) {
 
     //Visitors must use cookies
-    $rid = db_query("SELECT SQL_CACHE rid FROM {role} WHERE name = :name", array(':name' => 'fluksonian'))->fetchField();
+    $rid = get_role_id('Visitor');
 
-    if ($user->roles[$rid]) {
+    if (isset($user->roles[$rid])) {
       $id .= '_' . $user->uid;
       variable_set($id, $value);
     }
@@ -2577,6 +2584,8 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
 }
 
 function logger_account_access($permission, $account) {
+  global $GLOBALS;
+
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
@@ -2584,7 +2593,6 @@ function logger_account_access($permission, $account) {
  * Access callback ensuring the sensor is accessible only to the owner.
  */
 function logger_sensor_access($permission, $meter) {
-
   global $GLOBALS;
 
   $sql = "SELECT uid FROM {logger_meters} WHERE meter = :meter";
@@ -2597,7 +2605,6 @@ function logger_sensor_access($permission, $meter) {
  * Access callback ensuring the device is accessible only to the owner.
  */
 function logger_device_access($permission, $device) {
-
   global $GLOBALS;
 
   $sql = "SELECT uid FROM {logger_devices} WHERE device = :device";
@@ -2764,7 +2771,7 @@ function logger_support_requests_page() {
 
   $result = db_query($sql, array(':time_format' => LOGGER_TIMESTAMP_FORMAT_SQL));
 
-  $headers = array(
+  $header = array(
     array(
       'data' => t('Requested'),
       'field' => 'requested',
@@ -2809,7 +2816,8 @@ function logger_support_requests_page() {
       'operations' => $operations,
     );
   }
-  return theme_table(array('header' => $headers, 'rows' => $rows, 'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
+  return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '', 'empty' => '', 'sticky' => FALSE,
+    'attributes' => array(), 'colgroups' => array()));
 }
 
 /**

@@ -83,6 +83,8 @@ function notification_settings_access($permission, $account) {
 
 function notification_menu() {
 
+  //FIXME: restrict device access permissions
+
   $items['notification/list'] = array(
     'title' => 'Event Notifications',
     'page callback' => 'notification_list_page',
@@ -288,51 +290,44 @@ function notification_list_page() {
 /**
  * Builds the event log page.
  *
- * @param $serial  The device serial number.
- *
+ * @param $device  The device id.
  * @return the event log page.
  */
-function notification_eventlog_page($serial) {
+function notification_eventlog_page($device) {
 
-  $sql = "
-    SELECT
-      l.time,
-      e.name
-    FROM
-      {users} u,
-      {logger_devices} d,
-      {event} e,
-      {event_log} l
-    WHERE
-      l.event_id = e.id AND
-      l.device = d.device AND
-      d.serial = :serial AND
-      d.uid = u.uid
-    ORDER BY
-      l.time DESC";
+  $serial = db_select('logger_devices', 'd')
+    ->fields('d', array('serial'))
+    ->condition('d.device', $device, '=')
+    ->execute()
+    ->fetchField();
 
-  $args = array(':serial' => $serial);
+  $query = db_select('event_log', 'l')
+    ->fields('l', array('time'))
+    ->condition('l.device', $device, '=')
+    ->orderBy('l.time', 'DESC');
 
-  $result = db_query($sql, $args);
+  $query->join('event', 'e', 'e.id = l.event_id');
+  $query->addField('e', 'name');
+  $entries = $query->execute();
+
   $rows = array();
-
-  foreach ($result as $entry) {
+  foreach ($entries as $entry) {
     $rows[] = array(
       'time' => date(NOTIFICATION_TIMESTAMP_FORMAT, $entry->time),
       'name' => t($entry->name)
     );
   }
 
-  $headers = array(
+  $header = array(
     array('data' => t('Time')),
     array('data' => t('Event')),
   );
 
-  $caption = '<p>' . t('Serial Number') . ': ' . $serial . '</p>' . '<p>' .
-    l(t('Clear'), 'event/log/clear/' . $serial) . '</p>';
+  $caption = '<p>' . t('Serial Number') . ": $serial</p><p>" .
+    l(t('Clear'), "event/log/clear/$device") . '</p>';
 
-  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array(), 'caption' => $caption,
-    'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) .
+  return theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(), 'caption' => $caption,
+    'colgroups' => array(), 'sticky' => TRUE, 'empty' => '')) .
 
     theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => 100));
 }
@@ -340,31 +335,25 @@ function notification_eventlog_page($serial) {
 /**
  * Processes the event log deletion request.
  *
- * @param $serial The device serial number.
+ * @param $device The device id.
  * @return the event log page.
  */
-function notification_eventlog_clear($serial) {
-
-  $device = db_select('logger_devices', 'd')
-    ->fields('d', array('device'))
-    ->condition('d.serial', $serial, '=')
-    ->execute()
-    ->fetchField();
+function notification_eventlog_clear($device) {
 
   db_delete('event_log')
     ->condition('device', $device)
     ->execute();
 
-  return notification_eventlog_page($serial);
+  return notification_eventlog_page($device);
 }
 
 /**
- * Removes log entries older than 1 week.
+ * Removes log entries older than 3 days.
  */
 function notification_eventlog_clear_old() {
 
   db_delete('event_log')
-    ->condition('time', REQUEST_TIME - (2 * DAY), '<')
+    ->condition('time', REQUEST_TIME - (3 * DAY), '<')
     ->execute();
 }
 
