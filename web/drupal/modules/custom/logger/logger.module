@@ -1585,6 +1585,7 @@ function logger_create_chart_legend($chart) {
   }
   $data = $chart->data['legend'];
 
+  $lines = array();
   $header = array(
     array('data' => ''),
   );
@@ -2595,10 +2596,13 @@ function logger_account_access($permission, $account) {
 function logger_sensor_access($permission, $meter) {
   global $GLOBALS;
 
-  $sql = "SELECT uid FROM {logger_meters} WHERE meter = :meter";
-  $uid = db_query($sql, array(':meter' => $meter))->fetchField();
+  $uid = db_select('logger_meters', 'm')
+    ->fields('m', array('uid'))
+    ->condition('m.meter', $meter, '=')
+    ->execute()
+    ->fetchField();
 
-  return ($uid == $GLOBALS['user']->uid && user_access($permission));
+  return $uid == $GLOBALS['user']->uid && user_access($permission);
 }
 
 /**
@@ -2607,10 +2611,17 @@ function logger_sensor_access($permission, $meter) {
 function logger_device_access($permission, $device) {
   global $GLOBALS;
 
-  $sql = "SELECT uid FROM {logger_devices} WHERE device = :device";
-  $uid = db_query($sql, array(':device' => $device))->fetchField();
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
 
-  return ($uid == $GLOBALS['user']->uid && user_access($permission));
+  $uid = db_select('logger_devices', 'd')
+    ->fields('d', array('uid'))
+    ->condition('d.device', $device, '=')
+    ->execute()
+    ->fetchField();
+
+  return $uid == $GLOBALS['user']->uid && user_access($permission);
 }
 
 /**

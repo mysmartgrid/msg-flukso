@@ -392,7 +392,7 @@ function logger_device_deactivate($device) {
     ->condition('device', $device)
     ->execute();
 
-  logger_check_fluksonian();
+  logger_check_fluksonian($user->uid);
 
   drupal_goto("user/$user->uid/devices");
 }
@@ -404,12 +404,15 @@ function logger_device_deactivate($device) {
  */
 function logger_device_remove($device) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   db_delete('event_log')
     ->condition('device', $device)
     ->execute();
  
   $sensors = db_select('logger_meters', 'm')
-    ->condition('device', $device)
+    ->fields('m')
+    ->condition('m.device', $device, '=')
     ->execute();
 
   foreach ($sensors as $sensor) {
@@ -425,35 +428,50 @@ function logger_device_remove($device) {
     logger_rrd_remove($sensor->meter);
   }
 
+  $flukso = db_select('logger_devices', 'd')
+    ->fields('d', array('serial', 'uid'))
+    ->condition('d.device', $device, '=')
+    ->execute()
+    ->fetchObject();
+
+  db_delete('msgdump')
+    ->condition('meter', $flukso->serial)
+    ->execute();
+
+  db_delete('notification')
+    ->condition('device', $device)
+    ->execute();
+
   db_delete('logger_devices')
     ->condition('device', $device)
     ->execute();
 
-  logger_check_fluksonian();
+  logger_check_fluksonian($flukso->uid);
+
+  return t("Device and all its data have been successfuly removed.");
 }
 
 /**
  * Checks whether the user is still a fluksonian. If not, remove entries in users_roles and logger_users.
+ *
+ * @param $uid The user id.
  */
-function logger_check_fluksonian() {
-
-  global $user;
+function logger_check_fluksonian($uid) {
 
   $sql = "SELECT count(*) FROM {logger_devices} WHERE uid = :uid";
-  $count = db_query($sql, array(':uid' => $user->uid))->fetchField();
+  $count = db_query($sql, array(':uid' => $uid))->fetchField();
 
   if ($count == 0) {
 
     $rid = get_role_id('fluksonian');
 
     db_delete('users_roles')
-      ->condition('uid', $user->uid)
+      ->condition('uid', $uid)
       ->condition('rid', $rid)
       ->execute();
 
     db_delete('logger_users')
-      ->condition('uid', $user->uid)
-      ->condition('private', 0)
+      ->condition('uid', $uid)
       ->execute();
   }
 }

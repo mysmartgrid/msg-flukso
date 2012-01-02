@@ -134,6 +134,8 @@ function deployment_install() {
 
   $file_path = drupal_get_path('module', 'deployment') . '/pdf';
   mkdir($file_path);
+
+  deployment_create_summary();
 }
 
 function deployment_uninstall() {
