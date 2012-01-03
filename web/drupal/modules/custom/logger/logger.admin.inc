@@ -417,6 +417,10 @@ function logger_device_remove($device) {
 
   foreach ($sensors as $sensor) {
 
+    db_delete('msgdump')
+      ->condition('meter', $sensor->meter)
+      ->execute();
+
     db_delete('logger_tokens')
       ->condition('meter', $sensor->meter)
       ->execute();
@@ -433,10 +437,6 @@ function logger_device_remove($device) {
     ->condition('d.device', $device, '=')
     ->execute()
     ->fetchObject();
-
-  db_delete('msgdump')
-    ->condition('meter', $flukso->serial)
-    ->execute();
 
   db_delete('notification')
     ->condition('device', $device)

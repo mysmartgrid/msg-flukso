@@ -14,8 +14,8 @@ if [ -e $DAEMON_BIN ]; then
 			mkdir -p /tmp/flukso
 		fi
 		if [ -e $FLUKSO_BIN ] && [ $(ps | grep -c $FLUKSO_BIN) == 1 ]; then
-                        FLUKSO_SERVICE=$(cat $DAEMON_CONFIG | grep '.*SERVICE.*' | grep -o '".*"'| sed -e 's%"%%g')
-                        $FLUKSO_BIN $FLUKSO_SERVICE /tmp/flukso/ip &
+			FLUKSO_SERVICE=$(cat $DAEMON_CONFIG | grep '.*SERVICE.*' | grep -o '".*"'| sed -e 's%"%%g')
+			$FLUKSO_BIN $FLUKSO_SERVICE /tmp/flukso/ip &
 		else    
 			echo "Autoconfiguration disabled."
 		fi

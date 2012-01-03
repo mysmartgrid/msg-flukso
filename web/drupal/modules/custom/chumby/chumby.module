@@ -289,7 +289,7 @@ function chumby_create_daemon_config($params, $sensor, $tmp_path) {
   $daemonconfig = fopen($tmp_path . '/daemonconfig.lua', 'w');
   if ($daemonconfig) {
 
-    //If version 2 //TODO: find a better way of informing these properties
+    //If version 2
     if ($sensor->serial > 100000000) {
       $params['port'] = 8080;
       $params['service'] = '_flukso._tcp';

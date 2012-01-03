@@ -63,7 +63,7 @@ function deployment_menu() {
   $items['deployment/list'] = array(
     'title' => 'Device List',
     'page callback' => 'deployment_list_page',
-    'page arguments' => array(2),
+    'page arguments' => array(2, 3, 4),
     'access arguments' => array('device deployment overview'),
     'type' => MENU_NORMAL_ITEM,
   );
@@ -83,8 +83,6 @@ function deployment_menu() {
     'type' => MENU_NORMAL_ITEM,
   );
 
-  //FIXME: update the libraries to D7
-  /*
   $items['deployment/print'] = array(
     'title' => "Print Code",
     'page callback' => 'drupal_get_form',
@@ -92,7 +90,6 @@ function deployment_menu() {
     'access arguments' => array('print activation code'),
     'type' => MENU_NORMAL_ITEM,
   );
-  */
 
   $items['deployment/list/file'] = array(
     'title' => 'Downloads a deployment list file',
@@ -175,7 +172,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
         array(t('Serial Number'), $device['serial']),
         array(t('Device Id'), $device['device']),
         array(t('User'), $device['name']),
-        array(t('Email'), $device['email']),
+        array(t('E-mail'), $device['email']),
         array(t('Status'), $device['state'] . "<br>$message"),
         array(t('Operations'), $operations));
 
@@ -189,13 +186,18 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 /**
  * Builds the device list page.
  *
+ * @param $id The device id (optional).
+ * @param $user_name The user name (optional).
+ * @param $email Part of the user email (optional).
  * @return the device list page.
  */
-function deployment_list_page($id = NULL) {
+function deployment_list_page($id = NULL, $user_name = NULL, $email = NULL) {
 
   drupal_set_title(t('Device List'));
 
-  $state_id = $id > 0 ? $id : (isset($_SESSION['state_id']) ? $_SESSION['state_id'] : 0);
+  $state_id = $id > 0 ? $id : isset($_SESSION['state_id']) ? $_SESSION['state_id'] : 0;
+  $user_name = $user_name ? $user_name : isset($_SESSION['user_name']) ? $_SESSION['user_name'] : NULL;
+  $email = $email ? $email : isset($_SESSION['email']) ? $_SESSION['email'] : NULL;
 
   $form = drupal_get_form('deployment_listfilter_form', $state_id);
   $output = drupal_render($form);
@@ -226,7 +228,9 @@ function deployment_list_page($id = NULL) {
   );
 
   $page_limit = 20;
-  $data = deployment_get_devices(array('state_id' => $state_id), $header, $page_limit);
+  $filter = array('state_id' => $state_id, 'user_name' => $user_name, 'email' => $email);
+
+  $data = deployment_get_devices($filter, $header, $page_limit);
   foreach ($data as &$device) {
     $device['serial'] = l($device['serial'], 'deployment/checkup/serial/' . $device['serial']);
     $device['device'] = format_hashcode($device['device']);
@@ -366,20 +370,21 @@ function deployment_get_all_states() {
 /**
  * Returns the list of user devices.
  *
- * @param $params      The device filter parameters (optional) (use keys: state_id, serial, device).
+ * @param $filter     The device filter parameters (optional) (use keys: state_id, serial, device).
  * @param $header      The table header, used for sorting the result (optional).
  * @param $page_limit  The number of rows in a table page  (optional).
  * @return the array of user devices.
  */
-function deployment_get_devices($params = array(), $header = NULL, $page_limit = NULL) {
+function deployment_get_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
   $states = deployment_get_all_states();
-  $result = deployment_query_devices($params, $header, $page_limit);
+  $result = deployment_query_devices($filter, $header, $page_limit);
 
   $data = array(); 
   while ($device = $result->fetchAssoc()) {
 
     $device['state'] = $states[$device['state_id']];
+    $device['latest'] = date('d-m-Y H:i', $device['latest']);
     $data[] = $device;
   }
   return $data;
@@ -388,12 +393,12 @@ function deployment_get_devices($params = array(), $header = NULL, $page_limit =
 /**
  * Queries devices by state and serial number.
  *
- * @param $params      The device filter parameters (optional).
+ * @param $filter      The device filter parameters (optional).
  * @param $header      The table header, used for sorting the result (optional).
  * @param $page_limit  The number of rows in a table page  (optional).
  * @return the array of devices with the specified state and serial number.
  */
-function deployment_query_devices($params = array(), $header = NULL, $page_limit = NULL) {
+function deployment_query_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
   $now = REQUEST_TIME;
   $corrupted_events_query = db_select('event_log', 'l');
@@ -419,36 +424,35 @@ function deployment_query_devices($params = array(), $header = NULL, $page_limit
     ->fields('u', array('name', 'uid'))
     ->addField('u', 'mail', 'email');
 
-  if (isset($params['serial'])) {
-    $query->condition('d.serial', $params['serial'], '=');
+  if (isset($filter['user_name'])) {
+    $query->condition('u.name', '%' . $filter['user_name'] . '%', 'LIKE');
   }
 
-  if (isset($params['device'])) {
-    $query->condition('d.device', $params['device'], '=');
+  if (isset($filter['email'])) {
+    $query->condition('u.mail', '%' . $filter['email'] . '%', 'LIKE');
   }
 
-  $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
-  $result = db_query($visitor_sql, array(':name' => 'Visitor'));
-  foreach ($result as $visitor) {
+  if (isset($filter['serial'])) {
+    $query->condition('d.serial', $filter['serial'], '=');
+  }
+
+  if (isset($filter['device'])) {
+    $query->condition('d.device', $filter['device'], '=');
+  }
+
+  $sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
+  $visitors = db_query($sql, array(':name' => 'Visitor'));
+  foreach ($visitors as $visitor) {
     $query->condition('d.uid', $visitor->uid, '<>');
-  }
-
-  //FIXME: pager is still not working
-  if ($page_limit > 1) {
-    $query->extend('PagerDefault')
-      ->limit($page_limit);
-  }
-
-  if ($header) {
-    $query->extend('TableSort')->orderByHeader($header);
   }
 
   $registration_timeout = $now - 3 * DAY;
   $offline_timeout = $now - DAY;
   $communication_timeout = $now - 2 * HOUR;
-  $latest_field = NULL;
-  $state_id_field = NULL;
-  $state_id = isset($params['state_id']) ? $params['state_id'] : '';
+
+  $state_id = isset($filter['state_id']) ? $filter['state_id'] : '';
+  $state_id_field = $state_id;
+  $latest_field = "IF(d.access > 0, d.access, d.created)";
 
   switch ($state_id) {
     case UNINSTALLED_STATE_ID:
@@ -527,14 +531,18 @@ function deployment_query_devices($params = array(), $header = NULL, $page_limit
         )";
   }
 
-  $tzdif = get_timezone_offset() / HOUR;
-  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $state_id_field = $state_id_field ? $state_id_field : $state_id;
-  $latest_field = $latest_field ? $latest_field : "IF(d.access > 0, d.access, d.created)";
-  $latest_field = "CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz')";
-
   $query->addExpression($state_id_field, 'state_id');
   $query->addExpression($latest_field, 'latest');
+
+  //FIXME: pager is still not working
+  if ($page_limit > 1) {
+    $query->extend('PagerDefault')
+      ->limit($page_limit);
+  }
+
+  if ($header) {
+    $query->extend('TableSort')->orderByHeader($header);
+  }
 
   return $query->execute();
 }
@@ -551,12 +559,30 @@ function deployment_listfilter_form($form, &$form_state, $state_id) {
     '#options' => $states,
     '#default_value' => $state_id,
     '#required' => TRUE,
-    '#attributes' => array('onchange' => "document.getElementById('deployment-listfilter-form').submit();"),
+    '#attributes' => array('onchange' => "document.getElementById('deployment-listfilter-form').submit();")
+  );
+
+  $form['user_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t("User name"),
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => FALSE,
+    '#description' => t('Enter part of the user name.')
+  );
+
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => t("E-mail"),
+    '#size' => 40,
+    '#maxlength' => 40,
+    '#required' => FALSE,
+    '#description' => t('Enter part of the user email.')
   );
 
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Filter'),
+    '#value' => t('Filter')
   );
   return $form;
 }
@@ -569,7 +595,7 @@ function deployment_checkup_form($form, &$form_state) {
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => FALSE,
-    '#description' => t('Enter the device serial number you want to check up'),
+    '#description' => t('Enter the device serial number you want to check up')
   );
 
   $form['device'] = array(
@@ -578,12 +604,12 @@ function deployment_checkup_form($form, &$form_state) {
     '#size' => 32,
     '#maxlength' => 32,
     '#required' => FALSE,
-    '#description' => t('Enter the device id you want to check up'),
+    '#description' => t('Enter the device id you want to check up')
   );
 
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t("Check Up"),
+    '#value' => t("Check Up")
   );
   return $form;
 }
@@ -595,12 +621,12 @@ function deployment_printcode_form($form, &$form_state) {
     '#title' => t("Serial"),
     '#size' => 10,
     '#maxlength' => 10,
-    '#description' => t('Enter the serial you want to generate the PDF file for'),
+    '#description' => t('Enter the serial you want to generate the PDF file for')
   );
 
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t("Generate"),
+    '#value' => t("Generate")
   );
   return $form;
 }
@@ -617,7 +643,9 @@ function deployment_checkup_form_validate($form, &$form_state) {
 
 function deployment_listfilter_form_submit($form, &$form_state) {
 
-  $_SESSION['state_id']   = $form_state['values']['state_id'];
+  $_SESSION['state_id'] = $form_state['values']['state_id'];
+  $_SESSION['user_name'] = $form_state['values']['user_name'];
+  $_SESSION['email'] = $form_state['values']['email'];
   $form_state['redirect'] = 'deployment/list';
 }
 
@@ -631,6 +659,8 @@ function deployment_checkup_form_submit($form, &$form_state) {
 }
 
 function deployment_printcode_form_submit($form, &$form_state) {
+
+  //FIXME: update the libraries to D7
 
   $file_name = substr(md5(uniqid(rand(), TRUE)), 0, 10);
   $output_file_path = "/pdf/$file_name.pdf";

@@ -17,10 +17,9 @@ function msgdump_schema() {
         'disp-width' => '11',
       ),
       'meter' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
+        'type' => 'varchar',
+        'length' => '32',
         'not null' => TRUE,
-        'disp-width' => '10',
       ),
       'uid' => array(
         'type' => 'int',
@@ -46,14 +45,10 @@ function msgdump_schema() {
         'not null' => TRUE,
         'default' => '0',
       ),
-      'type' => array(
-        'type' => 'varchar',
-        'length' => '32',
-      ),
     ),
     'primary key' => array(
-      'id',
-    ),
+      'id'
+    )
   );
   return $schema;
 }
@@ -85,5 +80,54 @@ function msgdump_update_7000() {
   // hook_update_N() no longer returns a $ret array. Instead, return
   // nothing or a translated string indicating the update ran successfully.
   // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Changes field msgdump.meter to store sensor ids and not serial numbers. Removes field msgdump.type.
+ */
+function msgdump_update_7001() {
+
+  db_add_field('msgdump', 'new_meter', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => FALSE 
+  ));
+
+  $query = db_select('msgdump', 'p');
+  $query->join('logger_devices', 'd', 'p.meter = d.serial');
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $dumps = $query
+    ->fields('d', array('serial'))
+    ->fields('m', array('meter'))
+    ->condition('m.type', 1, '=')
+    ->isNotNull('m.function')
+    ->execute();
+
+  $output = '';
+  foreach ($dumps as $dump) {
+
+    db_update('msgdump')
+      ->fields(array(
+      'new_meter' =>  $dump->meter
+    ))
+    ->condition('meter', $dump->serial, '=')
+    ->execute();
+
+    $output .= 'Dump request for meter ' . $dump->meter . ' successfully converted. ';
+  }
+ 
+  db_drop_field('msgdump', 'meter');
+  db_drop_field('msgdump', 'type');
+
+  db_change_field('msgdump', 'new_meter', 'meter',
+    array(
+      'type' => 'varchar',
+      'length' => '32',
+      'not null' => TRUE
+  )); 
+
+  $output .= 'Field msgdump.meter has been successfully updated.';
+
+  return $output;
 }
 
