@@ -26,6 +26,7 @@ define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
 
 define('SUMMARY_REPORT_EVENT_ID',          10);
+define('SYSTEM_ERROR_EVENT_ID',            999);
 
 //Message events
 define('MESSAGE_RECEIVED_EVENT_ID',        100);
@@ -263,7 +264,7 @@ function notification_list_page() {
 
     $id = $object->device . '/' . $object->event_id . '/' . $object->limit_up . '/' . $object->unit_id;
 
-    $emails = implode("<br>", notification_tokenize_emails($object->emails));
+    $emails = implode("<br>", tokenize_string($object->emails));
 
     $row = array();
     $row['serial'] = $object->serial;
@@ -716,7 +717,7 @@ function notification_email_validate($field, $form_state) {
 
 function notification_emails_validate($field, $form_state) {
 
-  $emails = notification_tokenize_emails($form_state['values']['emails']);
+  $emails = tokenize_string($form_state['values']['emails']);
 
   if (count($emails) > 10) {
     form_error($field, t('Inform at most 10 e-mails.'));
@@ -799,13 +800,15 @@ function notification_newsletter_form_submit($form, &$form_state) {
 
   $email     = $form_state['values']['email'];
   $firstname = $form_state['values']['firstname'];
-  $surname   = $form_state['values']['surname'];
+  $lastname   = $form_state['values']['lastname'];
 
   $url = 'http://www.eor.de/fileadmin/verwaltung/mysmartgrid.php' .
     '?email=' . urlencode($email) .
     '&firstname=' . urlencode($firstname) .
-    '&surname=' . urlencode($surname);
-  //For testing, include '&test=1'
+    '&surname=' . urlencode($lastname);
+
+  //For testing, uncomment the following line
+  //$url .= '&test=1';
 
   $request = drupal_http_request($url);
   $response = $request->data;
@@ -821,7 +824,7 @@ function notification_newsletter_form_submit($form, &$form_state) {
   else {
     drupal_set_message(t('Our apologies. The newsletter subscription is temporarily unavailable. Please, try again later.'));
 
-    notification_send_system_error_email('newsletter', $response, $url);
+    notification_send_system_error_email('newsletter', $response, urlencode($url));
   }
 }
 
@@ -869,25 +872,6 @@ function notification_edit_event($values) {
   notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
   notification_delete($device, $event_id, $limit_up, $unit_id);
   notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
-}
-
-/**
- * Converts a string containing a list of emails into an array.
- *
- * @param $str  The string containing emails separated by space, new line char, or tab char.
- * @return an array of emails.
- */
-function notification_tokenize_emails($str) {
-
-  $sep = " \n\r";
-  $token = strtok($str, $sep);
-
-  $tokens = array();
-  while ($token !== FALSE) {
-    $tokens[] = trim($token, $sep);
-    $token = strtok($sep);
-  }
-  return $tokens;
 }
 
 /**
@@ -1452,36 +1436,35 @@ function notification_query_notifiables($sql, $args) {
 function notification_send_system_error_email($context, $error_code, $url) {
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
-  $error_descriptions['newsletter']['ERROR_INVALID_DATA'] =
-    'Invalid e-mail address.';
+  $error_descriptions = array(
+    'newsletter' => array(
+      'ERROR_INVALID_DATA' => 'Invalid e-mail address.',
+      'ERROR_INSERT_FAILED' => 'Error while inserting the record in mySQL database.',
+      'ERROR_UPDATE_FAILED' => 'Error while updating the record in mySQL database.'
+    )
+  );
 
-  $error_descriptions['newsletter']['ERROR_INSERT_FAILED'] =
-    'Error while inserting the record in mySQL database.';
+  $description = isset($error_descriptions[$context][$error_code]) ? t($error_descriptions[$context][$error_code]) : '';
 
-  $error_descriptions['newsletter']['ERROR_UPDATE_FAILED'] =
-    'Error while updating the record in mySQL database.';
+  $notifiables = array(
+    array(
+      'event_id' => SYSTEM_ERROR_EVENT_ID,
+      'event_time' => REQUEST_TIME,
+      'emails' => 'notifications@mysmartgrid.de',
+      'url' => $url,
+      'error_code' => $error_code,
+      'description' => $description
+    )
+  );
 
-  $message =
-    "<p>Dear Administrator" .
-    "<br><br></p>" .
+  $message = notification_compose_email(
+    "The following system error has been reported.",
 
-    "<p>The following system error has been reported.</p>" .
-    "<p>Error code: %error_code<br>" .
+    "Error code: %error_code<br>" .
     "Description: %description<br>" .
-    "Related URL: %url</p>" .
+    "Related URL: %url");
 
-    "<p><br>" .
-    "<p>mySmartGrid System</p>";
-
-  $variables['%error_code'] = $error_code;
-  $variables['%description'] = t($error_descriptions[$context][$error_code]);
-  $variables['%url'] = $url;
-
-  $body = t($message, $variables);
-  $subject = t('System Error');
-  $email = 'notifications@mysmartgrid.de';
-
-  notification_send_email($email, $subject, $body);
+  notification_send_emails($message, $notifiables);
 }
 
 /**
@@ -1555,10 +1538,21 @@ function notification_send_emails($message, $notifiables) {
 
   global $base_url;
 
-  $variables = array();
-  $variables["!base_url"] = $base_url;
-  $variables['!logo'] = "<img src='$base_url/sites/all/themes/mysmartgrid/logo.png'/>";
+  $variables = array(
+    '!base_url' => $base_url,
+    '!logo' => "<img src='cid:logo'/>"
+  );
+
   $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
+  $logo = file_get_contents("$base_url/sites/all/themes/mysmartgrid/logo.png");
+  $attachments = array(
+    array(
+      'cid' => 'logo',
+      'file_name' => 'logo.png',
+      'content_type' => 'image/png',
+      'content' => $logo
+    ),
+  );
 
   foreach ($notifiables as $notifiable) {
 
@@ -1591,13 +1585,12 @@ function notification_send_emails($message, $notifiables) {
       "</td></tr></table></p>" .
       "</td></tr></table></body>";
 
-    $emails = $notifiable['emails'];
-    foreach (notification_tokenize_emails($emails) as $email) {
-      notification_send_email($email, $subject, $body);
-    }
+    jobqueue_send_email($notifiable['emails'], $subject, $body, $attachments);
 
-    notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'],
-      array('last_sent' => REQUEST_TIME, 'base_time' => $base_time));
+    if (isset($notifiable['device'])) {
+      notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'],
+        array('last_sent' => REQUEST_TIME, 'base_time' => $base_time));
+    }
   }
 }
 
@@ -1630,74 +1623,5 @@ function notification_query_peak_consumption_violations($notifiable) {
     }
   }
   return $list ? array('timestamp' => $timestamp, 'list' => $list) : NULL;
-}
-
-/**
- * Sends a notification e-mail.
- *
- * @param $email    The e-mail address.
- * @param $subject  The e-mail subject.
- * @param $body     The e-mail body.
- */
-function notification_send_email($email, $subject, $body) {
-
-  global $language;
-
-  $body = "--nextPart_0000_001\n" .
-    "Content-Type: text/plain; charset=\"UTF-8\"\n" .
-    "Content-Transfer-Encoding: 8bit\n" .
-    "\n" .
-    notification_html2txt($body) .
-    "\n" .
-    "--nextPart_0000_001\n" .
-    "Content-Type: text/html; charset=\"UTF-8\"\n" .
-    "Content-Transfer-Encoding: quoted-printable\n" .
-    "\n" .
-    $body;
-
-  $header = "Content-Type: multipart/alternative; boundary=\"nextPart_0000_001\"";
-  $emailstring = "Header::" . $header . "|From::mySmartGrid <noreply@mysmartgrid.de>|To::" . $email . "|Subject::" . $subject . "|Body::" . $body;
-  $emailstring = base64_encode($emailstring);
-
-  // Needs the qworker running, add control mechanism in order to check and restart if not running
-  jobqueue_produce("mail", $emailstring);
-}
-
-/**
- * Converts HTML code into plain text.
- *
- * @param $html  The HTML code.
- * @return the plain text.
- */
-function notification_html2txt($html) {
-
-  $html = html_entity_decode($html, ENT_COMPAT, 'UTF-8');
-
-  //remove style tags. m = PCRE_MULTILINE, s = PCRE_DOTALL
-  $text = preg_replace("/<style.*?<\/style>/ms", "", $html);
-
-  //find link tags ..
-  $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
-    //.. and replace them with the actual link
-    create_function('$treffer',
-      'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $link);
-       preg_match("/(<a.*?>(.*?)<\/a.*?>)/", $treffer[1], $txt);
-       return $txt[1] . " \'" . $link[1] . "\'";'
-    ),
-    $text);
-
-  //replace <br> and </p> with linebreaks
-  $text = preg_replace("/<br.*?>/", "\n", $text);
-  $text = preg_replace("/<\/p>/", "\n\n", $text);
-
-  //replace list items with *
-  $text = preg_replace("/<li.*?>/", "* ", $text);
-
-  $text = preg_replace("/<\/tr>/", "\n", $text);
-  $text = preg_replace("/<\/th>/", "\t", $text);
-  $text = preg_replace("/<\/td>/", "\t", $text);
-
-  //remove all other tags
-  return preg_replace("/<.*?>/", "", $text);
 }
 

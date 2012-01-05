@@ -167,19 +167,12 @@ function notification_install() {
   global $user;
 
   drupal_set_message(st('Created notification module tables.'));
-  
+ 
   //event
   db_insert('event')
     ->fields(array(
       'id' => 1,
       'name' => 'No Communication',
-    ))
-    ->execute();
-
-  db_insert('event')
-    ->fields(array(
-      'id' => 2,
-      'name' => 'Corrupted Message',
     ))
     ->execute();
 
@@ -199,22 +192,29 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
-      'id' => 5,
-      'name' => 'Brownout',
-    ))
-    ->execute();
-
-  db_insert('event')
-    ->fields(array(
-      'id' => 6,
+      'id' => 101,
       'name' => 'Heartbeat Received',
     ))
     ->execute();
 
   db_insert('event')
     ->fields(array(
-      'id' => 7,
+      'id' => 102,
       'name' => 'Measurement Received',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 103,
+      'name' => 'Corrupted Message',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 104,
+      'name' => 'Brownout',
     ))
     ->execute();
 
@@ -222,6 +222,13 @@ function notification_install() {
     ->fields(array(
       'id' => 10,
       'name' => 'Summary Report',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 999,
+      'name' => 'System Error',
     ))
     ->execute();
 
@@ -315,13 +322,6 @@ function notification_install() {
 
   db_insert('event_unit')
     ->fields(array(
-      'event_id' => 2,
-      'unit_id' => 0,
-    ))
-    ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
       'event_id' => 3,
       'unit_id' => 0,
     ))
@@ -343,21 +343,28 @@ function notification_install() {
 
   db_insert('event_unit')
     ->fields(array(
-      'event_id' => 5,
+      'event_id' => 101,
       'unit_id' => 0,
     ))
     ->execute();
 
   db_insert('event_unit')
     ->fields(array(
-      'event_id' => 6,
+      'event_id' => 102,
       'unit_id' => 0,
     ))
     ->execute();
 
   db_insert('event_unit')
     ->fields(array(
-      'event_id' => 7,
+      'event_id' => 103,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 104,
       'unit_id' => 0,
     ))
     ->execute();

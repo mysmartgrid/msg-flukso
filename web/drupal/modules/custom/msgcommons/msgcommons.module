@@ -67,6 +67,82 @@ function jobqueue_produce($algorithm, $data) {
 }
 
 /**
+ * Sends an e-mail via the job queue system.
+ *
+ * @param $emails       The e-mail destinatary addresses, separated by space, new line char, or tab char.
+ * @param $subject      The e-mail subject.
+ * @param $body         The e-mail body.
+ * @param $attachments  The e-mail attachments (optional).
+ * @param $from         The e-mail sender address (optional).
+ */
+function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $from = 'mySmartGrid <noreply@mysmartgrid.de>') {
+
+  foreach (tokenize_string($emails) as $to) {
+
+    $main_boundary = "email_part_boundary";
+    $alternative_boundary = "email_alternative_boundary";
+
+    $main_header = "Content-Type: multipart/related; boundary=\"$main_boundary\"";
+
+    $parts =
+      "--$main_boundary\n" .
+      "Content-Type: multipart/alternative; boundary=\"$alternative_boundary\"\n\n" .
+
+      "--$alternative_boundary\n" .
+      "Content-Type: text/plain; charset=\"UTF-8\"\n" .
+      "Content-Transfer-Encoding: 8bit\n" .
+      "\n" .
+      html2txt($body) . "\n" .
+
+      "--$alternative_boundary\n" .
+      "Content-Type: text/html; charset=\"UTF-8\"\n" .
+      "Content-Transfer-Encoding: quoted-printable\n" .
+      "\n" .
+      $body . "\n" .
+
+      "--$alternative_boundary--\n";
+
+    foreach ($attachments as $attachment) {
+
+      $parts .=
+        "--$main_boundary\n" .
+        "Content-Type: " . $attachment['content_type'] . "\n" .
+        "Content-ID: " . $attachment['cid'] . "\n" .
+        "Content-Disposition: attachment;\n" .
+        " filename=" . $attachment['file_name'] . "\n" .
+        "Content-Transfer-Encoding: base64\n" .
+        "\n" .
+        base64_encode($attachment['content']) . "\n";
+    }
+    $parts .= "--$main_boundary--";
+
+    $mail = base64_encode("Header::$main_header|From::$from|To::$to|Subject::$subject|Body::$parts");
+
+    // Needs the qworker running, add control mechanism in order to check and restart if not running
+    jobqueue_produce("mail", $mail);
+  }
+}
+
+/**
+ * Converts a string containing a list of tokens into an array.
+ *
+ * @param $str  The string containing the tokens.
+ * @param $sep  The token separators. Default: space, new line char, or tab char.
+ * @return an array of tokens.
+ */
+function tokenize_string($str, $sep = " \n\r") {
+
+  $token = strtok($str, $sep);
+
+  $tokens = array();
+  while ($token !== FALSE) {
+    $tokens[] = trim($token, $sep);
+    $token = strtok($sep);
+  }
+  return $tokens;
+}
+
+/**
  * Downloads a chart data file.
  */
 function download_chart_data_file($file_name, $header, $lines) {
@@ -270,4 +346,42 @@ function get_role_id($name) {
     ->condition('r.name', $name, '=')
     ->execute()
     ->fetchField();
+}
+
+/**
+ * Converts HTML code into plain text.
+ *
+ * @param $html  The HTML code.
+ * @return the plain text.
+ */
+function html2txt($html) {
+
+  $html = html_entity_decode($html, ENT_COMPAT, 'UTF-8');
+
+  //remove style tags. m = PCRE_MULTILINE, s = PCRE_DOTALL
+  $text = preg_replace("/<style.*?<\/style>/ms", "", $html);
+
+  //find link tags ..
+  $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
+    //.. and replace them with the actual link
+    create_function('$treffer',
+      'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $link);
+       preg_match("/(<a.*?>(.*?)<\/a.*?>)/", $treffer[1], $txt);
+       return $txt[1] . " \'" . $link[1] . "\'";'
+    ),
+    $text);
+
+  //replace <br> and </p> with linebreaks
+  $text = preg_replace("/<br.*?>/", "\n", $text);
+  $text = preg_replace("/<\/p>/", "\n\n", $text);
+
+  //replace list items with *
+  $text = preg_replace("/<li.*?>/", "* ", $text);
+
+  $text = preg_replace("/<\/tr>/", "\n", $text);
+  $text = preg_replace("/<\/th>/", "\t", $text);
+  $text = preg_replace("/<\/td>/", "\t", $text);
+
+  //remove all other tags
+  return preg_replace("/<.*?>/", "", $text);
 }

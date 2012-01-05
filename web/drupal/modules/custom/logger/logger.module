@@ -39,7 +39,7 @@ function logger_init() {
   global $_SERVER;
 
   //If IE
-  if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
+  if (isset($_SERVER['HTTP_USER_AGENT']) && strpos( strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
     drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
   }
 
