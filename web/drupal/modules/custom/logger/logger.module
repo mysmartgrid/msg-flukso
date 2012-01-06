@@ -1707,34 +1707,15 @@ function logger_block_view($delta) {
   return $block;
 }
 
-function logger_form_contact_mail_page_alter(&$form, $form_state) {
-
-  $devices = logger_get_devices_options();
-  $options = array_flip($devices);
-
-  //Adds the list of user devices on the contact form as a hidden field.
-  $form['devices'] = array(
-    '#type' => 'select',
-    '#options' => $options,
-    '#default_value' => array_keys($options),
-    '#multiple' => TRUE,
-    '#size' => 1,
-    '#attributes' => array('style' => 'visibility:hidden;'),
-  );
-}
-
 function logger_mail_alter(&$message) {
 
+  global $base_url;
+
   switch ($message['id']) {
-
     case 'contact_page_mail':
-      $devices = $message['params']['devices'];
 
-      if (count($devices) > 0) {
-        
-        //Completes the user contact email with his list of devices
-        $message['body'][] = t("User Devices:") . implode(', ', $devices);
-      }
+      //Completes the user contact e-mail with a link to his list of devices
+      $message['body'][] = l(t("User Devices:"), "$base_url/deployment/list?user_name=" . $message['params']['name']);
       break;
   }
 }

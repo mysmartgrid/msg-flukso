@@ -63,7 +63,6 @@ function deployment_menu() {
   $items['deployment/list'] = array(
     'title' => 'Device List',
     'page callback' => 'deployment_list_page',
-    'page arguments' => array(2, 3, 4),
     'access arguments' => array('device deployment overview'),
     'type' => MENU_NORMAL_ITEM,
   );
@@ -185,49 +184,46 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 
 /**
  * Builds the device list page.
- *
- * @param $id The device id (optional).
- * @param $user_name The user name (optional).
- * @param $email Part of the user email (optional).
+ * The page expects the following optional request parameters:
+ *   state_id   The state id.
+ *   user_name  The user name.
+ *   email      Part of the user email.
  * @return the device list page.
  */
-function deployment_list_page($id = NULL, $user_name = NULL, $email = NULL) {
+function deployment_list_page() {
 
   drupal_set_title(t('Device List'));
-
-  $state_id = $id > 0 ? $id : isset($_SESSION['state_id']) ? $_SESSION['state_id'] : 0;
-  $user_name = $user_name ? $user_name : isset($_SESSION['user_name']) ? $_SESSION['user_name'] : NULL;
-  $email = $email ? $email : isset($_SESSION['email']) ? $_SESSION['email'] : NULL;
-
-  $form = drupal_get_form('deployment_listfilter_form', $state_id);
-  $output = drupal_render($form);
 
   $header = array(
     array(
       'data' => t('Serial'),
       'field' => 'serial',
-      'sort' => 'asc',
+      'sort' => 'asc'
     ),
     array(
       'data' => t('Device Id'),
-      'field' => 'device',
+      'field' => 'device'
     ),
     array(
       'data' => t('User'),
-      'field' => 'name',
+      'field' => 'name'
     ),
     array(
       'data' => t('E-mail'),
-      'field' => 'email',
+      'field' => 'email'
     ),
     array(
       'data' => t('Latest Update'),
-      'field' => 'latest',
+      'field' => 'latest'
     ),
-    array('data' => t('State')),
+    array('data' => t('State'))
   );
 
   $page_limit = 20;
+  $state_id = isset($_REQUEST['state_id']) ? $_REQUEST['state_id'] : 0;
+  $user_name = isset($_REQUEST['user_name']) ? $_REQUEST['user_name'] : NULL;
+  $email = isset($_REQUEST['email']) ? $_REQUEST['email'] : NULL;
+
   $filter = array('state_id' => $state_id, 'user_name' => $user_name, 'email' => $email);
 
   $data = deployment_get_devices($filter, $header, $page_limit);
@@ -241,14 +237,17 @@ function deployment_list_page($id = NULL, $user_name = NULL, $email = NULL) {
   }
   $_SESSION['deployment_list_lines'] = $data;
 
-  $output .= theme_table(array('header' => $header, 'rows' => $data, 'attributes' => array(),
+  $form = drupal_get_form('deployment_listfilter_form', $state_id, $user_name, $email);
+
+  return 
+    drupal_render($form) .
+
+    theme_table(array('header' => $header, 'rows' => $data, 'attributes' => array(),
     'caption' => '', 'colgroups' => array(), 'sticky' => TRUE, 'empty' => '')) .
 
     theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => ceil(sizeof($data)/$page_limit))) .
 
     '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
-
-  return $output;
 }
 
 /**
@@ -547,7 +546,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   return $query->execute();
 }
 
-function deployment_listfilter_form($form, &$form_state, $state_id) {
+function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, $email) {
 
   $states = deployment_get_all_states();
   $states[0] = t('All');
@@ -567,6 +566,7 @@ function deployment_listfilter_form($form, &$form_state, $state_id) {
     '#title' => t("User name"),
     '#size' => 30,
     '#maxlength' => 30,
+    '#default_value' => $user_name,
     '#required' => FALSE,
     '#description' => t('Enter part of the user name.')
   );
@@ -576,6 +576,7 @@ function deployment_listfilter_form($form, &$form_state, $state_id) {
     '#title' => t("E-mail"),
     '#size' => 40,
     '#maxlength' => 40,
+    '#default_value' => $email,
     '#required' => FALSE,
     '#description' => t('Enter part of the user email.')
   );
@@ -643,10 +644,12 @@ function deployment_checkup_form_validate($form, &$form_state) {
 
 function deployment_listfilter_form_submit($form, &$form_state) {
 
-  $_SESSION['state_id'] = $form_state['values']['state_id'];
-  $_SESSION['user_name'] = $form_state['values']['user_name'];
-  $_SESSION['email'] = $form_state['values']['email'];
-  $form_state['redirect'] = 'deployment/list';
+  $form_state['redirect'] = array('deployment/list', array(
+    'query' => array(
+      'state_id' => $form_state['values']['state_id'],
+      'user_name' => $form_state['values']['user_name'],
+      'email' => $form_state['values']['email']
+  )));
 }
 
 function deployment_checkup_form_submit($form, &$form_state) {
