@@ -72,6 +72,10 @@ function logger_permission() {
       'title' => t('list devices'),
       'description' => t('Access the list of user devices.'),
     ),
+    'activate devices' => array(
+      'title' => t('activate devices'),
+      'description' => t('Activate a device.'),
+    ),
     'deactivate devices' => array(
       'title' => t('deactivate devices'),
       'description' => t('Deactivate a device.'),
@@ -190,6 +194,16 @@ function logger_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
     'weight' => 3,
+  );
+
+  $items['device/activate'] = array(
+    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'page callback' => 'logger_device_activate',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('activate devices', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc',
   );
 
   $items['device/deactivate'] = array(
@@ -328,6 +342,24 @@ function logger_menu() {
     'weight' => 2,
   );
   return $items;
+}
+
+function user_menu_alter(&$items) {
+  //Overrides access control to manage visitor's permissions
+  $items['user/%user/edit']['access callback'] = 'logger_user_edit_access';
+}
+
+/**
+ * This function overrides user_edit_access to block user profile edition by visitors (such as the user "guest").
+ * 
+ * @param $account The user account.
+ */
+function logger_user_edit_access($account) {
+
+  global $user;
+
+  $rid = get_role_id('Visitor');
+  return empty($user->roles[$rid]) && user_edit_access($account);
 }
 
 /**
@@ -2566,16 +2598,18 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
 }
 
 function logger_account_access($permission, $account) {
-  global $GLOBALS;
 
-  return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
+  return $account->uid == $GLOBALS['user']->uid && user_access($permission);
 }
 
 /**
  * Access callback ensuring the sensor is accessible only to the owner.
  */
 function logger_sensor_access($permission, $meter) {
-  global $GLOBALS;
+
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
 
   $uid = db_select('logger_meters', 'm')
     ->fields('m', array('uid'))
@@ -2590,7 +2624,6 @@ function logger_sensor_access($permission, $meter) {
  * Access callback ensuring the device is accessible only to the owner.
  */
 function logger_device_access($permission, $device) {
-  global $GLOBALS;
 
   if ($GLOBALS['user']->uid == 1) {
     return TRUE;

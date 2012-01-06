@@ -265,74 +265,7 @@ function logger_sensor_form_validate($form, &$form_state) {
 
 function logger_deviceactivation_form_submit($form, &$form_state) {
 
-  global $user;
-
-  $code = $form_state['values']['code'];
-
-  db_update('logger_devices')
-    ->fields(array(
-      'uid' => $user->uid,
-    ))
-    ->condition('device', "$code%", 'LIKE')
-    ->execute();
-
-  $sensors = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'function'))
-    ->condition('m.device', "$code%", 'LIKE')
-    ->execute();
-
-  $i = 2;
-  foreach ($sensors as $sensor) {
-
-    $function = $sensor->function;
-
-    //Find an unique name for 'function'
-    while ($function && !logger_sensor_function_validate($function, $sensor->meter)) {
-      $function = "Sensor $i";
-      $i++;
-    }
-
-    if ($function) {
-      db_update('logger_meters')
-      ->fields(array(
-        'uid' => $user->uid,
-        'function' => $function,
-      ))
-      ->condition('meter', $sensor->meter)
-      ->execute();
-    }
-    else {
-        
-      db_update('logger_meters')
-        ->fields(array(
-          'function' => $function,
-        ))
-        ->condition('meter', $sensor->meter)
-        ->execute();
-    }
-  }
-
-  $rid = get_role_id('fluksonian');
-
-  // check whether the user is already a true fluksonian
-  // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (empty($user->roles[$rid])) {
-
-    db_insert('users_roles')
-      ->fields(array(
-        'uid' => $user->uid,
-        'rid' => $rid
-      ))
-      ->execute();
-    
-    db_insert('logger_users')
-      ->fields(array(
-        'uid' => $user->uid,
-        'private' => 0
-      ))
-      ->execute();
-  }
-  drupal_set_message(t("The device is now associated with your account."));
+  $form_state['redirect'] = 'device/activate/' . $form_state['values']['code'];
 }
 
 function logger_sensor_form_submit($form, &$form_state) {
@@ -367,6 +300,81 @@ function logger_userprivacy_form_submit($form, &$form_state) {
 
   // page redirection to the home page after form submission
   $form_state['redirect'] = 'logger';
+}
+
+/**
+ * Associates a device with the authenticated user.
+ *
+ * @param $code  The activation code.
+ */
+function logger_device_activate($code) {
+
+  global $user;
+
+  db_update('logger_devices')
+    ->fields(array(
+      'uid' => $user->uid,
+    ))
+    ->condition('device', "$code%", 'LIKE')
+    ->execute();
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'function'))
+    ->condition('m.device', "$code%", 'LIKE')
+    ->execute();
+
+  $i = 2;
+  foreach ($sensors as $sensor) {
+
+    $function = $sensor->function;
+
+    //Find an unique name for 'function'
+    while ($function && !logger_sensor_function_validate($function, $sensor->meter)) {
+      $function = "Sensor $i";
+      $i++;
+    }
+
+    if ($function) {
+      db_update('logger_meters')
+      ->fields(array(
+        'uid' => $user->uid,
+        'function' => $function,
+      ))
+      ->condition('meter', $sensor->meter)
+      ->execute();
+    }
+    else {
+
+      db_update('logger_meters')
+        ->fields(array(
+          'function' => $function,
+        ))
+        ->condition('meter', $sensor->meter)
+        ->execute();
+    }
+  }
+
+  $rid = get_role_id('fluksonian');
+
+  // check whether the user is already a true fluksonian
+  // if not, generate the proper entries in {users_roles} and {logger_users}
+  if (empty($user->roles[$rid])) {
+
+    db_insert('users_roles')
+      ->fields(array(
+        'uid' => $user->uid,
+        'rid' => $rid
+      ))
+      ->execute();
+
+    db_insert('logger_users')
+      ->fields(array(
+        'uid' => $user->uid,
+        'private' => 0
+      ))
+      ->execute();
+  }
+  drupal_set_message(t("The device is now associated with your account."));
 }
 
 /**
