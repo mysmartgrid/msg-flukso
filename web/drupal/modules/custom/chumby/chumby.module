@@ -60,7 +60,7 @@ function chumby_menu() {
     'page callback' => 'chumby_image_page',
     'page arguments' => array(1, 2, 3),
     'access callback' => 'chumby_device_access',
-    'access arguments' => array('chumby image', 2),
+    'access arguments' => array('chumby image'),
     'type' => MENU_NORMAL_ITEM
   );
 
@@ -269,7 +269,7 @@ function chumby_image_form_submit($form, &$form_state) {
   rrmdir($tmp_path);
 
   if ($success) {
-    $form_state['redirect'] = "chumby/image/$image_id/$sensor->serial/$sensor->function";
+    $form_state['redirect'] = "chumby/$image_id/$sensor->serial/$sensor->function";
   }
   else {
     drupal_set_message(t("Operation failed! Please try again later!"));
@@ -289,15 +289,7 @@ function chumby_create_daemon_config($params, $sensor, $tmp_path) {
   $daemonconfig = fopen($tmp_path . '/daemonconfig.lua', 'w');
   if ($daemonconfig) {
 
-    //If version 2
-    if ($sensor->serial > 100000000) {
-      $params['port'] = 8080;
-      $params['service'] = '_flukso._tcp';
-    } else {
-      $params['port'] = 80;
-      $params['service'] = '_flukso-realtime._tcp';
-    }
-
+    $params['version'] = $sensor->serial > 100000000 ? 2 : 1;
     $params['ip'] = isset($params['auto']) ? '' : $params['ip'];
     $params['token'] = $sensor->token;
 
@@ -353,7 +345,9 @@ function chumby_download_file($image_id) {
   drupal_add_http_header('Content-disposition', "attachment; filename=chumby-image.zip");
 
   $file_path = CHUMBY_PATH . "/files/$image_id.zip";
-  readfile($file_path, FALSE, $content);
+  $handle = fopen($file_path, "r");
+  $content = fread($handle, filesize($file_path));
+  fclose($handle);
 
   print $content;
   exit(0);

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION=20120102 			#current version
+VERSION=20120109 			#current version
 COPYUSR=0				#copy /mnt/storage/usr
 
 SRC_PATH=/mnt/usb

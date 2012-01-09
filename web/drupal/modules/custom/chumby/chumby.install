@@ -62,7 +62,7 @@ function chumby_install() {
       'id' => 2,
       'name' => 'Power Meter',
       'description' => 'Shows the current power consumption in a power meter.',
-      'directory' => 'last-reading',
+      'directory' => 'last_reading',
       'movie' => 'energietacho'
     ))
     ->execute();
@@ -72,7 +72,7 @@ function chumby_install() {
       'id' => 3,
       'name' => 'Light Bulb',
       'description' => 'Shows the current power consumption in a light bulb.',
-      'directory' => 'last-reading',
+      'directory' => 'last_reading',
       'movie' => 'Gluehlampe'
     ))
     ->execute();
@@ -82,7 +82,7 @@ function chumby_install() {
       'id' => 4,
       'name' => 'Power Graph',
       'description' => 'Shows the current power consumption i an area chart.',
-      'directory' => 'last-reading',
+      'directory' => 'last_reading',
       'movie' => 'EnergyGraph'
     ))
     ->execute();

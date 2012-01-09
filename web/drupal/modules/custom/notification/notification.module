@@ -306,9 +306,9 @@ function notification_eventlog_page($device) {
     ->fields('l', array('time'))
     ->condition('l.device', $device, '=')
     ->orderBy('l.time', 'DESC');
-
   $query->join('event', 'e', 'e.id = l.event_id');
   $query->addField('e', 'name');
+
   $entries = $query->execute();
 
   $rows = array();
@@ -349,13 +349,24 @@ function notification_eventlog_clear($device) {
 }
 
 /**
- * Removes log entries older than 3 days.
+ * Removes log entries older than 3 days since last device event.
  */
 function notification_eventlog_clear_old() {
 
-  db_delete('event_log')
-    ->condition('time', REQUEST_TIME - (3 * DAY), '<')
-    ->execute();
+  $query = db_select('event_log', 'l')
+    ->fields('l', array('device'))
+    ->groupBy('l.device');
+  $query->addExpression('MAX(l.time)', 'last_time');
+
+  $logs = $query->execute();  
+
+  foreach ($logs as $log) {
+
+    db_delete('event_log')
+      ->condition('device', $log->device, '=')
+      ->condition('time', $log->last_time - 3 * DAY, '<')
+      ->execute();
+  }
 }
 
 /**
