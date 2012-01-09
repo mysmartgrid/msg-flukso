@@ -2848,9 +2848,22 @@ ul.links li a {
   text-decoration: underline;
 }
 
-/* Forum (24/08/2010) */
+div.links {
+  text-align: right;
+}
 
-li.comment_delete a, li.comment_edit a, li.comment_reply a, li.mollom_comment_report a {
+div.submitted {
+  padding-bottom: 10px;
+}
+
+/* Forum */
+
+div.comment-links ul, li {
+  list-style: none;
+  display: inline;
+}
+
+li.comment-delete a, li.comment-edit a, li.comment-reply a, li.mollom-comment-report a {
   border-left: 1px solid #aaa;
   border-right: 1px solid #aaa;
   border-bottom: 1px solid #aaa;
@@ -2858,36 +2871,46 @@ li.comment_delete a, li.comment_edit a, li.comment_reply a, li.mollom_comment_re
   margin-right: 5px;
   padding-right:5px;
   padding-left:5px;
-  list-style: none;
   text-decoration: none;
   white-space: nowrap;
   background-color: #E9EDEB;
 }
 
-div.comment-published {
-  padding: 0px;
+div.comment-submitted {
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-bottom: 10px;
+  padding-top: 10px;
   margin: 0px;
+  border-top: 1px solid #aaa;
+  border-left: 1px solid #aaa;
+  border-right: 1px solid #aaa;
+}
+
+div.comment-submitted a {
+  text-decoration: none;
 }
 
 div.comment-content {
+  padding-top: 0px;
+  padding-bottom: 0px;
+  padding-left: 10px;
+  padding-right: 10px;
+  margin: 0px;
   border-left: 1px solid #aaa;
   border-right: 1px solid #aaa;
-  padding: 10px;
+  border-bottom: 1px solid #aaa;
+}
+
+div.comment {
+  margin-top: 20px;
 }
 
 div.comment-links {
   text-align: right;
-  border-top: 1px solid #aaa;
   padding: 0px;
 }
 
-div.comment-author {
-  border-top: 1px solid #aaa;
-  border-left: 1px solid #aaa;
-  border-right: 1px solid #aaa;
-  text-align: left;
-  padding: 10px;
-}
 
 /* Chart */
 

@@ -11,7 +11,9 @@
   <?php print render($title_suffix); ?>
 
   <?php if ($display_submitted): ?>
-    <span class="submitted"><?php print $submitted ?></span>
+    <div class="submitted">
+      <span><?php print $submitted ?></span>
+    </div>
   <?php endif; ?>
 
   <div class="content clearfix"<?php print $content_attributes; ?>>

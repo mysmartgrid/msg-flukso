@@ -14,8 +14,12 @@
  * @see theme_forums()
  */
 ?>
+<?php global $user; ?>
 <?php if ($forums_defined): ?>
 <div id="forum">
+  <?php if ($user->uid): ?>
+  <p><?php print l(t('Create Forum Topic'), 'node/add/forum/0'); ?></p>
+  <?php endif; ?>
   <?php print $forums; ?>
   <?php print $topics; ?>
 </div>

@@ -3,18 +3,15 @@
 
 <div id="page">
 
-  <?php print render($page['header']); ?>
-
   <div id="header">
     <div class="wrapper">
       <a href="<?php print $front_page ?>"><img src="<?php print $logo ?>" id="logo" /></a>
 
       <div class="section">
-        <?php if ($header != ""): ?><div id="header"><?php print $header ?></div><?php endif; ?>
+        <?php print render($page['header']); ?>
       </div>
     </div>
   </div>
-
 
   <div id="doc">
     <img src="/<?php print path_to_theme(); ?>/images/doc-bg.jpg" id="doc-bg" alt="" width="997" height="400" />
