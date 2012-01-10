@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Tests for msgcommons.module.
+ */
+
+class MSGCommonsTestCase extends DrupalWebTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => 'MSG Commons functionality',
+      'description' => 'Test mySmartGrid common functions.',
+      'group' => 'mySmartGrid'
+    );
+  }
+
+  /**
+   * Tests string tokenizing.
+   */
+  function testTokenizeString() {
+
+    $string = "token1 token2 token3";
+    $tokens = tokenize_string($string);
+
+    $this->assertEqual(3, sizeof($tokens));
+  }
+}
