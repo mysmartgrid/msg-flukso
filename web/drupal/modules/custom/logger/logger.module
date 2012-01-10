@@ -36,8 +36,6 @@ define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
 
 function logger_init() {
 
-  global $_SERVER;
-
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos( strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
     drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
@@ -437,7 +435,7 @@ function logger_create_mobile_page_icon($image, $label, $target) {
   return '
     <div class="menu-icon">
       <a href="' . $target . '">
-        <img src="/sites/all/themes/msgmobile/img/icons/' . $image . '"/>
+        <img src="/sites/all/themes/msgmobile/images/icons/' . $image . '"/>
         <span>' . $label . '</span>
       </a>
     </div> ';

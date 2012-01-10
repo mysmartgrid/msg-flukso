@@ -1,308 +1,175 @@
 <?php
 
 /**
- * Core functions for the msgmobile Mobile theme.
+ * Return a themed breadcrumb trail.
  *
- * Copyright (c) 2010 flukso.net
- *               2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * @param $breadcrumb
+ *   An array containing the breadcrumb links.
+ * @return a string containing the breadcrumb output.
  */
+function msgmobile_breadcrumb($variables) {
+  $breadcrumb = $variables['breadcrumb'];
 
-/**
- * Add a prefix to the terms list and insert a separateor between them.
- *
- * @param $terms The pre-rendered HTML string containing the term list
- *        elements.
- * @param $prefix The text to show before the list of terms. By default the
- *        output of t('Tags: ') is used.
- * @param $separator The character(s) to place between the terms. By default,
- * 		  the output of t(', ') is used.
- *
- * @return The modified HTML.
- */
-function msgmobile_separate_terms($terms, $prefix = NULL, $separator = NULL) {
+  if (!empty($breadcrumb)) {
+    // Provide a navigational heading to give context for breadcrumb links to
+    // screen-reader users. Make the heading invisible with .element-invisible.
+    $output = '<h2 class="element-invisible">' . t('You are here') . '</h2>';
 
-  $prefix    = ($prefix == NULL) ? t('Tags: ') : $prefix;
-  $separator = ($separator == NULL) ? t(', ') : $separator;
-  $output    = $prefix . preg_replace('!a></li>\s<li!',
-                                      "a>{$separator}</li>\n<li", $terms);
-  return $output;
-}
-
-/**
- * Insert a separator between items in the list of links for a node.
- *
- * @param $links The pre-rendered HTML string containing the link list
- *        elements.
- * @param $separator character(s) to place between the links. By default, the
- *        output of t(' | ') is used.
- *
- * @return The modified HTML.
- */
-function msgmobile_separate_links($links, $separator = ' | ') {
-
-  $separator = ($separator == NULL) ? t(' | ') : $separator;
-  $output    = preg_replace('!a></li>\s<li!',
-                            "a>{$separator}</li>\n<li", $links);
-  return $output;
-}
-
-/**
- * Preprocess the nodes.
- *
- * @param &$vars The template variables array. After invoking this function,
- *        these keys will be added to $vars:
- *        - 'msgmobile_node_author' - The node's "posted by" text and author
- *          link.
- *        - 'msgmobile_node_class' - The CSS classes to apply to the node.
- *        - 'msgmobile_node_links' - The node links with a separator placed
- *          between each.
- *        - 'msgmobile_perma_title' - The localized permalink text for the node.
- *        - 'msgmobile_node_timestamp' - The timestamp for this type, if one
- *          should be rendered for this type.
- *        - 'msgmobile_term_links' - The taxonomy links with a separator placed
- *          between each.
- */
-function msgmobile_preprocess_node(&$vars) {
-
-  $node = $vars['node'];
-  
-  $vars['msgmobile_node_class']  =
-    'node ' . ($node->sticky ? 'sticky ' : '') .
-    ($node->status ? '' : ' node-unpublished') .
-    ' node-' . $node->type .
-    ($teaser ? ' teaser' : '') . ' clear-block';
-
-  $vars['msgmobile_term_links']  = msgmobile_separate_terms($vars['terms']);
-  $vars['msgmobile_node_links']  = msgmobile_separate_links($vars['links']);
-  $vars['msgmobile_perma_title'] = t('Permanent Link to !title', array('!title' => $vars['title']));
-
-  //Node authorship.
-  if (!empty($vars['submitted'])) {
-    $vars['msgmobile_node_author'] = t('Posted by !author', array('!author' => $vars['name']));
-  }
-
-  //Timestamp for this type?
-  if (!empty($vars['submitted']) && isset($node->created)) {
-    $vars['msgmobile_node_timestamp'] = format_date($node->created, 'custom', t('d M Y'));
+    $output .= '<div class="breadcrumb">' . implode(' › ', $breadcrumb) . '</div>';
+    return $output;
   }
 }
 
 /**
- * Preprocess the pages.
- *
- * @param &$vars The template variables array. After invoking this function,
- *        no page title will be displayed on /node/x pages.
+ * Override or insert variables into the maintenance page template.
+ */
+function msgmobile_preprocess_maintenance_page(&$vars) {
+  // While markup for normal pages is split into page.tpl.php and html.tpl.php,
+  // the markup for the maintenance page is all in the single
+  // maintenance-page.tpl.php template. So, to have what's done in
+  // msgmobile_preprocess_html() also happen on the maintenance page, it has to be
+  // called here.
+  msgmobile_preprocess_html($vars);
+}
+
+/**
+ * Override or insert variables into the html template.
+ */
+function msgmobile_preprocess_html(&$vars) {
+  // Toggle fixed or fluid width.
+  if (theme_get_setting('msgmobile_width') == 'fluid') {
+    $vars['classes_array'][] = 'fluid-width';
+  }
+}
+
+/**
+ * Override or insert variables into the html template.
+ */
+function msgmobile_process_html(&$vars) {
+  // Hook into color.module
+  if (module_exists('color')) {
+    _color_html_alter($vars);
+  }
+}
+
+/**
+ * Override or insert variables into the page template.
  */
 function msgmobile_preprocess_page(&$vars) {
+  // Move secondary tabs into a separate variable.
+  $vars['tabs2'] = array(
+    '#theme' => 'menu_local_tasks',
+    '#secondary' => $vars['tabs']['#secondary'],
+  );
+  unset($vars['tabs']['#secondary']);
 
-  if (substr($_GET['q'], 0, 4) == 'node') {
-    $vars['title'] = ''; 
+  if (isset($vars['main_menu'])) {
+    $vars['primary_nav'] = theme('links__system_main_menu', array(
+      'links' => $vars['main_menu'],
+      'attributes' => array(
+        'class' => array('links', 'inline', 'main-menu'),
+      ),
+      'heading' => array(
+        'text' => t('Main menu'),
+        'level' => 'h2',
+        'class' => array('element-invisible'),
+      )
+    ));
+  }
+  else {
+    $vars['primary_nav'] = FALSE;
+  }
+  if (isset($vars['secondary_menu'])) {
+    $vars['secondary_nav'] = theme('links__system_secondary_menu', array(
+      'links' => $vars['secondary_menu'],
+      'attributes' => array(
+        'class' => array('links', 'inline', 'secondary-menu'),
+      ),
+      'heading' => array(
+        'text' => t('Secondary menu'),
+        'level' => 'h2',
+        'class' => array('element-invisible'),
+      )
+    ));
+  }
+  else {
+    $vars['secondary_nav'] = FALSE;
   }
 
- // -- tab text sould always be Flukso
- $vars['head_title'] = 'msgmobile';
+  // Prepare header.
+  $site_fields = array();
+  if (!empty($vars['site_name'])) {
+    $site_fields[] = $vars['site_name'];
+  }
+  if (!empty($vars['site_slogan'])) {
+    $site_fields[] = $vars['site_slogan'];
+  }
+  $vars['site_title'] = implode(' ', $site_fields);
+  if (!empty($site_fields)) {
+    $site_fields[0] = '<span>' . $site_fields[0] . '</span>';
+  }
+  $vars['site_html'] = implode(' ', $site_fields);
+
+  // Set a variable for the site name title and logo alt attributes text.
+  $slogan_text = $vars['site_slogan'];
+  $site_name_text = $vars['site_name'];
+  $vars['site_name_and_slogan'] = $site_name_text . ' ' . $slogan_text;
 }
 
 /**
- * Support for image_annotate on image nodes
+ * Override or insert variables into the node template.
  */
-function phptemplate_image_body($node, $size) {
+function msgmobile_preprocess_node(&$vars) {
+  $vars['submitted'] = $vars['date'] . ' — ' . $vars['name'];
+}
 
-  if (user_access('view image annotations') || user_access('create image annotations') || user_access('administer image annotations')) {
-    //Retrieve all the annotations for that image field
-    //We sort by area (height*width) to make sure small annotations are always on the top and avoid having some unhoverable ones
-    $result = db_query('SELECT i.*, c.uid, c.comment, u.name FROM {image_annotate} i INNER JOIN {comments} c ON i.cid = c.cid JOIN {users} u ON c.uid = u.uid WHERE c.nid = %d ORDER BY (i.size_height*i.size_width) ASC', $node->nid);
+/**
+ * Override or insert variables into the comment template.
+ */
+function msgmobile_preprocess_comment(&$vars) {
+  $vars['submitted'] = $vars['created'] . ' — ' . $vars['author'];
+}
 
-    //Build the array of notes settings
-    global $user;
-    $notes = array();
+/**
+ * Override or insert variables into the block template.
+ */
+function msgmobile_preprocess_block(&$vars) {
+  $vars['title_attributes_array']['class'][] = 'title';
+  $vars['classes_array'][] = 'clearfix';
+}
 
-    while ($note = db_fetch_object($result)) {
-
-      $editable = user_access('administer image annotations') || (user_access('create image annotations') && $note->uid && $note->uid == $user->uid);
-      $author = theme('username', $note);
-      $text = check_plain($note->comment); // . '"<span class="author"> '. t('by') .' '. $author . '</span>';
-
-      //if (user_access('access comments')) {
-      //  $text .= '<span class="actions"> » '. l(t('View comment'), $_GET['q'], array('fragment'=>'comment-'. $note->cid)) .'</span>';
-      //}
-
-      $notes[] = array(
-        'aid' => $note->aid,
-        'cid' => $note->cid,
-        'uid' => $note->uid,
-        'height' => $note->size_height,
-        'width' => $note->size_width,
-        'top' => $note->position_top,
-        'left' => $note->position_left,
-        'text' => $text,
-        'editable' => $editable,
-      );
-    }
-   
-    //Build the field settings
-    $settings = array(array(
-      'nid' => $node->nid,
-      'field' => 'image',
-      'notes' => $notes,
-      'editable' => user_access('administer image annotations') || user_access('create image annotations'),
-    ));
-   
-    module_load_include('module', 'jquery_ui');
-
-    //Load all the JS and CSS magic
-    drupal_add_js(array('imageAnnotate' => $settings), 'setting');
-    jquery_ui_add(array('ui.resizable', 'ui.draggable'));
-    drupal_add_js('misc/collapse.js');
-    drupal_add_js(drupal_get_path('module', 'image_annotate') .'/tag.js');
-    drupal_add_css(drupal_get_path('module', 'image_annotate') .'/tag.css');
-
-    //BVDM 13/09/09: substitute image-annotate-image for image-annotate-nid-$node->nid to create a unique class per inserted image
-    $class = 'imagefield imagefield-image image-annotate-nid-' . $node->nid;
-
-    return image_display($node, $size, array('class' => $class));
+/**
+ * Override or insert variables into the page template.
+ */
+function msgmobile_process_page(&$vars) {
+  // Hook into color.module
+  if (module_exists('color')) {
+    _color_page_alter($vars);
   }
 }
 
 /**
- * Support for image_annotate on img_assist inserted images
+ * Override or insert variables into the region template.
  */
-function phptemplate_img_assist_inline($node, $size, $attributes) {
-
-  $caption = '';
-
-  if ($attributes['title'] && $attributes['desc']) {
-    $caption = '<strong>'. $attributes['title'] .': </strong>'. $attributes['desc'];
-
-  } elseif ($attributes['title']) {
-    $caption = '<strong>'. $attributes['title'] .'</strong>';
-
-  } elseif ($attributes['desc']) {
-    $caption = $attributes['desc'];
+function msgmobile_preprocess_region(&$vars) {
+  if ($vars['region'] == 'header') {
+    $vars['classes_array'][] = 'clearfix';
   }
+}
 
-  //Change the node title because img_assist_display() uses the node title for alt and title.
-  $node->title = strip_tags($caption);
+/**
+ * Perform alterations before a page is rendered.
+ */
+function msgmobile_page_alter($page) {
 
-  if (user_access('view image annotations') || user_access('create image annotations') || user_access('administer image annotations')) {
-
-    //Retrieve all the annotations for that image field
-    //We sort by area (height*width) to make sure small annotations are always on the top and avoid having some unhoverable ones
-    $result = db_query('SELECT i.*, c.uid, c.comment, u.name FROM {image_annotate} i INNER JOIN {comments} c ON i.cid = c.cid JOIN {users} u ON c.uid = u.uid WHERE c.nid = %d ORDER BY (i.size_height*i.size_width) ASC', $node->nid);
-
-    //Build the array of notes settings
-    global $user;
-    $notes = array();
-
-    while ($note = db_fetch_object($result)) {
-
-      $editable = user_access('administer image annotations') || (user_access('create image annotations') && $note->uid && $note->uid == $user->uid);
-      $author = theme('username', $note);
-      $text = check_plain($note->comment); // . '"<span class="author"> '. t('by') .' '. $author . '</span>';
-
-      //if (user_access('access comments')) {
-      //  $text .= '<span class="actions"> » '. l(t('View comment'), $_GET['q'], array('fragment'=>'comment-'. $note->cid)) .'</span>';
-      //}
-
-      $notes[] = array(
-        'aid' => $note->aid,
-        'cid' => $note->cid,
-        'uid' => $note->uid,
-        'height' => $note->size_height,
-        'width' => $note->size_width,
-        'top' => $note->position_top,
-        'left' => $note->position_left,
-        'text' => $text,
-        //notes should be added when residing on the image page
-        'editable' => FALSE,
-      );
-    }
-   
-    //Build the field settings
-    $settings = array(array(
-      'nid' => $node->nid,
-      'field' => 'image',
-      'notes' => $notes,
-      'editable' => user_access('administer image annotations') || user_access('create image annotations'),
-    ));
-
-    module_load_include('module', 'jquery_ui');
-
-    //Load all the JS and CSS magic
-    drupal_add_js(array('imageAnnotate' => $settings), 'setting');
-    jquery_ui_add(array('ui.resizable', 'ui.draggable'));
-    drupal_add_js('misc/collapse.js');
-    drupal_add_js(drupal_get_path('module', 'image_annotate') .'/tag.js');
-    drupal_add_css(drupal_get_path('module', 'image_annotate') .'/tag.css');
-
-    //BVDM 13/09/09: substitute image-annotate-image for image-annotate-nid-$node->nid to create a unique class per inserted image
-    $class = 'imagefield imagefield-image image-annotate-nid-' . $node->nid;
-    $img_tag = img_assist_display($node, $size, array('class' => $class));
-
-  } else {
-    $img_tag = img_assist_display($node, $size);
-  }
-
-  //Always define an alignment class, even if it is 'none'.
-  $output = '<span class="inline inline-'. $attributes['align'] .'">';
-
-  $link = $attributes['link'];
-  $url  = '';
-
-  //Backwards compatibility: Also parse link/url in the format link=url,foo.
-  if (strpos($link, ',') !== FALSE) {
-    list($link, $url) = explode(',', $link, 2);
-
-  } elseif (isset($attributes['url'])) {
-    $url = $attributes['url'];
-  }
-  
-  if ($link == 'node') {
-    $output .= l($img_tag, 'node/'. $node->nid, array('html' => TRUE));
-
-  } elseif ($link == 'popup') {
-    $popup_size = variable_get('img_assist_popup_label', IMAGE_PREVIEW);
-    $info       = image_get_info(file_create_path($node->images[$popup_size]));
-    $width      = $info['width'];
-    $height     = $info['height'];
-    $popup_url  = file_create_url($node->images[variable_get('img_assist_popup_label', IMAGE_PREVIEW)]);
-    $output .= l($img_tag, $popup_url, array('attributes' => array('onclick' => "launch_popup({$node->nid}, {$width}, {$height}); return false;", 'target' => '_blank'), 'html' =>TRUE));
-
-  } elseif ($link == 'url') {
-    $output .= l($img_tag, $url, array('html' => TRUE));
-
-  } else {
-    $output .= $img_tag;
-  }
-  
-  if ($caption) {
-
-    if ($attributes['align'] != 'center') {
-      $info = image_get_info(file_create_path($node->images[$size['key']]));
-      // Reduce the caption width slightly so the variable width of the text
-      // doesn't ever exceed image width.
-      $width = $info['width'] - 2;
-      $output .= '<span class="caption" style="width: '. $width .'px;">'. $caption .'</span>';
-
-    } else {
-      $output .= '<span class="caption">'. $caption .'</span>';
-    }
-  }
-
-  $output .= '</span>';
-  return $output;
+  //Add META tags to the header
+  $meta = array(
+    '#type' => 'html_tag',
+    '#tag' => 'meta',
+    '#attributes' => array(
+      'http-equiv' => 'X-UA-Compatible',
+      'content' => 'IE=EmulateIE7'
+    )
+  );
+  drupal_add_html_head($meta, 'meta_ie7_emulation');
 }

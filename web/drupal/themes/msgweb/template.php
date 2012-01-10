@@ -40,8 +40,6 @@ function msgweb_preprocess_html(&$vars) {
   if (theme_get_setting('msgweb_width') == 'fluid') {
     $vars['classes_array'][] = 'fluid-width';
   }
-  // Add conditional CSS for IE6.
-  drupal_add_css(path_to_theme() . '/fix-ie.css', array('group' => CSS_THEME, 'browsers' => array('IE' => 'lt IE 7', '!IE' => FALSE), 'preprocess' => FALSE));
 }
 
 /**
@@ -157,4 +155,21 @@ function msgweb_preprocess_region(&$vars) {
   if ($vars['region'] == 'header') {
     $vars['classes_array'][] = 'clearfix';
   }
+}
+
+/**
+ * Perform alterations before a page is rendered.
+ */
+function msgweb_page_alter($page) {
+
+  //Add META tags to the header
+  $meta = array(
+    '#type' => 'html_tag',
+    '#tag' => 'meta',
+    '#attributes' => array(
+      'http-equiv' => 'X-UA-Compatible',
+      'content' => 'IE=EmulateIE7'
+    )
+  );
+  drupal_add_html_head($meta, 'meta_ie7_emulation');
 }
