@@ -1714,7 +1714,7 @@ table.sortable-table thead th.headerSortDown { background-position: 100% -46px; 
  * Forms *
  *********/
 form.context {
-	margin-bottom: 0.923em;
+  margin-bottom: 0.923em;
 }
 form.context fieldset {
   margin-bottom: 1px;
@@ -1824,18 +1824,29 @@ ul.con input {
   text-align: right;
   width:4em;
 }
-ul.tabs.primary,
-ul.tabs.secondary {
-  white-space: normal;
-	line-height: 20px;
-	/*text-align: center;*/
+
+div.tabs {
+  border-bottom: 1px solid #aaa;
+  margin-bottom: 10px;
 }
 
-ul.tabs.primary li,
-ul.tabs.secondary li {
-	white-space: nowrap;
+div.tabs ul {
+  display: inline;
+  list-style: none;
+  white-space: normal;
+  line-height: 20px;
 }
-/*end added*/
+
+div.tabs li {
+  white-space: nowrap;
+  border-right: 1px solid #aaa;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+div.tabs a {
+  text-decoration: none;
+}
 
 ul.con input.input-medium {
 	margin-right:6px;
@@ -2855,6 +2866,22 @@ div.links {
 div.submitted {
   padding-bottom: 10px;
 }
+
+ul.menu li {
+  margin: 0 0 0 1.5em;
+  display: list-item;
+}
+
+li.expanded, li.collapsed, li.leaf {
+  margin: 0;
+  padding: 0.2em 0.5em 0 0;
+}
+
+div.item-list ul li {
+  list-style: disc;
+  display: list-item;
+}
+
 
 /* Forum */
 

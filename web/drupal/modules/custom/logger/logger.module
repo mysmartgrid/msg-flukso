@@ -24,7 +24,7 @@
  */
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
-define('PRODUCTION_SENSOR_TYPE',   2);
+define('PRODUCTION_SENSOR_TYPE',  2);
 
 define('LOGGER_REL_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
@@ -1387,6 +1387,9 @@ function logger_theme() {
         'link' => NULL,
       ),
     ),
+    'logger_chart_tabs' => array(
+      'items' => array()
+    ),
     'logger_smoothing_level' => array(
       'render element' => 'element',
     ),
@@ -1600,8 +1603,8 @@ function logger_create_interval_menu($context) {
       l(t('Year'),    "$context/year"),
     );
   }
-  
-  return theme_item_list(array('items' => $items, 'title' => NULL, 'type' => 'ul', 'attributes' => array('class' => 'tabs secondary')));
+ 
+  return theme('logger_chart_tabs', $items);
 }
 
 /**
@@ -1969,6 +1972,22 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#value' => t('Refresh'),
   );
   return $form;
+}
+
+/**
+ * Builds the chart tabs list.
+ *
+ * @param $items The tabs list items.
+ * @return the tabs HTML code.
+ */
+function theme_logger_chart_tabs($items = array()) {
+
+  $output = '<div class="tabs"><ul>';
+  foreach ($items as $item) {
+    $output .= "<li>$item</li>";
+  }
+  $output .= "</ul></div>";
+  return $output;
 }
 
 /**
