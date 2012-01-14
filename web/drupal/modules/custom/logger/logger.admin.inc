@@ -42,6 +42,7 @@ function logger_userdevices_page() {
   $devices = $query->execute();
 
   $rows = array();
+ 
   foreach ($devices as $device) {
 
     $support_link = $device->support_requested ?
@@ -60,7 +61,7 @@ function logger_userdevices_page() {
 
     $rows[] = $row;
   }
-
+ 
   $header = array(t('Serial'), t('Device Id'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
 
   $form = drupal_get_form('logger_deviceactivation_form');
@@ -81,8 +82,8 @@ function logger_usersensors_page() {
   global $user;
 
   $query = db_select('logger_meters', 'lm');
-  $query->innerJoin('logger_tokens', 'lt', 'lm.meter = lt.meter');
-  $query->join('logger_meter_type', 'st', 'lm.type = st.id');
+  $query->join('logger_tokens', 'lt', 'lm.meter = lt.meter');
+  $query->leftJoin('logger_meter_type', 'st', 'lm.type = st.id');
   $query->addField('st', 'name', 'type');
 
   $sensors = $query
@@ -98,7 +99,6 @@ function logger_usersensors_page() {
     $row = array();
     $row[] = format_hashcode($sensor->meter);
     $row[] = format_hashcode($sensor->token);
-
     $operations = '';
 
     if ($sensor->function == NULL) {
@@ -115,7 +115,6 @@ function logger_usersensors_page() {
         l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
         l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
-
     $row[] = $operations;
     $rows[] = $row;
   }
@@ -214,7 +213,7 @@ function logger_userprivacy_form($form, &$form_state) {
     '#title' => t('Set your preferred privacy mode'),
     '#type' => 'radios',
     '#description' => t("When selecting Private mode, your data stream will not be drawn on other people's graph and all statistics will be marked as 'prv'. Conversely, nobody else's data stream will be drawn on your chart."),
-    '#default_value' => $private,
+    '#default_value' => (isset($private) ? $private : 0),
     '#options' => array(
       t('Shared within Flukso'),
       t('Private'),
@@ -334,24 +333,13 @@ function logger_device_activate($code) {
       $i++;
     }
 
-    if ($function) {
-      db_update('logger_meters')
+    db_update('logger_meters')
       ->fields(array(
         'uid' => $user->uid,
-        'function' => $function,
+        'function' => $function
       ))
       ->condition('meter', $sensor->meter)
       ->execute();
-    }
-    else {
-
-      db_update('logger_meters')
-        ->fields(array(
-          'function' => $function,
-        ))
-        ->condition('meter', $sensor->meter)
-        ->execute();
-    }
   }
 
   $rid = get_role_id('fluksonian');
@@ -375,6 +363,8 @@ function logger_device_activate($code) {
       ->execute();
   }
   drupal_set_message(t("The device is now associated with your account."));
+
+  drupal_goto("user/$user->uid/devices");
 }
 
 /**
@@ -385,17 +375,34 @@ function logger_device_activate($code) {
 function logger_device_deactivate($device) {
 
   global $user;
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m')
+    ->condition('m.device', $device, '=')
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    //FIXME: define a hook
+    msgdump_remove_by_sensor($sensor->meter);
+
+    db_update('logger_meters')
+      ->fields(array(
+        'uid' => 0,
+      ))
+      ->condition('meter', $sensor->meter)
+      ->execute();
+
+    logger_rrd_clear($sensor->meter);
+  }
+
+  //FIXME: define a hook
+  notification_remove_by_device($device);
 
   db_update('logger_devices')
     ->fields(array(
-      'uid' => 0,
-    ))
-    ->condition('device', $device)
-    ->execute();
-  
-  db_update('logger_meters')
-    ->fields(array(
-      'uid' => 0,
+      'uid' => 0
     ))
     ->condition('device', $device)
     ->execute();
@@ -414,10 +421,6 @@ function logger_device_remove($device) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  db_delete('event_log')
-    ->condition('device', $device)
-    ->execute();
- 
   $sensors = db_select('logger_meters', 'm')
     ->fields('m')
     ->condition('m.device', $device, '=')
@@ -425,9 +428,8 @@ function logger_device_remove($device) {
 
   foreach ($sensors as $sensor) {
 
-    db_delete('msgdump')
-      ->condition('meter', $sensor->meter)
-      ->execute();
+    //FIXME: define a hook
+    msgdump_remove_by_sensor($sensor->meter);
 
     db_delete('logger_tokens')
       ->condition('meter', $sensor->meter)
@@ -440,15 +442,14 @@ function logger_device_remove($device) {
     logger_rrd_remove($sensor->meter);
   }
 
+  //FIXME: define a hook
+  notification_remove_by_device($device);
+
   $flukso = db_select('logger_devices', 'd')
-    ->fields('d', array('serial', 'uid'))
+    ->fields('d', array('uid'))
     ->condition('d.device', $device, '=')
     ->execute()
     ->fetchObject();
-
-  db_delete('notification')
-    ->condition('device', $device)
-    ->execute();
 
   db_delete('logger_devices')
     ->condition('device', $device)

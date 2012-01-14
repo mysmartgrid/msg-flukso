@@ -191,7 +191,7 @@ function logger_menu() {
     'access arguments' => array('list devices', 1),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
-    'weight' => 3,
+    'weight' => 3
   );
 
   $items['device/activate'] = array(
@@ -201,7 +201,7 @@ function logger_menu() {
     'access callback' => 'logger_device_access',
     'access arguments' => array('activate devices', 2),
     'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc',
+    'file' => 'logger.admin.inc'
   );
 
   $items['device/deactivate'] = array(
@@ -211,7 +211,7 @@ function logger_menu() {
     'access callback' => 'logger_device_access',
     'access arguments' => array('deactivate devices', 2),
     'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc',
+    'file' => 'logger.admin.inc'
   );
 
   $items['device/remove'] = array(
@@ -588,7 +588,7 @@ function logger_overview_page($interval) {
  */
 function logger_relative_energy_consumption_page() {
 
-  $meters = logger_get_variable('selected_meters', 1);
+  $meters = logger_get_variable('selected_meters', array());
   $all_meters = array();
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
@@ -599,7 +599,7 @@ function logger_relative_energy_consumption_page() {
   $sensors = array();
   foreach ($all_sensors as $sensor) {
     $all_meters[] = $sensor->meter;
-    if (isset($meters[$sensor->meter])) {
+    if (isset($meters[$sensor->meter]) && $meters[$sensor->meter]) {
       $sensors[] = $sensor;
     }
   }
@@ -858,14 +858,8 @@ function logger_get_relative_chart_data($chart) {
     $time2 = $time1 + $window;
     $time3 = $time2 + $window;
 
-    $period1 = array(
-      'start' => $time1,
-      'end' => $time2 - 1,
-    ); //Until the last second
-    $period2 = array(
-      'start' => $time2,
-      'end' => $time3 - 1,
-    ); //Until the last second
+    $period1 = array('start' => $time1, 'end' => $time2);
+    $period2 = array('start' => $time2, 'end' => $time3);
 
     $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period2, $resolution);
     $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period1, $resolution);
@@ -881,6 +875,9 @@ function logger_get_relative_chart_data($chart) {
     $data_labels['current'][0][$label]  = $so_far;
     $data_labels['previous'][0][$label] = $previous;
     $data_labels['excess'][0][$label]   = $excess ? $previous + $excess : 0;
+
+    $period1['end'] -= 1; //Until the last second
+    $period2['end'] -= 1; //Until the last second
 
     $legend[0][$label] = logger_format_period($interval, $period2);
     $legend[1][$label] = logger_format_period($interval, $period1);
@@ -978,15 +975,18 @@ function logger_get_energy_chart_data(&$chart) {
 
       if ($chart->interval == 'year') {
         $start = mktime(0, 0, 0, date('n', $time + WEEK),     1, date('Y', $time + WEEK));
-        $end   = mktime(0, 0, 0, date('n', $time + WEEK) + 1, 1, date('Y', $time + WEEK)) - 1;
+        $end   = mktime(0, 0, 0, date('n', $time + WEEK) + 1, 1, date('Y', $time + WEEK));
       }
       else {
         $start = $time;
-        $end = $time + $sub_time_window - 1;
+        $end = $time + $sub_time_window;
       }
 
-      $period = array('start' => $start, 'end' => $end); //from 00:00:00 until 23:59:59
+      $period = array('start' => $start, 'end' => $end);
       $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $period, $chart->resolution);
+
+      $end -= 1; //from 00:00:00 until 23:59:59 on user timezone
+      $period['end'] = $end;
 
       switch ($chart->interval) {
         case 'day':
@@ -2641,18 +2641,24 @@ function logger_sensor_access($permission, $meter) {
  * Access callback ensuring the device is accessible only to the owner.
  */
 function logger_device_access($permission, $device) {
-
+  
   if ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
 
   $uid = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
-    ->condition('d.device', $device, '=')
+    ->condition('d.device', "$device%", 'LIKE')
     ->execute()
     ->fetchField();
 
-  return $uid == $GLOBALS['user']->uid && user_access($permission);
+  if ($permission == 'activate devices') {
+    $rid = get_role_id('Visitor');
+    return $uid == 0 && empty($GLOBALS['user']->roles[$rid]);
+  }
+  else {
+    return $uid == $GLOBALS['user']->uid && user_access($permission);
+  }
 }
 
 /**

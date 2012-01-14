@@ -37,7 +37,6 @@ function chumby_permission() {
  */
 function chumby_device_access($permission, $serial) {
 
-  global $GLOBALS;
   $access = TRUE;
 
   if ($serial) {

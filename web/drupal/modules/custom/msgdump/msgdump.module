@@ -117,7 +117,7 @@ function msgdump_setup_form($form, &$form_state) {
 
   $sensors = array();
   foreach ($result as $sensor) {
-    $sensors[$sensor->meter] = $sensor->serial . ' - '. $sensor->function;
+    $sensors[$sensor->meter] = $sensor->serial . ' - ' . $sensor->function;
   }
 
   $form['meter'] = array(
@@ -254,6 +254,19 @@ function msgdump_remove($file) {
   rmfiles(MSGDUMP_DB_PATH . '/' . $file . '.*');
 
   drupal_goto('dump/setup');
+}
+
+/**
+ * Removes dump requests associated with a sensor.
+ * FIXME: use a hook
+ *
+ * @param $meter The sensor id.
+ */
+function msgdump_remove_by_sensor($meter) {
+
+  db_delete('msgdump')
+    ->condition('meter', $meter)
+    ->execute();
 }
 
 function msgdump_cron() {

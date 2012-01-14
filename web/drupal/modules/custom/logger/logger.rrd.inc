@@ -36,10 +36,9 @@ define('METER', 'meter');
  */
 function logger_rrd_base_create($meter) {
 
-  $step = 1 * MINUTE;
   $archives = logger_rrd_get_storage_periods();
 
-  return logger_rrd_create($meter, $step, 'DERIVE', $archives);
+  return logger_rrd_create($meter, MINUTE, 'DERIVE', $archives);
 }
 
 /**
@@ -92,8 +91,10 @@ function logger_rrd_create($meter, $step, $ds_type, $archives) {
       "--step $step " .
       "$ds " .
       logger_rrd_rras($step, $archives);
+
+    system($command, $return);
   }
-  return $return;
+  return $return == 0;
 }
 
 /**
@@ -103,8 +104,26 @@ function logger_rrd_create($meter, $step, $ds_type, $archives) {
  * @return TRUE if successful, FALSE otherwise. 
  */
 function logger_rrd_remove($meter) {
+
   $file_path = logger_rrd_file($meter);
-  unlink($file_path);
+
+  if (file_exists($file_path)) {
+    return unlink($file_path);
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Recreates an RRD file.
+ *
+ * @param $meter     The sensor's id.
+ * @return TRUE if successful, FALSE otherwise.
+ */
+function logger_rrd_clear($meter) {
+
+  return logger_rrd_remove($meter) && logger_rrd_base_create($meter);
 }
 
 /**
@@ -165,7 +184,7 @@ function logger_rrd_update($meter, $values) {
 
   system($command, $return);
 
-  return $return;
+  return $return == 0;
 }
 
 /**

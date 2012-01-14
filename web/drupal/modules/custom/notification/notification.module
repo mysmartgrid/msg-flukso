@@ -158,6 +158,23 @@ function notification_remove($device, $event_id, $limit_up, $unit_id) {
 }
 
 /**
+ * Removes all notifications and event log entries related to a device.
+ * FIXME: use a hook
+ * 
+ * @param $device The device id.
+ */
+function notification_remove_by_device($device) {
+
+  db_delete('event_log')
+    ->condition('device', $device)
+    ->execute();
+
+  db_delete('notification')
+    ->condition('device', $device)
+    ->execute();
+}
+
+/**
  * Builds the event notification edition page.
  *
  * @param $device    The monitored device.

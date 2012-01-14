@@ -672,7 +672,8 @@ function deployment_checkup_form_submit($form, &$form_state) {
 
   if ($form_state['values']['device'] == '') {
     $form_state['redirect'] = "deployment/checkup/serial/" . $form_state['values']['serial'];
-  } else {
+  }
+  else {
     $form_state['redirect'] = "deployment/checkup/device/" . $form_state['values']['device'];
   }
 }
