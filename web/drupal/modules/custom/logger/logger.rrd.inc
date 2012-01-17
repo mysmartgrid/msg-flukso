@@ -237,7 +237,7 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
 function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = time() - 15 * MINUTE;
+  $end_time = REQUEST_TIME - 15 * MINUTE;
   $def = "";
   $variables = "";
 
@@ -265,7 +265,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return logger_rrd_export($interval, $def, $series_id, time(), FALSE, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, REQUEST_TIME, FALSE, $period, $step);
 }
 
 /**
@@ -352,7 +352,7 @@ function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_na
 
   $storage_period = logger_rrd_get_storage_period($step);
 
-  if ((time() - $end) > $storage_period) {
+  if ((REQUEST_TIME - $end) > $storage_period) {
     return array();
   }
 
@@ -367,6 +367,12 @@ function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_na
     "$def " .
     "XPORT:$exported_cdef";
 
+  //DEBUG
+  //$fh = fopen('/tmp/rrd.command.txt', 'w');
+  //fwrite($fh, $command);
+  //fclose($fh);
+
+  $lines = array();
   exec($command, $lines);
 
   return logger_rrd_parse_exported_lines($lines);

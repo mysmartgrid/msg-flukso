@@ -36,6 +36,31 @@ function msgweb_preprocess_maintenance_page(&$vars) {
  * Override or insert variables into the html template.
  */
 function msgweb_preprocess_html(&$vars) {
+
+    drupal_add_css(
+      path_to_theme() . '/style/fraunhofer-ie.css',
+      array(
+        'group' => CSS_THEME,
+        'browsers' => array(
+          'IE' => TRUE,
+          '!IE' => FALSE
+        ),
+        'every_page' => TRUE
+      )
+    );
+
+    drupal_add_css(
+      path_to_theme() . '/style/fraunhofer.css',
+      array(
+        'group' => CSS_THEME,
+        'browsers' => array(
+          'IE' => FALSE,
+          '!IE' => TRUE
+        ),
+        'every_page' => TRUE
+      )
+    );
+
   // Toggle fixed or fluid width.
   if (theme_get_setting('msgweb_width') == 'fluid') {
     $vars['classes_array'][] = 'fluid-width';
@@ -46,6 +71,7 @@ function msgweb_preprocess_html(&$vars) {
  * Override or insert variables into the html template.
  */
 function msgweb_process_html(&$vars) {
+
   // Hook into color.module
   if (module_exists('color')) {
     _color_html_alter($vars);
@@ -56,6 +82,7 @@ function msgweb_process_html(&$vars) {
  * Override or insert variables into the page template.
  */
 function msgweb_preprocess_page(&$vars) {
+
   // Move secondary tabs into a separate variable.
   $vars['tabs2'] = array(
     '#theme' => 'menu_local_tasks',

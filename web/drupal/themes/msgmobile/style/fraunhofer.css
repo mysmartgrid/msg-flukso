@@ -204,7 +204,6 @@ tr.highlight, td.highlight, table.sortable-table thead th.highlight { background
 
 #nav a {
   background-color: rgb(255,255,255);
-  background-color: rgba(255,255,255,0.8);
 }
 
 /* #feeds a, #feeds a:hover, #feeds a:focus, */
@@ -1937,7 +1936,6 @@ li.error label {
 /* Message */
 div.status {
 	background-color: #a5d2d9;
-	background-color: rgba(158,212,218,0.8);
 	border-color:#009474;
 	border-width:1px;
 	border-style:solid;
@@ -2394,12 +2392,10 @@ a.carousel-button {
 
 #contentboxes .content {
 	background-color: rgb(255,255,255);
-	background-color: rgba(255,255,255,0.8);
 }
 
 .region h2.title {
 	background-color: #a5d2d9;
-	background-color: rgba(158,212,218,0.8);
 	color:#fff;
 	font-stretch:wider;
 	font-weight:bold;

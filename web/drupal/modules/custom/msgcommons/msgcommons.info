@@ -1,6 +1,6 @@
 ; $Id$
-name = MSG common
-description = MSG common functions
+name = MSG commons
+description = Functions shared by MSG modules
 package = mySmartGrid
 core = 7.x
 version = 7.x-0.1
