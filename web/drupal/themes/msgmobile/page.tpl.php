@@ -76,12 +76,4 @@
       </form>
     </div>
   </div>
-
-  <div id="print-footer">
-    <p>
-      <strong>Quelle: Fraunhofer-Gesellschaft – T2 Übersichts-/Indexseite - Forschungsthemen</strong><br/>
-        Online im Internet; URL http://ve-166.bi.server.de/international/seitentypen/t2uebersichtseite1<br/>
-        [Stand: 26.02.2011, 08:39 Uhr]<br/>
-    </p>
-  </div>
 </div>

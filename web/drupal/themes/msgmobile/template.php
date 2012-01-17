@@ -173,3 +173,10 @@ function msgmobile_page_alter($page) {
   );
   drupal_add_html_head($meta, 'meta_ie7_emulation');
 }
+
+/**
+ * Alter the HTML head tag.
+ */
+function msgmobile_html_head_alter(&$head_elements) {
+  unset($head_elements['system_meta_generator']);
+}

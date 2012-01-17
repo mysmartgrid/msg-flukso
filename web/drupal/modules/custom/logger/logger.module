@@ -37,7 +37,7 @@ define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
 function logger_init() {
 
   //If IE
-  if (isset($_SERVER['HTTP_USER_AGENT']) && strpos( strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
+  if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
     drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
   }
 
@@ -1649,8 +1649,8 @@ function logger_create_chart_legend($chart) {
     }
   }
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", array('type' => 'inline', 'scope' => JS_DEFAULT));
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", array('type' => 'inline', 'scope' => JS_DEFAULT));
+  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", array('type' => 'inline', 'scope' => 'header'));
+  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", array('type' => 'inline', 'scope' => 'header'));
 
   return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
@@ -2101,7 +2101,7 @@ function logger_create_time_fields($element, $suffix) {
       monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
     }";
 
-  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', array('type' => 'inline', 'scope' => JS_DEFAULT));
+  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', array('type' => 'inline', 'scope' => 'header'));
 
   return logger_create_custom_field($element, $suffix . 'date', '', 10, 10) .
     logger_create_custom_field($element, $suffix . 'time', '', 5, 5);

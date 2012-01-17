@@ -60,7 +60,7 @@
     <div class="wrapper">
 
       <ul id="footer-nav" role="contentinfo">
-        <li>&copy;2011 Fraunhofer-Gesellschaft</li>
+        <li>&copy; <?php print date("Y"); ?> Fraunhofer-Gesellschaft</li>
         <li><a href="/kontakt" >Kontakt</a></li>
         <li><a href="/impressum" >Impressum</a></li>
         <li><a href="/content/datenschutzerklärung" >Datenschutzerklärung</a></li>
