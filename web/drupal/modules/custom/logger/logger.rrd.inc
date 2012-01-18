@@ -195,12 +195,13 @@ function logger_rrd_update($meter, $values) {
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
+ * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step) {
+function logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price = NULL) {
 
   $series_id = METER;
-  $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
+  $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price);
 
   $latest = logger_rrd_latest_timestamp($interval, $sensor);
 
@@ -232,9 +233,10 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
+ * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'. 
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
+function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price = NULL) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
   $end_time = REQUEST_TIME - 15 * MINUTE;
@@ -246,7 +248,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
 
     $sensor_cdef = METER . $i;
 
-    $def .= logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
+    $def .= logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price) .
 
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
@@ -276,14 +278,16 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step) {
  * @param $interval   The time interval menu option.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
+ * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
  * @return the summed power consumption.
  */
-function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step) {
+function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step, $prices = NULL) {
 
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step);
+    $price = isset($prices[$sensor->type_id]) ? $prices[$sensor->type_id] : NULL;
+    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price);
 
     foreach ($measurements as $timestamp => $value) {
       $total += $value * $step;
@@ -299,16 +303,18 @@ function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step) {
  * @param $series_id   The series id.
  * @param $sensor      The sensor.
  * @param $unit        The unit.
+ * @param $price       The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the DEF tag.
  */
-function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
+function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price = NULL) {
 
   global $user;
-  $factor = logger_rrd_get_unit_factor($unit, isset($sensor->price) ? $sensor->price : 0);//FIXME
 
   if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid) {
     return NULL;
   }
+
+  $factor = logger_rrd_get_unit_factor($unit, $price);
   $file_path = logger_rrd_file($sensor->meter);
 
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
@@ -417,21 +423,19 @@ function logger_rrd_parse_exported_lines($lines) {
  */
 function logger_rrd_get_unit_factor($unit, $price = NULL) {
 
-  $factors['eur'] = 0.018; // € 0.18 / kWh
+  $factors['eur'] = 0.00018; // € 0.18 / kWh
   $factors['Wh']  = 1;
   $factors['kWh'] = 0.001;
 
   $factors['watt']     = 3600; // 1Wh/s = 3600 W
   $factors['kWh/year'] = 31536; //($factors['watt'] / 1000) * 24 * 365;
-  $factors['eur/year'] = $factors['kWh/year'] * $factors['eur'] * 10; // € 0.18 / kWh
+  $factors['eur/year'] = $factors['kWh/year'] * $factors['eur'] * 1000; // € 0.18 / kWh
 
   if ($unit == 'eur' && $price) {
     return $price * $factors['kWh'];
-
   }
   elseif ($unit == 'eur/year' && $price) {
     return $price * $factors['kWh/year'];
-
   }
   else {
     return $factors[$unit];

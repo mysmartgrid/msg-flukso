@@ -732,6 +732,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $chart->unit = $unit;
   $chart->price1 = $price1;
   $chart->price2 = $price2;
+  $chart->prices = array(CONSUMPTION_SENSOR_TYPE => $price1, PRODUCTION_SENSOR_TYPE => $price2);
   $chart->stacked = $stacked;
   $chart->resolution = logger_get_resolution($interval);
   $chart->offset = get_timezone_offset();
@@ -818,6 +819,7 @@ function logger_download_chart_data_file($cache_id) {
 function logger_get_relative_chart_data($chart) {
 
   global $user;
+
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $now = getdate();
@@ -861,23 +863,26 @@ function logger_get_relative_chart_data($chart) {
     $period1 = array('start' => $time1, 'end' => $time2);
     $period2 = array('start' => $time2, 'end' => $time3);
 
-    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period2, $resolution);
-    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period1, $resolution);
+    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period2, $resolution, $chart->prices);
+    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period1, $resolution, $chart->prices);
 
     $so_far    = min($previous, $current);
     $remaining = max($previous - $current, 0);
     $excess    = max($current - $previous, 0);
 
+    //Percentages
     $series['current'][$label]  = @($so_far / $previous) * 100;
     $series['previous'][$label] = @($remaining / $previous) * 100;
     $series['excess'][$label]   = @($excess / ($previous ? $previous : $excess)) * 100;
 
+    //Actual values
     $data_labels['current'][0][$label]  = $so_far;
     $data_labels['previous'][0][$label] = $previous;
     $data_labels['excess'][0][$label]   = $excess ? $previous + $excess : 0;
 
-    $period1['end'] -= 1; //Until the last second
-    $period2['end'] -= 1; //Until the last second
+    //Until the last second
+    $period1['end'] -= 1;
+    $period2['end'] -= 1;
 
     $legend[0][$label] = logger_format_period($interval, $period2);
     $legend[1][$label] = logger_format_period($interval, $period1);
@@ -945,12 +950,12 @@ function logger_format_long_period($start, $end, $format) {
 function logger_get_energy_chart_data(&$chart) {
 
   global $user;
+
   module_load_include('inc', 'logger', 'logger.rrd');
   $last = array();
 
   $groups = array();
   foreach ($chart->sensors as &$sensor) {
-    $sensor->price = $sensor->type_id == CONSUMPTION_SENSOR_TYPE ? $chart->price1 : $chart->price2;
     $key = $chart->aggregate_sensors ? $sensor->type : $sensor->meter;
     $groups[$key][] = $sensor;
   }
@@ -983,7 +988,7 @@ function logger_get_energy_chart_data(&$chart) {
       }
 
       $period = array('start' => $start, 'end' => $end);
-      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $period, $chart->resolution);
+      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $period, $chart->resolution, $chart->prices);
 
       $end -= 1; //from 00:00:00 until 23:59:59 on user timezone
       $period['end'] = $end;
@@ -1111,8 +1116,8 @@ function logger_get_power_chart_data($chart) {
   $i = 0;
   foreach ($chart->sensors as &$sensor) {
 
-    $sensor->price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
-    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution);
+    $price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
+    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution, $price);
 
     $values = logger_format_power_series_data($chart, $measurements);
 
