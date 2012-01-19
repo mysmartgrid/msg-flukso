@@ -1572,7 +1572,8 @@ function notification_send_emails($message, $notifiables) {
   );
 
   $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
-  $logo = file_get_contents("$base_url/sites/all/themes/mysmartgrid/logo.png");
+  $theme_path =  drupal_get_path('theme', 'msgweb');
+  $logo = file_get_contents("$base_url/$theme_path/logo.png");
   $attachments = array(
     array(
       'cid' => 'logo',
