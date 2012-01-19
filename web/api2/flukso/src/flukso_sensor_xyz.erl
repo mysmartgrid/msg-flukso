@@ -235,7 +235,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
             RrdResponse = "ok",
 
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 0, 1, Function, 0, 0, 0, 0, "watt", Device]),
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, 0, 0, 0, 0, "watt", Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->
