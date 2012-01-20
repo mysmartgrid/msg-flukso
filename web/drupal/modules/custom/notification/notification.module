@@ -82,23 +82,41 @@ function notification_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
 
-function notification_menu() {
+/**
+ * Access callback ensuring the notification is accessible only to the device owner.
+ */
+function notification_device_access($permission, $device) {
 
-  //FIXME: restrict device access permissions
+  $rid = get_role_id('Techniker');
+  if (!empty($GLOBALS['user']->roles[$rid])) {
+    return TRUE;
+  }
+
+  $uid = db_select('logger_devices', 'd')
+    ->fields('d', array('uid'))
+    ->condition('d.device', "$device", '=')
+    ->execute()
+    ->fetchField();
+
+  return $uid == $GLOBALS['user']->uid && user_access($permission);
+}
+
+function notification_menu() {
 
   $items['notification/list'] = array(
     'title' => 'Event Notifications',
     'page callback' => 'notification_list_page',
     'access arguments' => array('list event notifications'),
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_NORMAL_ITEM
   );
 
   $items['notification/delete'] = array(
     'title' => $items['notification/list']['title'],
     'page callback' => 'notification_remove',
     'page arguments' => array(2, 3, 4, 5),
-    'access arguments' => array('delete event notifications'),
-    'type' => MENU_CALLBACK,
+    'access callback' => 'notification_device_access',
+    'access arguments' => array('delete event notifications', 2),
+    'type' => MENU_CALLBACK
   );
 
   $items['notification/register'] = array(
@@ -106,38 +124,41 @@ function notification_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('notification_registration_form'),
     'access arguments' => array('view event notifications'),
-    'type' => MENU_CALLBACK,
+    'type' => MENU_CALLBACK
   );
 
   $items['notification/edit'] = array(
     'title' => 'Event Notification Edition',
     'page callback' => 'notification_edition_page',
     'page arguments' => array(2, 3, 4, 5),
-    'access arguments' => array('view event notifications'),
-    'type' => MENU_CALLBACK,
+    'access callback' => 'notification_device_access',
+    'access arguments' => array('view event notifications', 2),
+    'type' => MENU_CALLBACK
   );
 
   $items['event/log/list'] = array(
     'title' => 'Device History',
     'page callback' => 'notification_eventlog_page',
     'page arguments' => array(3),
-    'access arguments' => array('list event logs'),
-    'type' => MENU_CALLBACK,
+    'access callback' => 'notification_device_access',
+    'access arguments' => array('list event logs', 3),
+    'type' => MENU_CALLBACK
   );
 
   $items['event/log/clear'] = array(
     'title' => $items['event/log/list']['title'],
     'page callback' => 'notification_eventlog_clear',
     'page arguments' => array(3),
-    'access arguments' => array('delete event logs'),
-    'type' => MENU_CALLBACK,
+    'access callback' => 'notification_device_access',
+    'access arguments' => array('delete event logs', 3),
+    'type' => MENU_CALLBACK
   );
 
   $items['newsletter'] = array(
     'title' => 'Newsletter',
     'page callback' => 'notification_newsletter_page',
     'access callback' => TRUE,
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_NORMAL_ITEM
   );
   return $items;
 }
@@ -223,35 +244,28 @@ function notification_list_page() {
 
   global $user;
 
-  $sql = "
-    SELECT
-      d.serial,
-      e.name AS event_name,
-      n.emails,
-      n.last_sent,
-      n.limit_up,
-      un.id AS unit_id,
-      un.symbol AS unit,
-      d.device,
-      e.id AS event_id
-    FROM
-      {users} u,
-      {logger_devices} d,
-      {notification} n,
-      {event} e,
-      {unit} un
-    WHERE
-      u.uid = d.uid AND
-      d.uid = :uid AND
-      d.device = n.device AND
-      n.event_id = e.id AND
-      n.unit_id = un.id";
+  $query = db_select('logger_devices', 'd')
+    ->fields('d', array('serial', 'device'))
+    ->condition('d.uid', $user->uid, '=');
 
-  $headers = array(
+  $query->join('notification', 'n', 'n.device = d.device');
+  $query->join('users', 'u', 'u.uid = d.uid');
+  $query->join('event', 'e', 'e.id = n.event_id');
+  $query->join('unit', 'un', 'un.id = n.unit_id');
+
+  $query->addField('e', 'name', 'event_name');
+  $query->addField('n', 'emails');
+  $query->addField('n', 'last_sent');
+  $query->addField('n', 'limit_up');
+  $query->addField('un', 'id', 'unit_id');
+  $query->addField('un', 'symbol', 'unit');
+  $query->addField('e', 'id', 'event_id');
+
+  $header = array(
     array(
       'data' => t('Device'),
       'field' => 'serial',
-      //'sort' => 'ASC',
+      'sort' => 'ASC',
     ),
     array(
       'data' => t('Event'),
@@ -268,10 +282,9 @@ function notification_list_page() {
     array('data' => t('Operation')),
   );
 
-  //TODO: sort table
-  //$sql .= tablesort_sql($headers);
+  $query->extend('TableSort')->orderByHeader($header);
 
-  $result = db_query($sql, array(':uid' => $user->uid));
+  $result = $query->execute();
 
   $rows = array();
   foreach ($result as $object) {
@@ -301,7 +314,7 @@ function notification_list_page() {
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
-  return theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => 'resizable'),
+  return theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => 'resizable'),
     'caption' => $caption, 'empty' => '', 'sticky' => FALSE, 'colgroups' => array()));
 }
 
@@ -892,9 +905,9 @@ function notification_edit_event($values) {
   $old_limit_up = $values["old_limit_up"];
   $old_unit_id = $values["old_unit_id"];
 
-  $limit_up = $values["limit_up"];
-  $unit_id = $values["unit_id"];
   $emails = $values['emails'];
+  $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
+  $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
   $min_interval = $values['min_interval'];
 
   notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
@@ -1182,11 +1195,21 @@ function notification_send_communication_restored_emails() {
       n.device = d.device AND
       n.event_id = :event_id AND
       n.unit_id = un.id AND
-      :now > n.base_time + n.limit_up * un.factor AND
       :now > n.last_sent + n.min_interval AND
       l.time > n.base_time + n.limit_up * un.factor AND
       l.device = d.device AND
-      l.event_id > :message_received_id";
+      l.event_id > :message_received_id AND
+      NOT EXISTS (
+        SELECT
+          1
+        FROM
+          {event_log} p
+        WHERE
+          p.device = n.device AND
+          p.event_id > :message_received_id AND
+          p.time > n.base_time AND
+          p.time < l.time
+      )";
 
   $args = array(':event_id' => COMMUNICATION_RESTORED_EVENT_ID, ':now' => REQUEST_TIME, ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID);
 
@@ -1202,7 +1225,36 @@ function notification_send_communication_restored_emails() {
     "Click <a href='!base_url/event/log/list/!serial '>here</a> " .
     "to check the latest events of your Flukso device.");
 
-  notification_send_emails($message, $notifiables);
+  notification_send_emails($message, $notifiables, FALSE);
+
+  //Update notification base times
+  $sql = "
+    SELECT SQL_NO_CACHE
+      n.device,
+      n.limit_up,
+      n.unit_id,
+      MAX(l.time) AS last_msg_time
+    FROM
+      notification n,
+      event_log l
+    WHERE
+      n.event_id = :event_id AND
+      n.device = l.device AND
+      n.base_time < l.time AND
+      l.event_id > :message_received_id
+    GROUP BY
+      n.device,
+      n.limit_up,
+      n.unit_id";
+
+  $args = array(':event_id' => COMMUNICATION_RESTORED_EVENT_ID, ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID);
+  $logs = db_query($sql, $args);
+
+  foreach ($logs as $log) {
+
+    notification_update($log->device, COMMUNICATION_RESTORED_EVENT_ID, $log->limit_up, $log->unit_id, 
+      array('base_time' => $log->last_msg_time));
+  }
 }
 
 /**
@@ -1492,7 +1544,7 @@ function notification_send_system_error_email($context, $error_code, $url) {
     "Description: %description<br>" .
     "Related URL: %url");
 
-  notification_send_emails($message, $notifiables);
+  notification_send_emails($message, $notifiables, FALSE);
 }
 
 /**
@@ -1559,10 +1611,11 @@ function notification_compose_error_email($description, $recommendation = NULL) 
 /**
  * Sends event notification e-mails to notifiable users.
  *
- * @param $message      The e-mail message.
- * @param $notifiables  The array of notifiable users.
+ * @param $message           The e-mail message.
+ * @param $notifiables       The array of notifiable users.
+ * @param $update_base_time  Whether the base_time field must be updated or not (optional).
  */
-function notification_send_emails($message, $notifiables) {
+function notification_send_emails($message, $notifiables, $update_base_time = TRUE) {
 
   global $base_url;
 
@@ -1580,7 +1633,7 @@ function notification_send_emails($message, $notifiables) {
       'file_name' => 'logo.png',
       'content_type' => 'image/png',
       'content' => $logo
-    ),
+    )
   );
 
   foreach ($notifiables as $notifiable) {
@@ -1617,8 +1670,14 @@ function notification_send_emails($message, $notifiables) {
     jobqueue_send_email($notifiable['emails'], $subject, $body, $attachments);
 
     if (isset($notifiable['device'])) {
-      notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'],
-        array('last_sent' => REQUEST_TIME, 'base_time' => $base_time));
+
+      $times = array('last_sent' => REQUEST_TIME);
+
+      if ($update_base_time) {
+        $times['base_time'] = $base_time;
+      }
+
+      notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], $times);
     }
   }
 }
