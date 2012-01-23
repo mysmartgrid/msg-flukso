@@ -841,7 +841,7 @@ function notification_newsletter_form_submit($form, &$form_state) {
 
   $email     = $form_state['values']['email'];
   $firstname = $form_state['values']['firstname'];
-  $lastname   = $form_state['values']['lastname'];
+  $lastname  = $form_state['values']['lastname'];
 
   $url = 'http://www.eor.de/fileadmin/verwaltung/mysmartgrid.php' .
     '?email=' . urlencode($email) .
@@ -1108,8 +1108,8 @@ function notification_send_no_communication_emails() {
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      :now AS event_time,
       n.access AS since_time,
+      :now AS event_time,
       n.serial,
       n.emails,
       n.unit_name,
@@ -1174,12 +1174,11 @@ function notification_send_communication_restored_emails() {
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
-      n.event_id,
+      :event_id AS event_id,
       n.limit_up,
       n.unit_id,
       n.base_time AS since_time,
       l.time AS event_time,
-      n.last_sent,
       d.serial,
       n.emails,
       un.name AS unit_name,
@@ -1222,7 +1221,7 @@ function notification_send_communication_restored_emails() {
     "for more than %limit_up %unit_name, since %since_time. " .
     "This problem has already been fixed.",
 
-    "Click <a href='!base_url/event/log/list/!serial '>here</a> " .
+    "Click <a href='!base_url/event/log/list/!device '>here</a> " .
     "to check the latest events of your Flukso device.");
 
   notification_send_emails($message, $notifiables, FALSE);
@@ -1265,7 +1264,7 @@ function notification_send_corrupted_message_emails() {
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
-      n.event_id,
+      :event_id AS event_id,
       n.limit_up,
       n.unit_id,
       l.time AS event_time,
@@ -1305,7 +1304,7 @@ function notification_send_peak_consumption_emails() {
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
-      n.event_id,
+      :event_id AS event_id,
       n.limit_up,
       n.unit_id,
       n.base_time AS since_time,
@@ -1363,11 +1362,11 @@ function notification_send_summary_report_emails() {
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
-      n.event_id,
+      :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      :now AS event_time,
       n.base_time AS since_time,
+      :now AS event_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
@@ -1387,36 +1386,43 @@ function notification_send_summary_report_emails() {
 
   $args = array(':now' => REQUEST_TIME, ':event_id' => SUMMARY_REPORT_EVENT_ID);
 
-  //FIXME Use user defined prices
-  $prices = array(
-    CONSUMPTION_SENSOR_TYPE => 0.18,
-    PRODUCTION_SENSOR_TYPE => 0.18,
-  );
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
 
   $notifiables = array();
   foreach (notification_query_notifiables($sql, $args) as $notifiable) {
 
     $lines = array();
+
+    //FIXME Use user defined prices
+    $prices = array(
+      CONSUMPTION_SENSOR_TYPE => 0.18,
+      PRODUCTION_SENSOR_TYPE => 0.18
+    );
     $total_cost = array(
       CONSUMPTION_SENSOR_TYPE => 0,
-      PRODUCTION_SENSOR_TYPE => 0,
+      PRODUCTION_SENSOR_TYPE => 0
     );
     $total_energy = array(
       CONSUMPTION_SENSOR_TYPE => 0,
-      PRODUCTION_SENSOR_TYPE => 0,
+      PRODUCTION_SENSOR_TYPE => 0
     );
 
-    $offset = get_timezone_offset($notifiable['timezone']);
-    $notifiable['since_time'] -= $offset + $notifiable['since_time'] % DAY + 1; 
-    $notifiable['event_time'] -= $offset + $notifiable['event_time'] % DAY;
+    date_default_timezone_set($notifiable['timezone']);
 
     $period = array(
-      'start' => $notifiable['since_time'],
-      'end' => $notifiable['event_time']
+      'start' => mktime(0, 0, 0,
+        date('n', $notifiable['since_time']),
+        date('j', $notifiable['since_time']),
+        date('Y', $notifiable['since_time'])),
+
+      'end' => mktime(0, 0, 0,
+        date('n', $notifiable['event_time']),
+        date('j', $notifiable['event_time']),
+        date('Y', $notifiable['event_time']))
     );
 
-    $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = :device AND type > :type";
-    $results = db_query($sql, array(':device' => $notifiable['device'], ':type' => 0));
+    $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = :device AND type IN (:types)";
+    $results = db_query($sql, array(':device' => $notifiable['device'], ':types' => $types));
 
     foreach ($results as $sensor) {
 
@@ -1594,7 +1600,7 @@ function notification_compose_error_email($description, $recommendation = NULL) 
       $recommendation .
 
       "<li><p>Click " .
-      "<a href='!base_url/event/log/list/!serial '>here</a> " .
+      "<a href='!base_url/event/log/list/!device '>here</a> " .
       "to check the latest events of your Flukso device.</p>" .
 
       "<li><p>Check if the device complies with the " .
@@ -1642,11 +1648,12 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       $notifiable['unit_name'] = t($notifiable['unit_name']);
     }
 
+    date_default_timezone_set($notifiable['timezone']);
+
     $base_time = $notifiable['event_time'];
     $notifiable['event_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT, $notifiable['event_time']);
 
     if (isset($notifiable['since_time'])) {
-      //FIXME: use user timezone $notifiable['timezone'];
       $notifiable['since_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT, $notifiable['since_time']);
     }
 
@@ -1701,7 +1708,8 @@ function notification_query_peak_consumption_violations($notifiable) {
 
         if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time']) {
 
-          //FIXME: $notifiable['timezone'];
+          date_default_timezone_set($notifiable['timezone']);
+
           $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
           $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
             number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
