@@ -382,13 +382,6 @@ function notification_install() {
       'unit_id' => 6,
     ))
     ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
-      'event_id' => 10,
-      'unit_id' => 7,
-    ))
-    ->execute();
 }
 
 function notification_uninstall() {

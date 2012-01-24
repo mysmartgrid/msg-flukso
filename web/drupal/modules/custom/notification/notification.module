@@ -37,7 +37,7 @@ define('BROWNOUT_EVENT_ID',                104);
 
 define('HOUR_UNIT_ID',   2);
 define('WATT_UNIT_ID',   3);
-define('MONTH_UNIT_ID',  7);
+define('WEEK_UNIT_ID',   6);
 
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
@@ -302,7 +302,7 @@ function notification_list_page() {
     $row['last_sent'] = $object->last_sent > 0 ? date(NOTIFICATION_TIMESTAMP_FORMAT, $object->last_sent) : NULL;
     $row['emails'] = $emails;
     $row[] = l(t('Remove'), "notification/delete/$id") . '<br>' .
-             l(t('Edit'),    "notification/edit/$id");
+             l(t('Edit'),   "notification/edit/$id");
 
     $rows[] = $row;
   }
@@ -543,7 +543,7 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
 
-  $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, MONTH_UNIT_ID,
+  $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
   $event_id = CORRUPTED_MESSAGE_EVENT_ID;
@@ -1103,54 +1103,46 @@ function notification_cron() {
 function notification_send_no_communication_emails() {
 
   $sql = "
-    SELECT SQL_NO_CACHE
+    SELECT
       n.device,
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      n.access AS since_time,
+      MAX(l.time) as since_time,
       :now AS event_time,
-      n.serial,
+      d.serial,
       n.emails,
-      n.unit_name,
-      n.timezone
+      un.name AS unit_name,
+      un.factor,
+      u.timezone
     FROM
-      (
-        SELECT
-          n.device,
-          n.limit_up,
-          n.unit_id,
-          d.serial,
-          n.emails,
-          n.last_sent,
-          n.min_interval,
-          un.name AS unit_name,
-          un.factor,
-          IF(d.access > MAX(m.access), d.access, MAX(m.access)) AS access,
-          u.timezone
-        FROM
-          {unit} un,
-          {users} u,
-          {notification} n,
-          {logger_devices} d,
-          {logger_meters} m
-        WHERE
-          n.event_id = :event_id AND
-          n.unit_id = un.id AND
-          n.device = d.device AND
-          d.device = m.device AND
-          d.uid = u.uid
-        GROUP BY
-          n.device,
-          n.limit_up,
-          n.unit_id
-      ) n
+      {unit} un,
+      {users} u,
+      {notification} n,
+      {logger_devices} d,
+      {event_log} l
     WHERE
-      :now > (n.access + n.limit_up * n.factor) AND
-      :now > (n.last_sent + n.limit_up * n.factor) AND
-      :now > (n.last_sent + n.min_interval)";
+      n.event_id = :event_id AND
+      n.unit_id = un.id AND
+      n.device = d.device AND
+      d.device = l.device AND
+      l.event_id > :message_received_id AND
+      d.uid = u.uid AND
+      :now > n.base_time + n.limit_up * un.factor AND
+      :now > n.last_sent + n.limit_up * un.factor AND
+      :now > n.last_sent + n.min_interval
+    GROUP BY
+      n.device,
+      n.limit_up,
+      n.unit_id
+    HAVING
+      :now > since_time + limit_up * factor";
 
-  $args = array(':event_id' => NO_COMMUNICATION_EVENT_ID, ':now' => REQUEST_TIME);
+  $args = array(
+    ':event_id' => NO_COMMUNICATION_EVENT_ID,
+    ':now' => REQUEST_TIME,
+    ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID
+  );
 
   $notifiables = notification_query_notifiables($sql, $args);
 
@@ -1210,7 +1202,11 @@ function notification_send_communication_restored_emails() {
           p.time < l.time
       )";
 
-  $args = array(':event_id' => COMMUNICATION_RESTORED_EVENT_ID, ':now' => REQUEST_TIME, ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID);
+  $args = array(
+    ':event_id' => COMMUNICATION_RESTORED_EVENT_ID,
+    ':now' => REQUEST_TIME,
+    ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID
+  );
 
   $notifiables = notification_query_notifiables($sql, $args);
 
@@ -1284,7 +1280,10 @@ function notification_send_corrupted_message_emails() {
       l.device = d.device AND
       l.time > n.base_time";
 
-  $args = array(':event_id' => CORRUPTED_MESSAGE_EVENT_ID, ':now' => REQUEST_TIME);
+  $args = array(
+    ':event_id' => CORRUPTED_MESSAGE_EVENT_ID,
+    ':now' => REQUEST_TIME
+  );
 
   $notifiables = notification_query_notifiables($sql, $args);
 
@@ -1327,7 +1326,11 @@ function notification_send_peak_consumption_emails() {
       m.device = d.device AND
       m.type = :sensor_type";
 
-  $args = array(':event_id' => PEAK_CONSUMPTION_EVENT_ID, ':now' => REQUEST_TIME, ':sensor_type' => CONSUMPTION_SENSOR_TYPE);
+  $args = array(
+    ':event_id' => PEAK_CONSUMPTION_EVENT_ID,
+    ':now' => REQUEST_TIME,
+    ':sensor_type' => CONSUMPTION_SENSOR_TYPE
+  );
 
   $notifiables = array();
   foreach (notification_query_notifiables($sql, $args) as $notifiable) {
@@ -1365,8 +1368,8 @@ function notification_send_summary_report_emails() {
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      n.base_time AS since_time,
-      :now AS event_time,
+      (n.base_time - (n.base_time % (n.limit_up * un.factor))) AS since_time,
+      (n.base_time - (n.base_time % (n.limit_up * un.factor)) + n.limit_up * un.factor) AS event_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
@@ -1381,10 +1384,13 @@ function notification_send_summary_report_emails() {
       n.unit_id = un.id AND
       n.device = d.device AND
       d.uid = u.uid AND
-      :now > (n.base_time + n.limit_up * un.factor) AND
+      :now > n.base_time - (n.base_time % (n.limit_up * un.factor)) + n.limit_up * un.factor AND
       :now > (n.last_sent + n.min_interval)";
 
-  $args = array(':now' => REQUEST_TIME, ':event_id' => SUMMARY_REPORT_EVENT_ID);
+  $args = array(
+    ':now' => REQUEST_TIME,
+    ':event_id' => SUMMARY_REPORT_EVENT_ID
+  );
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
 
@@ -1410,16 +1416,8 @@ function notification_send_summary_report_emails() {
     date_default_timezone_set($notifiable['timezone']);
 
     $period = array(
-      'start' => mktime(0, 0, 0,
-        date('n', $notifiable['since_time']),
-        date('j', $notifiable['since_time']),
-        date('Y', $notifiable['since_time'])),
-
-      'end' => mktime(0, 0, 0,
-        date('n', $notifiable['event_time']),
-        date('j', $notifiable['event_time']),
-        date('Y', $notifiable['event_time']))
-    );
+      'start' => $notifiable['since_time'],
+      'end' => $notifiable['event_time']);
 
     $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = :device AND type IN (:types)";
     $results = db_query($sql, array(':device' => $notifiable['device'], ':types' => $types));
