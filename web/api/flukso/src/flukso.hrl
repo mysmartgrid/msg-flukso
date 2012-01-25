@@ -1,20 +1,23 @@
-%% @author Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>
-%% @copyright (C) 2009-2011 Bart Van Der Meerssche
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% (at your option) any later version.
-%%%
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
-%%% You should have received a copy of the GNU General Public License
-%%% along with this program.  If not, see <http://www.gnu.org/licenses/>.
-%%%
-%% @doc Common record definitions and helper functions for the Flukso API. 
+%%
+%% Common record definitions and helper functions for the Flukso API.
+%%
+%% Copyright (c) 2008-2010 flukso.net
+%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+%%
+%% This program is free software; you can redistribute it and/or
+%% modify it under the terms of the GNU General Public License
+%% as published by the Free Software Foundation; either version 2
+%% of the License, or (at your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful,
+%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%% GNU General Public License for more details.
+%%
+%% You should have received a copy of the GNU General Public License
+%% along with this program; if not, write to the Free Software
+%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+%%
 
 -define(BASE_PATH,  "var/data/base/").
 
@@ -45,8 +48,10 @@
          rrdFactor,
          token,
          device,
+         event,
          digest,
          jsonpCallback}).
+
 
 %% checks
 check_version(Version) ->
@@ -63,6 +68,23 @@ check_version(undefined, Version) ->
     check_version(Version);
 check_version(_, _) ->
     {false, false}.
+
+
+check_event(Event) ->
+    case Event of
+        BROWNOUT_EVENT_ID -> {Event, true};
+        _ -> {false, false}
+    end.
+
+check_event(undefined, undefined) ->
+    {false, false};
+check_event(Event, undefined) ->
+    check_event(Event);
+check_event(undefined, Event) ->
+    check_event(Event);
+check_event(_, _) ->
+    {false, false}.
+
 
 check_sensor(Sensor) ->
     check_hex(Sensor, 32).
@@ -135,6 +157,7 @@ check_unit(Unit) ->
         {_Unit, RrdFactor} -> {RrdFactor, true}
     end.
 
+
 check_jsonp_callback(undefined) ->
     {undefined, true};
 check_jsonp_callback(JsonpCallback) ->
@@ -144,6 +167,7 @@ check_jsonp_callback(JsonpCallback) ->
         {match, [{0, Length}]} -> {JsonpCallback, true};
         _ -> {false, false}
     end.
+
 
 check_digest(Key, ReqData, ClientDigest) ->
     Data = wrq:req_body(ReqData),
@@ -252,3 +276,4 @@ int_to_hex(N) when N < 256 -> [hex(N div 16), hex(N rem 16)].
 
 hex(N) when N < 10 -> $0+N;
 hex(N) when N >= 10, N < 16 -> $a + (N-10).
+

@@ -1,25 +1,29 @@
-%% @author Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>
-%% @copyright (C) 2009-2011 Bart Van Der Meerssche
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% (at your option) any later version.
-%%%
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
-%%% You should have received a copy of the GNU General Public License
-%%% along with this program.  If not, see <http://www.gnu.org/licenses/>.
-%%%
-%% @doc Flukso module spec 
+%%
+%% Fukso module specification.
+%%
+%% Copyright (c) 2008-2010 flukso.net
+%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+%%
+%% This program is free software; you can redistribute it and/or
+%% modify it under the terms of the GNU General Public License
+%% as published by the Free Software Foundation; either version 2
+%% of the License, or (at your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful,
+%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%% GNU General Public License for more details.
+%%
+%% You should have received a copy of the GNU General Public License
+%% along with this program; if not, write to the Free Software
+%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+%%
 
 -module(flukso).
 -author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
 
 -export([start/0, start_link/0, stop/0]).
+
 
 ensure_started(App) ->
     case application:start(App) of
@@ -28,6 +32,7 @@ ensure_started(App) ->
 	{error, {already_started, App}} ->
 	    ok
     end.
+
 
 mysql_prepare() ->
     mysql:prepare(watchdog, <<"INSERT INTO watchdog (uid, type, message, variables, severity, location, hostname, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)">>),
@@ -44,7 +49,9 @@ mysql_prepare() ->
     mysql:prepare(event_insert, <<"INSERT INTO event_log (device, event_id, time) VALUES (?, ?, ?)">>),
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, function, phase, constant, value, factor, unit) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>).
+    mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),
+    mysql:prepare(support_slot, <<"SELECT username, host, port FROM device_support_slot WHERE device = ?">>).
+
 
 %% @spec start_link() -> {ok,Pid::pid()}
 %% @doc Starts the app for inclusion in a supervisor tree
@@ -57,6 +64,7 @@ start_link() ->
     ensure_started(webmachine),
     flukso_sup:start_link().
 
+
 %% @spec start() -> ok
 %% @doc Start the flukso server.
 start() ->
@@ -67,6 +75,7 @@ start() ->
     mysql_prepare(),
     ensure_started(webmachine),
     application:start(flukso).
+
 
 %% @spec stop() -> ok
 %% @doc Stop the flukso server.
