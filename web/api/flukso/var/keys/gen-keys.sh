@@ -10,7 +10,7 @@ cd /var/www/flukso-api/flukso/var/keys/$1
 #Generate the device key
 rm $2_device*
 dropbearkey -t dss -f $2_device_id >> /dev/null
-dropbearkey -f $2_device_id -y | grep "^ssh-dss " > $2_device_id.pub
+dropbearkey -f $2_device_id -y | /bin/grep ssh-dss > $2_device_id.pub
 
 #Generate the technician key
 rm $2_tech*
