@@ -31,7 +31,7 @@ define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
 
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
-define('LOGGER_DEVICE_CERT_PATH', '../api/flukso/var/keys');
+define('LOGGER_DEVICE_CERT_PATH', '../flukso-api/flukso/var/keys');
 
 
 function logger_init() {
@@ -3006,7 +3006,7 @@ function logger_remove_support($device) {
  * @param $device The device id.
  */
 function logger_create_support_key($host, $device) {
-  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device");
+  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device >> /tmp/genkeys.out");
 }
 
 /**

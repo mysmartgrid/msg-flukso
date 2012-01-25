@@ -45,9 +45,17 @@ function logger_userdevices_page() {
  
   foreach ($devices as $device) {
 
-    $support_link = $device->support_requested ?
-      l(t('Suspend Support'), "device/support/suspend/$device->device") :
-      l(t('Request Support'), "device/support/confirm/$device->device");
+    $links = l(t('Remove'), "device/deactivate/$device->device") . '<br>' .
+             l(t('History'), "event/log/list/$device->device");
+
+    //TODO: use a version field
+    if ($device->serial > 100000000) {
+      $support_link = $device->support_requested ?
+        l(t('Suspend Support'), "device/support/suspend/$device->device") :
+        l(t('Request Support'), "device/support/confirm/$device->device");
+
+      $links .= "<br><span style='white-space: nowrap;'>$support_link</span>";
+    }
 
     $row = array();
     $row[] = $device->serial;
@@ -55,9 +63,7 @@ function logger_userdevices_page() {
     $row[] = $device->resets;
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
-    $row[] = l(t('Remove'), "device/deactivate/$device->device") . '<br>' .
-             l(t('History'), "event/log/list/$device->device") . '<br>' .
-             "<span style='white-space: nowrap;'>$support_link</span>";
+    $row[] = $links;
 
     $rows[] = $row;
   }
