@@ -5,7 +5,7 @@ if [ $# -ne 2 ]; then
   exit 1
 fi
 
-cd ~flukso/www/api/flukso/var/keys/$1
+cd /var/www/flukso-api/flukso/var/keys/$1
 
 # Remove old keys
 find . -name '*device*' -mtime +2 -exec rm {} \;

@@ -5,7 +5,7 @@ if [ $# -ne 2 ]; then
   exit 1
 fi
 
-cd ~flukso/www/api/flukso/var/keys/$1
+cd /var/www/flukso-api/flukso/var/keys/$1
 
 #Generate the device key
 rm $2_device*
@@ -18,4 +18,4 @@ ssh-keygen -t dsa -f ./$2_tech_id -q -N ""
 
 #Key files - mode and ownership
 chmod 600 $2*
-chown flukso:flukso $2*
+chown www-data:www-data $2*
