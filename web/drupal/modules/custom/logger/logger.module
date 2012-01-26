@@ -2694,9 +2694,9 @@ function logger_query_device_measurements($interval, $device) {
 function logger_cron() {
 
   logger_remove_expired_support_requests();
-  $bindings = logger_bind_support_ports();
+  logger_bind_support_ports();
 
-  logger_update_support_authorized_keys($bindings);
+  logger_update_support_authorized_keys();
 }
 
 /**
@@ -2744,8 +2744,6 @@ function logger_remove_expired_support_requests() {
 
 /**
  * Binds device support requests with available hosts/ports for reverse SSH connections.
- *
- * @return the array of bindings.
  */
 function logger_bind_support_ports() {
 
@@ -2793,7 +2791,6 @@ function logger_bind_support_ports() {
       logger_create_support_key($slot->host, $device->device);
     }
   }
-  return $bindings;
 }
 
 /**
@@ -3022,13 +3019,17 @@ function logger_remove_support_key($device) {
 /**
  * Creates the file authorized_keys that contains a list of device DSS keys
  * authorized to open reverse SSL connections for remote support.
- * @param $bindings  An array of usernames, indexed by hosts, that represent the
- *                   hosts that need to update the authorized_keys files.
  */
-function logger_update_support_authorized_keys($bindings) {
+function logger_update_support_authorized_keys() {
 
-  foreach ($bindings as $host => $username) {
-    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $host $username");
+  $query = db_select('device_support_slot', 's')
+    ->fields('s', array('host', 'username'));
+  $query->groupBy('host');
+  $query->groupBy('username');
+  $accounts = $query->execute();
+
+  foreach ($accounts as $account) {
+    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->username");
   }
 }
 
