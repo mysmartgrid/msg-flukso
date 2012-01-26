@@ -38,6 +38,7 @@ define('BROWNOUT_EVENT_ID',                104);
 define('HOUR_UNIT_ID',   2);
 define('WATT_UNIT_ID',   3);
 define('WEEK_UNIT_ID',   6);
+define('DAY_UNIT_ID',    5);
 
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
@@ -1362,40 +1363,57 @@ function notification_send_summary_report_emails() {
 
   require_once LOGGER_PATH . "/logger.rrd.inc";
 
+  //TODO: create unit.offset field (with another name)
+
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      (n.base_time - (n.base_time % (n.limit_up * un.factor))) AS since_time,
-      (n.base_time - (n.base_time % (n.limit_up * un.factor)) + n.limit_up * un.factor) AS event_time,
+      (n.base_time - ((n.base_time - un.offset) % un.factor)) AS since_time,
+      (n.base_time - ((n.base_time - un.offset) % un.factor) + n.limit_up * un.factor - 1) AS event_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
       u.timezone
     FROM
-      {unit} un,
       {users} u,
       {logger_devices} d,
-      {notification} n
+      {notification} n,
+      (
+        SELECT
+          un.id,
+          un.name,
+          un.factor,
+          IF (un.id = :week_unit_id, 4 * :day, 0) AS offset
+        FROM
+          {unit} un
+      ) un
     WHERE
       n.event_id = :event_id AND
       n.unit_id = un.id AND
       n.device = d.device AND
       d.uid = u.uid AND
-      :now > n.base_time - (n.base_time % (n.limit_up * un.factor)) + n.limit_up * un.factor AND
+      :now > (n.base_time - ((n.base_time - un.offset) % un.factor) + n.limit_up * un.factor) + :delay AND
       :now > (n.last_sent + n.min_interval)";
 
   $args = array(
     ':now' => REQUEST_TIME,
-    ':event_id' => SUMMARY_REPORT_EVENT_ID
+    ':event_id' => SUMMARY_REPORT_EVENT_ID,
+    ':day' => DAY,
+    ':week_unit_id' => WEEK_UNIT_ID,
+    ':delay' => 12 * HOUR
   );
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
 
   $notifiables = array();
   foreach (notification_query_notifiables($sql, $args) as $notifiable) {
+
+    $tz_offset = get_timezone_offset($notifiable['timezone']);
+    $notifiable['since_time'] -= $tz_offset;
+    $notifiable['event_time'] -= $tz_offset;
 
     $lines = array();
 
@@ -1419,22 +1437,22 @@ function notification_send_summary_report_emails() {
       'start' => $notifiable['since_time'],
       'end' => $notifiable['event_time']);
 
-    $sql = "SELECT SQL_NO_CACHE meter, function, type FROM {logger_meters} WHERE device = :device AND type IN (:types)";
+    $sql = "SELECT SQL_NO_CACHE meter, function, type AS type_id FROM {logger_meters} WHERE device = :device AND type IN (:types)";
     $results = db_query($sql, array(':device' => $notifiable['device'], ':types' => $types));
 
     foreach ($results as $sensor) {
 
       $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $period, DAY), 2, '.', '');
-      $cost = number_format($energy * $prices[$sensor->type], 2, '.', '');
+      $cost = number_format($energy * $prices[$sensor->type_id], 2, '.', '');
 
-      $lines[$sensor->type] = '<tr>' .
+      $lines[$sensor->type_id] = '<tr>' .
         '<td>' . $notifiable['serial'] . '</td>' .
         '<td>' . $sensor->function . '</td>' .
         '<td>' . $energy . '</td>' .
         '<td>' . $cost . '</td></tr>';
 
-      $total_cost[$sensor->type] += $cost;
-      $total_energy[$sensor->type] += $energy;
+      $total_cost[$sensor->type_id] += $cost;
+      $total_energy[$sensor->type_id] += $energy;
     }
 
     $notifiable['tables'] =
