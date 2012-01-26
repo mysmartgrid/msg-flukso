@@ -6,6 +6,7 @@ if [ $# -ne 2 ]; then
 fi
 
 cd /var/www/flukso-api/flukso/var/keys/$1
+/usr/bin/touch authorized_keys.new
 
 # Remove old keys
 /usr/bin/find . -name '*device*' -mtime +2 -exec rm {} \;
@@ -22,7 +23,7 @@ while [ $i -lt $len ]; do
   let i++
 done
 
-#FIXME: Use JobQueue, and do not use "root"
-/usr/bin/scp -p -i ./flukso_id ./authorized_keys.new root@$1:/home/$2/.ssh/authorized_keys
+#FIXME: Use JobQueue to deploy this file
+/usr/bin/scp -p -i ./flukso_id ./authorized_keys.new fluksoadm@$1:authorized_keys
 
 /bin/rm -f authorized_keys.new
