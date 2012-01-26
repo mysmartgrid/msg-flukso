@@ -35,11 +35,11 @@ function chumby_permission() {
 /**
  * Access callback ensuring the device is accessible only to the owner.
  */
-function chumby_device_access($permission, $serial) {
+function chumby_device_access($permission, $serial = NULL) {
 
   $access = TRUE;
 
-  if ($serial) {
+  if (isset($serial)) {
     $uid = db_select('logger_devices', 'd')
       ->fields('d', array('uid'))
       ->condition('d.serial', $serial, '=')
