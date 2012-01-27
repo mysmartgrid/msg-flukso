@@ -1365,7 +1365,7 @@ function notification_send_summary_report_emails() {
       n.limit_up,
       n.unit_id,
       n.base_time - ((n.base_time - a.offset) % un.factor) AS since_time,
-      n.base_time - ((n.base_time - a.offset) % un.factor) + n.limit_up * un.factor - 1 AS event_time,
+      n.base_time - ((n.base_time - a.offset) % un.factor) + n.limit_up * un.factor AS event_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
@@ -1446,6 +1446,8 @@ function notification_send_summary_report_emails() {
       $total_cost[$sensor->type_id] += $cost;
       $total_energy[$sensor->type_id] += $energy;
     }
+
+    $notifiable['event_time'] -= 1;//Display 23:59:59
 
     $notifiable['tables'] =
       notification_compose_summary_report_table(CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
