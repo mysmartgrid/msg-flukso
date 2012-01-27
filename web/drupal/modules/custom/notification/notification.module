@@ -35,11 +35,6 @@ define('MEASUREMENT_RECEIVED_EVENT_ID',    102);
 define('CORRUPTED_MESSAGE_EVENT_ID',       103);
 define('BROWNOUT_EVENT_ID',                104);
 
-define('HOUR_UNIT_ID',   2);
-define('WATT_UNIT_ID',   3);
-define('WEEK_UNIT_ID',   6);
-define('DAY_UNIT_ID',    5);
-
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
 
@@ -1274,7 +1269,7 @@ function notification_send_corrupted_message_emails() {
       {event_log} l
     WHERE
       n.event_id = :event_id AND
-      :now > (n.last_sent + n.min_interval) AND
+      :now > n.last_sent + n.min_interval AND
       d.device = n.device AND
       d.uid = u.uid AND
       l.event_id = n.event_id AND
@@ -1323,7 +1318,7 @@ function notification_send_peak_consumption_emails() {
       d.device = n.device AND
       n.event_id = :event_id AND
       n.unit_id = un.id AND
-      :now > (n.last_sent + n.min_interval) AND
+      :now > n.last_sent + n.min_interval AND
       m.device = d.device AND
       m.type = :sensor_type";
 
@@ -1363,46 +1358,43 @@ function notification_send_summary_report_emails() {
 
   require_once LOGGER_PATH . "/logger.rrd.inc";
 
-  //TODO: create unit.offset field (with another name)
-
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
       :event_id AS event_id,
       n.limit_up,
       n.unit_id,
-      (n.base_time - ((n.base_time - un.offset) % un.factor)) AS since_time,
-      (n.base_time - ((n.base_time - un.offset) % un.factor) + n.limit_up * un.factor - 1) AS event_time,
+      n.base_time - ((n.base_time - a.offset) % un.factor) AS since_time,
+      n.base_time - ((n.base_time - a.offset) % un.factor) + n.limit_up * un.factor - 1 AS event_time,
       d.serial,
       n.emails,
       un.name AS unit_name,
       u.timezone
     FROM
+      {unit} un,
       {users} u,
       {logger_devices} d,
       {notification} n,
       (
-        SELECT
-          un.id,
-          un.name,
-          un.factor,
-          IF (un.id = :week_unit_id, 4 * :day, 0) AS offset
-        FROM
-          {unit} un
-      ) un
+        SELECT :week_unit_id AS unit_id, 4 * :day AS offset
+        UNION
+        SELECT :day_unit_id AS unit_id, 0 AS offset
+      ) a
     WHERE
       n.event_id = :event_id AND
       n.unit_id = un.id AND
       n.device = d.device AND
       d.uid = u.uid AND
-      :now > (n.base_time - ((n.base_time - un.offset) % un.factor) + n.limit_up * un.factor) + :delay AND
-      :now > (n.last_sent + n.min_interval)";
+      un.id = a.unit_id AND
+      :now > n.base_time - ((n.base_time - a.offset) % un.factor) + n.limit_up * un.factor + :delay AND
+      :now > n.last_sent + n.min_interval";
 
   $args = array(
     ':now' => REQUEST_TIME,
     ':event_id' => SUMMARY_REPORT_EVENT_ID,
     ':day' => DAY,
     ':week_unit_id' => WEEK_UNIT_ID,
+    ':day_unit_id' => DAY_UNIT_ID,
     ':delay' => 12 * HOUR
   );
 
