@@ -49,7 +49,8 @@ function logger_userdevices_page() {
              l(t('History'), "event/log/list/$device->device");
 
     //TODO: use a version field
-    if ($device->serial > 100000000) {
+    if ($device->serial > 100000000 && user_access('request device remote support', $user)) {
+
       $support_link = $device->support_requested ?
         l(t('Suspend Support'), "device/support/suspend/$device->device") :
         l(t('Request Support'), "device/support/confirm/$device->device");
