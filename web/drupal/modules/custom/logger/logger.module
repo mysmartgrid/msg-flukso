@@ -3173,9 +3173,9 @@ function logger_measurement_add($auth, $logs) {
           }
         }
 
-        $return = logger_rrd_update($meter, $values);
+        $updated = logger_rrd_update($meter, $values);
 
-        if ($return == 0) {
+        if ($updated) {
           watchdog('logger.measurementAdd', 'successful update of base rrd. meter: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
 
           //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
@@ -3188,7 +3188,7 @@ function logger_measurement_add($auth, $logs) {
             ->execute();
         }
         else {
-          watchdog('logger.measurementAdd', 'error updating base rrd. meter: %meter | return: %return ', array('%meter' => $meter, '%return' => $return), WATCHDOG_ERROR);
+          watchdog('logger.measurementAdd', 'error updating base rrd. meter: %meter ', array('%meter' => $meter), WATCHDOG_ERROR);
         }
       }
     }

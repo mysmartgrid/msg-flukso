@@ -168,9 +168,9 @@ function logger_create_node($serial, $country = "", $uid = 0) {
       }
 
       // create the meter base rrd
-      $return = logger_rrd_base_create($meter);
+      $created = logger_rrd_base_create($meter);
 
-      if (!($return == 0)) {
+      if (!$created) {
         drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
       }
 
