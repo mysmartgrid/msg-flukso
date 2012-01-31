@@ -1093,54 +1093,61 @@ function notification_cron() {
   notification_eventlog_clear_old();
 }
 
+function notification_compose_base_query($event_id) {
+  
+  $query = db_select('notification', 'n')
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent'));
+  
+  $query->join('logger_devices', 'd', 'd.device = n.device');
+  $query->join('unit', 'un', 'un.id = n.unit_id');
+  $query->join('users', 'u', 'u.uid = d.uid'); 
+
+  $query->addField('d', 'serial');
+  $query->addField('u', 'timezone');
+  $query->addField('un', 'factor');
+  $query->addField('un', 'name', 'unit_name');
+
+  $query->groupBy('n.device');
+  $query->groupBy('n.limit_up');
+  $query->groupBy('n.unit_id');
+
+  $query->condition('n.event_id', $event_id, '=');
+
+  return $query;  
+}
+
 /**
  * Sends e-mails notifying users of "No Communication" events.
  */
 function notification_send_no_communication_emails() {
 
-  $sql = "
-    SELECT
-      n.device,
-      :event_id AS event_id,
-      n.limit_up,
-      n.unit_id,
-      MAX(l.time) as since_time,
-      :now AS event_time,
-      d.serial,
-      n.emails,
-      un.name AS unit_name,
-      un.factor,
-      u.timezone
-    FROM
-      {unit} un,
-      {users} u,
-      {notification} n,
-      {logger_devices} d,
-      {event_log} l
-    WHERE
-      n.event_id = :event_id AND
-      n.unit_id = un.id AND
-      n.device = d.device AND
-      d.device = l.device AND
-      l.event_id > :message_received_id AND
-      d.uid = u.uid AND
-      :now > n.base_time + n.limit_up * un.factor AND
-      :now > n.last_sent + n.limit_up * un.factor AND
-      :now > n.last_sent + n.min_interval
-    GROUP BY
-      n.device,
-      n.limit_up,
-      n.unit_id
-    HAVING
-      :now > since_time + limit_up * factor";
+  $args = array(':now' => REQUEST_TIME);
+  $query = notification_compose_base_query(NO_COMMUNICATION_EVENT_ID)
+    ->where('n.last_sent + n.limit_up * un.factor < :now', $args)
+    ->where('n.last_sent + n.min_interval < :now', $args)
+    ->where('n.base_time + n.limit_up * un.factor < :now', $args);
 
-  $args = array(
-    ':event_id' => NO_COMMUNICATION_EVENT_ID,
-    ':now' => REQUEST_TIME,
-    ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID
-  );
+  $result = $query->execute();
 
-  $notifiables = notification_query_notifiables($sql, $args);
+  $notifiables = array();
+  while ($notification = $result->fetchAssoc()) {
+
+    $log_query = db_select('event_log', 'l');
+    $log_query->addExpression('MAX(l.time)', 'max_time');
+    $log_query
+      ->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
+      ->condition('l.device', $notification['device'], '=')
+      ->havingCondition('max_time', REQUEST_TIME - $notification['limit_up'] * $notification['factor'], '<');
+
+    $max_time = $log_query->execute()->fetchField();
+    
+    if ($max_time) {
+
+      $notification['since_time'] = $max_time;
+      $notification['event_time'] = REQUEST_TIME;
+      $notifiables[] = $notification;
+    }
+  }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_error_email(
@@ -1159,52 +1166,39 @@ function notification_send_no_communication_emails() {
  */
 function notification_send_communication_restored_emails() {
 
-  $sql = "
-    SELECT SQL_NO_CACHE
-      n.device,
-      :event_id AS event_id,
-      n.limit_up,
-      n.unit_id,
-      n.base_time AS since_time,
-      l.time AS event_time,
-      d.serial,
-      n.emails,
-      un.name AS unit_name,
-      u.timezone
-    FROM
-      {unit} un,
-      {users} u,
-      {logger_devices} d,
-      {notification} n,
-      {event_log} l
-    WHERE
-      d.uid = u.uid AND
-      n.device = d.device AND
-      n.event_id = :event_id AND
-      n.unit_id = un.id AND
-      :now > n.last_sent + n.min_interval AND
-      l.time > n.base_time + n.limit_up * un.factor AND
-      l.device = d.device AND
-      l.event_id > :message_received_id AND
-      NOT EXISTS (
-        SELECT
-          1
-        FROM
-          {event_log} p
-        WHERE
-          p.device = n.device AND
-          p.event_id > :message_received_id AND
-          p.time > n.base_time AND
-          p.time < l.time
-      )";
+  $args = array(':now' => REQUEST_TIME);
+  $query = notification_compose_base_query(COMMUNICATION_RESTORED_EVENT_ID)
+    ->where('n.last_sent + n.limit_up * un.factor < :now', $args)
+    ->where('n.last_sent + n.min_interval < :now', $args);
 
-  $args = array(
-    ':event_id' => COMMUNICATION_RESTORED_EVENT_ID,
-    ':now' => REQUEST_TIME,
-    ':message_received_id' => MESSAGE_RECEIVED_EVENT_ID
-  );
+  $result = $query->execute();
 
-  $notifiables = notification_query_notifiables($sql, $args);
+  $notifiables = array();
+  while ($notification = $result->fetchAssoc()) {
+
+    $msg_query = db_select('event_log', 'l')
+      ->fields('l', array('time'))
+      ->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
+      ->condition('l.device', $notification['device'], '=')
+      ->condition('l.time', $notification['base_time'] + $notification['limit_up'] * $notification['factor'], '>');
+
+    $recent_msg_query = db_select('event_log', 'p')
+      ->where('p.time < l.time')
+      ->condition('p.time', $notification['base_time'], '>')
+      ->condition('p.device', $notification['device'], '=')
+      ->condition('p.event_id', MESSAGE_RECEIVED_EVENT_ID, '>');
+    $recent_msg_query->addExpression('1');
+
+    $msg_query->notExists($recent_msg_query);
+
+    $time = $msg_query->execute()->fetchField();
+
+    if ($time) {
+      $notification['event_time'] = $time;
+      $notification['since_time'] = $notification['base_time'];
+      $notifiables[] = $notification;
+    }
+  }
 
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_email(
@@ -1218,6 +1212,7 @@ function notification_send_communication_restored_emails() {
 
   notification_send_emails($message, $notifiables, FALSE);
 
+  //TODO: use dynamic query
   //Update notification base times
   $sql = "
     SELECT SQL_NO_CACHE
@@ -1253,6 +1248,7 @@ function notification_send_communication_restored_emails() {
  */
 function notification_send_corrupted_message_emails() {
 
+  //TODO: use dynamic query
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
@@ -1296,6 +1292,7 @@ function notification_send_corrupted_message_emails() {
  */
 function notification_send_peak_consumption_emails() {
 
+  //TODO: use dynamic query
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,
@@ -1358,6 +1355,7 @@ function notification_send_summary_report_emails() {
 
   require_once LOGGER_PATH . "/logger.rrd.inc";
 
+  //TODO: use dynamic query
   $sql = "
     SELECT SQL_NO_CACHE
       n.device,

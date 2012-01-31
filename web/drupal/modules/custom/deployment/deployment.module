@@ -177,23 +177,23 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 
       $output .= '<br><br><br><br>' . theme_table(array('header' => NULL, 'rows' => $rows, 'attributes' => array(),
         'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
-    }
     
-    $result = db_select('logger_meters', 'm')
-      ->fields('m', array('meter', 'function'))
-      ->condition('m.device', $device['device'], '=')
-      ->orderBy('m.function', 'DESC')
-      ->execute();
+      $result = db_select('logger_meters', 'm')
+        ->fields('m', array('meter', 'function'))
+        ->condition('m.device', $device['device'], '=')
+        ->orderBy('m.function', 'DESC')
+        ->execute();
 
-    $sensors = array();
-    while ($sensor = $result->fetchAssoc()) {
-      $sensors[] = $sensor;
-    }
+      $sensors = array();
+      while ($sensor = $result->fetchAssoc()) {
+        $sensors[] = $sensor;
+      }
 
-    $header = array(t('Sensor Id'), t('Function'));
+      $header = array(t('Sensor Id'), t('Function'));
     
-    $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $sensors, 'attributes' => array(),
-    'caption' => t('Sensors'), 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $sensors, 'attributes' => array(),
+        'caption' => t('Sensors'), 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
   }
   return $output;
 }
