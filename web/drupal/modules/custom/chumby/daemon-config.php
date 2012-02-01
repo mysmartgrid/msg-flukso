@@ -1,7 +1,7 @@
 <?php
 $config = "config = {
   IP      = \"" . $params['ip'] . "\",
-  VERSION = " . $params['version'] .",
+  VERSION = \"" . $params['version'] ."\",
   SENSOR  = \"" . $params['sensor'] . "\",
   TOKEN   = \"" . $params['token'] . "\",
   DATADIR = \"/tmp/flukso\",

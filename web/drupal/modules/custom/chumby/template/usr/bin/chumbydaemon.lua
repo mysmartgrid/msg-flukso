@@ -72,7 +72,7 @@ function setIP()
 end
 
 function setPort()
-	if config.VERSION < 2 then
+	if config.VERSION == "1" then
 		port = 80
 	else
 		port = 8080
