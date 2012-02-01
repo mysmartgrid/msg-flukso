@@ -74,14 +74,11 @@ function msgdump_setup_page() {
   $rows = array();
   foreach ($dumps as $dump) {
 
-    $startdate = new DateTime('@' . $dump->start);
-    $stopdate = new DateTime('@' . $dump->stop);
-
     $row = array();
     $row[] = $dump->serial;
     $row[] = $dump->function;
-    $row[] = $startdate->format("Y-m-d");
-    $row[] = $stopdate->format("Y-m-d");
+    $row[] = date('d-m-Y', $dump->start);
+    $row[] = date('d-m-Y', $dump->stop);
     $row[] = l(t('Download'), MSGDUMP_DB_REL_PATH . '/' . $dump->file . '.sqlite') . '<br>' .
              l(t('Remove'), 'dump/remove/' . $dump->file);
 
@@ -231,7 +228,7 @@ function msgdump_register($file, $meter) {
     'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
     'ACCESS_TOKEN: "' . $sensor->token . '"' . PHP_EOL .
     'SENSOR_ID: "' . $sensor->meter . '"' . PHP_EOL .
-    'BASE_URL: "' . $base_url . '/sensor' . '"' . PHP_EOL;
+    'BASE_URL: "' . $base_url . ':8443/sensor' . '"' . PHP_EOL;
 
   $out = fopen(MSGDUMP_DB_PATH . "/$file.flukso4rrc", 'w');
   fwrite($out, $config);
