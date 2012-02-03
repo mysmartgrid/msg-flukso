@@ -81,7 +81,7 @@ function chumby_install() {
     ->fields(array(
       'id' => 4,
       'name' => 'Power Graph',
-      'description' => 'Shows the current power consumption i an area chart.',
+      'description' => 'Shows the current power consumption in an area chart.',
       'directory' => 'last_reading',
       'movie' => 'EnergyGraph'
     ))
@@ -102,4 +102,13 @@ function chumby_uninstall() {
 
   $file_path = drupal_get_path('module', 'chumby') . '/tmp';
   rrmdir($file_path);
+}
+
+function chumby_update_7001() {
+  db_update('chumby_widget')
+    ->fields(array(
+    'description' =>  'Shows the current power consumption in an area chart.',
+  ))
+  ->condition('id', 4)
+  ->execute();
 }

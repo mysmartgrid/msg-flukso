@@ -121,22 +121,6 @@ function chumby_image_form($form, &$form_state) {
     $sensors[$flukso->meter] = $flukso->function;
   }
 
-  $result = db_select('chumby_widget', 'w')
-    ->fields('w')
-    ->execute();
-
-  $widgets = array();
-  foreach ($result as $widget) {
-    $widgets[$widget->id] = $widget->name;  
-  }
-
-  $form['visualization'] = array(
-    '#type' => 'checkboxes',
-    '#options' => $widgets,
-    '#title' => t('Visualizations'),
-    '#description' => t('Visualizations that should be available'),
-  );
-
   $form['sensor'] = array(
     '#type' => 'select',
     '#options' => $sensors,
@@ -164,6 +148,48 @@ function chumby_image_form($form, &$form_state) {
     '#description' => t('The local ip address of the flukso.'),
     '#attributes' => array('onFocus' => 'document.getElementById("edit-ip").disabled = document.getElementById("edit-auto-1").checked'),
   );
+
+  $form['widgets'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Visualizations'),
+    '#prefix' => '<br><table width="100%">',
+    '#suffix' => '</table>',
+  );
+
+  $result = db_select('chumby_widget', 'w')
+    ->fields('w', array('id', 'name', 'description', 'directory', 'movie'))
+    ->execute();
+
+  foreach ($result as $widget) {
+    $id = $widget->id;
+
+    $form['widgets'][$id] = array(
+      "widget$id" =>  array(
+        '#type' => 'checkbox',
+        '#default_value' => TRUE,
+        '#prefix' => '<tr><td>',
+        '#suffix' => '</td>'
+      ),
+      "logo$id" => array(
+        '#type' => 'image_button',
+        '#src' => "sites/all/modules/chumby/template/usr/widgets/$widget->directory/$widget->movie.png",
+        '#prefix' => '<td>',
+        '#suffix' => '</td>',
+        '#disabled' => TRUE,
+        '#attributes' => array('style' => 'background-color: transparent;')
+      ),
+      "name$id" =>  array(
+        '#type' => 'fieldset',
+        '#prefix' => '<td style="padding-top: 15px;">' . t($widget->name),
+        '#suffix' => '</td>'
+      ),
+      "description$id" =>  array(
+        '#type' => 'fieldset',
+        '#prefix' => '<td style="padding-top: 15px;" width="400px">' . t($widget->description),
+        '#suffix' => '</td></tr>'
+      )
+    );
+  }
 
   $form['consumption'] = array(
     '#type' => 'fieldset',
@@ -200,19 +226,19 @@ function chumby_image_form($form, &$form_state) {
 
 function chumby_image_form_validate($form, &$form_state) {
 
-  // check if any visualization is selected.
-  $temp = TRUE;
-  foreach ( $form_state['values']['visualization'] as $value ) {
-    $temp &= ($value == '0');
+  // check if any widget is selected.
+  $no_selection = TRUE;
+  foreach ($form_state['values'] as $field => $value) {
+    if (strpos($field, "widget") >= 0 && $value == 1) {
+      $no_selection = FALSE;
+    }
   }
-
-  if ($temp) {
-    form_set_error('visualization', t('Please choose at least one visualization.'));
+  if ($no_selection) {
+    form_set_error('', t('Please choose at least one visualization.'));
   }
 
   if (!$form_state['values']['auto']['1']) {
     // check if a valid ip address was entered.
-    system("echo " . $form_state['values']['ip'] . " >> /tmp/test.txt");
     if (filter_var($form_state['values']['ip'], FILTER_VALIDATE_IP) == FALSE) {
       form_set_error('ip', t('Please enter a valid IP address.'));
     }
@@ -262,7 +288,7 @@ function chumby_image_form_submit($form, &$form_state) {
     rcopy(CHUMBY_PATH . '/template', $tmp_path) &&
 
     chumby_create_daemon_config($form_state['values'], $sensor, $tmp_path) &&
-    chumby_create_profile($form_state['values']['visualization'], $tmp_path) &&
+    chumby_create_profile($form_state['values'], $tmp_path) &&
     rzip($tmp_path, CHUMBY_PATH . "/files/$image_id.zip");
 
   rrmdir($tmp_path);
@@ -304,11 +330,11 @@ function chumby_create_daemon_config($params, $sensor, $tmp_path) {
 /**
  * Creates the chumby image profile.
  *
- * @param  $widgets   The array of selected widgets.
+ * @param  $values    The array of form fields values.
  * @param  $tmp_path  The directory where the profile file will be created.
  * @return TRUE on success, FALSE on failure.
  */
-function chumby_create_profile($selected_widgets, $tmp_path) {
+function chumby_create_profile($values, $tmp_path) {
 
   $profile = fopen("$tmp_path/profile.xml", 'w');
   if ($profile) {
@@ -316,20 +342,18 @@ function chumby_create_profile($selected_widgets, $tmp_path) {
     require CHUMBY_PATH . '/profile-head.php';
     fwrite($profile, $profile_head);
 
-    foreach ($selected_widgets as $id => $selected) {
+    $widgets = db_select('chumby_widget', 'w')->fields('w')->execute();
 
-      if ($selected != '0') {
+    foreach ($widgets as $widget) {
 
-        $widget = db_select('chumby_widget', 'w')
-          ->fields('w')
-          ->condition('w.id', $id, '=')
-          ->execute()
-          ->fetchObject();
+      //If selected
+      if (isset($values["widget$widget->id"]) && $values["widget$widget->id"] != 0) {
 
         require CHUMBY_PATH . '/widget.php';
         fwrite($profile, $widget);
       }
     }
+
     require CHUMBY_PATH . '/profile-tail.php';
     fwrite($profile, $profile_tail);
     fclose($profile);
