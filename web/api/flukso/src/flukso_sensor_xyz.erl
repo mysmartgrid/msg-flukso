@@ -284,6 +284,9 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
                     RrdResponse = "ok",
                     [LastTimestamp, LastValue] = lists:last(Measurements),
 
+                    %debugging
+                    %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
+
                     mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
                     mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
     
@@ -309,7 +312,8 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
 
 parse_measurements(Measurements) ->
   try
-    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Measurements]}
+    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements), 
+    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Sorted]}
   catch
     _:_ ->
       {error, error}
