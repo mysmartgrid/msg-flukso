@@ -1352,6 +1352,7 @@ function notification_send_summary_report_emails() {
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function'))
       ->condition('m.device', $notifiable['device'], '=')
+      ->isNotNull('m.function')
       ->condition('m.type', $types, 'IN');
     $sensors_query->addField('m', 'type', 'type_id');
 
