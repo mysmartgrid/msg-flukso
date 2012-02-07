@@ -53,14 +53,30 @@ function chumby_device_access($permission, $serial = NULL) {
 
 function chumby_menu() {
 
-  $items['chumby'] = array(
-    'title' => "Download chumby image",
+  $items['chumby1'] = array(
+    'title' => "Chumby Image",
     'description' => 'Shows the chumby image download page.',
-    'page callback' => 'chumby_image_page',
+    'page callback' => 'chumby_image_page1',
+    'access arguments' => array('chumby image'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['chumby2'] = array(
+    'title' => "Chumby Image",
+    'description' => 'Shows the chumby image download page.',
+    'page callback' => 'chumby_image_page2',
+    'access arguments' => array('chumby image'),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['chumby3'] = array(
+    'title' => "Chumby Image",
+    'description' => 'Shows the chumby image download page.',
+    'page callback' => 'chumby_image_page3',
     'page arguments' => array(1, 2, 3),
     'access callback' => 'chumby_device_access',
     'access arguments' => array('chumby image'),
-    'type' => MENU_NORMAL_ITEM
+    'type' => MENU_CALLBACK
   );
 
   $items['chumby/file'] = array(
@@ -68,10 +84,41 @@ function chumby_menu() {
     'description' => 'Downloads the chumby compressed image file.',
     'page callback' => 'chumby_download_file',
     'page arguments' => array(2),
-    'access callback' => TRUE,
+    'access arguments' => array('chumby image'),
     'type' => MENU_CALLBACK
   );
   return $items;
+}
+
+function chumby_image_page1() {
+
+  global $base_url;
+
+  $output = t('This wizard provides you with a step-by-step explanation on how to enable a Chumby device ' . 
+    'to display Flukso measurements.') . '<br><br>';
+
+  $output .= chumby_step(1, 'Make sure you have the following devices at hand.', 
+    '<table><tr align="center">' .
+    "<td><img src=\"$base_url/files/images/memory-stick.jpg\"/></td>" .
+    "<td><img src=\"$base_url/files/images/chumby-one.jpg\"/></td>" .
+    "<td><img src=\"$base_url/files/images/flukso-v2.jpg\"/></td>" .
+    '</tr><tr align="center">' .
+    '<td>' . t('USB Memory stick') . '</td>' .
+    '<td>' . t('Chumby One') . '</td>' .
+    '<td>' . t('Flukso device (version 1 or 2)') . '</td>' .
+    '</tr></table>');
+
+  $output .= chumby_step(2, 'Register and activate your Chumby. Please follow the procedure available at ' .
+    '<a href="http://www.chumby.com/help/chumby_1/get_started">chumby.com</a>.');
+
+  $output .= chumby_step(3, 
+    'Make sure your Flukso device is working properly, by checking its <a href="power">latest measurements</a>. ' . 
+    'If not, please read the <a href="content/installationsanleitung-des-fluksos">installation procedure</a> and ' . 
+    '<a href="content/häufige-fragen-und-antworten">FAQ</a> in order to fix the problem, before taking further steps.');
+
+  $output .= t('Please, click <a href="chumby2">here</a> for more instructions.') . '<br>';
+
+  return $output;
 }
 
 /**
@@ -82,28 +129,87 @@ function chumby_menu() {
  * @param $function  The sensor function.
  * @return the chumby image page.
  */
-function chumby_image_page($image_id = NULL, $serial = NULL, $function = NULL) {
+function chumby_image_page2($image_id = NULL, $serial = NULL, $function = NULL) {
+
+  $output = chumby_step(4, 'Now, fill in the following form and click the "Send" button.');
 
   $form = drupal_get_form('chumby_image_form');
-  $output = drupal_render($form);
+  $output .= drupal_render($form);
 
-  if ($image_id) {
- 
-    $headers = array(
-      t('Serial Number'),
-      t('Sensor'),
-      t('Image File'));
-
-    $lines = array(
-      array(
-        $serial, 
-        $function,
-        l(t('Download'), "chumby/file/$image_id")));
-
-    $output .= theme_table(array('header' => $headers, 'rows' => $lines, '', 'attributes' => array(),
-      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
-  }
   return $output;
+}
+
+/**
+ * Builds the chumby image page.
+ *
+ * @param $image_id  The image id.
+ * @param $serial    The device serial number.
+ * @param $function  The sensor function.
+ * @return the chumby image page.
+ */
+function chumby_image_page3($image_id, $serial, $function) {
+
+  global $base_url;
+
+  $headers = array(
+    t('Serial Number'),
+    t('Sensor'),
+    t('Image File'));
+
+  $lines = array(
+    array(
+      $serial, 
+      $function,
+      l(t('Download'), "chumby/file/$image_id")));
+
+  $table = theme_table(array('header' => $headers, 'rows' => $lines, '', 'attributes' => array(),
+    'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+
+  $output = chumby_step(5,
+    'The image file can be downloaded now. Please click the "download" link in the table bellow.', $table);
+
+  $output .= chumby_step(6, 'After saving the file, uncompress it. You will find 3 ' . 
+    'files and 1 folder, as shown in the following picture.',
+    "<p align=\"center\"><img src=\"$base_url/files/images/chumby-files.jpg\"/></p>");
+
+  $output .= chumby_step(7, 'Copy them to the the USB stick. Pay attention to the fact that they must be ' . 
+    'placed directly on the USB, and not in a subfolder.');
+
+  $output .= chumby_step(8, 'Plug the USB memory stick on the Chumby, and turn it on. That is it. ' . 
+    'The visualizations should be available now on the Chumby control panel.');
+
+  $output .= "<p><br><b>Troubleshooting</b></p>" .
+
+    chumby_problem('The visualizations are not being shown on the control panel.') .
+    chumby_solution('Make sure that the USB stick is plugged to the Chumby and restart it.') .
+
+    chumby_problem('The visualizations show no value, but only "Error" and "NaN".') .
+    chumby_solution('Make sure the Chumby and the Flukso are connected to the network. ' .
+      'Then, restart the Flukso, and 5 minutes later, restart the Chumby.') .
+
+    chumby_problem('My problem is not listed and the proposed solution did not work.') .
+    chumby_solution("Please contact us via the <a href=\"$base_url/kontakt\">Contact page</a>, " .
+      "and describe the steps taken and the environment where the Chumby and Flukso are used.");
+
+  return $output;
+}
+
+function chumby_step($number, $message, $complement = NULL) {
+
+  $step = '<p><b>' . t('Step') . " $number - </b> " . t($message) . '</p>';
+
+  if ($complement) {
+    $step .= $complement . '<br>';
+  }
+  return $step . '<br>';
+}
+
+function chumby_problem($message) {
+  return '<p><b>' . t('Problem') . " - </b> " . t($message) . '</p>';
+}
+
+function chumby_solution($message) {
+  return '<p><b>' . t('Solution') . " - </b> " . t($message) . '<br></p>';
 }
 
 function chumby_image_form($form, &$form_state) {
@@ -128,10 +234,12 @@ function chumby_image_form($form, &$form_state) {
     '#description' => t('Sensors from which values should be displayed.'),
   );
 
+  /*Should not it be in the same WLAN Flukso how her Chumby, so please disable the option "Configure the IP address automatically" and enter the IP address of the Flukso's in the input field below.*/
+
   $form['auto'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Flukso IP Address'),
-    '#description' => t('Automatically find the flukso in the local network. Normally this is the way you want to go.'),
+    '#description' => t('Automatically finds the flukso in the local network. Normally this is the way you want to go. If the Flukso is not on the same WLAN than the Chumby, then unckeck this option and enter the Flukso IP in the field bellow.'),
     '#options' => array(
       '1' => t('Autoconfigure'),
     ),
@@ -152,6 +260,7 @@ function chumby_image_form($form, &$form_state) {
   $form['widgets'] = array(
     '#type' => 'fieldset',
     '#title' => t('Visualizations'),
+    '#description' => t('Select at least one of the following visualizations to be installed on the Chumby.'),
     '#prefix' => '<br><table width="100%">',
     '#suffix' => '</table>',
   );
@@ -294,7 +403,7 @@ function chumby_image_form_submit($form, &$form_state) {
   rrmdir($tmp_path);
 
   if ($success) {
-    $form_state['redirect'] = "chumby/$image_id/$sensor->serial/$sensor->function";
+    $form_state['redirect'] = "chumby3/$image_id/$sensor->serial/$sensor->function";
   }
   else {
     drupal_set_message(t("Operation failed! Please try again later!"));
@@ -379,3 +488,4 @@ function chumby_download_file($image_id) {
 function chumby_cron() {
   cleardir(CHUMBY_PATH . '/files');
 }
+
