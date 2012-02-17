@@ -268,6 +268,8 @@ rrd_create(Path, RrdSensor) ->
   %FIXME: use erlrrd:create
   file:copy("/var/www/flukso-api/flukso/var/data/base/template.rrd", ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
 
+rrd_last(RRDFile) ->
+  erlrrd:last(RRDFile).
 
 % conversion functions
 list_to_hex(L) -> lists:map(fun(X) -> int_to_hex(X) end, L).

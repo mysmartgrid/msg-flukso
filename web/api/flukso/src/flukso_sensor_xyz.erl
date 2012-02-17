@@ -272,10 +272,37 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
 
         Timestamp = unix_time(),
 
-        case parse_measurements(Measurements) of
+      case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
+        % valid
+        {ok, Response} ->
+                %io:fwrite(string:concat(string:concat("rrdtool last successfull : ", integer_to_list(RrdTimestamp)), "\n"));
+                RrdTimestamp = Response;
+
+        % error
+        {error, Reason} ->
+                %io:fwrite("rrdtool last failed\n"),
+                RrdTimestamp = 1
+        end,
+
+        % io:fwrite(string:concat(string:concat("process_measurements sensor: ", integer_to_list(RrdTimestamp)), "\n")),
+
+        case parse_measurements(RrdTimestamp, Measurements) of
 
           %Measurements are valid
-          {ok, RrdData} ->
+          {ok, FilterState, RrdData} ->
+
+            case FilterState of
+              false ->
+                      logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData);
+              true ->
+                      Dummy = 1
+            end,
+
+            %debugging
+            UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
+            logger(Uid, <<"rrdupdate.base">>,
+              string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+              ?INFO, ReqData),
 
             case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
@@ -310,12 +337,14 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(Measurements) ->
+parse_measurements(RrdTimestamp, Measurements) ->
   try
-    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements), 
-    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Sorted]}
+    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
+    {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
+    FilterState = length(MultipleSend) == 0,
+    {ok, FilterState, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]}
   catch
     _:_ ->
-      {error, error}
+      {error, false, error}
   end.
 
