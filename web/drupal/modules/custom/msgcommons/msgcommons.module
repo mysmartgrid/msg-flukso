@@ -216,6 +216,33 @@ function rrmdir($dir) {
 }
 
 /**
+ * Removes files in a directory which are older than a certain age.
+ *
+ * @param $dir      The directory where the files are.
+ * @param $max_age  The maximum file age.
+ */
+function rmoldfiles($dir, $max_age) {
+
+  if (is_dir($dir)) {
+    $now = time();
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype("$dir/$object") == "file") {
+          $file = "$dir/$object";
+          if (($now - filectime($file)) > $max_age) {
+            unlink($file);
+          }
+        }
+      }
+    }
+    reset($objects);
+  }
+}
+
+/**
  * Removes the content of a directory.
  *
  * @param $path The directory to be cleared.

@@ -176,7 +176,8 @@ function chumby_image_page3($image_id, $serial, $function) {
     'placed directly on the USB, and not in a subfolder.');
 
   $output .= chumby_step(8, 'Plug the USB memory stick on the Chumby, and turn it on. That is it. ' . 
-    'The visualizations should be available now on the Chumby control panel.');
+    'The visualizations should be available now on the Chumby control panel. ' .
+    'Please, note that the USB stick must remain connected to the Chumby.');
 
   $output .= "<p><br><b>Troubleshooting</b></p>" .
 
@@ -486,6 +487,5 @@ function chumby_download_file($image_id) {
 }
 
 function chumby_cron() {
-  cleardir(CHUMBY_PATH . '/files');
+  rmoldfiles(CHUMBY_PATH . '/files', HOUR);
 }
-
