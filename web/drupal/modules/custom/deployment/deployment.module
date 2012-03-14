@@ -301,7 +301,10 @@ function deployment_overview_page() {
   foreach ($result as $summary) {
     $id = $summary->id - 1; //Must start from zero
 
-    $legend[$id][$state_title] = '<b>' . l(t($summary->name), 'deployment/list/' . $summary->id) . '</b> - ' . t($summary->description);
+    $legend[$id][$state_title] = '<b>' .
+      l(t($summary->name), 'deployment/list', array('query' => array('state_id' => $summary->id))) .
+      '</b> - ' . t($summary->description);
+
     $legend[$id][$total_title] = $summary->total;
     $total += $summary->total;
   }
