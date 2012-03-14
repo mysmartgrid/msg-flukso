@@ -116,7 +116,8 @@ function chumby_image_page1() {
     'If not, please read the <a href="content/installationsanleitung-des-fluksos">installation procedure</a> and ' . 
     '<a href="content/häufige-fragen-und-antworten">FAQ</a> in order to fix the problem, before taking further steps.');
 
-  $output .= t('Please, click <a href="chumby2">here</a> for more instructions.') . '<br>';
+  $output .= chumby_step(4,
+    'Please, click <a href="chumby2">here</a> for more instructions.');
 
   return $output;
 }
@@ -131,7 +132,7 @@ function chumby_image_page1() {
  */
 function chumby_image_page2($image_id = NULL, $serial = NULL, $function = NULL) {
 
-  $output = chumby_step(4, 'Now, fill in the following form and click the "Send" button.');
+  $output = chumby_step(5, 'Now, fill in the following form and click the "Send" button.');
 
   $form = drupal_get_form('chumby_image_form');
   $output .= drupal_render($form);
@@ -165,21 +166,21 @@ function chumby_image_page3($image_id, $serial, $function) {
   $table = theme_table(array('header' => $headers, 'rows' => $lines, '', 'attributes' => array(),
     'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
 
-  $output = chumby_step(5,
+  $output = chumby_step(6,
     'The image file can be downloaded now. Please click the "download" link in the table bellow.', $table);
 
-  $output .= chumby_step(6, 'After saving the file, uncompress it. You will find 3 ' . 
+  $output .= chumby_step(7, 'After saving the file, uncompress it. You will find 3 ' . 
     'files and 1 folder, as shown in the following picture.',
     "<p align=\"center\"><img src=\"$base_url/files/images/chumby-files.jpg\"/></p>");
 
-  $output .= chumby_step(7, 'Copy them to the the USB stick. Pay attention to the fact that they must be ' . 
+  $output .= chumby_step(8, 'Copy them to the the USB stick. Pay attention to the fact that they must be ' . 
     'placed directly on the USB, and not in a subfolder.');
 
-  $output .= chumby_step(8, 'Plug the USB memory stick on the Chumby, and turn it on. That is it. ' . 
-    'The visualizations should be available now on the Chumby control panel. ' .
-    'Please, note that the USB stick must remain connected to the Chumby.');
+  $output .= chumby_step(9, 'Plug the USB memory stick on the Chumby, and turn it on. That is it. ' . 
+    'The visualizations should be available now on the Chumby control panel. ' . 
+    'Please, note that the USB stick have to remain connected to the Chumby.');
 
-  $output .= "<p><br><b>Troubleshooting</b></p>" .
+  $output .= '<p><br><b>' . t('Troubleshooting') . '</b></p>' .
 
     chumby_problem('The visualizations are not being shown on the control panel.') .
     chumby_solution('Make sure that the USB stick is plugged to the Chumby and restart it.') .
@@ -206,11 +207,11 @@ function chumby_step($number, $message, $complement = NULL) {
 }
 
 function chumby_problem($message) {
-  return '<p><b>' . t('Problem') . " - </b> " . t($message) . '</p>';
+  return '<p><b>' . t('Problem') . " - </b> " . t($message) . '<br>';
 }
 
 function chumby_solution($message) {
-  return '<p><b>' . t('Solution') . " - </b> " . t($message) . '<br></p>';
+  return '<b>' . t('Solution') . " - </b> " . t($message) . '</p>';
 }
 
 function chumby_image_form($form, &$form_state) {
@@ -489,3 +490,4 @@ function chumby_download_file($image_id) {
 function chumby_cron() {
   rmoldfiles(CHUMBY_PATH . '/files', HOUR);
 }
+
