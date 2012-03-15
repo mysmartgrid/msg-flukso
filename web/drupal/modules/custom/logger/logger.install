@@ -1,8 +1,13 @@
 <?php
 
+/**
+ * @file
+ * Install, update and uninstall functions for the logger module.
+ */
+
 function logger_schema() {
   $schema['logger_devices'] = array(
-    'description' => t("Contains the Fluksometer device ID's."),
+    'description' => "Contains the Fluksometer device ID's.",
     'fields' => array(
       'device' => array(
         'type' => 'varchar',
@@ -117,26 +122,26 @@ function logger_schema() {
   );
 
   $schema['logger_meter_type'] = array(
-    'description' => t('Stores the meter types.'),
+    'description' => 'Stores the meter types.',
     'fields' => array(
       'id' => array(
-        'type'      => 'int',
-        'not null'  => TRUE,
+        'type' => 'int',
+        'not null' => TRUE,
         'unasigned' => TRUE,
       ),
       'name' => array(
         'type' => 'varchar',
-        'length'   => '30',
+        'length' => '30',
         'not null' => TRUE,
       ),
     ),
     'primary key' => array(
-      'id'
+      'id',
     ),
   );
 
   $schema['logger_meters'] = array(
-    'description' => t("Contains the Fluksometer meter ID's."),
+    'description' => "Contains the Fluksometer meter ID's.",
     'fields' => array(
       'meter' => array(
         'type' => 'varchar',
@@ -215,7 +220,7 @@ function logger_schema() {
   );
 
   $schema['device_support_request'] = array(
-    'description' => t('Stores device remote support requests via reverse SSH connections.'),
+    'description' => 'Stores device remote support requests via reverse SSH connections.',
     'fields' => array(
       'device' => array(
         'type' => 'varchar',
@@ -231,12 +236,12 @@ function logger_schema() {
       ),
     ),
     'primary key' => array(
-      'device'
+      'device',
     ),
   );
 
   $schema['device_support_slot'] = array(
-    'description' => t('Stores slots for device remote support via reverse SSH connections.'),
+    'description' => 'Stores slots for device remote support via reverse SSH connections.',
     'fields' => array(
       'host' => array(
         'type' => 'varchar',
@@ -262,344 +267,48 @@ function logger_schema() {
       ),
     ),
     'primary key' => array(
-      'host', 'port'
+      'host',
+      'port',
     ),
   );
-  
+
   return $schema;
 }
 
 function logger_install() {
-  drupal_install_schema('logger');
-  drupal_set_message(t('Created logger module tables.'));
+  drupal_set_message(st('Created logger module tables.'));
 
-  $sql = "INSERT INTO {logger_meter_type} (id, name) VALUES (1, 'Consumption')";
-  db_query($sql);
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Consumption',
+    ))
+    ->execute();
 
-  $sql = "INSERT INTO {logger_meter_type} (id, name) VALUES (2, 'Production')";
-  db_query($sql);
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Production',
+    ))
+    ->execute();
+
+  $file_path = drupal_get_path('module', 'logger') . '/data/base';
+  mkdir($file_path, 0777, TRUE);
+
+  $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
+  drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
 }
 
 function logger_uninstall() {
-  drupal_uninstall_schema('logger');
-  drupal_set_message(t('Deleted logger module tables {logger_devices} and {logger_meters}.'));
+  drupal_set_message(st('Deleted logger module tables.'));
+
+  $file_path = drupal_get_path('module', 'logger') . '/data';
+  rrmdir($file_path);
 }
 
-/**
-  * R5.x update
-  */
-function logger_update_1() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN night int unsigned NOT NULL default '0' AFTER access");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-/**
- * update to run with logger module's 6.x code
- */
-function logger_update_6000() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN sha varchar(32) AFTER uid");
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN memtotal smallint unsigned NOT NULL default '0'");
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN memfree smallint unsigned NOT NULL default '0'");
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN memcached smallint unsigned NOT NULL default '0'");
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN membuffers smallint unsigned NOT NULL default '0'");
-      $items[] = update_sql("ALTER TABLE {logger_devices} ADD COLUMN uart_oe smallint unsigned NOT NULL default '0'");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6001() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN corrupted int unsigned NOT NULL default '0' AFTER night");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6002() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_series_color%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_smooting_level%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_step_plot%'");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6003() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN night");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6009() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[0]  = update_sql("CREATE TABLE {logger_meter_type}(id int unsigned NOT NULL, name varchar(30) NOT NULL, PRIMARY KEY (id))");
-      $items[1] = update_sql("INSERT INTO {logger_meter_type} (id, name) VALUES (1, 'Electricity Consumption')");
-      $items[2] = update_sql("INSERT INTO {logger_meter_type} (id, name) VALUES (2, 'Electricity Production')");
-
-      $items[3] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN old_type varchar(16)");
-      $items[4] = update_sql("UPDATE {logger_meters} SET old_type = type");
-      $items[5] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN type");
-      $items[6] = update_sql("ALTER TABLE {logger_meters} ADD COLUMN type int unsigned default 1 AFTER corrupted");
-      $items[7] = update_sql("UPDATE {logger_meters} SET type = NULL WHERE old_type IS NULL");
-      $items[8] = update_sql("ALTER TABLE {logger_meters} DROP COLUMN old_type");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6010() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("UPDATE {logger_meters} SET function = NULL WHERE function = ''");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6011() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_series_color%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_smooting_level%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_step_plot%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_selected_sensor_types_%'");
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_aggregate_sensors_%'");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6012() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_chart_unit%'");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6018() {
-
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'logger_selected_sensor_types_%'");
-
-      $uid = 233;
-      $consumption = TRUE;
-      $items[] = update_sql("INSERT INTO {logger_users} (uid, private) VALUES ($uid, 0)");
-
-      for ($d = 1; $d < 5; $d++) {
-
-        $device = "dvdvdvdvdvdvdvdvdvdvdvdvdvdvdvd$d";
-
-        $items[] = update_sql("
-          INSERT INTO {logger_devices} (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, comment)
-          VALUES ('$device', 1234567$d, $uid, '$device', 1267438611, 1300179603, 102, 0, 29, 260768, 13764, 1148, 4304, 1072, 0, 12, 'DE', NULL)");
-
-        $function = "'Sensor$d'";
-        $type = $consumption? '1' : '2';
-        $consumption = !$consumption;
-
-        for ($m = 1; $m < 5; $m++) {
-
-          $meter = "dvd$d" . "mtmtmtmtmtmtmtmtmtmtmtmtmtm$m";
-
-          $items[] = update_sql("
-            INSERT INTO {logger_meters} (meter, uid, device, created, access, corrupted, type, function, phase, constant, value, factor, unit)
-            VALUES ('$meter', $uid, '$device', 1270386792, 0, 0, $type, $function, NULL, NULL, 0, 1, NULL)");
-
-          $function = 'NULL';
-          $type = 'NULL';
-
-          $token = "dvd$d" . "mtm$m" . "tktktktktktktktktktktkt$m";
-
-          $items[] = update_sql("
-            INSERT INTO {logger_tokens} (token, meter, permissions)
-            VALUES ('$token', '$meter', 62)");
-        }
-      }
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6020() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("
-        DELETE
-          FROM
-            user_relationships
-          WHERE
-            EXISTS(
-              SELECT
-                1
-              FROM
-                user_relationship_types
-              WHERE
-                user_relationships.rtid = user_relationship_types.rtid AND
-                user_relationship_types.name = 'subscription'
-            )");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6021() {
-
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-
-      $uid = 242;
-      $consumption = TRUE;
-      $items[] = update_sql("INSERT INTO {logger_users} (uid, private) VALUES ($uid, 0)");
-
-      for ($d = 6; $d < 8; $d++) {
-
-        $device = "dvdvdvdvdvdvdvdvdvdvdvdvdvdvdvd$d";
-
-        $items[] = update_sql("
-          INSERT INTO {logger_devices} (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, comment)
-          VALUES ('$device', 1234567$d, $uid, '$device', 1267438611, 1300179603, 102, 0, 29, 260768, 13764, 1148, 4304, 1072, 0, 12, 'DE', NULL)");
-
-        $function = "'Sensor$d'";
-        $type = $consumption? '1' : '2';
-        $consumption = !$consumption;
-
-        for ($m = 1; $m < 5; $m++) {
-
-          $meter = "dvd$d" . "mtmtmtmtmtmtmtmtmtmtmtmtmtm$m";
-
-          $items[] = update_sql("
-            INSERT INTO {logger_meters} (meter, uid, device, created, access, corrupted, type, function, phase, constant, value, factor, unit)
-            VALUES ('$meter', $uid, '$device', 1270386792, 0, 0, $type, $function, NULL, NULL, 0, 1, NULL)");
-
-          $function = 'NULL';
-          $type = 'NULL';
-
-          $token = "dvd$d" . "mtm$m" . "tktktktktktktktktktktkt$m";
-
-          $items[] = update_sql("
-            INSERT INTO {logger_tokens} (token, meter, permissions)
-            VALUES ('$token', '$meter', 62)");
-        }
-      }
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6025() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_devices} CHANGE `sha` `sha` VARCHAR( 32 ) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items; 
-}
-
-function logger_update_6033() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("CREATE TABLE {device_support_request}(device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, requested int unsigned NOT NULL, PRIMARY KEY (device))");
-      $items[] = update_sql("CREATE TABLE {device_support_slot}(host VARCHAR(40) CHARACTER SET utf8 COLLATE utf8_general_ci, port int unsigned NOT NULL, username VARCHAR(15) CHARACTER SET utf8 COLLATE utf8_general_ci, device VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci, PRIMARY KEY (host, port))");
-
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19990, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19991, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19992, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19993, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19994, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19995, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19996, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19997, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19998, 'support')");
-      $items[] = update_sql("INSERT INTO {device_support_slot} (host, port, username) VALUES ('support1.mysmartgrid.de', 19999, 'support')");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items;
-}
-
-function logger_update_6040() {
-  $items = array();
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      $items[] = update_sql("ALTER TABLE {logger_meters} DROP corrupted");
-      break;
-    case 'pgsql':
-      break;
-  }
-  return $items; 
+function logger_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
 }

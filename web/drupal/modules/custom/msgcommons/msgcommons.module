@@ -1,0 +1,419 @@
+<?php
+
+/**
+ * @file
+ * This module provides common functions shared by other MSG modules.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('SECOND',  1);
+define('MINUTE', 60);
+define('HOUR',   60 * MINUTE);
+define('DAY',    24 * HOUR);
+define('WEEK',    7 * DAY);
+define('MONTH',  30 * DAY);
+define('YEAR',   52 * WEEK);
+
+define('HOUR_UNIT_ID',   2);
+define('WATT_UNIT_ID',   3);
+define('WEEK_UNIT_ID',   6);
+define('DAY_UNIT_ID',    5);
+
+
+/**
+ * Forwards a remote execution to a JobQueue System.
+ * 
+ * @param $algorithm The JobQueue target algorithm.
+ * @param $data      The execution data.
+ */
+function jobqueue_produce($algorithm, $data) {
+
+  $command = "export HOME=/tmp; /usr/bin/producer.rb -v -c /usr/local/lib/msg-qworker/etc/qproducerrc -a $algorithm";
+  if ($data) {
+    $command .= " -p $data";
+  }
+
+  /*
+  //Debug
+  //Redirect error output to default output
+  $command .= " 2>&1";
+  exec($command, $output, $return);
+  */
+
+  exec($command);
+
+  /*
+  //Debug
+  $file = "/tmp/jobqueue.txt";
+  $fh = fopen($file, 'w');
+  fwrite($fh, $command);
+
+  foreach($output as $line) {
+    fwrite($fh, "\n$line");
+  }
+
+  fwrite($fh, "\n return: $return \n");
+  fclose($fh);
+  */
+}
+
+/**
+ * Sends an e-mail via the job queue system.
+ *
+ * @param $emails       The e-mail destinatary addresses, separated by space, new line char, or tab char.
+ * @param $subject      The e-mail subject.
+ * @param $body         The e-mail body.
+ * @param $attachments  The e-mail attachments (optional).
+ * @param $from         The e-mail sender address (optional).
+ */
+function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $from = 'mySmartGrid <noreply@mysmartgrid.de>') {
+
+  foreach (tokenize_string($emails) as $to) {
+
+    $main_boundary = "email_part_boundary";
+    $alternative_boundary = "email_alternative_boundary";
+
+    $main_header = "Content-Type: multipart/related; boundary=\"$main_boundary\"";
+
+    $parts =
+      "--$main_boundary\n" .
+      "Content-Type: multipart/alternative; boundary=\"$alternative_boundary\"\n\n" .
+
+      "--$alternative_boundary\n" .
+      "Content-Type: text/plain; charset=\"UTF-8\"\n" .
+      "Content-Transfer-Encoding: 8bit\n" .
+      "\n" .
+      html2txt($body) . "\n" .
+
+      "--$alternative_boundary\n" .
+      "Content-Type: text/html; charset=\"UTF-8\"\n" .
+      "Content-Transfer-Encoding: quoted-printable\n" .
+      "\n" .
+      $body . "\n" .
+
+      "--$alternative_boundary--\n";
+
+    foreach ($attachments as $attachment) {
+
+      $parts .=
+        "--$main_boundary\n" .
+        "Content-Type: " . $attachment['content_type'] . "\n" .
+        "Content-ID: " . $attachment['cid'] . "\n" .
+        "Content-Disposition: attachment;\n" .
+        " filename=" . $attachment['file_name'] . "\n" .
+        "Content-Transfer-Encoding: base64\n" .
+        "\n" .
+        base64_encode($attachment['content']) . "\n";
+    }
+    $parts .= "--$main_boundary--";
+
+    $mail = base64_encode("Header::$main_header|From::$from|To::$to|Subject::$subject|Body::$parts");
+
+    // Needs the qworker running, add control mechanism in order to check and restart if not running
+    jobqueue_produce("mail", $mail);
+  }
+}
+
+/**
+ * Converts a string containing a list of tokens into an array.
+ *
+ * @param $str  The string containing the tokens.
+ * @param $sep  The token separators. Default: space, new line char, or tab char.
+ * @return an array of tokens.
+ */
+function tokenize_string($str, $sep = " \n\r") {
+
+  $token = strtok($str, $sep);
+
+  $tokens = array();
+  while ($token !== FALSE) {
+    $tokens[] = trim($token, $sep);
+    $token = strtok($sep);
+  }
+  return $tokens;
+}
+
+/**
+ * Downloads a chart data file.
+ */
+function download_chart_data_file($file_name, $header, $lines) {
+
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-disposition', "attachment; filename=$file_name.txt");
+
+  print $header . PHP_EOL . $lines;
+  exit(0);
+}
+
+/**
+ * Copies a file or directory recursively.
+ *
+ * @param  $source       The source path
+ * @param  $destination  The destination path
+ * @return TRUE on success, FALSE on failure.
+ */
+function rcopy($source, $destination) {
+
+  if (is_link($source)) {
+    return symlink(readlink($source), $destination);
+  }
+  if (is_file($source)) {
+    return copy($source, $destination);
+  }
+  if (!is_dir($destination)) {
+    mkdir($destination);
+  }
+
+  $dir = dir($source);
+  while (false !== $entry = $dir->read()) {
+    if ($entry == '.' || $entry == '..') {
+      continue;
+    }
+    rcopy("$source/$entry", "$destination/$entry");
+  }
+  $dir->close();
+  return TRUE;
+}
+
+/**
+ * Removes a directory recursively.
+ *
+ * @param $dir The directory to be removed.
+ */
+function rrmdir($dir) {
+
+  if (is_dir($dir)) {
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype("$dir/$object") == "dir") {
+          rrmdir("$dir/$object");
+        }
+        else {
+          unlink("$dir/$object");
+        }
+      }
+    }
+    reset($objects);
+    rmdir($dir);
+  }
+}
+
+/**
+ * Removes files in a directory which are older than a certain age.
+ *
+ * @param $dir      The directory where the files are.
+ * @param $max_age  The maximum file age.
+ */
+function rmoldfiles($dir, $max_age) {
+
+  if (is_dir($dir)) {
+    $now = time();
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype("$dir/$object") == "file") {
+          $file = "$dir/$object";
+          if (($now - filectime($file)) > $max_age) {
+            unlink($file);
+          }
+        }
+      }
+    }
+    reset($objects);
+  }
+}
+
+/**
+ * Removes the content of a directory.
+ *
+ * @param $path The directory to be cleared.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function cleardir($path) {
+  rmfiles("$path/*");
+}
+
+/**
+ * Removes files that match the informed pattern.
+ *
+ * @param $path The directory where the files are.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function rmfiles($path) {
+  array_map("unlink", glob($path));
+}
+
+/**
+ * Compresses files and directories into a zip file recursively.
+ *
+ * @param $source       The files to be compressed.
+ * @param $destination  The zip file location.
+ * @return TRUE on success, FALSE on failure.
+ */
+function rzip($source, $destination) {
+
+  if (!extension_loaded('zip') || !file_exists($source)) {
+    return FALSE;
+  }
+
+  $zip = new ZipArchive();
+  if (!$zip->open($destination, ZIPARCHIVE::CREATE)) {
+    return FALSE;
+  }
+
+  $source = str_replace('\\', '/', realpath($source));
+
+  if (is_dir($source) === TRUE) {
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
+
+    foreach ($files as $file) {
+        $file = str_replace('\\', '/', realpath($file));
+
+        if (is_dir($file) === TRUE) {
+          $dir = str_replace($source . '/', '', $file . '/');
+
+          //FIXME: remove this test
+          if (strpos($dir, '/') > 0) {
+            $zip->addEmptyDir($dir);
+          }
+        }
+        elseif (is_file($file) === TRUE) {
+          $zip->addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
+        }
+    }
+  }
+  elseif (is_file($source) === TRUE) {
+    $zip->addFromString(basename($source), file_get_contents($source));
+  }
+  return $zip->close();
+}
+
+/**
+ * Returns the timezone offset.
+ *
+ * @param $name The timezone name.
+ * @return the timezone offset.
+ */
+function get_timezone_offset($name = NULL) {
+
+  global $user;
+
+  if (!isset($name)) {
+    if (isset($user) && isset($user->timezone)) {
+      $name = $user->timezone;
+    }
+    else {
+      $name = date_default_timezone_get();
+    }
+  }
+
+  $tz = new DateTimeZone($name);
+  return $tz->getOffset(new DateTime);
+}
+
+/**
+ * Converts unix timestamp to user local time.
+ * 
+ * @param $unix The unix timestamp.
+ * @return the converted time.
+ */
+function unixtime_to_localtime($unixtime) {
+
+  $offset = get_timezone_offset();
+  $localtime = gmdate('r', $unixtime + $offset);
+  return substr($localtime, 0, strlen($localtime) - 6);
+}
+
+/**
+ * Formats timestamp as a readable string informing days and hours.
+ * 
+ * @param $seconds The timestamp in seconds.
+ * @return the converted string.
+ */
+function seconds_to_dayshours($seconds) {
+  $days = intval($seconds / DAY);
+  $hours = intval(($seconds % DAY) / HOUR);
+  return sprintf('%d days %d hours', $days, $hours);
+}
+
+/**
+ * Formats a hashcode for exhibition in a table.
+ *
+ * @param $hash The hashcode to be formatted.
+ * @return the formatted code.
+ */
+function format_hashcode($hash) {
+  $length = floor(strlen($hash) / 2);
+  return substr($hash, 0, $length) . '<br>' . substr($hash, $length);
+}
+
+/**
+ * Finds a role by name, and returns its id.
+ * 
+ * @param $name  The role name.
+ * @return the role id.
+ */
+function get_role_id($name) {
+  return db_select('role', 'r')
+    ->fields('r', array('rid'))
+    ->condition('r.name', $name, '=')
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Converts HTML code into plain text.
+ *
+ * @param $html  The HTML code.
+ * @return the plain text.
+ */
+function html2txt($html) {
+
+  $html = html_entity_decode($html, ENT_COMPAT, 'UTF-8');
+
+  //remove style tags. m = PCRE_MULTILINE, s = PCRE_DOTALL
+  $text = preg_replace("/<style.*?<\/style>/ms", "", $html);
+
+  //find link tags ..
+  $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
+    //.. and replace them with the actual link
+    create_function('$treffer',
+      'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $link);
+       preg_match("/(<a.*?>(.*?)<\/a.*?>)/", $treffer[1], $txt);
+       return $txt[1] . " \'" . $link[1] . "\'";'
+    ),
+    $text);
+
+  //replace <br> and </p> with linebreaks
+  $text = preg_replace("/<br.*?>/", "\n", $text);
+  $text = preg_replace("/<\/p>/", "\n\n", $text);
+
+  //replace list items with *
+  $text = preg_replace("/<li.*?>/", "* ", $text);
+
+  $text = preg_replace("/<\/tr>/", "\n", $text);
+  $text = preg_replace("/<\/th>/", "\t", $text);
+  $text = preg_replace("/<\/td>/", "\t", $text);
+
+  //remove all other tags
+  return preg_replace("/<.*?>/", "", $text);
+}

@@ -1,0 +1,122 @@
+<?php
+
+/**
+ * @file
+ * Tests for module Logger.
+ */
+
+class LoggerTestCase extends DrupalWebTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => 'MSG Logger functionality',
+      'description' => 'Test mySmartGrid logger functions.',
+      'group' => 'mySmartGrid'
+    );
+  }
+
+  /**
+   * Tests function logger_rrd_get_storage_periods.
+   */
+  function testRRDGetStoragePeriods() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');    
+
+    $periods = logger_rrd_get_storage_periods();
+    $this->assertEqual(4, sizeof($periods));
+
+    foreach($periods as $resolution => $period) {
+      $this->assertEqual(0, $resolution % MINUTE);
+      $this->assertEqual(0, $period % DAY);
+    }
+  }
+
+  /**
+   * Tests function logger_rrd_get_storage_period.
+   */
+  function testRRDGetStoragePeriod() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');
+
+    $periods = logger_rrd_get_storage_periods();
+
+    foreach($periods as $resolution => $period) {
+      $return = logger_rrd_get_storage_period($resolution);
+      $this->assertEqual($return, $period);
+    }
+  }
+
+
+  /**
+   * Tests function logger_rrd_file.
+   */
+  function testRRDFile() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');
+
+    $meter = "1234567890123456789012345678902";
+
+    $file_path = logger_rrd_file($meter);
+    $this->assertEqual(LOGGER_PATH . "/data/base/$meter.rrd", $file_path);
+  }
+
+  /**
+   * Tests function logger_rrd_create.
+   */
+  function testRRDCreate() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');
+
+    $meter = "1234567890123456789012345678902";
+
+    $return = logger_rrd_base_create($meter);
+    $this->assertTrue($return);
+
+    $file_path = logger_rrd_file($meter);
+    $this->assertTrue(file_exists($file_path));
+
+    unlink($file_path);
+  }
+
+  /**
+   * Tests function logger_rrd_remove.
+   */
+  function testRRDRemove() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');
+
+    $meter = "1234567890123456789012345678902";
+    $return = logger_rrd_remove($meter);
+
+    $this->assertFalse($return);
+
+    logger_rrd_base_create($meter); 
+    $return = logger_rrd_remove($meter);
+
+    $this->assertTrue($return);
+
+    $file_path = logger_rrd_file($meter);
+    $this->assertFalse(file_exists($file_path));
+  }
+
+  /**
+   * Tests function logger_rrd_remove.
+   */
+  function testRRDClear() {
+
+    module_load_include('inc', 'logger', 'logger.rrd');
+
+    $meter = "1234567890123456789012345678902";
+    $return = logger_rrd_clear($meter);
+
+    $this->assertFalse($return);
+
+    logger_rrd_base_create($meter);
+    $return = logger_rrd_clear($meter);
+
+    $this->assertTrue($return);
+
+    $file_path = logger_rrd_file($meter);
+    $this->assertTrue(file_exists($file_path));
+  }
+}

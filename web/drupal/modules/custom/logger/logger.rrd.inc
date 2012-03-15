@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * Callbacks for accessing RRDs.
  *
  * Copyright (c) 2008-2009 jokamajo.org
@@ -23,9 +24,7 @@
  */
 
 //Constants
-//Some constants need to be redefined because this file can be called from xmlrpc.php
-//drupal_get_path does not work, because xmlrpc.php is called from xmlrpc.php.
-define('RRDTOOL_PATH', 'sites/all/modules/logger');
+define('RRDTOOL_PATH', DRUPAL_ROOT . '/sites/all/modules/logger');
 define('RRDTOOL', RRDTOOL_PATH . '/rrdtool');
 define('METER', 'meter');
 
@@ -37,10 +36,9 @@ define('METER', 'meter');
  */
 function logger_rrd_base_create($meter) {
 
-  $step = 1 * MINUTE;
-  $archives = _logger_rrd_get_storage_periods();
+  $archives = logger_rrd_get_storage_periods();
 
-  return _logger_rrd_create($meter, $step, 'DERIVE', $archives);
+  return logger_rrd_create($meter, MINUTE, 'DERIVE', $archives);
 }
 
 /**
@@ -48,13 +46,14 @@ function logger_rrd_base_create($meter) {
  *
  * @return the array of storage periods.
  */
-function _logger_rrd_get_storage_periods() {
+function logger_rrd_get_storage_periods() {
   return array(
-     //resolution   storage period
-     1 * MINUTE =>  1 * WEEK,
-    15 * MINUTE =>  1 * MONTH,
-     1 * DAY    =>  6 * MONTH,
-     1 * WEEK   => 10 * YEAR);
+    //resolution   storage period
+    1 * MINUTE => 1 * WEEK,
+    15 * MINUTE => 1 * MONTH,
+    1 * DAY => 6 * MONTH,
+    1 * WEEK => 10 * YEAR,
+  );
 }
 
 /**
@@ -64,7 +63,7 @@ function _logger_rrd_get_storage_periods() {
  * @return the storage period.
  */
 function logger_rrd_get_storage_period($step) {
-  $periods = _logger_rrd_get_storage_periods();
+  $periods = logger_rrd_get_storage_periods();
   return $periods[$step];
 }
 
@@ -77,13 +76,13 @@ function logger_rrd_get_storage_period($step) {
  * @param $archives  An array of RRD archives' properties formatted as (resolution => storage period).
  * @return the creation command execution code.
  */
-function _logger_rrd_create($meter, $step, $ds_type, $archives) {
+function logger_rrd_create($meter, $step, $ds_type, $archives) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter);
+  $file_path = logger_rrd_file($meter);
   $start = 1199487600; //Fri, 04 Jan 2008 23:00:00 GMT
 
-  $ds = _logger_rrd_meter_ds($ds_type);
+  $ds = logger_rrd_meter_ds($ds_type);
 
   if (!file_exists($file_path)) {
 
@@ -91,9 +90,40 @@ function _logger_rrd_create($meter, $step, $ds_type, $archives) {
       "--start $start " .
       "--step $step " .
       "$ds " .
-      _logger_rrd_rras($step, $archives);
+      logger_rrd_rras($step, $archives);
+
+    system($command, $return);
   }
-  return $return;
+  return $return == 0;
+}
+
+/**
+ * Removes an RRD file.
+ *
+ * @param $meter     The sensor's id.
+ * @return TRUE if successful, FALSE otherwise. 
+ */
+function logger_rrd_remove($meter) {
+
+  $file_path = logger_rrd_file($meter);
+
+  if (file_exists($file_path)) {
+    return unlink($file_path);
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Recreates an RRD file.
+ *
+ * @param $meter     The sensor's id.
+ * @return TRUE if successful, FALSE otherwise.
+ */
+function logger_rrd_clear($meter) {
+
+  return logger_rrd_remove($meter) && logger_rrd_base_create($meter);
 }
 
 /**
@@ -102,7 +132,7 @@ function _logger_rrd_create($meter, $step, $ds_type, $archives) {
  * @param $type  The DS type.
  * @return the DS definition.
  */
-function _logger_rrd_meter_ds($type) {
+function logger_rrd_meter_ds($type) {
 
   $name = METER;
   $timeout = 100 * DAY;
@@ -119,10 +149,10 @@ function _logger_rrd_meter_ds($type) {
  * @param $archives  The array of RRD archives' properties formatted as (resolution => storage period).
  * @return the list of RRD archives' definitions.
  */
-function _logger_rrd_rras($step, $archives) {
-  
+function logger_rrd_rras($step, $archives) {
+
   $rras = '';
-  foreach($archives as $resolution => $storage_period) {
+  foreach ($archives as $resolution => $storage_period) {
 
     $rows = $resolution / $step;
     $slots = $storage_period / $resolution;
@@ -142,19 +172,19 @@ function _logger_rrd_rras($step, $archives) {
 function logger_rrd_update($meter, $values) {
 
   $return = 0;
-  $file_path = _logger_rrd_file($meter);
+  $file_path = logger_rrd_file($meter);
 
   $command = RRDTOOL . " update $file_path ";
 
   ksort($values);
 
-  foreach($values as $timestamp => $value) {
+  foreach ($values as $timestamp => $value) {
     $command .= " $timestamp:$value";
   }
 
   system($command, $return);
 
-  return $return;
+  return $return == 0;
 }
 
 /**
@@ -163,19 +193,19 @@ function logger_rrd_update($meter, $values) {
  * @param $interval     The time interval. This argument is used to select the RRA.
  * @param $sensor       The sensor.
  * @param $unit         The power unit.
- * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
+ * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step) {
+function logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price = NULL) {
 
   $series_id = METER;
-  $def = _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit);
+  $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price);
 
-  $latest = _logger_rrd_latest_timestamp($interval, $sensor);
+  $latest = logger_rrd_latest_timestamp($interval, $sensor);
 
-  return _logger_rrd_export($interval, $def, $series_id, $latest, $offset, TRUE, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, $latest, TRUE, $period, $step);
 }
 
 /**
@@ -185,9 +215,9 @@ function logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $s
  * @param $sensor    The sensor.
  * @return the latest update timestamp.
  */
-function _logger_rrd_latest_timestamp($interval, $sensor) {
+function logger_rrd_latest_timestamp($interval, $sensor) {
 
-  $file_path = _logger_rrd_file($sensor->meter);
+  $file_path = logger_rrd_file($sensor->meter);
 
   $command = RRDTOOL . " last $file_path";
   exec($command, $lines);
@@ -201,15 +231,15 @@ function _logger_rrd_latest_timestamp($interval, $sensor) {
  * @param $interval     The time interval.
  * @param $sensors      The array of sensors.
  * @param $unit         The power unit.
- * @param $offset       The user timezone offset.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
+ * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'. 
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $step) {
+function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price = NULL) {
 
   //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = time() - 15 * MINUTE;
+  $end_time = REQUEST_TIME - 15 * MINUTE;
   $def = "";
   $variables = "";
 
@@ -218,7 +248,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
 
     $sensor_cdef = METER . $i;
 
-    $def .= _logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit) .
+    $def .= logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price) .
 
       //Considers unknown measurements to be zero
       "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
@@ -237,7 +267,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return _logger_rrd_export($interval, $def, $series_id, time(), $offset, false, $period, $step);
+  return logger_rrd_export($interval, $def, $series_id, REQUEST_TIME, FALSE, $period, $step);
 }
 
 /**
@@ -246,19 +276,20 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $offset, $period, $ste
  * @param $sensors    The sensors whose measurements are to be summed up.
  * @param $unit       The energy unit.
  * @param $interval   The time interval menu option.
- * @param $offset     The user timezone offset.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
+ * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
  * @return the summed power consumption.
  */
-function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $step) {
+function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step, $prices = NULL) {
 
   $total = 0;
 
   foreach ($sensors as $sensor) {
-    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $offset, $period, $step);
+    $price = isset($prices[$sensor->type_id]) ? $prices[$sensor->type_id] : NULL;
+    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price);
 
-    foreach($measurements as $timestamp => $value) {
+    foreach ($measurements as $timestamp => $value) {
       $total += $value * $step;
     }
   }
@@ -272,17 +303,19 @@ function logger_rrd_query_energy($sensors, $unit, $interval, $offset, $period, $
  * @param $series_id   The series id.
  * @param $sensor      The sensor.
  * @param $unit        The unit.
+ * @param $price       The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the DEF tag.
  */
-function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
+function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price = NULL) {
 
   global $user;
-  $factor = _logger_rrd_get_unit_factor($unit, $sensor->price);
 
-  if($sensor->private > 0 && $sensor->uid != $user->uid) {
-    return null;
+  if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid) {
+    return NULL;
   }
-  $file_path = _logger_rrd_file($sensor->meter);
+
+  $factor = logger_rrd_get_unit_factor($unit, $price);
+  $file_path = logger_rrd_file($sensor->meter);
 
   return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
     "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
@@ -290,11 +323,11 @@ function _logger_rrd_sensor_def($interval, $series_id, $sensor, $unit) {
 
 /**
  * Composes RRD file path.
- * 
+ *
  * @param $meter     The sensor id.
  * @return the RRD file path.
  */
-function _logger_rrd_file($meter) {
+function logger_rrd_file($meter) {
 
   return RRDTOOL_PATH . "/data/base/$meter.rrd";
 }
@@ -305,13 +338,12 @@ function _logger_rrd_file($meter) {
  * @param $def           The rrd def tag.
  * @param $exported_cdef The exported cdef.
  * @param $latest        The latest update time.
- * @param $offset        The user timezone offset.
  * @param $include_nan   Whether NaN values should be included in the result.
  * @param $period        An array containing a period of time to be queried.
  * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $include_nan, $period, $step) {
+function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();
@@ -326,12 +358,12 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
 
   $storage_period = logger_rrd_get_storage_period($step);
 
-  if ((time() - $end) > $storage_period) {
+  if ((REQUEST_TIME - $end) > $storage_period) {
     return array();
   }
 
   $maxrows = 1 + ($end - $start) / $step;
-  $maxrows = $maxrows < 10? 10: $maxrows; //RRDTool exports at least 8 rows
+  $maxrows = $maxrows < 10 ? 10 : $maxrows; //RRDTool exports at least 8 rows
 
   $command = RRDTOOL . ' xport ' .
     "--start $start " .
@@ -341,32 +373,37 @@ function _logger_rrd_export($interval, $def, $exported_cdef, $latest, $offset, $
     "$def " .
     "XPORT:$exported_cdef";
 
+  //DEBUG
+  //$fh = fopen('/tmp/rrd.command.txt', 'w');
+  //fwrite($fh, $command);
+  //fclose($fh);
+
+  $lines = array();
   exec($command, $lines);
 
-  return _logger_rrd_parse_exported_lines($lines, $offset);
+  return logger_rrd_parse_exported_lines($lines);
 }
 
 /**
  * Parses output of command rrdtool xport into an array.
- * 
+ *
  * @param $lines   The lines to be exported.
- * @param $offset  The user timezone offset.
  * @return the array of sensors' measurements.
  */
-function _logger_rrd_parse_exported_lines($lines, $offset) {
+function logger_rrd_parse_exported_lines($lines) {
 
   $data = array();
 
-  foreach($lines as $line) {
+  foreach ($lines as $line) {
     $line = strtolower($line);
 
     if (strpos($line, '<row>') > 0) {
 
-      $line = str_replace(array('<row><t>', '</v></row>'), '',  $line);
+      $line = str_replace(array('<row><t>', '</v></row>'), '',   $line);
       $line = str_replace('</t><v>', ':', $line);
       $div_pos = strpos($line, ':');
 
-      $timestamp = trim(substr($line, 0, $div_pos)) + $offset;
+      $timestamp = trim(substr($line, 0, $div_pos));
       $value = trim(substr($line, $div_pos + 1));
 
       if ($value != 'nan') {
@@ -377,23 +414,30 @@ function _logger_rrd_parse_exported_lines($lines, $offset) {
   return $data;
 }
 
-function _logger_rrd_get_unit_factor($unit, $price = NULL) {
+/**
+ * Returns the unit conversion factor.
+ * 
+ * @param $unit  the unit.
+ * @param $price the price (if the unit is Euro).
+ * @return the unit conversion factor.
+ */
+function logger_rrd_get_unit_factor($unit, $price = NULL) {
 
-  $factors['eur'] = 0.018; // € 0.18 / kWh
+  $factors['eur'] = 0.00018; // € 0.18 / kWh
   $factors['Wh']  = 1;
   $factors['kWh'] = 0.001;
 
-  $factors['watt']     = 3600;  // 1Wh/s = 3600 W
+  $factors['watt']     = 3600; // 1Wh/s = 3600 W
   $factors['kWh/year'] = 31536; //($factors['watt'] / 1000) * 24 * 365;
-  $factors['eur/year'] = $factors['kWh/year'] * $factors['eur'] * 10;  // € 0.18 / kWh
+  $factors['eur/year'] = $factors['kWh/year'] * $factors['eur'] * 1000; // € 0.18 / kWh
 
   if ($unit == 'eur' && $price) {
     return $price * $factors['kWh'];
-
-  } else if ($unit == 'eur/year' && $price) {
+  }
+  elseif ($unit == 'eur/year' && $price) {
     return $price * $factors['kWh/year'];
-    
-  } else {
+  }
+  else {
     return $factors[$unit];
   }
 }

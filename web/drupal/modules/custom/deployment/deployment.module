@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * This module allows the user to see devices' statuses.
  *
  * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
@@ -29,16 +30,20 @@ define('OFFLINE_STATE_ID',            6);
 define('NO_MEASUREMENT_STATE_ID',     7);
 define('NO_HEARTBEAT_STATE_ID',       8);
 
-//FIXME get value from notification.module
-define('CORRUPTED_MESSAGE_EVENT_ID',103);
-
-define('DEPLOYMENT_PATH', drupal_get_path('module', 'deployment'));
+define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
+define('DEPLOYMENT_PATH', DRUPAL_ROOT . '/' . DEPLOYMENT_REL_PATH);
 
 
-function deployment_perm() {
+function deployment_permission() {
   return array(
-    'device deployment overview',
-    'print activation code'
+    'device deployment overview' => array(
+      'title' => t('device deployment overview'),
+      'description' => t('Access the Deployment Overview page.'),
+    ),
+    'print activation code' => array(
+      'title' => t('print activation code.'),
+      'description' => t('Print device activation code.'),
+    )
   );
 }
 
@@ -49,94 +54,216 @@ function deployment_settings_access($permission, $account) {
 function deployment_menu() {
 
   $items['deployment'] = array(
-    'title'             => 'Device',
-    'page callback'     => 'deployment_overview_page',
-    'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_NORMAL_ITEM
+    'title' => 'Device',
+    'page callback' => 'deployment_overview_page',
+    'access arguments' => array('device deployment overview'),
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['deployment/list'] = array(
-    'title'             => 'Device List',
-    'page callback'     => 'deployment_list_page',
-    'page arguments'    => array(2),
-    'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_NORMAL_ITEM
+    'title' => 'Device List',
+    'page callback' => 'deployment_list_page',
+    'access arguments' => array('device deployment overview'),
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['deployment/overview'] = array(
-    'title'             => 'Deployment Overview',
-    'page callback'     => 'deployment_overview_page',
-    'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_NORMAL_ITEM
+    'title' => 'Deployment Overview',
+    'page callback' => 'deployment_overview_page',
+    'access arguments' => array('device deployment overview'),
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['deployment/checkup'] = array(
-    'title'             => 'Device Check Up',
-    'page callback'     => 'drupal_get_form',
-    'page arguments'    => array('deployment_checkup_form'),
-    'access arguments'  => array('device deployment overview'),
-    'type'              => MENU_NORMAL_ITEM
+    'title' => 'Device Check Up',
+    'page callback' => 'deployment_checkup_page',
+    'page arguments' => array(2, 3),
+    'access arguments' => array('device deployment overview'),
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['deployment/print'] = array(
-    'title'            => "Print Code",
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('deployment_printcode_form'),
+    'title' => "Print Code",
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('deployment_printcode_form'),
     'access arguments' => array('print activation code'),
-    'type'             => MENU_NORMAL_ITEM,
+    'type' => MENU_NORMAL_ITEM,
   );
 
   $items['deployment/list/file'] = array(
-    'title'            => 'Downloads a deployment list file',
-    'page callback'    => '_deployment_download_list_file',
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
+    'title' => 'Downloads a deployment list file',
+    'page callback' => 'deployment_download_list_file',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
   );
 
   $items['deployment/chart/file'] = array(
-    'title'            => 'Downloads a deployment chart file',
-    'page callback'    => '_depolyment_download_chart_file',
-    'access callback'  => TRUE,
-    'type'             => MENU_CALLBACK
+    'title' => 'Downloads a deployment chart file',
+    'page callback' => 'deployment_download_chart_file',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
   );
   return $items;
 }
 
 /**
- * Builds the device list page.
+ * Builds the device checkup page.
  *
+ * @param $param_name   The param name (either 'serial', or 'device').
+ * @param $param_value  The param velue (either the serial number or the device id).
+ * @return the device checkup page.
+ */
+function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
+
+  $form = drupal_get_form('deployment_checkup_form');
+  $output = drupal_render($form);
+
+  if ($param_name && $param_value) {
+
+    $result = deployment_get_devices(array($param_name => $param_value));
+
+    if (empty($result)) {
+      $output .= '<br><br>' . t('No device was found with such serial number or id.');
+    }
+    else {
+      $device = $result[0];
+      $latest = array('%latest' => $device['latest']);
+      $message = ''; 
+
+      switch ($device['state_id']) {
+
+        case UNINSTALLED_STATE_ID:
+          $message = t('This device has not yet been installed.');
+          break;
+
+        case UNREGISTERED_STATE_ID:
+          $message = t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest);
+          break;
+
+        case NO_COMMUNICATION_STATE_ID:
+        case OFFLINE_STATE_ID:
+          $message = t('No message has been received from this device since %latest.', $latest);
+          break;
+
+        case NO_MEASUREMENT_STATE_ID:
+          $message = t('No measurement has been received from this device since %latest.', $latest);
+          break;
+
+        case NO_HEARTBEAT_STATE_ID:
+          $message = t('No heartbeat has been received from this device since %latest.', $latest);
+          break;
+
+        case CORRUPTED_STATE_ID:
+          $message = t('This device has sent a message with corrupted data at %latest.', $latest);
+          break;
+
+        case WORKING_STATE_ID:
+          $message = t('This device is working fine. Latest message received at %latest.', $latest);
+          break;
+      }
+
+      $operations = l(t('Device History'), 'event/log/list/' . $device['device']);
+      if (user_access('remove device')) {
+        $operations .= '<br>' . l(t('Remove device and all its related data'), 'device/remove/' . $device['device']);
+      }
+
+      $rows = array(
+        array(t('Serial Number'), $device['serial']),
+        array(t('Device Id'), $device['device']),
+        array(t('User'), $device['name']),
+        array(t('E-mail'), $device['email']),
+        array(t('Status'), $device['state'] . "<br>$message"),
+        array(t('Operations'), $operations));
+
+      $output .= '<br><br><br><br>' . theme_table(array('header' => NULL, 'rows' => $rows, 'attributes' => array(),
+        'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    
+      $result = db_select('logger_meters', 'm')
+        ->fields('m', array('meter', 'function'))
+        ->condition('m.device', $device['device'], '=')
+        ->orderBy('m.function', 'DESC')
+        ->execute();
+
+      $sensors = array();
+      while ($sensor = $result->fetchAssoc()) {
+        $sensors[] = $sensor;
+      }
+
+      $header = array(t('Sensor Id'), t('Function'));
+    
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $sensors, 'attributes' => array(),
+        'caption' => t('Sensors'), 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+  }
+  return $output;
+}
+
+/**
+ * Builds the device list page.
+ * The page expects the following optional request parameters:
+ *   state_id   The state id.
+ *   user_name  The user name.
+ *   email      Part of the user email.
  * @return the device list page.
  */
-function deployment_list_page($id = NULL) {
+function deployment_list_page() {
 
   drupal_set_title(t('Device List'));
 
-  $state_id = $id > 0 ? $id : (isset($_SESSION['state_id']) ? $_SESSION['state_id'] : 0);
-
-  $output = drupal_get_form('deployment_listfilter_form', $state_id);
-
-  $headers = array(
-    array('data' => t('Device'),        'field' => 'serial', 'sort'=> 'asc'),
-    array('data' => t('User'),          'field' => 'name'),
-    array('data' => t('E-mail'),        'field' => 'email'),
-    array('data' => t('Latest Update'), 'field' => 'latest'),
+  $header = array(
+    array(
+      'data' => t('Serial'),
+      'field' => 'serial',
+      'sort' => 'asc'
+    ),
+    array(
+      'data' => t('Device Id'),
+      'field' => 'device'
+    ),
+    array(
+      'data' => t('User'),
+      'field' => 'name'
+    ),
+    array(
+      'data' => t('E-mail'),
+      'field' => 'email'
+    ),
+    array(
+      'data' => t('Latest Update'),
+      'field' => 'latest'
+    ),
     array('data' => t('State'))
   );
 
-  $limit = 15;
-  $data = _deployment_get_devices($state_id, $headers, $limit);
-  foreach ($data as &$device) {
-    $device['serial'] = l($device['serial'], 'event/log/list/' . $device['serial']);
-    $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
-    unset($device['uid']);
-  }
-  $_SESSION['deployment_list'] = $data;
+  $page_limit = 20;
+  $state_id = isset($_REQUEST['state_id']) ? $_REQUEST['state_id'] : 0;
+  $user_name = isset($_REQUEST['user_name']) ? $_REQUEST['user_name'] : NULL;
+  $email = isset($_REQUEST['email']) ? $_REQUEST['email'] : NULL;
 
-  if($data){
-    $output .= theme('table', $headers, $data) . theme('pager', NULL, $limit, 0) .
-      '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
+  $filter = array('state_id' => $state_id, 'user_name' => $user_name, 'email' => $email);
+
+  $data = deployment_get_devices($filter, $header, $page_limit);
+  foreach ($data as &$device) {
+    $device['serial'] = l($device['serial'], 'deployment/checkup/serial/' . $device['serial']);
+    $device['device'] = format_hashcode($device['device']);
+    $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
+    $device['email'] = preg_replace("/@/", '@<br>', $device['email']);
+    unset($device['uid']);
+    unset($device['state_id']);
   }
-  return $output;
+  $_SESSION['deployment_list_lines'] = $data;
+
+  $form = drupal_get_form('deployment_listfilter_form', $state_id, $user_name, $email);
+
+  return 
+    drupal_render($form) .
+
+    theme_table(array('header' => $header, 'rows' => $data, 'attributes' => array(),
+    'caption' => '', 'colgroups' => array(), 'sticky' => TRUE, 'empty' => '')) .
+
+    theme_pager(array('tags' => NULL, 'element' => 0, 'parameters' => array(), 'quantity' => ceil(sizeof($data)/$page_limit))) .
+
+    '<p align="right">' . l(t('Save Data'), 'deployment/list/file') . '</p>';
 }
 
 /**
@@ -145,8 +272,9 @@ function deployment_list_page($id = NULL) {
  * @return the deployment overview page.
  */
 function deployment_overview_page() {
-
+  
   global $user;
+
   $legend = array();
   $state_title = t('State');
   $total_title = t('Total');
@@ -170,72 +298,75 @@ function deployment_overview_page() {
       s.id";
 
   $result = db_query($sql);
-  while($summary = db_fetch_array($result)) {
-    $id = $summary['id'] - 1;//Must start from zero
+  foreach ($result as $summary) {
+    $id = $summary->id - 1; //Must start from zero
 
-    $legend[$id][$state_title] = '<b>' . l(t($summary['name']), 'deployment/list/' . $summary['id']) . '</b> - ' . t($summary['description']);
-    $legend[$id][$total_title] = $summary['total'];
-    $total += $summary['total'];
+    $legend[$id][$state_title] = '<b>' .
+      l(t($summary->name), 'deployment/list', array('query' => array('state_id' => $summary->id))) .
+      '</b> - ' . t($summary->description);
+
+    $legend[$id][$total_title] = $summary->total;
+    $total += $summary->total;
   }
 
-  foreach($legend as &$row) {
+  foreach ($legend as &$row) {
     $perc = $total > 0 ? round(($row[$total_title] / $total) * 100, 2) : 0;
-    $row[$percentage_title] = $perc? $perc . ' %' : '';
+    $row[$percentage_title] = $perc ? $perc . ' %' : '';
   }
 
-  $chart = _logger_create_chart_object('deployment', array(), 'year', t('Devices'), FALSE, array());
-  $chart->file_url = 'deployment/chart/file';//TODO: avoid setting this property
+  $chart = logger_create_chart_object('deployment', array(), 'year', t('Devices'), FALSE, array());
+  $chart->file_url = 'deployment/chart/file'; //TODO: avoid setting this property
   $chart->data['legend'] = $legend;
 
   drupal_set_title(t('Deployment Overview'));
 
-  return
-    '<div>' . t($chart->unit) . '</div>' . '<br>' .
-    _logger_create_dygraph($chart, TRUE) . '<br>' .
-    _logger_create_chart_legend($chart);
+  return '<div>' . t($chart->unit) . '</div><br>' .
+    logger_create_dygraph($chart, TRUE) . '<br>' .
+    logger_create_chart_legend($chart);
 }
 
 /**
  * Downloads a deployment summary chart file.
  */
-function _depolyment_download_chart_file() {
+function deployment_download_chart_file() {
 
-  global $user;
-  $sql = "SELECT * FROM {deployment_summary} ORDER BY time, state_id";
-  $result = db_query($sql);
-
+  $header = '';
+  $lines = '';
+  $offset = get_timezone_offset();
   $time = 0;
-  while($summary = db_fetch_array($result)) {
 
-    if ($summary['time'] != $time) {
+  $summaries = db_query("SELECT * FROM {deployment_summary} ORDER BY time, state_id");
+  foreach ($summaries as $summary) {
+
+    if ($summary->time != $time) {
       $lines .= $time ? "\r\n" : '';
-      $time = $summary['time'];
+      $time = $summary->time;
 
-      $lines .= date('d-M-Y H:i', $time + $user->timezone);
+      $lines .= date('d-M-Y H:i', $time + $offset);
       $header = t('Time');
     }
-
-    $header .= ',S' . $summary['state_id'];
-    $lines .= ',' . $summary['total'];
+    $header .= ',S' . $summary->state_id;
+    $lines .= ',' . $summary->total;
   }
-
-  _logger_download_file('chart-data-file', $header, $lines);
+  download_chart_data_file('chart-data-file', $header, $lines);
 }
 
 /**
  * Downloads a deployment list file.
  */
-function _deployment_download_list_file() {
+function deployment_download_list_file() {
 
-  $header = t('Device') . ',' . t('User') . ',' . t('E-mail') . ',' . t('Latest') . ',' . t('State');
-  
-  foreach($_SESSION['deployment_list'] as $entry) {
+  $header = t('Serial') . ',' . t('Device Id') . ',' . t('User') . ',' . t('E-mail') . ',' . t('Latest') . ',' . t('State');
+  $lines = '';
+
+  foreach ($_SESSION['deployment_list_lines'] as $entry) {
     $lines .= implode(',', $entry) . PHP_EOL;
   }
+  $lines = preg_replace("/<br>/", '', $lines);
   $lines = preg_replace("/<\/a>/", '', $lines);
-  $lines = preg_replace("/<a href=(.*)>/", '', $lines);
+  $lines = preg_replace("/<a.*?>/", '', $lines);
 
-  _logger_download_file('deployment-list', $header, $lines);
+  download_chart_data_file('deployment-list', $header, $lines);
 }
 
 /**
@@ -243,14 +374,13 @@ function _deployment_download_list_file() {
  *
  * @return an array of device states.
  */
-function _deployment_get_all_states() {
+function deployment_get_all_states() {
+
+  $result = db_query("SELECT SQL_CACHE id, name FROM {deployment_state}");
 
   $states = array();
-  $sql = "SELECT SQL_CACHE id, name FROM {deployment_state}";
-  $result = db_query($sql, $user->uid);
-
-  while ($state = db_fetch_array($result)) {
-    $states[$state['id']] = t($state['name']);
+  foreach ($result as $state) {
+    $states[$state->id] = t($state->name);
   }
   return $states;
 }
@@ -258,96 +388,149 @@ function _deployment_get_all_states() {
 /**
  * Returns the list of user devices.
  *
- * @param $state_id  The device state id (optional).
- * @param $headers   The field headers (optional).
- * @param $limit     The number of items in a table page (optional).
- * @param $serial    The serial number for selecting a single device (optionally).
+ * @param $filter     The device filter parameters (optional) (use keys: state_id, serial, device).
+ * @param $header      The table header, used for sorting the result (optional).
+ * @param $page_limit  The number of rows in a table page  (optional).
  * @return the array of user devices.
  */
-function _deployment_get_devices($state_id = NULL, $headers = NULL, $limit = 15, $serial = NULL) {
+function deployment_get_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
-  global $user;
-  $now = time();
+  $states = deployment_get_all_states();
+  $result = deployment_query_devices($filter, $header, $page_limit);
 
-  $sql = _deployment_create_devices_query($now, $state_id, $serial);
-
-  if ($headers) {
-    $count_sql = "SELECT SQL_NO_CACHE COUNT(*) FROM ($sql) d ";
-    $sql .= tablesort_sql($headers);
-    $result = pager_query($sql, $limit, 0, $count_sql);
-
-  } else {
-    $result = db_query($sql);
-  }
-
-  $states = _deployment_get_all_states();
-
-  $data = array();
-  while($device = db_fetch_array($result)) {
+  $data = array(); 
+  while ($device = $result->fetchAssoc()) {
 
     $device['state'] = $states[$device['state_id']];
-    if ($headers) {
-      unset($device['state_id']);
-    }
+    $device['latest'] = date('d-m-Y H:i', $device['latest']);
     $data[] = $device;
   }
   return $data;
 }
 
-function _deployment_create_devices_query($now, $state_id, $serial) {
+/**
+ * Queries devices by state and serial number.
+ *
+ * @param $filter      The device filter parameters (optional).
+ * @param $header      The table header, used for sorting the result (optional).
+ * @param $page_limit  The number of rows in a table page  (optional).
+ * @return the array of devices with the specified state and serial number.
+ */
+function deployment_query_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
-  //If parameters are used in this SQL query, pager_query does not count rows correctly
+  $now = REQUEST_TIME;
+  $corrupted_events_query = db_select('event_log', 'l');
+  $corrupted_events_query->groupBy('l.device');
+  $corrupted_events_query->addExpression('MAX(l.time)', 'corrupted');
+  $corrupted_events_query->fields('l', array('device'))
+    ->condition('l.event_id', CORRUPTED_MESSAGE_EVENT_ID, '=')
+    ->condition('l.time', $now - 15 * MINUTE, '>');
 
-  global $user;
-  $tzdif = $user->timezone / 3600; //divided by 1 hour
-  $tz = $tzdif < 0 ? "$tzdif:00" : "+$tzdif:00";
-  $registration_timeout  = $now - 3 * 24 * 3600; //3 days
-  $offline_timeout       = $now - 24 * 3600; //24 hours
-  $communication_timeout = $now - 2 * 3600; //2 hours
+  $corrupted_query = db_select('logger_meters', 'm');
+  $corrupted_query->leftJoin($corrupted_events_query, 'e', 'm.device = e.device');
+  $corrupted_query->groupBy('m.device');
+  $corrupted_query->fields('m', array('device'));
+  $corrupted_query->addExpression('MAX(m.access)', 'access');
+  $corrupted_query->addExpression('MAX(e.corrupted)', 'corrupted');
 
-  $latest_field = "IF(d.access > 0, d.access, d.created)";
+  $query = db_select('logger_devices', 'd');
+  $query->leftJoin('users', 'u', 'u.uid = d.uid');
+  $query->join($corrupted_query, 'm', 'm.device = d.device');
+  $query->groupBy('d.uid');
+  $query->groupBy('d.serial');
+  $query->fields('d', array('serial', 'device'))
+    ->fields('u', array('name', 'uid'))
+    ->addField('u', 'mail', 'email');
+
+  if (isset($filter['user_name'])) {
+    $query->condition('u.name', '%' . $filter['user_name'] . '%', 'LIKE');
+  }
+
+  if (isset($filter['email'])) {
+    $query->condition('u.mail', '%' . $filter['email'] . '%', 'LIKE');
+  }
+
+  if (isset($filter['serial'])) {
+    $query->condition('d.serial', $filter['serial'], '=');
+  }
+
+  if (isset($filter['device'])) {
+    $query->condition('d.device', $filter['device'], '=');
+  }
+
+  $sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
+  $visitors = db_query($sql, array(':name' => 'Visitor'));
+  foreach ($visitors as $visitor) {
+    $query->condition('d.uid', $visitor->uid, '<>');
+  }
+
+  $registration_timeout = $now - 3 * DAY;
+  $offline_timeout = $now - DAY;
+  $communication_timeout = $now - 2 * HOUR;
+
+  $state_id = isset($filter['state_id']) ? $filter['state_id'] : '';
   $state_id_field = $state_id;
+  $latest_field = "IF(d.access > 0, d.access, d.created)";
 
   switch ($state_id) {
     case UNINSTALLED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access  < $registration_timeout";
+      $query->condition('d.uid', 0, '=')
+        ->condition('d.access', $registration_timeout, '<');
       break;
 
     case UNREGISTERED_STATE_ID:
-      $filters = "AND d.uid = 0 AND d.access >= $registration_timeout";
+      $query->condition('d.uid', 0, '=')
+        ->condition('d.access', $registration_timeout, '>=');
       break;
 
     case CORRUPTED_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NOT NULL";
+      $query->condition('d.uid', 0, '>')
+        ->isNotNull('m.corrupted');
       $latest_field = "m.corrupted";
       break;
 
     case OFFLINE_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access < $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '<')
+        ->condition('m.access', $offline_timeout, '<');
       break;
-    
+
     case NO_HEARTBEAT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access < $offline_timeout AND m.access >= $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '<')
+        ->condition('m.access', $offline_timeout, '>=');
       $latest_field = "m.access";
       break;
 
     case NO_COMMUNICATION_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $offline_timeout AND d.access < $communication_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $offline_timeout, '>=')
+        ->condition('m.access', $communication_timeout, '<');
       break;
 
     case NO_MEASUREMENT_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', 0, '>')
+        ->condition('m.access', $offline_timeout, '<');
       $latest_field = "m.access";
       break;
 
     case WORKING_STATE_ID:
-      $filters = "AND d.uid > 0 AND m.corrupted IS NULL AND d.access >= $communication_timeout AND m.access >= $offline_timeout";
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', $offline_timeout, '>=');
       break;
 
     default:
       $latest_field = "
         IF(m.corrupted IS NOT NULL, m.corrupted,
-          IF(d.access = 0, d.created, 
+          IF(d.access = 0, d.created,
             IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access, d.access)
           )
         )";
@@ -356,189 +539,159 @@ function _deployment_create_devices_query($now, $state_id, $serial) {
         IF(d.uid = 0,
           IF(d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
           IF(m.corrupted IS NOT NULL, " . CORRUPTED_STATE_ID . " ,
-            IF(d.access < $offline_timeout,  
+            IF(d.access < $offline_timeout,
               IF(m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
-              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ", 
+              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ",
                  IF(m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
               )
             )
           )
         )";
   }
-  $filters .= $serial ? " AND d.serial = $serial" : '';
 
-  $visitor_sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = '%s'";
-  $result = db_query($visitor_sql, 'Visitor');
+  $query->addExpression($state_id_field, 'state_id');
+  $query->addExpression($latest_field, 'latest');
 
-  while ($visitor = db_fetch_object($result)) {
-    $filters .= " AND d.uid <> $visitor->uid ";
+  //FIXME: pager is still not working
+  if ($page_limit > 1) {
+    $query->extend('PagerDefault')
+      ->limit($page_limit);
   }
 
-  $min_time = $now - 15*MINUTE;
-  return "
-    SELECT SQL_NO_CACHE
-      d.serial,
-      u.name,
-      u.uid,
-      u.mail AS email,
-      CONVERT_TZ(FROM_UNIXTIME($latest_field), '+00:00', '$tz') AS latest,
-      ($state_id_field) AS state_id
-    FROM
-      {logger_devices} d
-      LEFT OUTER JOIN {users} u ON u.uid = d.uid,
-      (
-        SELECT
-          m.device,
-          MAX(m.access) AS access,
-          MAX(e.corrupted) AS corrupted
-        FROM
-          {logger_meters} m LEFT JOIN
-          (
-            SELECT
-            l.device,
-            MAX(l.time) AS corrupted
-            FROM
-              {event_log} l
-            WHERE
-              l.event_id = " . CORRUPTED_MESSAGE_EVENT_ID . " AND l.time > $min_time 
-            GROUP BY
-              l.device
-          ) e ON m.device = e.device
-        GROUP BY
-          m.device
-      ) m
-    WHERE
-      m.device = d.device
-      $filters 
-    GROUP BY
-      d.uid,
-      d.serial";
+  if ($header) {
+    $query->extend('TableSort')->orderByHeader($header);
+  }
+
+  return $query->execute();
 }
 
-function deployment_listfilter_form(&$form_state, $state_id) {
+function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, $email) {
 
-  $states = _deployment_get_all_states();
+  $states = deployment_get_all_states();
   $states[0] = t('All');
 
   $form['state_id'] = array(
-    '#type'          => 'select',
-    '#title'         => t('State'),
-    '#description'   => t('Select the device state.'),
-    '#options'       => $states,
+    '#type' => 'select',
+    '#title' => t('State'),
+    '#description' => t('Select the device state.'),
+    '#options' => $states,
     '#default_value' => $state_id,
-    '#required'      => TRUE,
-    '#attributes'    => array('onchange' => "document.getElementById('deployment-listfilter-form').submit();")
+    '#required' => TRUE,
+    '#attributes' => array('onchange' => "document.getElementById('deployment-listfilter-form').submit();")
+  );
+
+  $form['user_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t("User name"),
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#default_value' => $user_name,
+    '#required' => FALSE,
+    '#description' => t('Enter part of the user name.')
+  );
+
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => t("E-mail"),
+    '#size' => 40,
+    '#maxlength' => 40,
+    '#default_value' => $email,
+    '#required' => FALSE,
+    '#description' => t('Enter part of the user email.')
   );
 
   $form['submit'] = array(
-    '#type'  => 'submit',
+    '#type' => 'submit',
     '#value' => t('Filter')
   );
   return $form;
 }
 
-function deployment_checkup_form(&$form_state) {
+function deployment_checkup_form($form, &$form_state) {
 
   $form['serial'] = array(
-    '#type'        => 'textfield',
-    '#title'       => t("Serial"),
-    '#size'        => 32,
-    '#maxlength'   => 40,
-    '#required'    => 1,
+    '#type' => 'textfield',
+    '#title' => t("Serial"),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#required' => FALSE,
     '#description' => t('Enter the device serial number you want to check up')
   );
 
+  $form['device'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Device Id"),
+    '#size' => 32,
+    '#maxlength' => 32,
+    '#required' => FALSE,
+    '#description' => t('Enter the device id you want to check up')
+  );
+
   $form['submit'] = array(
-    '#type'  => 'submit',
+    '#type' => 'submit',
     '#value' => t("Check Up")
   );
   return $form;
 }
 
-function deployment_printcode_form(&$form_state) {
+function deployment_printcode_form($form, &$form_state) {
 
   $form['serial'] = array(
-    '#type'        => 'textfield',
-    '#title'       => t("Serial"),
-    '#size'        => 32,
-    '#maxlength'   => 40,
-    '#description' => t('Enter the serial you want to generate the PDF file for'),
+    '#type' => 'textfield',
+    '#title' => t("Serial"),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#description' => t('Enter the serial you want to generate the PDF file for')
   );
 
   $form['submit'] = array(
-    '#type'   => 'submit',
-    '#value'  => t("Generate")
+    '#type' => 'submit',
+    '#value' => t("Generate")
   );
   return $form;
 }
 
+function deployment_checkup_form_validate($form, &$form_state) {
+
+  $serial = $form_state['values']['serial'];
+  $device = $form_state['values']['device'];
+
+  if (!($serial != '' && $device == '' || $serial == '' && $device != '')) {
+    form_set_error('serial', t('Please enter either a serial number or a device id.')); 
+  }
+}
+
 function deployment_listfilter_form_submit($form, &$form_state) {
 
-  $_SESSION['state_id']   = $form_state['values']['state_id'];
-  $form_state['redirect'] = 'deployment/list';
+  $form_state['redirect'] = array('deployment/list', array(
+    'query' => array(
+      'state_id' => $form_state['values']['state_id'],
+      'user_name' => $form_state['values']['user_name'],
+      'email' => $form_state['values']['email']
+  )));
 }
 
 function deployment_checkup_form_submit($form, &$form_state) {
 
-  $serial = $form_state['values']['serial'];
-  $result = _deployment_get_devices(NULL, NULL, 1, $serial);
-
-  if (empty($result)) {
-    drupal_set_message(t('No device was found with such serial number.'));
-
-  } else {
-    $device = $result[0];
-    $latest = array('%latest' => $device['latest']);
-
-    drupal_set_message(t('Status: ') . $device['state']);
-
-    switch ($device['state_id']) {
-
-      case UNINSTALLED_STATE_ID:
-        drupal_set_message(t('This device has not yet been installed.'));
-        break;
-
-      case UNREGISTERED_STATE_ID:
-        drupal_set_message(t('This device has been installed, but not yet registered by the user. Latest heartbeat received at %latest.', $latest));
-        break;
-
-      case NO_COMMUNICATION_STATE_ID:
-      case OFFLINE_STATE_ID:
-        drupal_set_message(t('No message has been received from this device since %latest.', $latest));
-        break;
-
-      case NO_MEASUREMENT_STATE_ID:
-        drupal_set_message(t('No measurement has been received from this device since %latest.', $latest));
-        break;
-
-      case NO_HEARTBEAT_STATE_ID:
-        drupal_set_message(t('No heartbeat has been received from this device since %latest.', $latest));
-        break;
-
-      case CORRUPTED_STATE_ID:
-        drupal_set_message(t('This device has sent a message with corrupted data at %latest.', $latest));
-        break;
-
-      case WORKING_STATE_ID:
-        drupal_set_message(t('This device is working fine. Latest message received at %latest.', $latest));
-        break;
-    }
+  if ($form_state['values']['device'] == '') {
+    $form_state['redirect'] = "deployment/checkup/serial/" . $form_state['values']['serial'];
   }
-  
-  drupal_set_message('<br>' . l(t('Device History'), "event/log/list/$serial"));
+  else {
+    $form_state['redirect'] = "deployment/checkup/device/" . $form_state['values']['device'];
+  }
 }
 
 function deployment_printcode_form_submit($form, &$form_state) {
 
-  exec('mkdir -p ' . DEPLOYMENT_PATH . '/pdf');
+  //FIXME: update the libraries to D7
 
-  $file_name = substr(md5(uniqid(rand(), TRUE)),0,10);
+  $file_name = substr(md5(uniqid(rand(), TRUE)), 0, 10);
   $output_file_path = "/pdf/$file_name.pdf";
 
-  require_once('fpdf/fpdf.php');
-  require_once('fpdi/fpdi.php');
+  require_once DRUPAL_ROOT . '/sites/all/libraries/fpdf/fpdf.php';
+  require_once DRUPAL_ROOT . '/sites/all/libraries/fpdi/fpdi.php';
 
-  define('FPDF_FONTPATH',   DEPLOYMENT_PATH . '/fpdf/font/');
+  define('FPDF_FONTPATH', DRUPAL_ROOT . '/sites/all/libraries/fpdf/font/');
   define('PDF_SOURCE_FILE', DEPLOYMENT_PATH . '/Beipackzettel.pdf');
   define('PDF_OUTPUT_FILE', DEPLOYMENT_PATH . $output_file_path);
 
@@ -548,81 +701,88 @@ function deployment_printcode_form_submit($form, &$form_state) {
 
   preg_match_all('/[\d]*[-[\d]*]?/', $form_state['values']['serial'], $values);
 
-  foreach($values[0] as $serial) {
+  foreach ($values[0] as $serial) {
 
     if ($serial != '') {
 
-      if (stripos($serial,'-') < 1) {
+      if (stripos($serial, '-') < 1) {
 
-        $sql = "SELECT * FROM {logger_devices} WHERE serial = %d";
-        $result = db_query($sql, $serial);
-
-      } else {
+        $sql = "SELECT * FROM {logger_devices} WHERE serial = :serial";
+        $result = db_query($sql, array(':serial' => $serial));
+      }
+      else {
         preg_match_all('/([\d]*)-([\d]*)/', $serial, $match);
 
-        $sql = "SELECT * FROM {logger_devices} WHERE serial >= %d AND serial <= %d";
-        $result = db_query($sql, $match[1][0], $match[2][0]);
+        $sql = "SELECT * FROM {logger_devices} WHERE serial >= :serial1 AND serial <= :serial2";
+        $result = db_query($sql, array(':serial1' => $match[1][0], ':serial2' => $match[2][0]));
       }
 
       if ($result) {
 
-        while ($device = db_fetch_object($result)) {
+        foreach ($result as $device) {
 
           $pdf->AddPage();
           $pdf->useTemplate($tplidx, 10, 10, 190);
-
           $pdf->SetFont('Arial', '', 12);
-          $pdf->SetTextColor(0,0,0);
+          $pdf->SetTextColor(0, 0, 0);
           $pdf->SetXY(43, 165);
-
           $pdf->Write(0, 'Seriennummer: WA' . $device->serial);
-          $pdf->setXY(43,175);
-          $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device,0,10));
-
+          $pdf->setXY(43, 175);
+          $pdf->Write(0, 'Aktivierungscode: ' . substr($device->device, 0, 10));
         }
-      } else {
+      }
+      else {
         form_set_error('serial', t('Error while looking up activation code!'));
       }
     }
   }
 
   $pdf->Output(PDF_OUTPUT_FILE, 'F');
-  drupal_set_message(l(t('Download'), DEPLOYMENT_PATH . $output_file_path));
+  drupal_set_message(check_plain(l(t('Download'), DEPLOYMENT_REL_PATH . $output_file_path)));
 }
 
 function deployment_cron() {
-  exec('rm -f ' . DEPLOYMENT_PATH . '/pdf/*');
-  _deployment_create_summary();
+  cleardir(DEPLOYMENT_PATH . '/pdf/*');
+  deployment_create_summary();
 }
 
-function _deployment_create_summary() {
+/**
+ * Creates a periodic deployment summary.
+ */
+function deployment_create_summary() {
 
-  $now = time();
-  $now = $now - ($now % 3600);
+  $now = REQUEST_TIME;
+  $now = $now - ($now % HOUR);
 
-  $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = %d";
-  $result = db_result(db_query($sql, $now));
+  $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = :time";
+  $result = db_query($sql, array(':time' => $now))->fetchField();
 
   if ($result == 0) {
     $totals = array();
-    $devices = _deployment_get_devices();
+    $devices = deployment_get_devices();
 
     foreach ($devices as $device) {
       $state_id = $device['state_id'];
-      $totals[$state_id]++;
+      $totals[$state_id] = isset($totals[$state_id]) ? $totals[$state_id] + 1 : 1;
     }
 
-    $states = _deployment_get_all_states();
+    $states = deployment_get_all_states();
 
     foreach (array_keys($states) as $state_id) {
-      $total = $totals[$state_id];
+      $total = isset($totals[$state_id]) ? $totals[$state_id] : 0;
       $total = $total > 0 ? $total : 0;
 
-      $sql = "INSERT INTO {deployment_summary}(time, state_id, total) VALUES(%d, %d, %d)";
-      db_query($sql, $now, $state_id, $total);
+      db_insert('deployment_summary')
+      ->fields(array(
+        'time' => $now,
+        'state_id' => $state_id,
+        'total' => $total
+      ))
+      ->execute();
     }
 
-    $sql = "DELETE FROM {deployment_summary} WHERE time < %d";
-    db_query($sql, $now - 3 * 30 * 24 * 3600); //90 days
+    db_delete('deployment_summary')
+      ->condition('time', $now - 3 * MONTH, '<')
+      ->execute(); //3 months
   }
 }

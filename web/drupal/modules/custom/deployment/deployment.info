@@ -1,4 +1,10 @@
 ; $Id$
-name = Deployment Overview
-description =  Allows the user to see devices' statuses.
-core = 6.x
+name = Flukso Deployment Overview
+description =  Allows the user to see flukso devices' statuses.
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+php = 5.3
+
+dependencies[] = msgcommons
+dependencies[] = logger

@@ -14,7 +14,13 @@ if [ -e $DAEMON_BIN ]; then
 			mkdir -p /tmp/flukso
 		fi
 		if [ -e $FLUKSO_BIN ] && [ $(ps | grep -c $FLUKSO_BIN) == 1 ]; then
-			$FLUKSO_BIN _flukso-realtime._tcp /tmp/flukso/ip &
+			FLUKSO_VERSION=$(cat $DAEMON_CONFIG | grep '.*VERSION.*' | grep -o '".*"'| sed -e 's%"%%g')
+			if [ $FLUKSO_VERSION -lt 2 ]; then
+				FLUKSO_SERVICE='_flukso-realtime._tcp'
+			else
+				FLUKSO_SERVICE='_flukso._tcp'
+			fi
+			$FLUKSO_BIN $FLUKSO_SERVICE /tmp/flukso/ip &
 		else    
 			echo "Autoconfiguration disabled."
 		fi

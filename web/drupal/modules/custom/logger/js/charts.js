@@ -64,17 +64,41 @@ function formatCVSTimeStamp(d) {
  * Look through stylesheets in reverse order that they appear in the document.
  */
 function getStyleBySelector(selector) {
+
   var sheets = document.styleSheets;
-  var rules, s, r;
+  var rules, imported, rule, style, s, r, i;
+  var isIE = sheets[0].cssRules == undefined;
 
   for (s = sheets.length - 1; s >= 0; s--) {
-    rules = sheets[s].cssRules == undefined ? sheets[s].rules : sheets[s].cssRules;
+    rules = isIE ? sheets[s].rules : sheets[s].cssRules;
+
+    style = findStyle(rules, selector);
+    if (style != null) {
+      return style;
+    }
+ 
+    rules = isIE ? sheets[s].imports : rules;
 
     for (r = 0; r < rules.length; r++){
+      var imported = isIE ? rules[r].rules : rules[r].styleSheet.cssRules;
 
-      if (rules[r].selectorText && rules[r].selectorText.toLowerCase() == selector){
-        return rules[r].style;
+      style = findStyle(imported, selector);
+      if (style != null) {
+        return style;
       }
+    }
+  }
+  return null;
+}
+
+function findStyle(rules, selector) {
+
+  var r, rule;
+  for (r = 0; r < rules.length; r++) {
+    rule = rules[r];
+
+    if (rule.selectorText && rule.selectorText.toLowerCase() == selector){
+      return rule.style;
     }
   }
   return null;
@@ -193,7 +217,7 @@ function removePowerSeries(uid, i, username, tableId) {
   }
 
   if (!found) {
-    $.get('/logger/remove/user/' + uid);
+    jQuery.get('/logger/remove/user/' + uid);
 
     //IE makes it necessary to use an auxiliary array
     var sorted = new Array(field.length + 1);
@@ -232,7 +256,7 @@ function updateSmoothingLevel(fieldId, step) {
     sliderChart.updateOptions({rollPeriod: level});
   }
 
-  $.get('/logger/setvariable/smoothing_level/' + level);
+  jQuery.get('/logger/setvariable/smoothing_level/' + level);
 
   return true;
 }
@@ -481,7 +505,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
   chart.options = options;
 
   chart.plot = function() {
-    var plot = $.plot($('#' + id), data, options);
+    var plot = jQuery.plot(jQuery('#' + id), data, options);
     showBarDataLabels(plot, stacked, dataLabels, barWidth);
   };
   chart.plot();
@@ -539,7 +563,7 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
 
   for (var d = 0; d < series.length; d++) {
 
-    $.each(series[d].data,
+    jQuery.each(series[d].data,
 
       function(i, point) {
 
@@ -589,7 +613,7 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
             display: 'none'
           };
 
-        $(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
+        jQuery(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
     });
   }
 }
@@ -613,7 +637,7 @@ function setSeriesColor(chartId, i, color) {
     }
   }
 
-  $.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
+  jQuery.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
 }
 
 function updateDygraphColor(chart, i, color) {
