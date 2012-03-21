@@ -87,7 +87,9 @@ function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $
     $main_boundary = "email_part_boundary";
     $alternative_boundary = "email_alternative_boundary";
 
-    $main_header = "Content-Type: multipart/related; boundary=\"$main_boundary\"";
+    $main_header =
+      "X-Virus-Scanned: Clear (ClamAV 0.97.3/14664/Mon Mar 19 02:17:00 2012)\n" .
+      "Content-Type: multipart/related; boundary=\"$main_boundary\"";
 
     $parts =
       "--$main_boundary\n" .

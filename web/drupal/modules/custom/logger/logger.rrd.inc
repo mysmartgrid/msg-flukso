@@ -51,6 +51,7 @@ function logger_rrd_get_storage_periods() {
     //resolution   storage period
     1 * MINUTE => 1 * WEEK,
     15 * MINUTE => 1 * MONTH,
+    1 * HOUR => 2 * MONTH,
     1 * DAY => 6 * MONTH,
     1 * WEEK => 10 * YEAR,
   );

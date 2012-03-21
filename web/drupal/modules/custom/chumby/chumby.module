@@ -426,7 +426,7 @@ function chumby_create_daemon_config($params, $sensor, $tmp_path) {
   if ($daemonconfig) {
 
     $params['version'] = $sensor->serial > 100000000 ? 2 : 1;
-    $params['ip'] = isset($params['auto']) ? '' : $params['ip'];
+    $params['ip'] = $params['auto'][1] ? '' : $params['ip'];
     $params['token'] = $sensor->token;
 
     require CHUMBY_PATH . '/daemon-config.php';

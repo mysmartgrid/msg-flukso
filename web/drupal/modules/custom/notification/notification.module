@@ -1363,7 +1363,8 @@ function notification_send_summary_report_emails() {
       $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $period, DAY), 2, '.', '');
       $cost = number_format($energy * $prices[$sensor->type_id], 2, '.', '');
 
-      $lines[$sensor->type_id] = '<tr>' .
+      $lines[$sensor->type_id] = (isset($lines[$sensor->type_id]) ? $lines[$sensor->type_id] : '') .
+        '<tr>' .
         '<td>' . $notifiable['serial'] . '</td>' .
         '<td>' . $sensor->function . '</td>' .
         '<td>' . $energy . '</td>' .
