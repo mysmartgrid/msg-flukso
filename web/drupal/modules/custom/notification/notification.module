@@ -883,9 +883,13 @@ function notification_register_event($values, $event_id) {
 
     $emails = $values['emails'];
     $min_interval = $values['min_interval'];
+    $values = array('emails' => $emails, 'min_interval' => $min_interval);
 
-    notification_delete($device, $event_id, $limit_up, $unit_id);
-    notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
+    $updated = notification_update($device, $event_id, $limit_up, $unit_id, $values);
+
+    if ($updated == 0) {
+      notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
+    }
   }
 }
 
@@ -905,10 +909,21 @@ function notification_edit_event($values) {
   $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
   $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
   $min_interval = $values['min_interval'];
+  $values = array(
+    'limit_up' => $limit_up,
+    'unit_id' => $unit_id,
+    'emails' => $emails,
+    'min_interval' => $min_interval
+  );
 
-  notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
-  notification_delete($device, $event_id, $limit_up, $unit_id);
-  notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
+  $updated = notification_update($device, $event_id, $limit_up, $unit_id, $values);
+
+  if ($updated == 0) {
+    notification_update($device, $event_id, $old_limit_up, $old_unit_id, $values);
+  }
+  elseif ($old_limit_up != $limit_up || $old_unit_id != $unit_id) {
+    notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
+  }
 }
 
 /**
@@ -1026,10 +1041,11 @@ function notification_insert($device, $event_id, $emails, $min_interval, $limit_
  * @param $limit_up       The event's threshold.
  * @param $unit_id        The event unit id.
  * @param $field_values   The array of fields and their new values.
+ * @return the number of rows updated.
  */
 function notification_update($device, $event_id, $limit_up, $unit_id, $field_values) {
 
-  db_update('notification')
+  return db_update('notification')
     ->fields($field_values)
     ->condition('device', $device)
     ->condition('event_id', $event_id)
