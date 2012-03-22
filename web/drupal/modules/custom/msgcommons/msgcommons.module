@@ -88,7 +88,8 @@ function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $
     $alternative_boundary = "email_alternative_boundary";
 
     $main_header =
-      "X-Virus-Scanned: Clear (ClamAV 0.97.3/14664/Mon Mar 19 02:17:00 2012)\n" .
+      "To: $to\n" .
+      "MIME-Version: 1.0\n" .
       "Content-Type: multipart/related; boundary=\"$main_boundary\"";
 
     $parts =
@@ -115,11 +116,12 @@ function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $
         "--$main_boundary\n" .
         "Content-Type: " . $attachment['content_type'] . "\n" .
         "Content-ID: " . $attachment['cid'] . "\n" .
+        "Content-Size: " . $attachment['size'] . "\n" .
         "Content-Disposition: attachment;\n" .
         " filename=" . $attachment['file_name'] . "\n" .
         "Content-Transfer-Encoding: base64\n" .
         "\n" .
-        base64_encode($attachment['content']) . "\n";
+        chunk_split(base64_encode($attachment['content'])) . "\n";
     }
     $parts .= "--$main_boundary--";
 

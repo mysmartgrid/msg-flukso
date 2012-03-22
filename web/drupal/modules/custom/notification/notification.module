@@ -1567,13 +1567,15 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
 
   $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
   $theme_path =  drupal_get_path('theme', 'msgweb');
-  $logo = file_get_contents("$base_url/$theme_path/logo.png");
+  $file_path = "$base_url/$theme_path/logo.png";
+  $logo = file_get_contents($file_path);
   $attachments = array(
     array(
       'cid' => 'logo',
       'file_name' => 'logo.png',
       'content_type' => 'image/png',
-      'content' => $logo
+      'content' => $logo,
+      'size' => filesize($file_path)
     )
   );
 
