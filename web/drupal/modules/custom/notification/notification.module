@@ -1601,7 +1601,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
   foreach ($notifiables as $notifiable) {
 
     if (isset($notifiable['unit_name'])) {
-      $notifiable['unit_name'] = t($notifiable['unit_name']);
+      $notifiable['unit_name'] = format_plural($notifiable['limit_up'], $notifiable['unit_name'], $notifiable['unit_name'] . 's');
     }
 
     date_default_timezone_set($notifiable['timezone']);
