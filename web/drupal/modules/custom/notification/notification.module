@@ -1138,6 +1138,7 @@ function notification_compose_base_query($event_id) {
     ->groupBy('n.limit_up')
     ->groupBy('n.unit_id');
   
+  $query->join('event', 'ev', 'ev.id = n.event_id');
   $query->join('logger_devices', 'd', 'd.device = n.device');
   $query->join('unit', 'un', 'un.id = n.unit_id');
   $query->join('users', 'u', 'u.uid = d.uid'); 
@@ -1146,6 +1147,7 @@ function notification_compose_base_query($event_id) {
   $query->addField('u', 'timezone');
   $query->addField('un', 'factor');
   $query->addField('un', 'name', 'unit_name');
+  $query->addField('ev', 'name', 'event_name');
 
   return $query;  
 }
@@ -1623,7 +1625,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       $variables["!$key"] = $value;
     }
 
-    $subject = t('Event Notification');
+    $subject = t('Event Notification') . ' - ' . t($notifiable['event_name']) . ' (' . $notifiable['serial'] . ')';
     $body = "<body>" .
       "<style type='text/css'>$css</style>" .
       "<table class='outer'><tr><td>" .
