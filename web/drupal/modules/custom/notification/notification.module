@@ -885,9 +885,12 @@ function notification_register_event($values, $event_id) {
     $min_interval = $values['min_interval'];
     $values = array('emails' => $emails, 'min_interval' => $min_interval);
 
-    $updated = notification_update($device, $event_id, $limit_up, $unit_id, $values);
+    $notification = notification_get($device, $event_id, $limit_up, $unit_id);
 
-    if ($updated == 0) {
+    if ($notification) {
+      notification_update($device, $event_id, $limit_up, $unit_id, $values);
+    }
+    else {
       notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id);
     }
   }
@@ -916,14 +919,11 @@ function notification_edit_event($values) {
     'min_interval' => $min_interval
   );
 
-  $updated = notification_update($device, $event_id, $limit_up, $unit_id, $values);
-
-  if ($updated == 0) {
-    notification_update($device, $event_id, $old_limit_up, $old_unit_id, $values);
+  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
+  if ($notification && ($old_limit_up != $limit_up || $old_unit_id != $unit_id)) {
+    notification_delete($device, $event_id, $limit_up, $unit_id);
   }
-  elseif ($old_limit_up != $limit_up || $old_unit_id != $unit_id) {
-    notification_delete($device, $event_id, $old_limit_up, $old_unit_id);
-  }
+  notification_update($device, $event_id, $old_limit_up, $old_unit_id, $values);
 }
 
 /**
@@ -1041,17 +1041,36 @@ function notification_insert($device, $event_id, $emails, $min_interval, $limit_
  * @param $limit_up       The event's threshold.
  * @param $unit_id        The event unit id.
  * @param $field_values   The array of fields and their new values.
- * @return the number of rows updated.
  */
 function notification_update($device, $event_id, $limit_up, $unit_id, $field_values) {
 
-  return db_update('notification')
+  db_update('notification')
     ->fields($field_values)
     ->condition('device', $device)
     ->condition('event_id', $event_id)
     ->condition('limit_up', $limit_up)
     ->condition('unit_id', $unit_id)
     ->execute();  
+}
+
+/**
+ * Gets an event notification.
+ *
+ * @param $device         The monitored device.
+ * @param $event_id       The event id.
+ * @param $limit_up       The event's threshold.
+ * @param $unit_id        The event unit id.
+ * @return the notification, if one was found.
+ */
+function notification_get($device, $event_id, $limit_up, $unit_id) {
+  return db_select('notification', 'n')
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id'))
+    ->condition('device', $device)
+    ->condition('event_id', $event_id)
+    ->condition('limit_up', $limit_up)
+    ->condition('unit_id', $unit_id)
+    ->execute()
+    ->fetchObject();
 }
 
 function notification_theme() {
