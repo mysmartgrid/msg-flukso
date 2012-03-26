@@ -1596,7 +1596,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       'file_name' => 'logo.png',
       'content_type' => 'image/png',
       'content' => $logo,
-      'size' => filesize($file_path)
+      'size' => strlen($logo)
     )
   );
 
