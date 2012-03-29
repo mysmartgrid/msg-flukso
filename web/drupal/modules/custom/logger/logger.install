@@ -175,13 +175,6 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '10',
       ),
-      'corrupted' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '10',
-      ),
       'type' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -215,6 +208,12 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 'watt',
       ),
+      'forecast' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0
+      )
     ),
     'primary key' => array('meter'),
   );
@@ -295,6 +294,9 @@ function logger_install() {
   $file_path = drupal_get_path('module', 'logger') . '/data/base';
   mkdir($file_path, 0777, TRUE);
 
+  $file_path = drupal_get_path('module', 'logger') . '/data/forecast';
+  mkdir($file_path, 0777, TRUE);
+
   $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
   drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
 }
@@ -312,3 +314,33 @@ function logger_update_7000() {
   // nothing or a translated string indicating the update ran successfully.
   // See http://drupal.org/node/224333#update_sql.
 }
+
+/**
+ * Makes a directory for storing forecasts.
+ */
+function logger_update_7001() {
+
+  $file_path = drupal_get_path('module', 'logger') . '/data/forecast';
+  mkdir($file_path, 0777, TRUE);
+
+  return st('Directory successfully created.');
+}
+
+/**
+ * Sets the system variable logger_forecast_service_url.
+ * Adds field forecast on table logger_meters.
+ */
+function logger_update_7002() {
+
+  variable_set('logger_forecast_service_url', "http://dev1.mypowergrid.de/pvcast/forecast");
+
+  db_add_field('logger_meters', 'forecast', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0
+  ));
+
+  return st('Field logger_meters.forecast successfully added. Variable logger_forecast_service_url successfully created.');
+}
+

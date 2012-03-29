@@ -28,6 +28,7 @@ define('PRODUCTION_SENSOR_TYPE',  2);
 
 define('LOGGER_REL_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
+define('LOGGER_FORECAST_PATH', LOGGER_PATH . '/data/forecast');
 
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
@@ -61,6 +62,10 @@ function logger_permission() {
     'view logger charts' => array(
       'title' => t('view logger charts'),
       'description' => t('View logger charts.'),
+    ),
+    'view forecast charts' => array(
+      'title' => t('view forecast charts'),
+      'description' => t('View forecast charts.'),
     ),
     'set user preferences' => array(
       'title' => t('set user preferences'),
@@ -178,6 +183,16 @@ function logger_menu() {
     'page callback' => 'logger_download_chart_data_file',
     'page arguments' => array(2),
     'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['forecast'] = array(
+    'title' => 'Your power production forecast',
+    'description' => 'Show the power consumption and production forecast page',
+    'page callback' => 'logger_forecast_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_forecast_access',
+    'access arguments' => array('view forecast charts'),
     'type' => MENU_CALLBACK,
   );
 
@@ -498,6 +513,41 @@ function logger_power_page($interval) {
 }
 
 /**
+ * Builds the power production forecast page.
+ *
+ * @param $interval The time interval.
+ * @return the forecast page.
+ */
+function logger_forecast_page($interval) {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $interval = $interval ? $interval : 'f3days';
+  if (!logger_get_default_time_window($interval)) {
+    drupal_goto('forecast', array(), 301);
+  }
+
+  drupal_set_title(t('Your power production forecast'));
+
+  $xvalue1 = logger_get_xvalue(1);
+  $xvalue2 = logger_get_xvalue(2);
+  $yvalue1 = logger_get_yvalue(1);
+  $yvalue2 = logger_get_yvalue(2);
+  $types = array(PRODUCTION_SENSOR_TYPE);
+  $unit = logger_get_variable('powerchart_unit', 'watt');
+  $price2 = logger_get_variable('price2', 0.18);
+  $sensors = logger_get_subscribed_sensors($types);
+
+  $chart = logger_create_chart_object('forecast', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, NULL, $price2);
+
+  $form = drupal_get_form('logger_powerchart_form', $chart);
+  $form['resolution']['#options'] = array(HOUR => t('Hour'));//TODO: include other resolutions
+  unset($form['new_user']);
+
+  return theme('logger_power_chart_area', array('chart' => $chart)) . drupal_render($form);
+}
+
+/**
  * Builds the overview page.
  *
  * @param $interval The time interval.
@@ -737,16 +787,25 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $chart->resolution = logger_get_resolution($interval);
   $chart->offset = get_timezone_offset();
   $chart->colors = logger_get_series_colors($context);
-  $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
   $chart->sensors = $sensors;
   $chart->aggregate_sensors = $aggregate_sensors;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
-    $xaxis[1] = REQUEST_TIME;
-    $xaxis[0] = $xaxis[1] - logger_get_default_time_window($interval);
+
+    $window = logger_get_default_time_window($interval, FALSE);
+
+    if ($window > 0) {//future
+      $xaxis[0] = REQUEST_TIME - (REQUEST_TIME % DAY) - $chart->offset;
+      $xaxis[1] = $xaxis[0] + $window;
+    }
+    else {//past
+      $xaxis[1] = REQUEST_TIME;
+      $xaxis[0] = $xaxis[1] + $window;
+    }
   }
   $chart->yaxis = $yaxis;
   $chart->xaxis = $xaxis;
+  $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
 
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
@@ -1123,7 +1182,7 @@ function logger_get_power_chart_data($chart) {
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = $values;
 
-    //Hide user names for Visitors
+    //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
     $operations = $sensor->uid > 0 ?
@@ -1132,6 +1191,50 @@ function logger_get_power_chart_data($chart) {
         t('Remove') . '</a>' : '';
 
     $data['legend'][] = logger_create_power_legend_line($username, $sensor->function, t($sensor->type), $i++, $operations);
+  }
+  return $data;
+}
+
+/**
+ * Returns an array containing all power production forecast chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_forecast_chart_data($chart) {
+
+  $data = logger_get_power_chart_data($chart);
+  $total = count($data['series']);
+  $i = $total;
+
+  foreach ($data['series'] as $uid => $userdata) {
+    foreach ($userdata as $username => $sensors) {
+      foreach ($sensors as $meter => $typedata) {
+        foreach ($typedata as $type => $measurements) {
+          $function = $data['legend'][$i - $total][t('Sensor')];
+
+          $file_path = LOGGER_FORECAST_PATH . "/$meter.json";
+
+          if (file_exists($file_path)) {
+
+            $forecast = array();
+            foreach (json_decode(file_get_contents($file_path)) as $values) {
+              $time = $values[0];
+              $value = $values[1];
+              $forecast[$time] = $value;
+            }
+
+            $operations = $uid > 0 ?
+              '<a href="javascript: void(0)"
+                OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+                t('Remove') . '</a>' : '';
+
+            $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
+            $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
+          }
+        }
+      }
+    }
   }
   return $data;
 }
@@ -1178,7 +1281,7 @@ function logger_format_power_series_data($chart, $measurements) {
     $key = date('Y-m-d H:i', $timestamp) . " $tz";
     $value = isset($measurements[$timestamp]) ? $measurements[$timestamp] : NULL;
 
-    $formatted[$key] = $value ? number_format($value, 3, '.', '') : '';
+    $formatted[$key] = isset($value) ? number_format($value, 3, '.', '') : '';
   }
   return $formatted;
 }
@@ -1186,18 +1289,18 @@ function logger_format_power_series_data($chart, $measurements) {
 /**
  * Creates a line for the power consumption chart legend.
  * 
- * @param $sensor      The sensor object.
  * @param $username    The sensor user name.
+ * @param $function    The sensor object.
  * @param $type        The sensor type.
  * @param $i           The line index.
  * @param $operations  The list of links that affect the sensor.
  * @return the legend line.
  */
-function logger_create_power_legend_line($username, $sensor, $type, $i, $operations = NULL) {
+function logger_create_power_legend_line($username, $function, $type, $i, $operations = NULL) {
 
   $line = array(
     t('User') => $username,
-    t('Sensor') => $sensor,
+    t('Sensor') => $function,
     t('Type') => $type,
     t('Max') => "<div id='max$i'/>",
     t('Min') => "<div id='min$i'/>",
@@ -1592,21 +1695,26 @@ function logger_create_interval_menu($context) {
       l(t('Day'),     "$context/day"),
       l(t('Week'),    "$context/week"),
       l(t('Month'),   "$context/month"),
-      l(t('Year'),    "$context/year"),
+      l(t('Year'),    "$context/year")
     );
-
+  }
+  elseif ($context == 'forecast') {
+    $items = array(
+      l(t('3 Days'), "$context/f3days"),
+      l(t('2 Days'), "$context/f2days"),
+      l(t('Today'),  "$context/f1day")
+    );
   }
   else {
     $items = array(
       l(t('Hour'),    "$context/hour"),
       l(t('Day'),     "$context/day"),
-      l(t('3 Days'), "$context/days"),
+      l(t('3 Days'),  "$context/3days"),
       l(t('Week'),    "$context/week"),
       l(t('Month'),   "$context/month"),
-      l(t('Year'),    "$context/year"),
+      l(t('Year'),    "$context/year")
     );
   }
- 
   return theme('logger_chart_tabs', $items);
 }
 
@@ -1902,25 +2010,28 @@ function logger_powerchart_form($form, &$form_state, $chart) {
 
   if (strpos(" $chart->unit", 'eur') > 0) {
 
-    $form['price1'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Energy Consumption Price'),
-      '#description' => t("Enter the energy consumption price."),
-      '#maxlength' => 6,
-      '#field_prefix' => '€ ',
-      '#default_value' => $chart->price1,
-      '#field_suffix' => ' / kWh',
-    );
-
-    $form['price2'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Energy Production Price'),
-      '#description' => t("Enter the energy production price."),
-      '#maxlength' => 6,
-      '#field_prefix' => '€ ',
-      '#default_value' => $chart->price2,
-      '#field_suffix' => ' / kWh',
-    );
+    if ($chart->price1) {
+      $form['price1'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Energy Consumption Price'),
+        '#description' => t("Enter the energy consumption price."),
+        '#maxlength' => 6,
+        '#field_prefix' => '€ ',
+        '#default_value' => $chart->price1,
+        '#field_suffix' => ' / kWh',
+      );
+    }
+    if ($chart->price2) {
+      $form['price2'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Energy Production Price'),
+        '#description' => t("Enter the energy production price."),
+        '#maxlength' => 6,
+        '#field_prefix' => '€ ',
+        '#default_value' => $chart->price2,
+        '#field_suffix' => ' / kWh',
+      );
+    }
   }
 
   $form['step_plot'] = array(
@@ -2367,10 +2478,13 @@ function logger_get_resolution($interval) {
   $options = array(
     'hour' => 1 * MINUTE,
     'day' => 15 * MINUTE,
-    'days' => 15 * MINUTE,
+    '3days' => 15 * MINUTE,
     'week' => 15 * MINUTE,
     'month' => 1 * DAY,
     'year' => 1 * WEEK,
+    'f3days' => 1 * HOUR,
+    'f2days' => 1 * HOUR,
+    'f1day' => 1 * HOUR
   );
   return $options[$interval];
 }
@@ -2387,7 +2501,7 @@ function logger_get_resolutions_options() {
     15 * MINUTE => 15 . ' ' . t('Minutes'),
     1 * HOUR => 1 . ' ' . t('Hour'),
     1 * DAY => 1 . ' ' . t('Day'),
-    1 * WEEK => 1 . ' ' . t('Week'),
+    1 * WEEK => 1 . ' ' . t('Week')
   );
 }
 
@@ -2395,20 +2509,25 @@ function logger_get_resolutions_options() {
  * Returns the default time window associated with a time interval menu option.
  *
  * @param $interval  The time interval menu option.
+ * @param $absolute  Whether the absolute value of the time window is to be returned.
  * @return the amount of seconds of the time window.
  */
-function logger_get_default_time_window($interval) {
+function logger_get_default_time_window($interval, $absolute = TRUE) {
 
   $windows = array(
-    'hour' => 1 * HOUR,
-    'dayquarter' => 6 * HOUR,
-    'day' => 1 * DAY,
-    'days' => 3 * DAY,
-    'week' => 7 * DAY,
-    'month' => 30 * DAY,
-    'year' => 365 * DAY,
+    'hour' => -1 * HOUR,
+    'dayquarter' => -6 * HOUR,
+    'day' => -1 * DAY,
+    '3days' => -3 * DAY,
+    'week' => -7 * DAY,
+    'month' => -30 * DAY,
+    'year' => -365 * DAY,
+    'f3days' => 3 * DAY,
+    'f2days' => 2 * DAY,
+    'f1day' => 1 * DAY
   );
-  return $windows[$interval];
+  $window = $windows[$interval];
+  return ($absolute ? abs($window) : $window);
 }
 
 /**
@@ -2421,10 +2540,13 @@ function logger_get_sub_interval($interval) {
   $windows = array(
     'dayquarter' => 'hour',
     'day' => 'dayquarter',
-    'days' => 'day',
+    '3days' => 'day',
     'week' => 'day',
     'month' => 'week',
     'year' => 'month',
+    'f3days' => 'day',
+    'f2days' => 'day',
+    'f1day' => 'hour'
   );
   return $windows[$interval];
 }
@@ -2445,8 +2567,7 @@ function logger_get_period($interval, $resolution, $start = 0, $end = 0) {
   $storage_period = logger_rrd_get_storage_period($resolution);
 
   //If period not informed, consider default time window
-  $window = $start > 0 && $end > 0 ? $end - $start :
-    logger_get_default_time_window($interval);
+  $window = $start > 0 && $end > 0 ? $end - $start : logger_get_default_time_window($interval);
 
   $now = REQUEST_TIME;
   if ($end < ($now - $storage_period)) {
@@ -2668,6 +2789,25 @@ function logger_device_access($permission, $device) {
 }
 
 /**
+ * Access callback ensuring the sensor forecast page is accessible only to users who have requested forecasts.
+ */
+function logger_forecast_access($permission) {
+
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
+
+  $sensor = db_select('logger_meters', 'm')
+    ->fields('m', array('uid'))
+    ->condition('m.uid', $GLOBALS['user']->uid, '=')
+    ->condition('m.forecast', 1, '=')
+    ->execute()
+    ->fetchObject();
+
+  return $sensor && user_access($permission);
+}
+
+/**
  * Queries the databases for measurements reported by sensors of a single device.
  *
  * @param $interval The time interval.
@@ -2694,10 +2834,35 @@ function logger_query_device_measurements($interval, $device) {
 
 function logger_cron() {
 
+  logger_download_forecasts();
+
   logger_remove_expired_support_requests();
   logger_bind_support_ports();
 
   logger_update_support_authorized_keys();
+}
+
+/**
+ * Downloads forecasts from myPowerGrid.
+ */
+function logger_download_forecasts() {
+
+  $url = variable_get('logger_forecast_service_url');
+
+  $sensors = db_select('logger_meters', 's')
+    ->fields('s', array('meter'))
+    ->condition('s.forecast', '1', '=')
+    ->execute();
+
+  foreach($sensors as $sensor) {
+
+    $content = file_get_contents("$url/$sensor->meter");
+    $file_path = LOGGER_FORECAST_PATH . "/$sensor->meter.json";
+
+    $fh = fopen($file_path, 'w');
+    fwrite($fh, $content);
+    fclose($fh);
+  }
 }
 
 /**
