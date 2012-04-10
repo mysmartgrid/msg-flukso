@@ -288,8 +288,6 @@ function logger_deviceactivation_form_submit($form, &$form_state) {
 
 function logger_sensor_form_submit($form, &$form_state) {
 
-  global $user;
-
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
   $meter = $form_state['values']['meter'];
@@ -302,7 +300,7 @@ function logger_sensor_form_submit($form, &$form_state) {
     ->condition('meter', $meter)
     ->execute();
 
-  $form_state['redirect'] = "user/" . $user->uid . "/sensors";
+  $form_state['redirect'] = "sensor/mylist";
 }
 
 function logger_userprivacy_form_submit($form, &$form_state) {
@@ -383,7 +381,7 @@ function logger_device_activate($code) {
   }
   drupal_set_message(t("The device is now associated with your account."));
 
-  drupal_goto("user/$user->uid/devices");
+  drupal_goto("device/mylist");
 }
 
 /**
@@ -428,7 +426,7 @@ function logger_device_deactivate($device) {
 
   logger_check_fluksonian($user->uid);
 
-  drupal_goto("user/$user->uid/devices");
+  drupal_goto("device/mylist");
 }
 
 /**
@@ -511,8 +509,6 @@ function logger_check_fluksonian($uid) {
  */
 function logger_sensor_deactivate($meter) {
 
-  global $user;
-
   db_update('logger_meters')
     ->fields(array(
       'function' =>  NULL,
@@ -521,7 +517,7 @@ function logger_sensor_deactivate($meter) {
     ->condition('meter', $meter)
     ->execute();
 
-  drupal_goto("user/$user->uid/sensors");
+  drupal_goto("sensor/mylist");
 }
 
 /**
