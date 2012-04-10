@@ -421,3 +421,36 @@ function html2txt($html) {
   //remove all other tags
   return preg_replace("/<.*?>/", "", $text);
 }
+
+/**
+ * Checks if the browser is supported.
+ */
+function check_browser_support() {
+
+  $supported = FALSE;
+  $agent = $_SERVER['HTTP_USER_AGENT'];
+
+  $browsers = array(
+    array('name' => 'Firefox',  'version' => 3),
+    array('name' => 'MSIE',     'version' => 7),
+    array('name' => 'Chrome',   'version' => 15),
+    array('name' => 'Chromium', 'version' => 15),
+    array('name' => 'Safari',   'version' => 4)
+  );
+
+  foreach ($browsers as $browser) {
+    $pos = strpos($agent, $browser['name']);
+    if ($pos > 0) {
+      $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
+      $version = str_replace('.', '', $version);
+      $supported = $version >= $browser['version'];
+      break;
+    }
+  }
+
+  if (!$supported) {
+    drupal_set_message(t('Warning: you are using an outdated browser. ' .
+      'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' .
+      'Internet Explorer 7, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11 (or a later version).'), 'error', FALSE);
+  }
+}

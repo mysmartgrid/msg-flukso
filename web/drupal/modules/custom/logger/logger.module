@@ -42,6 +42,8 @@ define('LOGGER_DEVICE_CERT_PATH', '../flukso-api/flukso/var/keys');
 
 function logger_init() {
 
+  check_browser_support();
+
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
     drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
