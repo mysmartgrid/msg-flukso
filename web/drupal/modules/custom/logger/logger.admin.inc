@@ -32,6 +32,8 @@ function logger_userdevices_page() {
 
   global $user;
 
+  drupal_set_title(t('My Devices'));
+
   $query = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial', 'access', 'resets', 'uptime'))
     ->condition('d.uid', $user->uid, '=')
@@ -70,9 +72,13 @@ function logger_userdevices_page() {
   }
  
   $header = array(t('Serial'), t('Device Id'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
+  $options = array('type' => 'inline', 'scope' => 'header');
+
+  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
 
   $form = drupal_get_form('logger_deviceactivation_form');
-  return drupal_render($form) .
+  return drupal_render($form) . '<br><br><br>' . 
 
     theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
       'empty' => t('No devices available.'), 'sticky' => FALSE, 'colgroups' => array(),
@@ -87,6 +93,8 @@ function logger_userdevices_page() {
 function logger_usersensors_page() {
 
   global $user;
+
+  drupal_set_title(t('My Sensors'));
 
   $query = db_select('logger_meters', 'lm');
   $query->join('logger_tokens', 'lt', 'lm.meter = lt.meter');
@@ -105,28 +113,32 @@ function logger_usersensors_page() {
 
     $row = array();
     $row[] = format_hashcode($sensor->meter);
-    $row[] = format_hashcode($sensor->token);
     $operations = '';
 
     if ($sensor->function == NULL) {
+      $row[] = '';
+      $row[] = '';
       $row[] = t('Inactive');
-      $row[] = '';
-      $row[] = '';
       $operations = l(t('Activate'), 'sensor/activate/' . $sensor->meter);
     }
     else {
-      $row[] = t('Active');
-      $row[] = t($sensor->type);
       $row[] = $sensor->function;
+      $row[] = t($sensor->type);
+      $row[] = t('Active');
       $operations .=
         l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
         l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
+    $row[] = format_hashcode($sensor->token);
     $row[] = $operations;
     $rows[] = $row;
   }
 
-  $header = array(t('Sensor'), t('Token'), t('Status'), t('Type'), t('Function'), t('Operation'));
+  $header = array(t('Sensor'), t('Function'), t('Type'), t('Status'), t('Token'), t('Operation'));
+  $options = array('type' => 'inline', 'scope' => 'header');
+
+  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
 
   return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
    'empty' => t('No sensors available.'), 'sticky' => FALSE, 'colgroups' => array(),

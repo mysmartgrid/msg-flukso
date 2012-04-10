@@ -23,6 +23,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+//Debug
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
+
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
 
@@ -199,18 +204,18 @@ function logger_menu() {
 
   //Device operations
 
-  $items['user/%user_uid_optional/devices'] = array(
-    'title' => 'Devices',
+  $device_title = 'Devices';
+  $items['device/mylist'] = array(
+    'title' => $device_title,
     'page callback' => 'logger_userdevices_page',
     'access callback' => 'logger_account_access',
-    'access arguments' => array('list devices', 1),
+    'access arguments' => array('list devices'),
     'type' => MENU_LOCAL_TASK,
-    'file' => 'logger.admin.inc',
-    'weight' => 3
+    'file' => 'logger.admin.inc'
   );
 
   $items['device/activate'] = array(
-    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'title' => $device_title,
     'page callback' => 'logger_device_activate',
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
@@ -220,7 +225,7 @@ function logger_menu() {
   );
 
   $items['device/deactivate'] = array(
-    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'title' => $device_title,
     'page callback' => 'logger_device_deactivate',
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
@@ -230,7 +235,7 @@ function logger_menu() {
   );
 
   $items['device/remove'] = array(
-    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'title' => $device_title,
     'page callback' => 'logger_device_remove',
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
@@ -239,8 +244,9 @@ function logger_menu() {
     'file' => 'logger.admin.inc',
   );
 
+  $support_title = 'Support Requests';
   $items['device/support/confirm'] = array(
-    'title' => 'Support Requests',
+    'title' => $support_title,
     'description' => 'Show the device support request confirmation page',
     'page callback' => 'logger_support_confirmation_page',
     'page arguments' => array(3),
@@ -250,7 +256,7 @@ function logger_menu() {
   );
 
   $items['device/support/request'] = array(
-    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'title' => $device_title,
     'page callback' => 'logger_request_support',
     'page arguments' => array(3),
     'access callback' => 'logger_device_access',
@@ -259,7 +265,7 @@ function logger_menu() {
   );
 
   $items['device/support/suspend'] = array(
-    'title' => $items['user/%user_uid_optional/devices']['title'],
+    'title' => $device_title,
     'page callback' => 'logger_suspend_support',
     'page arguments' => array(3),
     'access callback' => 'logger_device_access',
@@ -268,7 +274,7 @@ function logger_menu() {
   );
 
   $items['device/support/requests'] = array(
-    'title' => 'Support Requests',
+    'title' => $support_title,
     'description' => 'Show the device support requests page',
     'page callback' => 'logger_support_requests_page',
     'access arguments' => array('attend device remote support requests'),
@@ -276,7 +282,7 @@ function logger_menu() {
   );
 
   $items['device/support/postpone'] = array(
-    'title' => $items['device/support/requests']['title'],
+    'title' => $support_title,
     'page callback' => 'logger_postpone_support',
     'page arguments' => array(3),
     'access arguments' => array('attend device remote support requests'),
@@ -284,7 +290,7 @@ function logger_menu() {
   );
 
   $items['device/support/remove'] = array(
-    'title' => $items['device/support/requests']['title'],
+    'title' => $support_title,
     'page callback' => 'logger_remove_support',
     'page arguments' => array(3),
     'access arguments' => array('attend device remote support requests'),
@@ -294,18 +300,19 @@ function logger_menu() {
 
   //Sensor operations
 
-  $items['user/%user_uid_optional/sensors'] = array(
-    'title' => 'Sensors',
+  $sensor_title = 'Sensors';
+  $items['sensor/mylist'] = array(
+    'title' => $sensor_title,
     'page callback' => 'logger_usersensors_page',
     'access callback' => 'logger_account_access',
-    'access arguments' => array('list sensors', 1),
+    'access arguments' => array('list sensors'),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
-    'weight' => 3,
   );
 
+  $sensor_edit_title = 'Sensor Edition';
   $items['sensor/edit'] = array(
-    'title' => 'Sensor Edition',
+    'title' => $sensor_edit_title,
     'page callback' => 'logger_sensor_edition_page',
     'page arguments' => array(2),
     'access callback' => 'logger_sensor_access',
@@ -315,7 +322,7 @@ function logger_menu() {
   );
 
   $items['sensor/deactivate'] = array(
-    'title' => $items['user/%user_uid_optional/sensors']['title'],
+    'title' => $sensor_title,
     'page callback' => 'logger_sensor_deactivate',
     'page arguments' => array(2),
     'access callback' => 'logger_sensor_access',
@@ -325,7 +332,7 @@ function logger_menu() {
   );
 
   $items['sensor/activate'] = array(
-    'title' => $items['sensor/edit']['title'],
+    'title' => $sensor_edit_title,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('logger_sensor_form', 2),
     'access callback' => 'logger_sensor_access',
@@ -409,19 +416,25 @@ function logger_mobile_page() {
   global $user;
 
   if ($user->uid) {
+    $is_pv_producer = logger_forecast_access('view forecast charts');
+
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      ($is_pv_producer ?
+      logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') : '') .
       logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
       logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
       logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
-      logger_create_mobile_page_icon('dump.png',        t('Dump values'),      '/dump/116/setup') .
-      logger_create_mobile_page_icon('myaccount.png',   t('My Account'),        "/users/$user->name");
+      logger_create_mobile_page_icon('dump.png',        t('Dump values'),       '/dump/116/setup') .
+      logger_create_mobile_page_icon('myaccount.png',   t('My Account'),        "/users/$user->name") .
+      logger_create_mobile_page_icon('device.png',      t('Devices'),           '/device/mylist') .
+      logger_create_mobile_page_icon('sensor.png',      t('Sensors'),           '/sensor/mylist');
   }
   else {
-    $output .=
-      logger_create_mobile_page_icon('join.png',        t('Join mySmartGrid'), '/content/werden-sie-teilnehmer');
+    $output =
+      logger_create_mobile_page_icon('join.png',        t('Join mySmartGrid'),  '/content/werden-sie-teilnehmer');
   }
 
   $output .=
@@ -462,7 +475,6 @@ function logger_create_mobile_page_icon($image, $label, $target) {
  * @return TRUE if it is; FALSE otherwise.
  */
 function logger_is_mobile_device() {
-
   $check = mobile_tools_is_mobile_device();
   return $check['type'] == 'mobile';
 }
@@ -1214,23 +1226,27 @@ function logger_get_forecast_chart_data($chart) {
           $function = $data['legend'][$i - $total][t('Sensor')];
 
           $file_path = LOGGER_FORECAST_PATH . "/$meter.json";
-
           if (file_exists($file_path)) {
 
             $forecast = array();
-            foreach (json_decode(file_get_contents($file_path)) as $values) {
-              $time = $values[0];
-              $value = $values[1];
-              $forecast[$time] = $value;
+
+            $content = json_decode(file_get_contents($file_path));
+            if (!empty($content)) {
+
+              foreach ($content as $values) {
+                $time = $values[0];
+                $value = $values[1];
+                $forecast[$time] = $value;
+              }
+
+              $operations = $uid > 0 ?
+                '<a href="javascript: void(0)"
+                  OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+                  t('Remove') . '</a>' : '';
+
+              $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
+              $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
             }
-
-            $operations = $uid > 0 ?
-              '<a href="javascript: void(0)"
-                OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-                t('Remove') . '</a>' : '';
-
-            $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
-            $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
           }
         }
       }
@@ -1761,9 +1777,10 @@ function logger_create_chart_legend($chart) {
       $header[$title] = array('data' => t($title));
     }
   }
+  $options = array('type' => 'inline', 'scope' => 'header');
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", array('type' => 'inline', 'scope' => 'header'));
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", array('type' => 'inline', 'scope' => 'header'));
+  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", $options);
+  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
 
   return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
@@ -2741,9 +2758,11 @@ function logger_form_alter(&$form, &$form_state, $form_id) {
   }
 }
 
-function logger_account_access($permission, $account) {
+function logger_account_access($permission) {
 
-  return $account->uid == $GLOBALS['user']->uid && user_access($permission);
+  global $user;
+
+  return $user->uid == $GLOBALS['user']->uid && user_access($permission);
 }
 
 /**
@@ -2849,19 +2868,32 @@ function logger_download_forecasts() {
 
   $url = variable_get('logger_forecast_service_url');
 
+  $visitor_query = db_select('users_roles', 'ur')
+    ->fields('ur', array('uid'));
+  $visitor_query->join('role', 'r', 'r.rid = ur.rid');
+  $visitor_query->condition('r.name', 'Visitor', '=');
+
   $sensors = db_select('logger_meters', 's')
     ->fields('s', array('meter'))
     ->condition('s.forecast', '1', '=')
+    ->condition('s.uid', $visitor_query, 'NOT IN')
     ->execute();
 
-  foreach($sensors as $sensor) {
+  foreach ($sensors as $sensor) {
 
     $content = file_get_contents("$url/$sensor->meter");
-    $file_path = LOGGER_FORECAST_PATH . "/$sensor->meter.json";
 
-    $fh = fopen($file_path, 'w');
-    fwrite($fh, $content);
-    fclose($fh);
+    if (empty($content)) {
+      watchdog('logger.forecast', 'Forecast for sensor %meter downloaded from myPowerGrid is empty', array('%meter' => $sensor->meter), WATCHDOG_ERROR);
+    }
+    else {
+      watchdog('logger.forecast', 'Forecast for sensor %meter has been downloaded from myPowerGrid.', array('%meter' => $sensor->meter), WATCHDOG_NOTICE);
+      $file_path = LOGGER_FORECAST_PATH . "/$sensor->meter.json";
+
+      $fh = fopen($file_path, 'w');
+      fwrite($fh, $content);
+      fclose($fh);
+    }
   }
 }
 

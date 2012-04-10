@@ -25,7 +25,7 @@ class LoggerTestCase extends DrupalWebTestCase {
     $periods = logger_rrd_get_storage_periods();
     $this->assertEqual(4, sizeof($periods));
 
-    foreach($periods as $resolution => $period) {
+    foreach ($periods as $resolution => $period) {
       $this->assertEqual(0, $resolution % MINUTE);
       $this->assertEqual(0, $period % DAY);
     }
@@ -40,7 +40,7 @@ class LoggerTestCase extends DrupalWebTestCase {
 
     $periods = logger_rrd_get_storage_periods();
 
-    foreach($periods as $resolution => $period) {
+    foreach ($periods as $resolution => $period) {
       $return = logger_rrd_get_storage_period($resolution);
       $this->assertEqual($return, $period);
     }
