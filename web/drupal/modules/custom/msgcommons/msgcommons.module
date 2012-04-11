@@ -430,19 +430,19 @@ function check_browser_support() {
   $supported = FALSE;
   $agent = $_SERVER['HTTP_USER_AGENT'];
 
-  $browsers = array(
+  $supported_browsers = array(
     array('name' => 'Firefox',  'version' => 3),
     array('name' => 'MSIE',     'version' => 7),
-    array('name' => 'Chrome',   'version' => 15),
-    array('name' => 'Chromium', 'version' => 15),
-    array('name' => 'Safari',   'version' => 4)
+    array('name' => 'Chrome',   'version' => 1),
+    array('name' => 'Chromium', 'version' => 1),
+    array('name' => 'Safari',   'version' => 4),
+    array('name' => 'Webkit',   'version' => 5)
   );
 
-  foreach ($browsers as $browser) {
+  foreach ($supported_browsers as $browser) {
     $pos = strpos($agent, $browser['name']);
     if ($pos > 0) {
-      $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
-      $version = str_replace('.', '', $version);
+      $version = substr($agent, $pos + strlen($browser['name']) + 1, 1);
       $supported = $version >= $browser['version'];
       break;
     }
