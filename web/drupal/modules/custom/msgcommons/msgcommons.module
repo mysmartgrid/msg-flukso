@@ -442,7 +442,8 @@ function check_browser_support() {
   foreach ($supported_browsers as $browser) {
     $pos = strpos($agent, $browser['name']);
     if ($pos > 0) {
-      $version = substr($agent, $pos + strlen($browser['name']) + 1, 1);
+      $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
+      $version = str_replace('.', '', $version);
       $supported = $version >= $browser['version'];
       break;
     }
