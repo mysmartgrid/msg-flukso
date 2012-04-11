@@ -164,7 +164,9 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 
       $operations = l(t('Device History'), 'event/log/list/' . $device['device']);
       if (user_access('remove device')) {
-        $operations .= '<br>' . l(t('Remove device and all its related data'), 'device/remove/' . $device['device']);
+        $operations .= '<br>' . l(t('Remove device and all its related data'), 'device/remove/' . $device['device'],
+            array('attributes' => array('onclick' => "javascript: return confirm('" .
+              t('This device and all its related data is going to be permanently removed. Do you really want to proceed?') . "');")));
       }
 
       $rows = array(
