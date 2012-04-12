@@ -2178,8 +2178,8 @@ function theme_logger_geo_location($variables) {
 
   drupal_add_js("jQuery(document).ready(function(){createMap($latitude, $longitude);});", array('type' => 'inline', 'scope' => 'header'));
 
-  $latitude_field = logger_create_custom_field($element, '_latitude', $latitude, 9, 9);
-  $longitude_field = logger_create_custom_field($element, '_longitude', $longitude, 9, 9);
+  $latitude_field = logger_create_custom_field($element, '_latitude', $latitude, 11, 11);
+  $longitude_field = logger_create_custom_field($element, '_longitude', $longitude, 11, 11);
 
   return '<div>' .
     t('Latitude') . ": $latitude_field &nbsp;&nbsp;" .

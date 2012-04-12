@@ -363,14 +363,14 @@ function logger_update_7003() {
 
   db_add_field('logger_meters', 'latitude', array(
     'type' => 'float',
-    'size' => 'normal',
+    'size' => 'big',
     'not null' => TRUE,
     'default' => 0
   ));
 
   db_add_field('logger_meters', 'longitude', array(
     'type' => 'float',
-    'size' => 'normal',
+    'size' => 'big',
     'not null' => TRUE,
     'default' => 0
   ));
