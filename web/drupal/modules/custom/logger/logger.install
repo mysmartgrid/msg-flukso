@@ -213,7 +213,19 @@ function logger_schema() {
         'size' => 'tiny',
         'not null' => TRUE,
         'default' => 0
-      )
+      ),
+      'latitude' => array(
+        'type' => 'float',
+        'size' => 'normal',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'longitude' => array(
+        'type' => 'float',
+        'size' => 'normal',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
     ),
     'primary key' => array('meter'),
   );
@@ -328,7 +340,7 @@ function logger_update_7001() {
 
 /**
  * Sets the system variable logger_forecast_service_url.
- * Adds field forecast on table logger_meters.
+ * Adds field forecast to table logger_meters.
  */
 function logger_update_7002() {
 
@@ -344,3 +356,39 @@ function logger_update_7002() {
   return st('Field logger_meters.forecast successfully added. Variable logger_forecast_service_url successfully created.');
 }
 
+/**
+ * Adds fields latitude and longitude to table logger_meters.
+ */
+function logger_update_7003() {
+
+  db_add_field('logger_meters', 'latitude', array(
+    'type' => 'float',
+    'size' => 'normal',
+    'not null' => TRUE,
+    'default' => 0
+  ));
+
+  db_add_field('logger_meters', 'longitude', array(
+    'type' => 'float',
+    'size' => 'normal',
+    'not null' => TRUE,
+    'default' => 0
+  ));
+  
+  return st('Fields latitude and longitude successfully added to table logger_meters.');
+}
+
+/**
+ * Updates the latitude and longitude of the existing sensors to Kaiserslautern's.
+ */
+function logger_update_7004() {
+
+  db_update('logger_meters')
+    ->fields(array(
+      'latitude' => 49.444710,
+      'longitude' => 7.769031,
+    ))
+    ->execute();
+
+  return st("Sensors' latitude and longitude have been updated.");
+}

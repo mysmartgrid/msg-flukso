@@ -44,11 +44,14 @@ function logger_userdevices_page() {
   $devices = $query->execute();
 
   $rows = array();
- 
+
   foreach ($devices as $device) {
 
-    $links = l(t('Remove'), "device/deactivate/$device->device") . '<br>' .
-             l(t('History'), "event/log/list/$device->device");
+    $links = l(t('Remove'), "device/deactivate/$device->device",
+      array('attributes' => array('onclick' => "javascript: return confirm('" .
+        t('This device and all its related data is going to be permanently removed. Do you want to proceed?') . "');"))) . '<br>' .
+
+      l(t('History'), "event/log/list/$device->device");
 
     //TODO: use a version field
     if ($device->serial > 100000000 && user_access('request device remote support', $user)) {
@@ -154,12 +157,13 @@ function logger_usersensors_page() {
 function logger_sensor_edition_page($meter) {
 
   $sensor = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'type', 'function'))
+    ->fields('m', array('meter', 'type', 'function', 'forecast', 'latitude', 'longitude'))
     ->condition('m.meter', $meter, '=')
     ->execute()
     ->fetchObject();
 
-  $form = drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function);
+  $form = drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function, $sensor->forecast, $sensor->latitude, $sensor->longitude);
+
   return drupal_render($form);
 }
 
@@ -181,10 +185,13 @@ function logger_deviceactivation_form($form, &$form_state) {
   return $form;
 }
 
-function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main') {
+function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main', $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE) {
+
+  global $user;
 
   $form['meter'] = array(
     '#type' => 'textfield',
+    '#title' => t('Id'),
     '#description' => t("The sensor meter id."),
     '#maxlength' => 32,
     '#size' => 32,
@@ -195,6 +202,7 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
 
   $form['type'] = array(
     '#type' => 'select',
+    '#title' => t('Type'),
     '#description' => t('The sensor type.'),
     '#options' => logger_get_sensor_types_options(),
     '#default_value' => $type,
@@ -204,12 +212,37 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
 
   $form['function'] = array(
     '#type' => 'textfield',
+    '#title' => t('Function'),
     '#description' => t("Enter the sensor's function name."),
     '#maxlength' => 16,
     '#size' => 16,
     '#required' => TRUE,
     '#default_value' => $function,
   );
+
+  $rid = get_role_id('PV Producer');
+
+  if (!empty($user->roles[$rid])) {
+
+    $form['forecast'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Forecast'),
+      '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
+      '#options' => array(
+        '1' => t('Activate'),
+      ),
+      '#default_value' => array("$forecast")
+    );
+
+    $form['coordinates'] = array(
+      '#type' => 'textfield',
+      '#theme' => 'logger_geo_location',
+      '#title' => t('Location'),
+      '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
+      '#default_value' => "$latitude,$longitude",
+      '#text-align' => 'center'
+    );
+  }
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -279,6 +312,15 @@ function logger_sensor_form_validate($form, &$form_state) {
     form_set_error('function', t('Another sensor was found with the function name: %function_name. ' .
       'Please inform another name which has not yet been used.', array('%function_name' => $function)));
   }
+
+  $rid = get_role_id('PV Producer');
+
+  if (!empty($user->roles[$rid]) && !(isset($_REQUEST['coordinates_latitude']) && isset($_REQUEST['coordinates_longitude']) &&
+    $_REQUEST['coordinates_latitude'] >= -90 && $_REQUEST['coordinates_latitude'] <= 90 &&
+    $_REQUEST['coordinates_longitude'] >= -90 && $_REQUEST['coordinates_longitude'] <= 90)) {
+
+    form_set_error('coordinates', t('Invalid geographic coordinates.'));
+  }
 }
 
 function logger_deviceactivation_form_submit($form, &$form_state) {
@@ -288,16 +330,24 @@ function logger_deviceactivation_form_submit($form, &$form_state) {
 
 function logger_sensor_form_submit($form, &$form_state) {
 
-  $function = $form_state['values']['function'];
-  $type = $form_state['values']['type'];
-  $meter = $form_state['values']['meter'];
+  global $user;
+
+  $fields = array(
+    'function' => $form_state['values']['function'],
+    'type' => $form_state['values']['type']
+  );
+
+  $rid = get_role_id('PV Producer');
+  if (!empty($user->roles[$rid])) {
+
+    $fields['forecast'] = $form_state['values']['forecast'];
+    $fields['latitude'] = $_REQUEST['coordinates_latitude'];
+    $fields['longitude'] = $_REQUEST['coordinates_longitude'];
+  }
 
   db_update('logger_meters')
-    ->fields(array(
-      'function' => $function,
-      'type' => $type,
-    ))
-    ->condition('meter', $meter)
+    ->fields($fields)
+    ->condition('meter', $form_state['values']['meter'])
     ->execute();
 
   $form_state['redirect'] = "sensor/mylist";

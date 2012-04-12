@@ -1,5 +1,5 @@
 /**
- * Javascript functions used by module logger.
+ * Javascript functions used by module logger to build charts.
  *
  * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
  *
