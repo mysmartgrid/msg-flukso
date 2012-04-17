@@ -1229,34 +1229,52 @@ function logger_get_forecast_chart_data($chart) {
         foreach ($typedata as $type => $measurements) {
           $function = $data['legend'][$i - $total][t('Sensor')];
 
-          $file_path = LOGGER_FORECAST_PATH . "/$meter.json";
-          if (file_exists($file_path)) {
+          $forecast = logger_query_forecast($meter, $chart->period['start'], $chart->period['end']);
+          if (!empty($forecast)) {
 
-            $forecast = array();
+            $operations = $uid > 0 ?
+              '<a href="javascript: void(0)"
+                OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+                t('Remove') . '</a>' : '';
 
-            $content = json_decode(file_get_contents($file_path));
-            if (!empty($content)) {
-
-              foreach ($content as $values) {
-                $time = $values[0];
-                $value = $values[1];
-                $forecast[$time] = $value;
-              }
-
-              $operations = $uid > 0 ?
-                '<a href="javascript: void(0)"
-                  OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-                  t('Remove') . '</a>' : '';
-
-              $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
-              $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
-            }
+            $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
+            $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
           }
         }
       }
     }
   }
   return $data;
+}
+
+/**
+ * Queries the forecast data.
+ *
+ * @param $meter      The sensor meter.
+ * @param $start_time The forecast period start time.
+ * @param $end_time   The forecast period end time.
+ * @return the forecast data filtered by the parameters, as an array.
+ */
+function logger_query_forecast($meter, $start_time, $end_time) {
+
+  $forecast = array();
+
+  $file_path = LOGGER_FORECAST_PATH . "/$meter.json";
+  if (file_exists($file_path)) {
+
+    $content = json_decode(file_get_contents($file_path));
+    if (!empty($content)) {
+
+      foreach ($content as $values) {
+        $time = $values[0];
+        if ($time >= $start_time && $time <= $end_time) {
+          $value = $values[1];
+          $forecast[$time] = $value;
+        }
+      }
+    }
+  }
+  return $forecast;
 }
 
 /**

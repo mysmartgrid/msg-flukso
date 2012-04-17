@@ -26,6 +26,7 @@ define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
 
 define('SUMMARY_REPORT_EVENT_ID',          10);
+define('FORECAST_REPORT_EVENT_ID',         11);
 define('SYSTEM_ERROR_EVENT_ID',            999);
 
 //Message events
@@ -542,6 +543,14 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
+  $rid = get_role_id('PV Producer');
+
+  if (!empty($user->roles[$rid])) {
+
+    $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
+    'Here you can set the period of time in which you want to receive energy production forecast reports.');
+  }
+
   $event_id = CORRUPTED_MESSAGE_EVENT_ID;
   $form['events']["event_id$event_id"] = array(
     '#title' => check_plain(notification_get_event_name($event_id)),
@@ -688,6 +697,11 @@ function notification_edition_form($form, &$form_state, $notification) {
       $form['limit_up']['#title'] = t('Frequency');
       $form['limit_up']['#description'] = t('Here you can set the period of time in which you want to receive summary reports.');
       break;
+
+    case FORECAST_REPORT_EVENT_ID:
+      $form['limit_up']['#title'] = t('Frequency');
+      $form['limit_up']['#description'] = t('Here you can set the period of time in which you want to receive forecast reports.');
+      break;
       
     default:
       unset($form['limit_up']);
@@ -823,6 +837,7 @@ function notification_registration_form_submit($form, &$form_state) {
   notification_register_event($_REQUEST, COMMUNICATION_RESTORED_EVENT_ID);
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
+  notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -1125,6 +1140,7 @@ function notification_cron() {
   notification_send_communication_restored_emails();
   notification_send_peak_consumption_emails();
   notification_send_summary_report_emails();
+  notification_send_forecast_report_emails();
   notification_eventlog_clear_old();
 }
 
@@ -1469,6 +1485,108 @@ function notification_compose_summary_report_table($type, $lines, $total_cost, $
 }
 
 /**
+ * Sends forecast report e-mails.
+ */
+function notification_send_forecast_report_emails() {
+
+  $query = notification_compose_base_query(FORECAST_REPORT_EVENT_ID);
+
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $query->condition('m.forecast', 1, '=');
+  $query->addField('m', 'meter');
+  $query->addField('m', 'function');
+
+  $since_time = ":now - (:now % :day) + :day";
+  $until_time = "$since_time + n.limit_up * un.factor";
+
+  $args = array(
+    ':now' => REQUEST_TIME,
+    ':day' => DAY
+  );
+
+  $query->addExpression($since_time, 'since_time', $args);
+  $query->addExpression($until_time, 'until_time', $args);
+  $query->addExpression(':now', 'event_time', $args);
+  $query->where('n.last_sent + n.limit_up * un.factor < :now', $args);
+
+  $result = $query->execute();
+
+  $notifiables = array();
+  while ($notifiable = $result->fetchAssoc()) {
+
+    $notifiable['chart'] = notification_create_forecast_chart($notifiable);
+    if ($notifiable['chart']) {
+
+      $tz_offset = get_timezone_offset($notifiable['timezone']);
+      $notifiable['since_time'] -= $tz_offset;
+      $notifiable['until_time'] -= $tz_offset;
+      $notifiables[] = $notifiable;
+    }
+  }
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = notification_compose_email(
+    "This is the forecast of the energy production of your photovoltaic plant for the period between %since_time and %until_time.<br><br>" .
+    '!chart');
+
+  notification_send_emails($message, $notifiables, FALSE);
+}
+
+/**
+ * Creates a forecast report chart.
+ * 
+ * @param $notification  The forecast report notification object.
+ * @return the chart image in binary format.
+ */
+function notification_create_forecast_chart($notifiable) {
+
+  //TODO: improve the quality of the chart
+  global $base_url;
+
+  $lib_path = libraries_get_path('pChart.1.27d');
+  include("$lib_path/pChart/pData.class");
+  include("$lib_path/pChart/pChart.class");
+
+  $content = NULL;
+  $file_path = NOTIFICATION_REL_PATH . '/tmp/' . $notifiable['meter'] . '.png';
+  $forecast = logger_query_forecast($notifiable['meter'], $notifiable['since_time'], $notifiable['until_time']);
+
+  if (!empty($forecast)) {
+
+    date_default_timezone_set($notifiable['timezone']); 
+
+    $values = array();
+    $days = array();
+    foreach ($forecast as $timestamp => $value) {
+      $values[] = $value;
+      $hour = date('G', $timestamp);
+      $hours[] = $hour % 12 == 0 ? date('d.m.Y G:i', $timestamp) : NULL;
+    }
+
+    $dataset = new pData;
+    $dataset->AddPoint($values, "Serie1");
+    $dataset->AddSerie("Serie1");
+    $dataset->AddPoint($hours, 'XLabel');
+    $dataset->SetAbsciseLabelSerie("XLabel");
+    $dataset->SetYAxisName(t('watt'));
+
+    $chart = new pChart(700, 230);
+    $chart->setColorPalette(0, 0, 0, 255);
+    $chart->setFontProperties("$lib_path/Fonts/tahoma.ttf", 8);
+    $chart->setGraphArea(70, 30, 680, 200);
+    $chart->drawScale($dataset->GetData(), $dataset->GetDataDescription(), SCALE_NORMAL, 150, 150, 150, TRUE, 0, 2);
+    $chart->drawGrid(4, TRUE, 230, 230, 230, 50);
+    $chart->drawLineGraph($dataset->GetData(), $dataset->GetDataDescription());
+    $chart->setFontProperties("$lib_path/Fonts/tahoma.ttf", 10);
+    $chart->drawTitle(60, 22, t('Device') . ': ' . $notifiable['serial'] . ' ' . t('Sensor') . ': ' . $notifiable['function'], 50, 50, 50, 585);
+    $chart->Render($file_path);
+
+    $content = file_get_contents("$base_url/$file_path");
+  }
+  return $content;
+}
+
+/**
  * Notifies the administrator of the occurrence of a system error.
  *
  * @param $context     The page or function where the error occurred.
@@ -1583,24 +1701,35 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
 
   $variables = array(
     '!base_url' => $base_url,
-    '!logo' => "<img src='cid:logo'/>"
+    '!logo' => "<img src='cid:logo'/>",
+    '!chart' => "<img src='cid:chart'/>"
   );
 
   $css = file_get_contents(NOTIFICATION_PATH . "/style/email.css");
   $theme_path =  drupal_get_path('theme', 'msgweb');
   $file_path = "$base_url/$theme_path/logo.png";
   $logo = file_get_contents($file_path);
-  $attachments = array(
-    array(
-      'cid' => 'logo',
-      'file_name' => 'logo.png',
-      'content_type' => 'image/png',
-      'content' => $logo,
-      'size' => strlen($logo)
-    )
+  $attachments = array();
+  $attachments[0] = array(
+    'cid' => 'logo',
+    'file_name' => 'logo.png',
+    'content_type' => 'image/png',
+    'content' => $logo,
+    'size' => strlen($logo)
   );
 
   foreach ($notifiables as $notifiable) {
+
+    if (isset($notifiable['chart'])) {
+      $attachments[1] = array(
+        'cid' => 'chart',
+        'file_name' => 'chart.jpg',
+        'content_type' => 'image/jpeg',
+        'content' => $notifiable['chart'],
+        'size' => strlen($notifiable['chart'])
+      );
+      unset($notifiable['chart']);
+    }
 
     if (isset($notifiable['unit_name'])) {
       $notifiable['unit_name'] = format_plural($notifiable['limit_up'], $notifiable['unit_name'], $notifiable['unit_name'] . 's');
@@ -1683,3 +1812,47 @@ function notification_query_peak_consumption_violations($notifiable) {
   return $list ? array('timestamp' => $timestamp, 'list' => $list) : NULL;
 }
 
+function notification_create_chart($file_path) {
+
+  $path = libraries_get_path('pChart.1.27d');
+
+  // Standard inclusions
+  include("$path/pChart/pData.class");
+  include("$path/pChart/pChart.class");
+
+  // Dataset definition
+  $DataSet = new pData;
+  $DataSet->ImportFromCSV("$path/Sample/bulkdata.csv",",",array(1,2,3),FALSE,0);
+  $DataSet->AddAllSeries();
+  $DataSet->SetAbsciseLabelSerie();
+  $DataSet->SetSerieName("January","Serie1");
+  $DataSet->SetSerieName("February","Serie2");
+  $DataSet->SetSerieName("March","Serie3");
+  $DataSet->SetYAxisName("Average age");
+  $DataSet->SetYAxisUnit("µs");
+
+  // Initialise the graph
+  $Test = new pChart(700,230);
+  $Test->setFontProperties("Fonts/tahoma.ttf",8);
+  $Test->setGraphArea(70,30,680,200);
+  $Test->drawFilledRoundedRectangle(7,7,693,223,5,240,240,240);
+  $Test->drawRoundedRectangle(5,5,695,225,5,230,230,230);
+  $Test->drawGraphArea(255,255,255,TRUE);
+  $Test->drawScale($DataSet->GetData(),$DataSet->GetDataDescription(),SCALE_NORMAL,150,150,150,TRUE,0,2);
+  $Test->drawGrid(4,TRUE,230,230,230,50);
+
+  // Draw the 0 line
+  $Test->setFontProperties("Fonts/tahoma.ttf",6);
+  $Test->drawTreshold(0,143,55,72,TRUE,TRUE);
+
+  // Draw the line graph
+  $Test->drawLineGraph($DataSet->GetData(),$DataSet->GetDataDescription());
+  $Test->drawPlotGraph($DataSet->GetData(),$DataSet->GetDataDescription(),3,2,255,255,255);
+
+  // Finish the graph
+  $Test->setFontProperties("Fonts/tahoma.ttf",8);
+  $Test->drawLegend(75,35,$DataSet->GetDataDescription(),255,255,255);
+  $Test->setFontProperties("Fonts/tahoma.ttf",10);
+  $Test->drawTitle(60,22,"example 1",50,50,50,585);
+  $Test->Render($file_path);
+}

@@ -8,3 +8,4 @@ php = 5.3
 
 dependencies[] = msgcommons
 dependencies[] = logger
+dependencies[] = pchart
