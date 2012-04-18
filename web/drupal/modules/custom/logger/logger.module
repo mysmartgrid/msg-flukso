@@ -2736,8 +2736,6 @@ function logger_remove_user($uid) {
 function logger_get_variable($id, $default_value) {
 
   global $user;
-  global $_SESSION;
-  global $_COOKIE;
 
   $id = "logger_$id";
 
@@ -2747,11 +2745,11 @@ function logger_get_variable($id, $default_value) {
     $rid = get_role_id('Visitor');
 
     if (isset($user->roles[$rid])) {
-      $id .= '_' . $user->uid;
-      return variable_get($id, $default_value);
+      return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
     }
     else {
-      return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
+      $id .= '_' . $user->uid;
+      return variable_get($id, $default_value);
     }
   }
   else {
@@ -2772,7 +2770,6 @@ function logger_get_variable($id, $default_value) {
  */
 function logger_set_variable($id, $value) {
 
-  global $_SESSION;
   global $user;
 
   $id = "logger_$id";
@@ -2783,11 +2780,11 @@ function logger_set_variable($id, $value) {
     $rid = get_role_id('Visitor');
 
     if (isset($user->roles[$rid])) {
-      $id .= '_' . $user->uid;
-      variable_set($id, $value);
+      $_SESSION[$id] = $value;
     }
     else {
-      $_SESSION[$id] = $value;
+      $id .= '_' . $user->uid;
+      variable_set($id, $value);
     }
   }
   else {
