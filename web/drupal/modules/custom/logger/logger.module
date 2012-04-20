@@ -67,6 +67,7 @@ function logger_init() {
 }
 
 function logger_permission() {
+
   return array(
     'view logger charts' => array(
       'title' => t('view logger charts'),
@@ -644,7 +645,7 @@ function logger_overview_page($interval) {
   }
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
-  $sensors = logger_get_active_sensors($types);
+  $sensors = logger_get_sensors($types);
 
   $chart = logger_create_chart_object('overview', $types, $interval, 'watt', FALSE, $sensors);
 
@@ -660,11 +661,13 @@ function logger_overview_page($interval) {
  */
 function logger_relative_energy_consumption_page() {
 
+  global $user;
+
   $meters = logger_get_variable('selected_meters', array());
   $all_meters = array();
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
-  $all_sensors = logger_get_user_sensors($types);
+  $all_sensors = logger_get_sensors($types, array($user->uid));
   $unit = logger_get_variable('relativechart_unit', 'kWh');
   $price1 = logger_get_variable('price1', 0.18);
 
@@ -741,7 +744,7 @@ function logger_energy_page($interval) {
     logger_set_variable('selected_sensor_types', $all_types_options);
   }
 
-  $sensors = logger_get_user_sensors($types);
+  $sensors = logger_get_sensors($types, array($user->uid));
   $aggregate_sensors = logger_get_variable('aggregate_sensors', 1);
   $unit = logger_get_variable('energychart_unit', 'kWh');
   $price1 = logger_get_variable('price1', 0.18);
@@ -1018,6 +1021,7 @@ function logger_format_period($interval, $period) {
  * @return the long period of time as a string.
  */
 function logger_format_long_period($start, $end, $format) {
+
   return t('from:') . '&nbsp;&nbsp;' . date($format, $start) . '<br>' .
          t('to:') . '&nbsp;&nbsp;' . date($format, $end);
 }
@@ -1358,44 +1362,47 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 }
 
 /**
- * Returns an array containing all sensors owned by the user.
+ * Returns an array containing sensors owned by the informed users.
  *
- * @param $types    The types of sensors to be returned.
- * @param $virtual  Whether virtual sensors should be returned.
- * @return the array of user sensors.
+ * @param $types     The types of sensors to be returned (default: all).
+ * @param $user_ids  The user ids of sensor owners (default: all).
+ * @param $virtual   Whether virtual sensors should be returned (default: false).
+ * @return the array of sensors.
  */
-function logger_get_user_sensors($types, $virtual = FALSE) {
+function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE) {
 
-  global $user;
+  $query = db_select('logger_meters', 'm')
+    ->fields('m', array('uid', 'meter', 'function', 'unit'))
+    ->isNotNull('m.function');
 
-  $sensors = array();
+  $query->join('logger_meter_type', 't', 't.id = m.type');
+  $query->addField('t', 'name', 'type');
+  $query->addField('t', 'id', 'type_id');
+
+  $query->join('logger_users', 'lu', 'lu.uid = m.uid');
+  $query->addField('lu', 'private', 'private');
+
+  $query->join('users', 'u', 'u.uid = lu.uid');
+  $query->addField('u', 'name', 'username');
 
   if (!empty($types)) {
+    $query->condition('m.type', $types, 'IN');
+  }
+  if (!empty($user_ids)) {
+    $query->condition('u.uid', $user_ids, 'IN');
+  }
+  if (!$include_virtual) {
+    $query->condition('m.virtual', 0);
+  }
 
-    $query = db_select('logger_meters', 'm')
-      ->fields('m', array('uid', 'meter', 'function', 'unit'))
-      ->condition('m.uid', $user->uid)
-      ->condition('m.type', $types, 'IN')
-      ->isNotNull('m.function')
-      ->orderBy('m.function');
+  $query->orderBy('u.name');
+  $query->orderBy('m.function');
 
-    $query->join('logger_meter_type', 't', 't.id = m.type');
-    $query->addField('t', 'name', 'type');
-    $query->addField('t', 'id', 'type_id');
-    
-    $query->join('logger_users', 'u', 'u.uid = m.uid');
-    $query->addField('u', 'private', 'private');
-    $query->addExpression("'" . $user->name . "'", 'username');
+  $result = $query->execute();
 
-    if (!$virtual) {
-      $query->condition('m.virtual', 0);
-    }
-
-    $result = $query->execute();
-
-    foreach ($result as $sensor) {
-      $sensors[] = $sensor;
-    }
+  $sensors = array();
+  foreach ($result as $sensor) {
+    $sensors[] = $sensor;
   }
   return $sensors;
 }
@@ -1417,81 +1424,15 @@ function logger_get_subscribed_sensors($types) {
     logger_set_variable('selected_users', $selected_users);
   }
 
-  $sensors = array();
-
-  if (user_access('view logger charts') && !empty($types)) {
-
-    $sql = "
-      SELECT
-        u.uid,
-        u.name AS username,
-        lm.meter,
-        lm.function,
-        st.name AS type,
-        st.id AS type_id,
-        lm.unit,
-        lu.private
-      FROM
-        {logger_meter_type} st,
-        {users} u,
-        {logger_users} lu,
-        {logger_meters} lm
-      WHERE
-        lm.type = st.id AND
-        lm.uid = u.uid AND
-        u.uid = lu.uid AND
-        u.uid IN (:selected_users) AND
-        lm.type IN (:sensor_types) AND
-        lm.function IS NOT NULL AND
-        lm.virtual = 0
-      ORDER BY
-        u.name,
-        lm.function";
-
-    $result = db_query($sql, array(':selected_users' => $selected_users, ':sensor_types' => $types));
-
-    foreach ($result as $sensor) {
-      $sensors[] = $sensor;
-    }
-  }
-  return $sensors;
+  return logger_get_sensors($types, $selected_users, TRUE);
 }
 
 /**
- * Returns an array containing all active sensors.
- *
- * @param $type       The types of sensors to be returned.
- * @return the array of user sensors.
+ * Returns an array containing the ids of sensors aggregated by a virtual sensor.
+ * 
+ * @param $virtual_meter The virtual sensor id.
+ * @return the array of aggregated sensors' ids.
  */
-function logger_get_active_sensors($types) {
- 
-  $sensors = array();
-
-  if (!empty($types)) {
-
-    $sql = "
-      SELECT
-        lm.meter,
-        st.name AS type,
-        st.id AS type_id
-      FROM
-        {logger_meter_type} st,
-        {logger_meters} lm
-      WHERE
-        lm.uid > 0 AND
-        lm.type = st.id AND
-        lm.type IN (:sensor_types) AND
-        lm.function IS NOT NULL";
-
-    $result = db_query($sql, array(':sensor_types' => $types));
-
-    foreach ($result as $sensor) {
-      $sensors[] = $sensor;
-    }
-  }
-  return $sensors;
-}
-
 function logger_get_aggregated_meters($virtual_meter) {
 
   $aggregated = array();
@@ -1586,6 +1527,7 @@ function logger_theme() {
  * @return the topic.
  */
 function theme_logger_overview_topic($variables) {
+
   $title = $variables['title'];
   $body = $variables['body'];
   $link = $variables['link'];
@@ -1665,8 +1607,8 @@ function theme_logger_power_chart_area($variables) {
  * @return the chart area output.
  */
 function theme_logger_energy_chart_area($variables) {
-  $chart = $variables['chart'];
 
+  $chart = $variables['chart'];
   $data_labels = array();
   $series = array();
   $names = array();
@@ -2174,8 +2116,8 @@ function theme_logger_chart_tabs($items = array()) {
  * @return the field HTML code.
  */
 function theme_logger_smoothing_level($variables) {
-  $element = $variables['element'];
 
+  $element = $variables['element'];
   $id = $element['#id'];
   $value = check_plain($element['#value']);
 
@@ -2233,8 +2175,8 @@ function theme_logger_geo_location($variables) {
  * @return the field HTML code.
  */
 function theme_logger_value_range($variables) {
-  $element = $variables['element'];
 
+  $element = $variables['element'];
   $field1 = logger_create_custom_field($element, 1, '');
   $field2 = logger_create_custom_field($element, 2, '');
 
@@ -2248,8 +2190,8 @@ function theme_logger_value_range($variables) {
  * @return the field HTML code.
  */
 function theme_logger_time_period($variables) {
-  $element = $variables['element'];
 
+  $element = $variables['element'];
   $field1 = logger_create_time_fields($element, 1);
   $field2 = logger_create_time_fields($element, 2);
 
@@ -2265,10 +2207,10 @@ function theme_logger_time_period($variables) {
  * @return the picker HTML code.
  */
 function theme_logger_color_picker($variables) {
+
   $chart_id = $variables['chartId'];
   $i = $variables['index'];
   $colors = $variables['colors'];
-
   $id = 'series_color' . $i;
 
   return '
@@ -2410,9 +2352,6 @@ function logger_energychart_form_submit($form, &$form_state) {
 
 function logger_powerchart_form_submit($form, &$form_state) {
 
-  global $_REQUEST;
-  global $_GET;
-
   if ($form_state['values']['new_user'] > 0) {
     logger_add_user($form_state['values']['new_user']);
   }
@@ -2477,7 +2416,9 @@ function logger_get_sensor_types_options($uid = NULL) {
  */
 function logger_get_meters_options($types, $virtual = FALSE) {
 
-  $sensors = logger_get_user_sensors($types, $virtual);
+  global $user;
+
+  $sensors = logger_get_sensors($types, array($user->uid), $virtual);
   $options = array();
   foreach ($sensors as $sensor) {
     $options[$sensor->meter] = $sensor->function;
@@ -2517,7 +2458,6 @@ function logger_get_energy_units_options() {
  * @return the value.
  */
 function logger_get_yvalue($index) {
-  global $_REQUEST;
 
   return isset($_REQUEST['yvalue' . $index]) ? $_REQUEST['yvalue' . $index] : 0;
 }
@@ -2529,7 +2469,6 @@ function logger_get_yvalue($index) {
  * @return the value.
  */
 function logger_get_xvalue($index) {
-  global $_REQUEST;
 
   //Both need to be set
   if (!(isset($_REQUEST['xvalue' . $index . 'date']) && isset($_REQUEST['xvalue' . $index . 'time']))) {
@@ -2556,7 +2495,6 @@ function logger_get_xvalue($index) {
  * @return the chart resolution.
  */
 function logger_get_resolution($interval) {
-  global $_REQUEST;
 
   $resolution = isset($_REQUEST['resolution']) ? $_REQUEST['resolution'] : 0;
   if ($resolution > 0) {
@@ -2625,6 +2563,7 @@ function logger_get_default_time_window($interval, $absolute = TRUE) {
  * @return the sub interval name.
  */
 function logger_get_sub_interval($interval) {
+
   $windows = array(
     'dayquarter' => 'hour',
     'day' => 'dayquarter',
