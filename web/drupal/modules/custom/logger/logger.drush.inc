@@ -146,37 +146,23 @@ function logger_create_node($serial, $country = "", $uid = 0) {
       $meter = md5(uniqid(rand(), TRUE));
       $token = md5(uniqid(rand(), TRUE));
 
-      $return = db_insert('logger_meters')
-        ->fields(array(
-          'meter' => $meter,
-          'uid' => $uid,
-          'device' => $device,
-          'created' => $created,
-        ))
-        ->execute();
+      $inserted = logger_sensor_add($meter, $uid, $device, $created, $token, $permissions);
 
-      $insert = db_insert('logger_tokens')
-        ->fields(array(
-          'token' => $token,
-          'meter' => $meter,
-          'permissions' => $permissions,
-        ))
-        ->execute();
-
-      if (!($return && $insert)) {
+      if (!$inserted) {
         drush_set_error('LOGGER_CREATE_METER_ENTRY', dt('Error creating meter entry for @meter.', array('@meter' => $meter)));
-      }
 
-      // create the meter base rrd
-      $created = logger_rrd_base_create($meter);
+      } else {
+        // create the meter base rrd
+        $created = logger_rrd_base_create($meter);
 
-      if (!$created) {
-        drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
-      }
+        if (!$created) {
+          drush_set_error('LOGGER_CREATE_RRD_BASE_ERROR', dt('Error creating the base @meter rrd.', array('@meter' => $meter)));
+        }
 
-      if (!drush_get_error()) {
-        drush_log(dt('Successfully created the meter: @meter with token: @token', array('@meter' => $meter, '@token' => $token)), 'ok');
-        $pipe[] .= 'SENSOR' . $i . '=' . $meter;
+        if (!drush_get_error()) {
+          drush_log(dt('Successfully created the meter: @meter with token: @token', array('@meter' => $meter, '@token' => $token)), 'ok');
+          $pipe[] .= 'SENSOR' . $i . '=' . $meter;
+        }
       }
     }
 

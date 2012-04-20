@@ -543,9 +543,7 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
-  $rid = get_role_id('PV Producer');
-
-  if (!empty($user->roles[$rid])) {
+  if (user_has_role('PV Producer')) {
 
     $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
     'Here you can set the period of time in which you want to receive energy production forecast reports.');
@@ -1319,6 +1317,7 @@ function notification_send_peak_consumption_emails() {
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->condition('m.type', CONSUMPTION_SENSOR_TYPE, '=');
+  $query->condition('m.virtual', 0, '=');
   
   $result = $query->execute();
 
@@ -1406,7 +1405,8 @@ function notification_send_summary_report_emails() {
       ->fields('m', array('meter', 'function'))
       ->condition('m.device', $notifiable['device'], '=')
       ->isNotNull('m.function')
-      ->condition('m.type', $types, 'IN');
+      ->condition('m.type', $types, 'IN')
+      ->condition('m.virtual', 0, '=');
     $sensors_query->addField('m', 'type', 'type_id');
 
     $sensors = $sensors_query->execute();
@@ -1493,6 +1493,7 @@ function notification_send_forecast_report_emails() {
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->condition('m.forecast', 1, '=');
+  $query->condition('m.virtual', 0, '=');
   $query->addField('m', 'meter');
   $query->addField('m', 'function');
 

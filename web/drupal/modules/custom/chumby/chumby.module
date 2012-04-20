@@ -221,6 +221,7 @@ function chumby_image_form($form, &$form_state) {
   $result = db_select('logger_meters', 'm')
     ->fields('m', array('meter', 'function'))
     ->condition('m.uid', $user->uid, '=')
+    ->condition('m.virtual', 0, '=')
     ->isNotNull('m.function')
     ->execute();
 

@@ -385,6 +385,22 @@ function get_role_id($name) {
 }
 
 /**
+ * Returns the array of selected options in a combobox field.
+ *
+ * @param $field_values  The form field values array, containing zeros to indicate non-selected options.
+ * @return the array of selected options. 
+ */
+function get_selected_combobox_options($field_values) {
+  $selected = array();
+  foreach ($field_values as $option) {
+    if ($option) {
+      $selected[] = $option;
+    }
+  }
+  return $selected;
+}
+
+/**
  * Converts HTML code into plain text.
  *
  * @param $html  The HTML code.
@@ -450,8 +466,22 @@ function check_browser_support() {
   }
 
   if (!$supported) {
-    drupal_set_message(t('Warning: you are using an outdated browser. ' .
-      'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' .
+    drupal_set_message(t('Warning: you are using an outdated browser. ' . 
+      'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' . 
       'Internet Explorer 7, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11 (or a later version).'), 'error', FALSE);
   }
+}
+
+/**
+ * Checks if the user has a role.
+ * 
+ * @param $role_name The role name.
+ * @return TRUE if it does, FALSE otherwise.
+ */
+function user_has_role($role_name) {
+
+  global $user;
+
+  $rid = get_role_id($role_name);
+  return !empty($user->roles[$rid]);
 }

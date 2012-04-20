@@ -314,6 +314,15 @@ function logger_menu() {
     'file' => 'logger.admin.inc',
   );
 
+  $items['sensor/register'] = array(
+    'title' => 'New Virtual Sensor',
+    'page callback' => 'logger_sensor_edition_page',
+    'access callback' => 'logger_account_access',
+    'access arguments' => array('manage sensors'),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc'
+  );
+
   $sensor_edit_title = 'Sensor Edition';
   $items['sensor/edit'] = array(
     'title' => $sensor_edit_title,
@@ -322,7 +331,7 @@ function logger_menu() {
     'access callback' => 'logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
     'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc',
+    'file' => 'logger.admin.inc'
   );
 
   $items['sensor/deactivate'] = array(
@@ -332,17 +341,17 @@ function logger_menu() {
     'access callback' => 'logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
     'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc',
+    'file' => 'logger.admin.inc'
   );
 
-  $items['sensor/activate'] = array(
-    'title' => $sensor_edit_title,
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('logger_sensor_form', 2),
+  $items['sensor/remove'] = array(
+    'title' => $sensor_title,
+    'page callback' => 'logger_sensor_remove',
+    'page arguments' => array(2, "sensor/mylist"),
     'access callback' => 'logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
     'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc',
+    'file' => 'logger.admin.inc'
   );
 
 
@@ -380,10 +389,7 @@ function user_menu_alter(&$items) {
  */
 function logger_user_edit_access($account) {
 
-  global $user;
-
-  $rid = get_role_id('Visitor');
-  return empty($user->roles[$rid]) && user_edit_access($account);
+  return !user_has_role('Visitor') && user_edit_access($account);
 }
 
 /**
@@ -1184,8 +1190,7 @@ function logger_get_power_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $rid = get_role_id('Visitor');
-  $is_visitor = !empty($user->roles[$rid]);
+  $is_visitor = user_has_role('Visitor');
 
   $data = array();
   $i = 0;
@@ -1355,10 +1360,11 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 /**
  * Returns an array containing all sensors owned by the user.
  *
- * @param $types  The types of sensors to be returned.
+ * @param $types    The types of sensors to be returned.
+ * @param $virtual  Whether virtual sensors should be returned.
  * @return the array of user sensors.
  */
-function logger_get_user_sensors($types) {
+function logger_get_user_sensors($types, $virtual = FALSE) {
 
   global $user;
 
@@ -1366,29 +1372,26 @@ function logger_get_user_sensors($types) {
 
   if (!empty($types)) {
 
-    $sql = "
-      SELECT
-        lm.uid,
-        :username AS username,
-        lm.meter,
-        lm.function,
-        st.name AS type,
-        st.id AS type_id,
-        lm.unit,
-        lu.private
-      FROM
-        {logger_meter_type} st,
-        {logger_meters} lm
-        INNER JOIN {logger_users} lu ON lm.uid = lu.uid
-      WHERE
-        lm.uid = :uid AND
-        lm.type IN (:sensor_types) AND
-        lm.type = st.id AND
-        lm.function IS NOT NULL
-      ORDER BY
-        lm.function";
+    $query = db_select('logger_meters', 'm')
+      ->fields('m', array('uid', 'meter', 'function', 'unit'))
+      ->condition('m.uid', $user->uid)
+      ->condition('m.type', $types, 'IN')
+      ->isNotNull('m.function')
+      ->orderBy('m.function');
 
-    $result = db_query($sql, array(':username' => $user->name, ':uid' => $user->uid, ':sensor_types' => $types));
+    $query->join('logger_meter_type', 't', 't.id = m.type');
+    $query->addField('t', 'name', 'type');
+    $query->addField('t', 'id', 'type_id');
+    
+    $query->join('logger_users', 'u', 'u.uid = m.uid');
+    $query->addField('u', 'private', 'private');
+    $query->addExpression("'" . $user->name . "'", 'username');
+
+    if (!$virtual) {
+      $query->condition('m.virtual', 0);
+    }
+
+    $result = $query->execute();
 
     foreach ($result as $sensor) {
       $sensors[] = $sensor;
@@ -1439,7 +1442,8 @@ function logger_get_subscribed_sensors($types) {
         u.uid = lu.uid AND
         u.uid IN (:selected_users) AND
         lm.type IN (:sensor_types) AND
-        lm.function IS NOT NULL
+        lm.function IS NOT NULL AND
+        lm.virtual = 0
       ORDER BY
         u.name,
         lm.function";
@@ -1486,6 +1490,23 @@ function logger_get_active_sensors($types) {
     }
   }
   return $sensors;
+}
+
+function logger_get_aggregated_meters($virtual_meter) {
+
+  $aggregated = array();
+  if ($virtual_meter) {
+
+    $selected = db_select('logger_aggregated_meters', 'm')
+    ->fields('m', array('meter'))
+    ->condition('m.virtual_meter', $virtual_meter, '=')
+    ->execute();
+
+    foreach ($selected as $sensor) {
+      $aggregated[] = $sensor->meter;
+    }
+  }
+  return $aggregated;
 }
 
 /**
@@ -2450,12 +2471,13 @@ function logger_get_sensor_types_options($uid = NULL) {
 /**
  * Returns a list of all meters of the informed type.
  *
- * @param $types  sensor types.
+ * @param $types    The sensor types.
+ * @param $virtual  Whether virtual sensors should be returned.
  * @return an array of meters.
  */
-function logger_get_meters_options($types) {
+function logger_get_meters_options($types, $virtual = FALSE) {
 
-  $sensors = logger_get_user_sensors($types);
+  $sensors = logger_get_user_sensors($types, $virtual);
   $options = array();
   foreach ($sensors as $sensor) {
     $options[$sensor->meter] = $sensor->function;
@@ -2661,9 +2683,7 @@ function logger_get_users_options() {
   global $user;
 
   $selected_users = logger_get_variable('selected_users', array($user->uid));
-
-  $rid = get_role_id('Visitor');
-  $is_visitor = !empty($user->roles[$rid]);
+  $is_visitor = user_has_role('Visitor');
 
   $sql = "
     SELECT
@@ -2742,9 +2762,7 @@ function logger_get_variable($id, $default_value) {
   if (isset($user->uid)) {
 
     //Visitors must use cookies
-    $rid = get_role_id('Visitor');
-
-    if (isset($user->roles[$rid])) {
+    if (user_has_role('Visitor')) {
       return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
     }
     else {
@@ -2777,9 +2795,7 @@ function logger_set_variable($id, $value) {
   if ($user->uid) {
 
     //Visitors must use cookies
-    $rid = get_role_id('Visitor');
-
-    if (isset($user->roles[$rid])) {
+    if (user_has_role('Visitor')) {
       $_SESSION[$id] = $value;
     }
     else {

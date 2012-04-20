@@ -109,6 +109,7 @@ function msgdump_setup_form($form, &$form_state) {
     ->fields('d', array('serial'))
     ->fields('m', array('meter', 'function'))
     ->condition('m.uid', $user->uid, '=')
+    ->condition('m.virtual', 0, '=')
     ->isNotNull('m.function')
     ->execute();
 

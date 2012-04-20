@@ -105,7 +105,7 @@ function logger_usersensors_page() {
   $query->addField('st', 'name', 'type');
 
   $sensors = $query
-    ->fields('lm', array('meter', 'function'))
+    ->fields('lm', array('meter', 'function', 'virtual'))
     ->fields('lt', array('token', 'permissions'))
     ->condition('lm.uid', $user->uid, '=')
     ->orderBy('lm.function', 'DESC')
@@ -122,14 +122,16 @@ function logger_usersensors_page() {
       $row[] = '';
       $row[] = '';
       $row[] = t('Inactive');
-      $operations = l(t('Activate'), 'sensor/activate/' . $sensor->meter);
+      $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
     }
     else {
       $row[] = $sensor->function;
       $row[] = t($sensor->type);
       $row[] = t('Active');
-      $operations .=
-        l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>' .
+      $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
+
+      $operations .= $sensor->virtual ? 
+        l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
         l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
     $row[] = format_hashcode($sensor->token);
@@ -143,7 +145,9 @@ function logger_usersensors_page() {
   drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
   drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
 
-  return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+  $caption = user_has_role('PV Producer') ? '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br><br></p>' : '';
+
+  return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => $caption,
    'empty' => t('No sensors available.'), 'sticky' => FALSE, 'colgroups' => array(),
    'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
 }
@@ -154,15 +158,28 @@ function logger_usersensors_page() {
  * @param $meter  The sensor id.
  * @return the sensor edition page.
  */
-function logger_sensor_edition_page($meter) {
+function logger_sensor_edition_page($meter = NULL) {
 
-  $sensor = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'type', 'function', 'forecast', 'latitude', 'longitude'))
-    ->condition('m.meter', $meter, '=')
-    ->execute()
-    ->fetchObject();
+  if ($meter) {
+    $sensor = db_select('logger_meters', 'm')
+      ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual'))
+      ->condition('m.meter', $meter, '=')
+      ->execute()
+      ->fetchObject();
+  }
+  else {
+    $sensor = new stdClass();
+    $sensor->device = NULL;
+    $sensor->meter = NULL;
+    $sensor->type = CONSUMPTION_SENSOR_TYPE;
+    $sensor->function = '';
+    $sensor->forecast = 0;
+    $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
+    $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
+    $sensor->virtual = TRUE;
+  }
 
-  $form = drupal_get_form('logger_sensor_form', $meter, $sensor->type, $sensor->function, $sensor->forecast, $sensor->latitude, $sensor->longitude);
+  $form = drupal_get_form('logger_sensor_form', $sensor);
 
   return drupal_render($form);
 }
@@ -185,29 +202,39 @@ function logger_deviceactivation_form($form, &$form_state) {
   return $form;
 }
 
-function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SENSOR_TYPE, $function = 'main', $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE) {
+function logger_sensor_form($form, &$form_state, $sensor = NULL) {
 
-  global $user;
-
-  $form['meter'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Id'),
-    '#description' => t("The sensor meter id."),
-    '#maxlength' => 32,
-    '#size' => 32,
-    '#required' => TRUE,
-    '#default_value' => $meter,
-    '#attributes' => array('readonly' => 'readonly'),
+  $options = logger_get_devices_options();
+  $form['device'] = array(
+    '#type' => 'select',
+    '#title' => t('Device'),
+    '#description' => t('Select the device where this sensor belongs.'),
+    '#default_value' => $sensor->device,
+    '#required' => TRUE
   );
+  $form['device']['#options'] = $sensor->virtual ? $options : array($sensor->device => $options[$sensor->device]);
+
+  if ($sensor->meter) {
+    $form['meter'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Id'),
+      '#description' => t("The sensor meter id."),
+      '#maxlength' => 32,
+      '#size' => 32,
+      '#required' => TRUE,
+      '#default_value' => $sensor->meter,
+      '#attributes' => array('readonly' => 'readonly')
+    );
+  }
 
   $form['type'] = array(
     '#type' => 'select',
     '#title' => t('Type'),
     '#description' => t('The sensor type.'),
     '#options' => logger_get_sensor_types_options(),
-    '#default_value' => $type,
+    '#default_value' => $sensor->type,
     '#required' => TRUE,
-    '#attributes' => array('readonly' => 'readonly'),
+    '#attributes' => array('readonly' => 'readonly')
   );
 
   $form['function'] = array(
@@ -217,12 +244,26 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
     '#maxlength' => 16,
     '#size' => 16,
     '#required' => TRUE,
-    '#default_value' => $function,
+    '#default_value' => $sensor->function
   );
 
-  $rid = get_role_id('PV Producer');
+  if (user_has_role('PV Producer')) {
 
-  if (!empty($user->roles[$rid])) {
+    //If creating or editing a virtual sensor
+    if ($sensor->virtual) {
+
+      $meters_options = logger_get_meters_options(array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE));
+      $selected_options = logger_get_aggregated_meters($sensor->meter);
+
+      $form['aggregated_meters'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Aggregated Sensors'),
+        '#description' => t('Select the sensors that are aggregated by this virtual sensor.'),
+        '#default_value' => $selected_options,
+        '#options' => $meters_options,
+        '#required' => TRUE
+      );
+    }
 
     $form['forecast'] = array(
       '#type' => 'checkboxes',
@@ -231,7 +272,7 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
       '#options' => array(
         '1' => t('Activate'),
       ),
-      '#default_value' => array("$forecast")
+      '#default_value' => array($sensor->forecast)
     );
 
     $form['coordinates'] = array(
@@ -239,7 +280,7 @@ function logger_sensor_form($form, &$form_state, $meter, $type = CONSUMPTION_SEN
       '#theme' => 'logger_geo_location',
       '#title' => t('Location'),
       '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
-      '#default_value' => "$latitude,$longitude",
+      '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
       '#text-align' => 'center'
     );
   }
@@ -304,8 +345,9 @@ function logger_deviceactivation_form_validate($form, &$form_state) {
 
 function logger_sensor_form_validate($form, &$form_state) {
 
+  $in_edition = isset($form_state['values']['meter']);
   $function = $form_state['values']['function'];
-  $meter = $form_state['values']['meter'];
+  $meter = $in_edition ? $form_state['values']['meter'] : NULL;
 
   if (!logger_sensor_function_validate($function, $meter)) {
 
@@ -313,13 +355,21 @@ function logger_sensor_form_validate($form, &$form_state) {
       'Please inform another name which has not yet been used.', array('%function_name' => $function)));
   }
 
-  $rid = get_role_id('PV Producer');
+  if (user_has_role('PV Producer')) {
 
-  if (!empty($user->roles[$rid]) && !(isset($_REQUEST['coordinates_latitude']) && isset($_REQUEST['coordinates_longitude']) &&
-    $_REQUEST['coordinates_latitude'] >= -90 && $_REQUEST['coordinates_latitude'] <= 90 &&
-    $_REQUEST['coordinates_longitude'] >= -90 && $_REQUEST['coordinates_longitude'] <= 90)) {
+    if (!($_REQUEST['coordinates_latitude'] >= -90 && $_REQUEST['coordinates_latitude'] <= 90 &&
+      $_REQUEST['coordinates_longitude'] >= -90 && $_REQUEST['coordinates_longitude'] <= 90)) {
 
-    form_set_error('coordinates', t('Invalid geographic coordinates.'));
+      form_set_error('coordinates', t('Invalid geographic coordinates.'));
+    }
+
+    if (!$in_edition) {
+      $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
+
+      if (count($aggregated_meters) < 2) {
+        form_set_error('aggregated_meters', t('Please, select at least 2 meters for aggregation.'));
+      }
+    }
   }
 }
 
@@ -332,23 +382,47 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   global $user;
 
-  $fields = array(
-    'function' => $form_state['values']['function'],
-    'type' => $form_state['values']['type']
-  );
+  $is_procuder = user_has_role('PV Producer');
+  $function = $form_state['values']['function'];
+  $type = $form_state['values']['type'];
 
-  $rid = get_role_id('PV Producer');
-  if (!empty($user->roles[$rid])) {
+  //If edition
+  if (isset($form_state['values']['meter'])) {
 
-    $fields['forecast'] = $form_state['values']['forecast'];
-    $fields['latitude'] = $_REQUEST['coordinates_latitude'];
-    $fields['longitude'] = $_REQUEST['coordinates_longitude'];
+    $meter = $form_state['values']['meter'];
+
+    $fields = array(
+      'function' => $function,
+      'type' => $type
+    );
+    if ($is_procuder) {
+      $fields['forecast'] = $form_state['values']['forecast'];
+      $fields['latitude'] = $_REQUEST['coordinates_latitude'];
+      $fields['longitude'] = $_REQUEST['coordinates_longitude'];
+    }
+
+    db_update('logger_meters')
+      ->fields($fields)
+      ->condition('meter', $meter)
+      ->execute();
+  }
+  //If creation
+  else {
+    $meter = md5(uniqid(rand(), TRUE));
+    $token = md5(uniqid(rand(), TRUE));
+    $device = $form_state['values']['device'];
+    $forecast = $form_state['values']['forecast'];
+    $latitude = $_REQUEST['coordinates_latitude'];
+    $longitude = $_REQUEST['coordinates_longitude'];
+
+    logger_sensor_add($meter, $user->uid, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude);
   }
 
-  db_update('logger_meters')
-    ->fields($fields)
-    ->condition('meter', $form_state['values']['meter'])
-    ->execute();
+  if (isset($form_state['values']['aggregated_meters'])) {
+
+    $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
+    logger_set_virtual_sensor_aggregations($meter, $aggregated_meters);
+  }
 
   $form_state['redirect'] = "sensor/mylist";
 }
@@ -409,11 +483,9 @@ function logger_device_activate($code) {
       ->execute();
   }
 
-  $rid = get_role_id('fluksonian');
-
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (empty($user->roles[$rid])) {
+  if (user_has_role('fluksonian')) {
 
     db_insert('users_roles')
       ->fields(array(
@@ -498,13 +570,7 @@ function logger_device_remove($device) {
     //FIXME: define a hook
     msgdump_remove_by_sensor($sensor->meter);
 
-    db_delete('logger_tokens')
-      ->condition('meter', $sensor->meter)
-      ->execute();
-
-    db_delete('logger_meters')
-      ->condition('meter', $sensor->meter)
-      ->execute();
+    logger_sensor_remove($sensor->meter);
 
     logger_rrd_remove($sensor->meter);
   }
@@ -538,7 +604,6 @@ function logger_check_fluksonian($uid) {
   $count = db_query($sql, array(':uid' => $uid))->fetchField();
 
   if ($count == 0) {
-
     $rid = get_role_id('fluksonian');
 
     db_delete('users_roles')
@@ -571,6 +636,83 @@ function logger_sensor_deactivate($meter) {
 }
 
 /**
+ * Removes a sensor and all its related data.
+ * 
+ * @param $meter     The sensor id.
+ * @param $next_url  The URL to go, after removal (optional).
+ */
+function logger_sensor_remove($meter, $next_url = NULL) {
+
+  db_delete('logger_tokens')
+    ->condition('meter', $meter)
+    ->execute();
+
+  db_delete('logger_aggregated_meters')
+    ->condition('virtual_meter', $meter)
+    ->execute();
+
+  db_delete('logger_meters')
+    ->condition('meter', $meter)
+    ->execute();
+
+  if ($next_url) {
+    drupal_goto($next_url);
+  }
+}
+
+/**
+ * Adds a new device sensor.
+ */
+function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE) {
+
+  $error = db_insert('logger_meters')
+    ->fields(array(
+      'meter' => $meter,
+      'uid' => $uid,
+      'device' => $device,
+      'created' => $created,
+      'function' => $function,
+      'type' => $type,
+      'virtual' => $virtual,
+      'unit' => 'watt',
+      'forecast' => $forecast,
+      'latitude' => $latitude,
+      'longitude' => $longitude
+    ))
+    ->execute();
+
+  if (!$error) {
+    $error = db_insert('logger_tokens')
+      ->fields(array(
+        'token' => $token,
+        'meter' => $meter,
+        'permissions' => $permissions
+      ))
+      ->execute();
+  }
+  return !$error;
+}
+
+/**
+ * Sets the sensors aggregated by a virtual sensor.
+ */
+function logger_set_virtual_sensor_aggregations($virtual_meter, $aggregated_meters) {
+
+  db_delete('logger_aggregated_meters')
+    ->condition('virtual_meter', $virtual_meter)
+    ->execute();
+
+  foreach ($aggregated_meters as $agg_meter) {
+    db_insert('logger_aggregated_meters')
+      ->fields(array(
+        'virtual_meter' => $virtual_meter,
+        'meter' => $agg_meter
+      ))
+      ->execute();
+  }
+}
+
+/**
  * Validates the uniqueness of a sensor function.
  *
  * @param $function The function to be validated.
@@ -586,12 +728,14 @@ function logger_sensor_function_validate($function, $meter) {
   if ($function) {
     $query = db_select('logger_meters', 'm');
     $query->addExpression('COUNT(*)', 'count');
-    $count = $query
-      ->condition('m.function', $function, '=')
-      ->condition('m.uid', $user->uid, '=')
-      ->condition('m.meter', $meter, '<>')
-      ->execute()
-      ->fetchField();
+    $query->condition('m.function', $function, '=')
+      ->condition('m.uid', $user->uid, '=');
+
+    if ($meter) {
+      $query->condition('m.meter', $meter, '<>');
+    }
+
+    $count = $query->execute()->fetchField();
   }
   return $count == 0;
 }

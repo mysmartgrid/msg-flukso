@@ -135,9 +135,7 @@ function logger_schema() {
         'not null' => TRUE,
       ),
     ),
-    'primary key' => array(
-      'id',
-    ),
+    'primary key' => array('id')
   );
 
   $schema['logger_meters'] = array(
@@ -226,8 +224,31 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'virtual' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0
+      ),
     ),
-    'primary key' => array('meter'),
+    'primary key' => array('meter')
+  );
+
+  $schema['logger_aggregated_meters'] = array(
+    'description' => "Sensors aggregated by virtual sensors.",
+    'fields' => array(
+      'virtual_meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE
+      ),
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE
+      )
+    ),
+    'primary key' => array('virtual_meter', 'meter')
   );
 
   $schema['device_support_request'] = array(
@@ -391,4 +412,22 @@ function logger_update_7004() {
     ->execute();
 
   return st("Sensors' latitude and longitude have been updated.");
+}
+
+/**
+ * Creates table logger_aggregated_meters.
+ * Adds field virtual to table logger_meters.
+ */
+function logger_update_7005() {
+
+  db_create_table('logger_aggregated_meters', drupal_get_schema_unprocessed('logger', 'logger_aggregated_meters'));
+
+  db_add_field('logger_meters', 'virtual', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0
+  ));
+
+  return st('Field logger_meters.virtual successfully added. Table logger_aggregated_meters successfully created.');
 }
