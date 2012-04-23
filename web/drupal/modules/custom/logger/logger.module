@@ -1201,7 +1201,15 @@ function logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
-    $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution, $price);
+
+    //TODO: make a single call
+    if ($sensor->virtual) {
+      $aggregated = logger_get_aggregated_sensors($sensor->meter);
+      $measurements = logger_rrd_query_agg($chart->interval, $aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
+    else {
+      $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
 
     $values = logger_format_power_series_data($chart, $measurements);
 
@@ -1372,7 +1380,7 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE) {
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'unit'))
+    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual'))
     ->isNotNull('m.function');
 
   $query->join('logger_meter_type', 't', 't.id = m.type');
@@ -1428,12 +1436,12 @@ function logger_get_subscribed_sensors($types) {
 }
 
 /**
- * Returns an array containing the ids of sensors aggregated by a virtual sensor.
+ * Returns an array containing the sensors aggregated by a virtual sensor.
  * 
  * @param $virtual_meter The virtual sensor id.
- * @return the array of aggregated sensors' ids.
+ * @return the array of aggregated sensors.
  */
-function logger_get_aggregated_meters($virtual_meter) {
+function logger_get_aggregated_sensors($virtual_meter) {
 
   $aggregated = array();
   if ($virtual_meter) {
@@ -1444,7 +1452,7 @@ function logger_get_aggregated_meters($virtual_meter) {
     ->execute();
 
     foreach ($selected as $sensor) {
-      $aggregated[] = $sensor->meter;
+      $aggregated[] = $sensor;
     }
   }
   return $aggregated;

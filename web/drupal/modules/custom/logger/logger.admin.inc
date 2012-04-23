@@ -253,7 +253,12 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     if ($sensor->virtual) {
 
       $meters_options = logger_get_meters_options(array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE));
-      $selected_options = logger_get_aggregated_meters($sensor->meter);
+      $aggregated = logger_get_aggregated_sensors($sensor->meter);
+
+      $selected_options = array();
+      foreach ($aggregated as $agg_sensor) {
+        $selected_options[] = $agg_sensor->meter;
+      }
 
       $form['aggregated_meters'] = array(
         '#type' => 'checkboxes',
@@ -485,12 +490,12 @@ function logger_device_activate($code) {
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (user_has_role('fluksonian')) {
+  if (!user_has_role('fluksonian')) {
 
     db_insert('users_roles')
       ->fields(array(
         'uid' => $user->uid,
-        'rid' => $rid
+        'rid' => get_role_id('fluksonian')
       ))
       ->execute();
 
