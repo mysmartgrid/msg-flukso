@@ -239,8 +239,8 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
  */
 function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price = NULL) {
 
-  //Latest measurements are not considered, in order to tolerate heartbeat delays.
-  $end_time = REQUEST_TIME - 15 * MINUTE;
+  //Latest measurements are not considered, in order to tolerate message delays.
+  $end_time = REQUEST_TIME - 5 * MINUTE;
   $def = "";
   $variables = "";
 
