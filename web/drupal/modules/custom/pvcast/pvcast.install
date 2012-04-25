@@ -1,0 +1,49 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the pvcast module.
+ */
+
+function pvcast_install() {
+  variable_set('pvcast_forecast_service_url', "http://dev1.mypowergrid.de:3000");
+  variable_set('pvcast_key', 'QPaBzpytX2Rc7icsXqc1');
+
+  $file_path = drupal_get_path('module', 'pvcast') . '/data';
+  mkdir($file_path, 0777, TRUE);
+}
+
+function pvcast_uninstall() {
+  $file_path = drupal_get_path('module', 'pvcast') . '/data';
+  rrmdir($file_path);
+}
+
+/**
+ * Updates the PV Cast URL variable
+ */
+function pvcast_update_7001() {
+
+  db_update('variable')
+    ->fields(array(
+      'value' => 'http://dev1.mypowergrid.de:3000'
+    ))
+    ->condition('name', 'logger_forecast_service_url')
+    ->execute();
+
+  return st("Variable 'pvcast_forecast_service_url' has been updated.");
+}
+
+/**
+ * Updates the PV Cast Key variable
+ */
+function pvcast_update_7002() {
+
+  db_update('variable')
+    ->fields(array(
+      'value' => 'QPaBzpytX2Rc7icsXqc1'
+    ))
+    ->condition('name', 'logger_key')
+    ->execute();
+
+  return st("Variable 'pvcast_key' has been updated.");
+}

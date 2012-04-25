@@ -1,0 +1,140 @@
+<?php
+
+/**
+ * @file
+ * This module provides an interface with the PV Cast Service.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('PVCAST_PATH', DRUPAL_ROOT . '/sites/all/modules/pvcast');
+define('PVCAST_FORECAST_PATH', PVCAST_PATH . '/data');
+
+/**
+ * Queries the forecast data.
+ *
+ * @param $meter      The sensor meter.
+ * @param $start_time The forecast period start time.
+ * @param $end_time   The forecast period end time.
+ * @return the forecast data filtered by the parameters, as an array.
+ */
+function pvcast_query_forecast($meter, $start_time, $end_time) {
+
+  $forecast = array();
+
+  $file_path = PVCAST_FORECAST_PATH . "/$meter.json";
+  if (file_exists($file_path)) {
+
+    $content = json_decode(file_get_contents($file_path));
+    if (!empty($content)) {
+
+      foreach ($content as $values) {
+        $time = $values[0];
+        if ($time >= $start_time && $time <= $end_time) {
+          $value = $values[1];
+          $forecast[$time] = $value;
+        }
+      }
+    }
+  }
+  return $forecast;
+}
+
+function pvcast_cron() {
+
+  //FIXME
+  //pvcast_download_forecasts();
+}
+
+/**
+ * Downloads forecasts from myPowerGrid.
+ */
+function pvcast_download_forecasts() {
+
+  $visitor_query = db_select('users_roles', 'ur')
+    ->fields('ur', array('uid'));
+  $visitor_query->join('role', 'r', 'r.rid = ur.rid');
+  $visitor_query->condition('r.name', 'Visitor', '=');
+
+  $sensors = db_select('logger_meters', 's')
+    ->fields('s', array('meter'))
+    ->condition('s.forecast', '1', '=')
+    ->condition('s.uid', $visitor_query, 'NOT IN')
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    $content = pvcast_get_forecast($sensor->meter);
+
+    if (empty($content)) {
+      watchdog('pvcast.forecast', 'Forecast for sensor %meter downloaded from myPowerGrid is empty', array('%meter' => $sensor->meter), WATCHDOG_ERROR);
+    }
+    else {
+      watchdog('pvcast.forecast', 'Forecast for sensor %meter has been downloaded from myPowerGrid.', array('%meter' => $sensor->meter), WATCHDOG_NOTICE);
+      $file_path = PVCAST_FORECAST_PATH . "/$sensor->meter.json";
+
+      $fh = fopen($file_path, 'w');
+      fwrite($fh, $content);
+      fclose($fh);
+    }
+  }
+}
+
+function pvcast_get_forecast($meter) {
+
+  return pvcast_request('GET', "/plants/alias/$meter/forecast");
+}
+
+function pvcast_delete_plant($meter) {
+
+  return pvcast_request('DELETE', "/plants/alias/$meter");
+}
+
+function pvcast_update_plant($meter, $latitude, $longitude) {
+
+  $path = '/plants/alias/' . $meter;
+  $body = '{"plant":{"alias":"' . $meter . '","latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}';
+
+  pvcast_request('DELETE', $path);
+  return pvcast_request('PUT', $path, $body);
+}
+
+function pvcast_request($method, $path, $body = NULL) {
+
+  $url = variable_get('pvcast_forecast_service_url') . $path;    
+  $key = variable_get('pvcast_key');
+
+  $options = array(
+    'http' => array(
+      'method' => $method,
+      'header' => array(
+        'Content-type' => 'application/json',
+        'X-API-KEY' => $key 
+      )
+    )
+  );
+  if ($body) {
+    $options['content'] = $body;
+  }
+
+  //FIXME
+  /*
+  $context = stream_context_create($options);
+
+  return file_get_contents($url, $context);
+  */
+  return '';
+}

@@ -401,9 +401,13 @@ function logger_sensor_form_submit($form, &$form_state) {
       'type' => $type
     );
     if ($is_procuder) {
-      $fields['forecast'] = $form_state['values']['forecast'];
-      $fields['latitude'] = $_REQUEST['coordinates_latitude'];
-      $fields['longitude'] = $_REQUEST['coordinates_longitude'];
+      $forecast = $form_state['values']['forecast'];
+      $latitude = $_REQUEST['coordinates_latitude'];
+      $longitude = $_REQUEST['coordinates_longitude'];
+
+      $fields['forecast'] = $forecast;
+      $fields['latitude'] = $latitude;
+      $fields['longitude'] = $longitude;
     }
 
     db_update('logger_meters')
@@ -427,6 +431,10 @@ function logger_sensor_form_submit($form, &$form_state) {
 
     $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
     logger_set_virtual_sensor_aggregations($meter, $aggregated_meters);
+  }
+
+  if ($is_procuder) {
+    pvcast_update_plant($meter, $latitude, $longitude);
   }
 
   $form_state['redirect'] = "sensor/mylist";
@@ -653,7 +661,10 @@ function logger_sensor_remove($meter, $next_url = NULL) {
     ->execute();
 
   db_delete('logger_aggregated_meters')
-    ->condition('virtual_meter', $meter)
+    ->condition(db_or()
+      ->condition('meter', $meter)
+      ->condition('virtual_meter', $meter)
+    )
     ->execute();
 
   db_delete('logger_meters')

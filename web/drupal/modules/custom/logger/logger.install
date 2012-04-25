@@ -327,9 +327,6 @@ function logger_install() {
   $file_path = drupal_get_path('module', 'logger') . '/data/base';
   mkdir($file_path, 0777, TRUE);
 
-  $file_path = drupal_get_path('module', 'logger') . '/data/forecast';
-  mkdir($file_path, 0777, TRUE);
-
   $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
   drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
 }
@@ -430,4 +427,20 @@ function logger_update_7005() {
   ));
 
   return st('Field logger_meters.virtual successfully added. Table logger_aggregated_meters successfully created.');
+}
+
+
+/**
+ * Removes forecast data directory 
+ */
+function logger_update_7006() {
+
+  $file_path = drupal_get_path('module', 'logger') . '/data/forecast';
+  rrmdir($file_path);
+
+  db_delete('variable')
+    ->condition('name', 'logger_forecast_service_url')
+    ->execute();
+
+  return st("Forecast data directory and variable 'logger_forecast_service_url' has been removed.");
 }

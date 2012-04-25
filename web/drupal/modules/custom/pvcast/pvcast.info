@@ -1,0 +1,8 @@
+; $Id$
+name = PV Cast
+description = Interface with the PV Cast Service
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+
+dependencies[] = msgcommons

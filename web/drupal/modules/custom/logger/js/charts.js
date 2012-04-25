@@ -398,10 +398,14 @@ function addPowerAnnotation(event, point) {
       width: width,
       clickHandler: function(annotation, point, chart, event) {
         removePowerAnnotation(chart, annotation.text);
+ 
+        hideAppliances(); 
       }
     });
 
     lineChart.setAnnotations(annotations);
+
+    showAppliances();
   }
 }
 
@@ -423,6 +427,16 @@ function removePowerAnnotation(chart, text) {
   } else {
     return false;
   }
+}
+
+function showAppliances() {
+  var div = document.getElementById('app');
+  div.style.display = "block";
+}
+
+function hideAppliances() {
+  var div = document.getElementById('app');
+  div.style.display = "none";
 }
 
 function createLineChart(id, fileURL, properties) {
