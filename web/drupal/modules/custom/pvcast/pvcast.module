@@ -34,9 +34,9 @@ define('PVCAST_FORECAST_PATH', PVCAST_PATH . '/data');
 function pvcast_query_forecast($alias, $start_time, $end_time) {
 
   $forecast = array();
-
   $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
-  if (!file_exists($file_path) || filemtime($file_path) < time() - 30 * MINUTE) {
+ 
+  if (!file_exists($file_path) || date('G', filemtime($file_path)) != date('G', time())) {
     pvcast_download_forecast($alias);
   }
 
@@ -102,7 +102,7 @@ function pvcast_delete_plant($alias) {
 function pvcast_update_plant($alias, $latitude, $longitude) {
 
   return pvcast_request('PUT', "/plants/alias/$alias",
-    '{"plant":{"alias":"' . $alias . '","latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
+    '{"plant":{"latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
 }
 
 /**
@@ -130,7 +130,8 @@ function pvcast_request($method, $path, $body = NULL) {
     $options['http']['content'] = $body;
   }
 
-  $content = file_get_contents($url, FALSE, stream_context_create($options));
+  $context = stream_context_create($options);
+  $content = file_get_contents($url, FALSE, $context);
 
   watchdog('pvcast.request', 'Request: %method %url using key: %key has returned %size characters.',
     array('%method' => $method, '%url' => $url, '%key' => $key, '%size' => strlen($content), WATCHDOG_NOTICE));

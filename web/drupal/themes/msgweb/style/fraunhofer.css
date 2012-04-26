@@ -2958,12 +2958,19 @@ div.slider {
   font-size: 12px;
 }
 
-div.appliances {
-  position: absolute;
-  top: 650px;
-  right: 0;
+div.point-annotation {
   background-color: white;
-  display: none;
+}
+
+span.point-annotation {
+  position: relative;
+  left: 4px;
+  top: 8px;
+  float: left;
+}
+
+img.point-annotation {
+  float: right;
 }
 
 table.resizable {

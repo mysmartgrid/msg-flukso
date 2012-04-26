@@ -205,6 +205,14 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['logger/getappliances'] = array(
+    'title' => 'Returns list of appliances',
+    'page callback' => 'logger_get_appliances',
+    'page arguments' => array(2, 3),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
 
   //Device operations
 
@@ -542,6 +550,8 @@ function logger_power_page($interval) {
  */
 function logger_forecast_page($interval) {
 
+  global $user;
+
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $interval = $interval ? $interval : 'f3days';
@@ -558,7 +568,7 @@ function logger_forecast_page($interval) {
   $types = array(PRODUCTION_SENSOR_TYPE);
   $unit = logger_get_variable('powerchart_unit', 'watt');
   $price2 = logger_get_variable('price2', 0.18);
-  $sensors = logger_get_subscribed_sensors($types);
+  $sensors = logger_get_sensors($types, array($user->uid), TRUE, TRUE);
 
   $chart = logger_create_chart_object('forecast', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, NULL, $price2);
 
@@ -1239,8 +1249,9 @@ function logger_get_forecast_chart_data($chart) {
 
   if (!empty($data['series'])) {
 
-    $total = count($data['series']);
+    $total = count($chart->sensors);
     $i = $total;
+
     foreach ($data['series'] as $uid => $userdata) {
       foreach ($userdata as $username => $sensors) {
         foreach ($sensors as $meter => $typedata) {
@@ -1248,16 +1259,14 @@ function logger_get_forecast_chart_data($chart) {
             $function = $data['legend'][$i - $total][t('Sensor')];
 
             $forecast = pvcast_query_forecast($meter, $chart->period['start'], $chart->period['end']);
-            if (!empty($forecast)) {
+           
+            $operations = $uid > 0 ?
+              '<a href="javascript: void(0)"
+                OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+                t('Remove') . '</a>' : '';
 
-              $operations = $uid > 0 ?
-                '<a href="javascript: void(0)"
-                  OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-                  t('Remove') . '</a>' : '';
-
-              $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
-              $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
-            }
+            $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
+            $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
           }
         }
       }
@@ -1344,12 +1353,13 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 /**
  * Returns an array containing sensors owned by the informed users.
  *
- * @param $types     The types of sensors to be returned (default: all).
- * @param $user_ids  The user ids of sensor owners (default: all).
- * @param $virtual   Whether virtual sensors should be returned (default: false).
+ * @param $types         The types of sensors to be returned (default: all).
+ * @param $user_ids      The user ids of sensor owners (default: all).
+ * @param $virtual       Whether virtual sensors should be returned (default: false).
+ * @param $only_forecast Whether only forecast sensors should be returned (default: false).
  * @return the array of sensors.
  */
-function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE) {
+function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE) {
 
   $query = db_select('logger_meters', 'm')
     ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual'))
@@ -1373,6 +1383,10 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   }
   if (!$include_virtual) {
     $query->condition('m.virtual', 0);
+  }
+
+  if ($only_forecast) {
+    $query->condition('m.forecast', 1);
   }
 
   $query->orderBy('u.name');
@@ -1577,8 +1591,6 @@ function theme_logger_power_chart_area($variables) {
     logger_create_dygraph($chart, TRUE, $chart_properties) .
     logger_create_dygraph($chart, FALSE, $slider_properties, TRUE) .
 
-    logger_create_appliances_list($chart) .
-
     logger_create_chart_legend($chart);
 }
 
@@ -1702,39 +1714,6 @@ function logger_create_interval_menu($context) {
     );
   }
   return theme('logger_chart_tabs', $items);
-}
-
-/**
- * Creates a DIV with the list of appliances.
- *
- * @param $chart   The chart object.
- * @return the list of detected appliances as a DIV.
- */
-function logger_create_appliances_list($chart) {
-
-  //TODO: remove this
-  if (!user_has_role('Techniker')) {
-    return '';
-  }
-
-  $appliances = array(
-    1 => t('Minibar'),
-    2 => t('Dish Washer'),
-    3 => t('Stove'),
-    4 => t('Water Boiler'),
-    5 => t('Iron'),
-    6 => t('Computer'),
-    7 => t('Fridge'),
-    8 => t('Wash Machine'),
-    9 => t('Microwave')
-  );
-
-  $icons = "";
-  foreach ($appliances as $id => $label) {
-    $icons .= "<div id='app-$id' style='float: left;'><img src='/" . LOGGER_REL_PATH . "/img/appliances/icon-$id.jpg' title='$label'/></div>";
-  }
-  return "<div id='app' class='appliances'>$icons</div>" .
-    "<script></script>";
 }
 
 /**
@@ -2763,6 +2742,27 @@ function logger_set_variable($id, $value) {
     }
     setcookie($id, $value, REQUEST_TIME + WEEK, '/');
   }
+}
+
+/**
+ * Returns list detected appliances at a specific moment in time.
+ *
+ * @param $meter      The sensor id.
+ * @param $timestamp  The timestamp.
+ */
+function logger_get_appliances($meter, $timestamp) {
+
+  drupal_add_http_header('Content-Type', 'application/json;');
+
+  $appliances = array();
+
+  if (user_has_role('Techniker')) { 
+    $appliances = array(1, 2, 3, 4);
+  }
+
+  print json_encode($appliances);
+
+  exit(0);
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {

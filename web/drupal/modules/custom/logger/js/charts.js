@@ -380,32 +380,41 @@ function updatePowerLegendValue(name, i, value) {
 
 function addPowerAnnotation(event, point) {
 
-  var date = new Date(point.xval);
-  var yval = point.yval.toFixed(2);
-  var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
+  var id = 'annotation' + point.name + '' + point.xval + '' + point.yval;
+  var div = findAnnotationDiv(id);
 
-  if (!removePowerAnnotation(lineChart, text)) {
-
-    var annotations = lineChart.annotations();
-
+  if (!div) {
+    var date = new Date(point.xval);
+    var yval = point.yval.toFixed(2);
+    var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
     var width = 50 * ('' + yval).length / 6;
 
+    var appliances = getAppliances(point.name, date);
+    var icons = '';
+    for (var i = 0; i < appliances.length; i++) {
+      icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + appliances[i] + '.jpg"/>';
+      width += 35;
+    }
+
+    var annotations = new Array();
     annotations.push({
       series: point.name,
       x: formatCVSTimeStamp(date),
       shortText: yval,
       text: text,
       width: width,
+      height: 30,
+      cssClass: 'point-annotation ' + id,
       clickHandler: function(annotation, point, chart, event) {
+
         removePowerAnnotation(chart, annotation.text);
- 
-        hideAppliances(); 
       }
     });
 
     lineChart.setAnnotations(annotations);
 
-    showAppliances();
+    div = findAnnotationDiv(id);
+    div.innerHTML = '<span class="point-annotation">' + div.innerHTML + '</span>' + icons;
   }
 }
 
@@ -419,24 +428,35 @@ function removePowerAnnotation(chart, text) {
       remaining.push(annotations[i]);
     }
   }
+  chart.setAnnotations(remaining);
+}
 
-  if (remaining.length != annotations.length) {
-    chart.setAnnotations(remaining);
-    return true;
+function findAnnotationDiv(className) {
 
-  } else {
-    return false;
+  var divs = document.getElementsByTagName('div');
+  for (var i = 0; i < divs.length; i++) {
+    var div = divs[i];
+    if (div.className.indexOf(className) != -1) {
+      return div;
+    }
   }
+  return null;
 }
 
-function showAppliances() {
-  var div = document.getElementById('app');
-  div.style.display = "block";
-}
+function getAppliances(meter, timestamp) {
 
-function hideAppliances() {
-  var div = document.getElementById('app');
-  div.style.display = "none";
+  var apps = new Array();
+
+  jQuery.ajax({
+    async: false,
+    url: '/logger/getappliances/' + meter + '/' + timestamp, 
+    success: function (result) {
+      jQuery.each(result, function(i, id) {
+        apps[i] = id;
+      });
+    }
+  });
+  return apps;
 }
 
 function createLineChart(id, fileURL, properties) {

@@ -2954,6 +2954,21 @@ div.slider {
   font-size: 12px;
 }
 
+div.point-annotation {
+  background-color: white;
+}
+
+span.point-annotation {
+  position: relative;
+  left: 4px;
+  top: 8px;
+  float: left;
+}
+
+img.point-annotation {
+  float: right;
+}
+
 table.resizable {
   width: 100%;
 }
