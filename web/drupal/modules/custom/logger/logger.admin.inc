@@ -270,6 +270,11 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       );
     }
 
+    $form['prev_forecast'] = array(
+      '#type' => 'hidden',
+      '#default_value' => array($sensor->forecast)
+    );
+
     $form['forecast'] = array(
       '#type' => 'checkboxes',
       '#title' => t('Forecast'),
@@ -401,7 +406,7 @@ function logger_sensor_form_submit($form, &$form_state) {
       'type' => $type
     );
     if ($is_procuder) {
-      $forecast = $form_state['values']['forecast'];
+      $forecast = $form_state['values']['forecast'][1];
       $latitude = $_REQUEST['coordinates_latitude'];
       $longitude = $_REQUEST['coordinates_longitude'];
 
@@ -420,7 +425,7 @@ function logger_sensor_form_submit($form, &$form_state) {
     $meter = md5(uniqid(rand(), TRUE));
     $token = md5(uniqid(rand(), TRUE));
     $device = $form_state['values']['device'];
-    $forecast = $form_state['values']['forecast'];
+    $forecast = $form_state['values']['forecast'][1];
     $latitude = $_REQUEST['coordinates_latitude'];
     $longitude = $_REQUEST['coordinates_longitude'];
 
@@ -434,7 +439,17 @@ function logger_sensor_form_submit($form, &$form_state) {
   }
 
   if ($is_procuder) {
-    pvcast_update_plant($meter, $latitude, $longitude);
+    $prev_forecast = $form_state['values']['prev_forecast'];
+
+    if ($prev_forecast == 1 && $forecast == 0) {
+      pvcast_delete_plant($meter);
+    }
+    elseif ($prev_forecast == 0 && $forecast == 1) {
+      pvcast_create_plant($meter, $latitude, $longitude);
+    }
+    elseif ($prev_forecast == 1 && $forecast == 1) {
+      pvcast_update_plant($meter, $latitude, $longitude);
+    }
   }
 
   $form_state['redirect'] = "sensor/mylist";
@@ -670,6 +685,8 @@ function logger_sensor_remove($meter, $next_url = NULL) {
   db_delete('logger_meters')
     ->condition('meter', $meter)
     ->execute();
+
+  pvcast_delete_plant($meter);
 
   if ($next_url) {
     drupal_goto($next_url);
