@@ -2941,6 +2941,14 @@ div.slider {
   font-size: 11px;
 }
 
+div.appliances {
+  position: absolute;
+  top: 650px;
+  right: 0;
+  background-color: white;
+  display: none;
+}
+
 table.resizable {
   width: 100%;
   font-size: 11px;

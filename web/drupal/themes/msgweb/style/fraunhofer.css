@@ -2958,6 +2958,14 @@ div.slider {
   font-size: 12px;
 }
 
+div.appliances {
+  position: absolute;
+  top: 650px;
+  right: 0;
+  background-color: white;
+  display: none;
+}
+
 table.resizable {
   width: 100%;
 }

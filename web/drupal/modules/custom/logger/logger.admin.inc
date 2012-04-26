@@ -367,10 +367,24 @@ function logger_sensor_form_validate($form, &$form_state) {
 
   if (user_has_role('PV Producer')) {
 
-    if (!($_REQUEST['coordinates_latitude'] >= -90 && $_REQUEST['coordinates_latitude'] <= 90 &&
-      $_REQUEST['coordinates_longitude'] >= -90 && $_REQUEST['coordinates_longitude'] <= 90)) {
+    $forecast = $form_state['values']['forecast'][1];
+    $latitude = $_REQUEST['coordinates_latitude'];
+    $longitude = $_REQUEST['coordinates_longitude'];
+    $type = $form_state['values']['type'];
+
+    if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
 
       form_set_error('coordinates', t('Invalid geographic coordinates.'));
+    }
+
+    if ($forecast && !($latitude >= 47.25 && $latitude <= 55.09 && $longitude >= 5.8 && $longitude <= 15.069)) {
+
+      form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
+    }
+
+    if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
+
+      form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
     }
 
     if (!$in_edition) {
