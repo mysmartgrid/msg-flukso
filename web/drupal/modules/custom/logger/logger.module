@@ -531,8 +531,9 @@ function logger_power_page($interval) {
   $yvalue2 = logger_get_yvalue(2);
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $unit = logger_get_variable('powerchart_unit', 'watt');
-  $price1 = logger_get_variable('price1', 0.18);
-  $price2 = logger_get_variable('price2', 0.18);
+  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
+  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
   $sensors = logger_get_subscribed_sensors($types);
 
   $chart = logger_create_chart_object('power', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2);
@@ -678,7 +679,8 @@ function logger_relative_energy_consumption_page() {
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $all_sensors = logger_get_sensors($types, array($user->uid));
   $unit = logger_get_variable('relativechart_unit', 'kWh');
-  $price1 = logger_get_variable('price1', 0.18);
+  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
 
   $sensors = array();
   foreach ($all_sensors as $sensor) {
@@ -756,8 +758,9 @@ function logger_energy_page($interval) {
   $sensors = logger_get_sensors($types, array($user->uid));
   $aggregate_sensors = logger_get_variable('aggregate_sensors', 1);
   $unit = logger_get_variable('energychart_unit', 'kWh');
-  $price1 = logger_get_variable('price1', 0.18);
-  $price2 = logger_get_variable('price2', 0.18);
+  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
+  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
 
   $chart = logger_create_chart_object('energy', $types, $interval, $unit, FALSE, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price1, $price2);
 
@@ -1210,6 +1213,7 @@ function logger_get_power_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
+    $price = $price ? $price : $sensor->price;
 
     //TODO: make a single call
     if ($sensor->virtual) {
@@ -1910,29 +1914,41 @@ function logger_energychart_form($form, &$form_state, $chart) {
   );
 
   if (strpos(" $chart->unit", 'eur') > 0) {
+    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    if (in_array(CONSUMPTION_SENSOR_TYPE, $selected_types)) {
-      $form['price1'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Energy Consumption Price'),
-        '#description' => t("Enter the energy consumption price."),
-        '#maxlength' => 6,
-        '#field_prefix' => '€ ',
-        '#default_value' => $chart->price1,
-        '#field_suffix' => ' / kWh',
-      );
-    }
+    $form['use_sensor_prices'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Use sensor prices'),
+      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+      '#default_value' => $use_sensor_prices,
+      '#return_value' => 1,
+      '#attributes' => array('onclick' => 'submitEnergyChartForm()'), //In IE, onchange does not work
+    );
 
-    if (in_array(PRODUCTION_SENSOR_TYPE, $selected_types)) {
-      $form['price2'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Energy Production Price'),
-        '#description' => t("Enter the energy production price."),
-        '#maxlength' => 6,
-        '#field_prefix' => '€ ',
-        '#default_value' => $chart->price2,
-        '#field_suffix' => ' / kWh',
-      );
+    if (!$use_sensor_prices) {
+
+      if (in_array(CONSUMPTION_SENSOR_TYPE, $selected_types)) {
+        $form['price1'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Energy Consumption Price'),
+          '#description' => t("Enter the energy consumption price."),
+          '#maxlength' => 6,
+          '#field_prefix' => '€ ',
+          '#default_value' => $chart->price1,
+          '#field_suffix' => ' / kWh',
+        );
+      }
+      if (in_array(PRODUCTION_SENSOR_TYPE, $selected_types)) {
+        $form['price2'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Energy Production Price'),
+          '#description' => t("Enter the energy production price."),
+          '#maxlength' => 6,
+          '#field_prefix' => '€ ',
+          '#default_value' => $chart->price2,
+          '#field_suffix' => ' / kWh',
+        );
+      }
     }
   }
 
@@ -1970,17 +1986,29 @@ function logger_relativechart_form($form, &$form_state, $chart) {
   );
 
   if (strpos(" $chart->unit", 'eur') > 0) {
+    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    $form['price1'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Energy Consumption Price'),
-      '#description' => t("Enter the energy consumption price."),
-      '#maxlength' => 6,
-      '#size' => 6,
-      '#field_prefix' => '€ ',
-      '#default_value' => $chart->price1,
-      '#field_suffix' => ' / kWh',
+    $form['use_sensor_prices'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Use sensor prices'),
+      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+      '#default_value' => $use_sensor_prices,
+      '#return_value' => 1,
+      '#attributes' => array('onclick' => 'submitRelativeChartForm()'), //In IE, onchange does not work
     );
+
+    if (!$use_sensor_prices) {
+      $form['price1'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Energy Consumption Price'),
+        '#description' => t("Enter the energy consumption price."),
+        '#maxlength' => 6,
+        '#size' => 6,
+        '#field_prefix' => '€ ',
+        '#default_value' => $chart->price1,
+        '#field_suffix' => ' / kWh',
+      );
+    }
   }
 
   $form['submit'] = array(
@@ -2014,39 +2042,43 @@ function logger_powerchart_form($form, &$form_state, $chart) {
   );
 
   if (strpos(" $chart->unit", 'eur') > 0) {
+    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    if ($chart->price1) {
-      $form['price1'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Energy Consumption Price'),
-        '#description' => t("Enter the energy consumption price."),
-        '#maxlength' => 6,
-        '#field_prefix' => '€ ',
-        '#default_value' => $chart->price1,
-        '#field_suffix' => ' / kWh',
-      );
-    }
-    if ($chart->price2) {
-      $form['price2'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Energy Production Price'),
-        '#description' => t("Enter the energy production price."),
-        '#maxlength' => 6,
-        '#field_prefix' => '€ ',
-        '#default_value' => $chart->price2,
-        '#field_suffix' => ' / kWh',
-      );
+    $form['use_sensor_prices'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Use sensor prices'),
+      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+      '#default_value' => $use_sensor_prices,
+      '#return_value' => 1,
+      '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
+    );
+
+    if (!$use_sensor_prices) {
+
+      if ($chart->price1) {
+        $form['price1'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Energy Consumption Price'),
+          '#description' => t("Enter the energy consumption price."),
+          '#maxlength' => 6,
+          '#field_prefix' => '€ ',
+          '#default_value' => $chart->price1,
+          '#field_suffix' => ' / kWh',
+        );
+      }
+      if ($chart->price2) {
+        $form['price2'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Energy Production Price'),
+          '#description' => t("Enter the energy production price."),
+          '#maxlength' => 6,
+          '#field_prefix' => '€ ',
+          '#default_value' => $chart->price2,
+          '#field_suffix' => ' / kWh',
+        );
+      }
     }
   }
-
-  $form['step_plot'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Stepped Lines'),
-    '#description' => t('Do you want the chart series to use stepped lines?'),
-    '#default_value' => logger_get_variable('step_plot', 0),
-    '#return_value' => 1,
-    '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
-  );
 
   $form['smoothing_level'] = array(
     '#type' => 'textfield',
@@ -2058,6 +2090,15 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#text-align' => 'center',
     '#default_value' => logger_get_variable('smooting_level', 1),
     '#required' => TRUE,
+  );
+
+  $form['step_plot'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Stepped Lines'),
+    '#description' => t('Do you want the chart series to use stepped lines?'),
+    '#default_value' => logger_get_variable('step_plot', 0),
+    '#return_value' => 1,
+    '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
 
   $form['yvalue'] = array(
@@ -2303,7 +2344,6 @@ function logger_powerchart_form_validate($form, &$form_state) {
   if ($form_state['values']['smoothing_level'] < 1) {
     form_set_error('smoothing_level', t('The smoothing level must be greater than 0.'));
   }
-
   if ($form_state['values']['step_plot'] != 1 && $form_state['values']['step_plot'] != 0) {
     form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
   }
@@ -2338,22 +2378,28 @@ function logger_chartform_validate($form, &$form_state) {
 
 function logger_energychart_form_submit($form, &$form_state) {
 
-  logger_set_variable('aggregate_sensors', $form_state['values']['aggregate_sensors']);
-  logger_set_variable('selected_sensor_types', $form_state['values']['selected_sensor_types']);
-  logger_set_variable('energychart_unit', $form_state['values']['unit']);
-
+  if (isset($form_state['values']['use_sensor_prices'])) {
+    logger_set_variable('use_sensor_prices', $form_state['values']['use_sensor_prices']);
+  }
   if (isset($form_state['values']['price1'])) {
     logger_set_variable('price1', $form_state['values']['price1']);
   }
   if (isset($form_state['values']['price2'])) {
     logger_set_variable('price2', $form_state['values']['price2']);
   }
+
+  logger_set_variable('aggregate_sensors', $form_state['values']['aggregate_sensors']);
+  logger_set_variable('selected_sensor_types', $form_state['values']['selected_sensor_types']);
+  logger_set_variable('energychart_unit', $form_state['values']['unit']);
 }
 
 function logger_powerchart_form_submit($form, &$form_state) {
 
   if ($form_state['values']['new_user'] > 0) {
     logger_add_user($form_state['values']['new_user']);
+  }
+  if (isset($form_state['values']['use_sensor_prices'])) {
+    logger_set_variable('use_sensor_prices', $form_state['values']['use_sensor_prices']);
   }
   if (isset($form_state['values']['price1'])) {
     logger_set_variable('price1', $form_state['values']['price1']);
@@ -2372,12 +2418,15 @@ function logger_powerchart_form_submit($form, &$form_state) {
 
 function logger_relativechart_form_submit($form, &$form_state) {
 
-  logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
-  logger_set_variable('relativechart_unit', $form_state['values']['unit']);
-
+  if (isset($form_state['values']['use_sensor_prices'])) {
+    logger_set_variable('use_sensor_prices', $form_state['values']['use_sensor_prices']);
+  }
   if (isset($form_state['values']['price1'])) {
     logger_set_variable('price1', $form_state['values']['price1']);
   }
+
+  logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
+  logger_set_variable('relativechart_unit', $form_state['values']['unit']);
 }
 
 /**

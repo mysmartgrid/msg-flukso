@@ -1816,6 +1816,10 @@ ul.con input {
 #edit-smoothing-level {
 	width:2em;
 }
+#edit-price {
+  text-align: right;
+  width:4em;
+}
 #edit-price1 {
   text-align: right;
   width:4em;
