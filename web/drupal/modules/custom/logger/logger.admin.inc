@@ -162,7 +162,7 @@ function logger_sensor_edition_page($meter = NULL) {
 
   if ($meter) {
     $sensor = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual'))
+      ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter, '=')
       ->execute()
       ->fetchObject();
@@ -177,6 +177,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
     $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
     $sensor->virtual = TRUE;
+    $sensor->price = 0.18;
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -235,6 +236,18 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->type,
     '#required' => TRUE,
     '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['price'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Energy Price'),
+    '#description' => t("Enter the energy price."),
+    '#maxlength' => 6,
+    '#size' => 6,
+    '#field_prefix' => '€ ',
+    '#default_value' => $sensor->price,
+    '#required' => TRUE,
+    '#field_suffix' => ' / kWh'
   );
 
   $form['function'] = array(
@@ -358,11 +371,16 @@ function logger_sensor_form_validate($form, &$form_state) {
   $in_edition = isset($form_state['values']['meter']);
   $function = $form_state['values']['function'];
   $meter = $in_edition ? $form_state['values']['meter'] : NULL;
+  $price = $form_state['values']['price'];
 
   if (!logger_sensor_function_validate($function, $meter)) {
 
     form_set_error('function', t('Another sensor was found with the function name: %function_name. ' .
       'Please inform another name which has not yet been used.', array('%function_name' => $function)));
+  }
+
+  if (!($price > 0)) {
+    form_set_error('price', t('The informed price is invalid.'));
   }
 
   if (user_has_role('PV Producer')) {
@@ -409,6 +427,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   $is_procuder = user_has_role('PV Producer');
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
+  $price = $form_state['values']['price'];
 
   //If edition
   if (isset($form_state['values']['meter'])) {
@@ -417,7 +436,8 @@ function logger_sensor_form_submit($form, &$form_state) {
 
     $fields = array(
       'function' => $function,
-      'type' => $type
+      'type' => $type,
+      'price' => $price
     );
     if ($is_procuder) {
       $forecast = $form_state['values']['forecast'][1];
@@ -443,7 +463,7 @@ function logger_sensor_form_submit($form, &$form_state) {
     $latitude = $_REQUEST['coordinates_latitude'];
     $longitude = $_REQUEST['coordinates_longitude'];
 
-    logger_sensor_add($meter, $user->uid, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude);
+    logger_sensor_add($meter, $user->uid, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
   }
 
   if (isset($form_state['values']['aggregated_meters'])) {
@@ -710,7 +730,7 @@ function logger_sensor_remove($meter, $next_url = NULL) {
 /**
  * Adds a new device sensor.
  */
-function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE) {
+function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
 
   $error = db_insert('logger_meters')
     ->fields(array(
@@ -724,7 +744,8 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
       'unit' => 'watt',
       'forecast' => $forecast,
       'latitude' => $latitude,
-      'longitude' => $longitude
+      'longitude' => $longitude,
+      'price' => $price
     ))
     ->execute();
 

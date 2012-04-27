@@ -230,6 +230,12 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 0
       ),
+      'price' => array(
+        'type' => 'float',
+        'size' => 'normal',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
     ),
     'primary key' => array('meter')
   );
@@ -443,4 +449,25 @@ function logger_update_7006() {
     ->execute();
 
   return st("Forecast data directory and variable 'logger_forecast_service_url' has been removed.");
+}
+
+/**
+ * Adds field price to table logger.meters.
+ */
+function logger_update_7007() {
+
+  db_add_field('logger_meters', 'price', array(
+    'type' => 'float',
+    'size' => 'normal',
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+
+  db_update('logger_meters')
+    ->fields(array(
+      'price' => 0.18
+    ))
+    ->execute();  
+
+  return st('Field logger_meters.price successfully added.');
 }

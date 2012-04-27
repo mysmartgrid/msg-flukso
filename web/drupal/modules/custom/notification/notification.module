@@ -1381,11 +1381,6 @@ function notification_send_summary_report_emails() {
 
     $lines = array();
 
-    //FIXME Use user defined prices
-    $prices = array(
-      CONSUMPTION_SENSOR_TYPE => 0.18,
-      PRODUCTION_SENSOR_TYPE => 0.18
-    );
     $total_cost = array(
       CONSUMPTION_SENSOR_TYPE => 0,
       PRODUCTION_SENSOR_TYPE => 0
@@ -1402,7 +1397,7 @@ function notification_send_summary_report_emails() {
       'end' => $notifiable['until_time']);
 
     $sensors_query = db_select('logger_meters', 'm')
-      ->fields('m', array('meter', 'function'))
+      ->fields('m', array('meter', 'function', 'price'))
       ->condition('m.device', $notifiable['device'], '=')
       ->isNotNull('m.function')
       ->condition('m.type', $types, 'IN')
@@ -1414,7 +1409,7 @@ function notification_send_summary_report_emails() {
     foreach ($sensors as $sensor) {
 
       $energy = number_format(logger_rrd_query_energy(array($sensor), 'kWh', 'month', $period, DAY), 2, '.', '');
-      $cost = number_format($energy * $prices[$sensor->type_id], 2, '.', '');
+      $cost = number_format($energy * $sensor->price, 2, '.', '');
 
       $lines[$sensor->type_id] = (isset($lines[$sensor->type_id]) ? $lines[$sensor->type_id] : '') .
         '<tr>' .

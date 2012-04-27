@@ -1369,7 +1369,7 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE) {
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast'))
+    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast', 'price'))
     ->isNotNull('m.function');
 
   $query->join('logger_meter_type', 't', 't.id = m.type');
