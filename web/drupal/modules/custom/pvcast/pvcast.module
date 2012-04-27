@@ -87,7 +87,10 @@ function pvcast_create_plant($alias, $latitude, $longitude) {
  */
 function pvcast_delete_plant($alias) {
 
-  unlink(PVCAST_FORECAST_PATH . "/$alias.json");
+  $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
+  if (file_exists($file_path)) {
+    unlink($file_path);
+  }
   return pvcast_request('DELETE', "/plants/alias/$alias");
 }
 
@@ -118,25 +121,18 @@ function pvcast_request($method, $path, $body = NULL) {
   $url = variable_get('pvcast_forecast_service_url') . "$path.json";
   $key = variable_get('pvcast_key');
 
-  $options = array(
-    'http' => array(
-      'method' => $method,
-      'header' =>
-        "Content-type: application/json\r\n" .
-        "X-API-KEY: $key\r\n"
-    )
-  );
-  if ($body) {
-    $options['http']['content'] = $body;
-  }
-
-  $context = stream_context_create($options);
-  $content = file_get_contents($url, FALSE, $context);
+  $response = drupal_http_request($url, array(
+    'method' => $method,
+    'data' => $body,
+    'headers' => array(
+      'Content-type' => 'application/json',
+      'X-API-KEY' => $key
+    )));
 
   watchdog('pvcast.request', 'Request: %method %url using key: %key has returned %size characters.',
-    array('%method' => $method, '%url' => $url, '%key' => $key, '%size' => strlen($content), WATCHDOG_NOTICE));
+    array('%method' => $method, '%url' => $url, '%key' => $key, '%size' => strlen($response->data), WATCHDOG_NOTICE));
 
-  return $content;
+  return $response->data;
 }
 
 /**
