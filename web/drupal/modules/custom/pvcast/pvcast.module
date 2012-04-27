@@ -158,12 +158,10 @@ function pvcast_download_forecast($alias) {
 
     $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
 
-    $fh = fopen($file_path, 'w');
-    fwrite($fh, $content);
-    fclose($fh);
+    save_file($file_path, $content);
   }
 }
 
 function pvcast_cron() {
-  rmoldfiles(PVCAST_FORECAST_PATH, 3 * DAY);
+  rmoldfiles(PVCAST_FORECAST_PATH, DAY);
 }

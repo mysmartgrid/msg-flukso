@@ -93,9 +93,7 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
     mkdir($source);
     mkdir("$source/subdir");
 
-    $handle = fopen("$source/subdir/file.txt", 'a');
-    fwrite($handle, "123");
-    fclose($handle);
+    save_file("$source/subdir/file.txt", "123");
     
     $destination = "/tmp/destdir";
     rcopy($source, $destination);
@@ -113,9 +111,7 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
     mkdir($subsubdir, 0777, TRUE);
     mkdir("$dir/subdir2/abc/def", 0777, TRUE);
 
-    $handle = fopen("$subsubdir/file.txt", 'a');
-    fwrite($handle, "123");
-    fclose($handle);
+    save_file("$subsubdir/file.txt", "123");
 
     rrmdir($dir);
 

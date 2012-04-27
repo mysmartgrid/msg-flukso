@@ -231,9 +231,7 @@ function msgdump_register($file, $meter) {
     'SENSOR_ID: "' . $sensor->meter . '"' . PHP_EOL .
     'BASE_URL: "' . $base_url . ':8443/sensor' . '"' . PHP_EOL;
 
-  $out = fopen(MSGDUMP_DB_PATH . "/$file.flukso4rrc", 'w');
-  fwrite($out, $config);
-  fclose($out);
+  save_file(MSGDUMP_DB_PATH . "/$file.flukso4rrc", $config);
 
   exec(MSGDUMP_BIN_PATH . '/flukso_create_db -c ' . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }

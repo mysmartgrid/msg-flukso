@@ -846,7 +846,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
   $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
-    $unique_id .= " $sensor->meter $sensor->type";
+    $unique_id .= " $sensor->meter $sensor->type $sensor->forecast";
   }
 
   $chart->id = 'logger_' . $interval . '_chart_data_' . md5($unique_id);
@@ -1204,9 +1204,9 @@ function logger_get_power_chart_data($chart) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $is_visitor = user_has_role('Visitor');
-
   $data = array();
   $i = 0;
+
   foreach ($chart->sensors as &$sensor) {
 
     $price = ($sensor->type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
@@ -1227,10 +1227,7 @@ function logger_get_power_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = $sensor->uid > 0 ?
-      '<a href="javascript: void(0)"
-        OnClick="javascript: removePowerSeries(' . "$sensor->uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-        t('Remove') . '</a>' : '';
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
 
     $data['legend'][] = logger_create_power_legend_line($username, $sensor->function, t($sensor->type), $i++, $operations);
   }
@@ -1244,35 +1241,45 @@ function logger_get_power_chart_data($chart) {
  * @return the chart data.
  */
 function logger_get_forecast_chart_data($chart) {
+  
+  global $user;
 
+  $is_visitor = user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
+  $total = count($chart->sensors);
+  $i = $total;
 
-  if (!empty($data['series'])) {
+  foreach ($chart->sensors as &$sensor) {
 
-    $total = count($chart->sensors);
-    $i = $total;
+    $forecast = pvcast_query_forecast($sensor->meter, $chart->period['start'], $chart->period['end']);
 
-    foreach ($data['series'] as $uid => $userdata) {
-      foreach ($userdata as $username => $sensors) {
-        foreach ($sensors as $meter => $typedata) {
-          foreach ($typedata as $type => $measurements) {
-            $function = $data['legend'][$i - $total][t('Sensor')];
+    //Hide usernames for Visitors
+    $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-            $forecast = pvcast_query_forecast($meter, $chart->period['start'], $chart->period['end']);
-           
-            $operations = $uid > 0 ?
-              '<a href="javascript: void(0)"
-                OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-                t('Remove') . '</a>' : '';
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
 
-            $data['series'][$uid][$username]["$meter Forecast"][$type] = logger_format_power_series_data($chart, $forecast);
-            $data['legend'][] = logger_create_power_legend_line($username, "$function  (" . t('Forecast') . ')', t($type), $i++, $operations);
-          }
-        }
-      }
-    }
+    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
+      logger_format_power_series_data($chart, $forecast);
+
+    $data['legend'][] =
+      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i++, $operations);
   }
   return $data;
+}
+
+/**
+ * Creates a link to remove power chart series.
+ *
+ * @param $uid  The user id.
+ * @param $username The user name.
+ * @param $i    The series number.
+ * @return the link code.
+ */
+function logger_create_remove_power_series_link($uid, $username, $i) {
+  return $uid > 0 ?
+    '<a href="javascript: void(0)"
+      OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
+      t('Remove') . '</a>' : '';
 }
 
 /**
@@ -1362,7 +1369,7 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE) {
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual'))
+    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast'))
     ->isNotNull('m.function');
 
   $query->join('logger_meter_type', 't', 't.id = m.type');
@@ -1384,7 +1391,6 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   if (!$include_virtual) {
     $query->condition('m.virtual', 0);
   }
-
   if ($only_forecast) {
     $query->condition('m.forecast', 1);
   }
