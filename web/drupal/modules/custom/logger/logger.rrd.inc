@@ -249,19 +249,24 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price
 
     $sensor_cdef = METER . $i;
 
-    $def .= logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price) .
+    $sensor_def = logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price);
 
-      //Considers unknown measurements to be zero
-      "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
+    if ($sensor_def) {
 
-      //Do not consider latest minutes
-      "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
+      $def .= $sensor_def .
 
-    $variables .= ($i > 1 ? ',' : '') . "filtered$i";
-    $i++;
+        //Considers unknown measurements to be zero
+        "CDEF:completeseries$i=" . "$sensor_cdef,UN,0,$sensor_cdef,IF " .
+
+        //Do not consider latest minutes
+        "CDEF:filtered$i=TIME,$end_time,GT,UNKN,completeseries$i,IF ";
+
+      $variables .= ($i > 1 ? ',' : '') . "filtered$i";
+      $i++;
+    }
   }
 
-  $operators = str_repeat(",+", count($sensors) - 1);
+  $operators = str_repeat(",+", $i - 2);
 
   $series_id = METER . '0';
 
