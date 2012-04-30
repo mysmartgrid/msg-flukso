@@ -395,7 +395,7 @@ function logger_sensor_form_validate($form, &$form_state) {
       form_set_error('coordinates', t('Invalid geographic coordinates.'));
     }
 
-    if ($forecast && !($latitude >= 47.25 && $latitude <= 55.09 && $longitude >= 5.8 && $longitude <= 15.069)) {
+    if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
 
       form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
     }
