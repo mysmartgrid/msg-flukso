@@ -455,9 +455,14 @@ function html2txt($html) {
  */
 function check_browser_support() {
 
-  $supported = FALSE;
   $agent = $_SERVER['HTTP_USER_AGENT'];
 
+  //If called by Drush
+  if (empty($agent)) {
+    return TRUE;
+  }
+
+  $supported = FALSE;
   $supported_browsers = array(
     array('name' => 'Firefox',  'version' => 3),
     array('name' => 'MSIE',     'version' => 7),
