@@ -115,6 +115,25 @@ function pvcast_update_plant($alias, $latitude, $longitude) {
 }
 
 /**
+ * Updates a PV plant model.
+ *
+ * @param $alias         The plant alias.
+ * @param $measurements  The plant measurements (timestamp => value).
+ * @return the server response.
+ */
+function pvcast_update_model($alias, $measurements) {
+
+  $pairs = '';
+  foreach ($measurements as $timestamp => $value) {
+    $pairs .= empty($pairs) ? '' : ',';
+    $pairs .= "[$timestamp,$value]";
+  }
+
+  return pvcast_request('POST', "/plants/alias/$alias/updateModel",
+    '{"measurements":[' . $pairs . ']}');
+}
+
+/**
  * Sends a request to myPowerGrid.
  *
  * @param $method  The HTTP method.
@@ -135,8 +154,14 @@ function pvcast_request($method, $path, $body = NULL) {
       'X-API-KEY' => $key
     )));
 
-  watchdog('pvcast.request', 'Request: %method %url using key: %key has returned %size characters.',
-    array('%method' => $method, '%url' => $url, '%key' => $key, '%size' => strlen($response->data), WATCHDOG_NOTICE));
+  watchdog('pvcast.request', 'Request: %method %url using key: %key has returned %size characters. Error Message: "%error".',
+    array(
+      '%method' => $method,
+      '%url' => $url,
+      '%key' => $key,
+      '%size' => strlen($response->data),
+      '%error' => isset($response->error) ? $response->error : '',
+      WATCHDOG_NOTICE));
 
   return $response->data;
 }

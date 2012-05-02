@@ -2926,6 +2926,8 @@ function logger_cron() {
   logger_bind_support_ports();
 
   logger_update_support_authorized_keys();
+
+  logger_update_pvcast_models();
 }
 
 /**
@@ -3259,6 +3261,28 @@ function logger_update_support_authorized_keys() {
 
   foreach ($accounts as $account) {
     system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->username");
+  }
+}
+
+/**
+ * Updates PVCast plants with sensor measurements.
+ */
+function logger_update_pvcast_models() {
+
+  $last = variable_get('logger_last_pvcast_model_update', 0);
+  $now = time();
+
+  if ($now - $last >= DAY) {
+    $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
+    $period = logger_get_period('day', HOUR, $now - DAY, $now);
+
+    foreach ($sensors as $sensor) {
+      $measurements = logger_rrd_query_sensor('day', $sensor, 'watt', $period, HOUR);
+      if (!empty($measurements)) {
+        pvcast_update_model($sensor->meter, $measurements);
+      }
+    }
+    variable_set('logger_last_pvcast_model_update', $now);
   }
 }
 
