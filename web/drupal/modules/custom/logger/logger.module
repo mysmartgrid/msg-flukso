@@ -626,20 +626,8 @@ function logger_overview_page($interval) {
     $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid";
     $devcounter = db_query($sql, array(':uid' => 0))->fetchField();
 
-    $sql = "
-      SELECT
-        COUNT(*)
-      FROM
-        {users} u
-      WHERE
-        EXISTS(
-          SELECT
-            1
-          FROM
-            {logger_devices} d
-          WHERE
-            d.uid = u.uid
-        )";
+    $sql = "SELECT COUNT(*) FROM {users} u WHERE EXISTS(
+      SELECT 1 FROM {logger_devices} d WHERE d.uid = u.uid)";
 
     $usercounter = db_query($sql)->fetchField();
 
@@ -1274,12 +1262,12 @@ function logger_get_forecast_chart_data($chart) {
 /**
  * Creates a link to remove power chart series.
  *
- * @param $uid  The user id.
+ * @param $uid      The user id.
  * @param $username The user name.
- * @param $i    The series number.
+ * @param $i        The series number.
  * @return the link code.
  */
-function logger_create_remove_power_series_link($uid, $username, $i) {
+function logger_create_remove_power_series_link($uid, $i, $username) {
   return $uid > 0 ?
     '<a href="javascript: void(0)"
       OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
@@ -1439,19 +1427,17 @@ function logger_get_subscribed_sensors($types) {
  */
 function logger_get_aggregated_sensors($virtual_meter) {
 
-  $aggregated = array();
   if ($virtual_meter) {
 
-    $selected = db_select('logger_aggregated_meters', 'm')
+    $query = db_select('logger_aggregated_meters', 'm')
     ->fields('m', array('meter'))
-    ->condition('m.virtual_meter', $virtual_meter, '=')
-    ->execute();
+    ->condition('m.virtual_meter', $virtual_meter, '=');
 
-    foreach ($selected as $sensor) {
-      $aggregated[] = $sensor;
-    }
+    return db_query_objects($query);
   }
-  return $aggregated;
+  else {
+    return array();
+  }
 }
 
 /**
@@ -2797,6 +2783,13 @@ function logger_set_variable($id, $value) {
     }
     setcookie($id, $value, REQUEST_TIME + WEEK, '/');
   }
+}
+
+function logger_request_appliance_detection($meter, $measurements) {
+
+  $data = json_encode(array($meter => $measurements));
+
+  //jobqueue_produce('appdetect', $data);
 }
 
 /**
