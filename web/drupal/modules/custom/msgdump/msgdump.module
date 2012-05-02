@@ -21,6 +21,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
 define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
 define('MSGDUMP_DB_PATH', DRUPAL_ROOT . '/' . MSGDUMP_DB_REL_PATH);
 define('MSGDUMP_BIN_PATH', DRUPAL_ROOT . '/' . drupal_get_path('module', 'msgdump') . '/flukso4r/bin');

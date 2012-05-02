@@ -20,8 +20,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
 define('PVCAST_PATH', DRUPAL_ROOT . '/sites/all/modules/pvcast');
 define('PVCAST_FORECAST_PATH', PVCAST_PATH . '/data');
+
 
 /**
  * Queries the PV plant forecast for a period of time.
@@ -35,8 +41,8 @@ function pvcast_query_forecast($alias, $start_time, $end_time) {
 
   $forecast = array();
   $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
- 
-  if (!file_exists($file_path) || date('G', filemtime($file_path)) != date('G', time())) {
+
+  if (!file_exists($file_path) || date('d-m-Y-G', filemtime($file_path)) != date('d-m-Y-G', time())) {
     pvcast_download_forecast($alias);
   }
 

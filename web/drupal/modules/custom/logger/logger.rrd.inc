@@ -382,7 +382,7 @@ function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_na
     "XPORT:$exported_cdef";
 
   //DEBUG
-  save_file('/tmp/rrd.command.txt', $command);
+  //save_file('/tmp/rrd.command.txt', $command);
 
   $lines = array();
   exec($command, $lines);

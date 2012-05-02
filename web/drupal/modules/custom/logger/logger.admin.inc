@@ -576,6 +576,7 @@ function logger_device_activate($code) {
 function logger_device_deactivate($device) {
 
   global $user;
+
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $sensors = db_select('logger_meters', 'm')

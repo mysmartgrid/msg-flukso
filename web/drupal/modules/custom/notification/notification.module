@@ -20,6 +20,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
 //Constants
 define('NO_COMMUNICATION_EVENT_ID',        1);
 define('COMMUNICATION_RESTORED_EVENT_ID',  3);

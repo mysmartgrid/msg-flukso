@@ -20,6 +20,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
 define('SECOND',  1);
 define('MINUTE', 60);
 define('HOUR',   60 * MINUTE);
@@ -39,6 +44,7 @@ define('DAY_UNIT_ID',    5);
  * 
  * @param $algorithm The JobQueue target algorithm.
  * @param $data      The execution data.
+ * @return the job UUID.
  */
 function jobqueue_produce($algorithm, $data) {
 
@@ -51,15 +57,25 @@ function jobqueue_produce($algorithm, $data) {
   //Debug
   //Redirect error output to default output
   $command .= " 2>&1";
-  exec($command, $output, $return);
   */
 
-  exec($command);
+  exec($command, $output, $return);
+
+  $uuid = NULL;
+  foreach ($output as $line) {
+    $start = strpos($line, '{"uuid":"');
+    if ($start > 0) {
+      $start += 9;
+      $end = strpos($line, '"', $start);
+      $uuid = substr($line, $start, $end - $start);
+      break;
+    }
+  }
 
   /*
   //Debug
   $file = "/tmp/jobqueue.txt";
-  $fh = fopen($file, 'w');
+  fwrite($fh, "command:\n");
   fwrite($fh, $command);
 
   foreach($output as $line) {
@@ -69,6 +85,8 @@ function jobqueue_produce($algorithm, $data) {
   fwrite($fh, "\n return: $return \n");
   fclose($fh);
   */
+
+  return $uuid;
 }
 
 /**
@@ -501,4 +519,21 @@ function user_has_role($role_name) {
 
   $rid = get_role_id($role_name);
   return !empty($user->roles[$rid]);
+}
+
+/**
+ * Executes a database query and returns rows as an array of objects.
+ *
+ * @param $query The database query.
+ * @return an array of objects.
+ */
+function db_query_objects($query) {
+  
+  $result = $query->execute();
+  $objects = array();
+
+  foreach ($result as $object) {
+    $objects[] = $object;
+  }
+  return $objects;
 }
