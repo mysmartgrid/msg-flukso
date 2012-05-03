@@ -320,7 +320,7 @@ function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price = N
     return NULL;
   }
 
-  $price = $price ? $price : $sensor->price;
+  $price = isset($price) ? $price : $sensor->price;
 
   $factor = logger_rrd_get_unit_factor($unit, $price);
   $file_path = logger_rrd_file($sensor->meter);
