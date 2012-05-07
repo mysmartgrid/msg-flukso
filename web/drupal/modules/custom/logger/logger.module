@@ -3109,8 +3109,6 @@ function logger_support_requests_page() {
  */
 function logger_support_confirmation_page($device) {
 
-  global $user;
-
   return t('You are about to request remote support for your Flukso device. ' .
       'If so, the device will open a reverse SSH connection with our ' .
       'server that enables our technicians to log into it ' .
@@ -3122,7 +3120,7 @@ function logger_support_confirmation_page($device) {
     t('Do you allow our technicians to log into your Flukso device?') . '<br><br>' .
 
     l(t('Yes'), "device/support/request/$device") . ' ' .
-    l(t('No'), "user/$user->uid/devices");
+    l(t('No'), "device/mylist");
 }
 
 /**
@@ -3132,8 +3130,6 @@ function logger_support_confirmation_page($device) {
  * @param $device The device id.
  */
 function logger_request_support($device) {
-
-  global $user;
 
   db_update('device_support_slot')
     ->fields(array(
@@ -3153,7 +3149,7 @@ function logger_request_support($device) {
     ))
     ->execute();
 
-  drupal_goto("user/$user->uid/devices");
+  drupal_goto("device/mylist");
 }
 
 /**
@@ -3163,8 +3159,6 @@ function logger_request_support($device) {
  * @param $device The device id.
  */
 function logger_suspend_support($device) {
-
-  global $user;
 
   db_update('device_support_slot')
     ->fields(array(
@@ -3179,7 +3173,7 @@ function logger_suspend_support($device) {
 
   logger_remove_support_key($device);
 
-  drupal_goto("user/$user->uid/devices");
+  drupal_goto("device/mylist");
 }
 
 /**
@@ -3234,7 +3228,7 @@ function logger_remove_support($device) {
  * @param $device The device id.
  */
 function logger_create_support_key($host, $device) {
-  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device >> /tmp/genkeys.out");
+  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device");
 }
 
 /**
