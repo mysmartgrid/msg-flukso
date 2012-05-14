@@ -1,6 +1,6 @@
 ; $Id$
-name = PV Cast
-description = Interface with the PV Cast Service
+name = PVCast
+description = Interface with the PVCast Service
 package = mySmartGrid
 core = 7.x
 version = 7.x-0.1

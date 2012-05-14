@@ -7,19 +7,11 @@
 
 function pvcast_install() {
   variable_set('pvcast_forecast_service_url', "https://dev1.mypowergrid.de:3000");
-  variable_set('pvcast_key', 'QPaBzpytX2Rc7icsXqc1');
-
-  $file_path = drupal_get_path('module', 'pvcast') . '/data';
-  mkdir($file_path, 0777, TRUE);
-}
-
-function pvcast_uninstall() {
-  $file_path = drupal_get_path('module', 'pvcast') . '/data';
-  rrmdir($file_path);
+  variable_set('pvcast_key', '*');
 }
 
 /**
- * Updates the PV Cast URL variable
+ * Updates the PVCast URL variable.
  */
 function pvcast_update_7001() {
 
@@ -29,11 +21,22 @@ function pvcast_update_7001() {
 }
 
 /**
- * Updates the PV Cast Key variable
+ * Updates the PVCast Key variable.
  */
 function pvcast_update_7003() {
 
-  variable_set('pvcast_key', 'QPaBzpytX2Rc7icsXqc1');
+  variable_set('pvcast_key', '*');
 
   return st("Variable 'pvcast_key' has been updated.");
+}
+
+/**
+ * Removes the data directory.
+ */
+function pvcast_update_7004() {
+
+  $file_path = drupal_get_path('module', 'pvcast') . '/data';
+  rrmdir($file_path);
+
+  return st("The data directory has been removed.");
 }

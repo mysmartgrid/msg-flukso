@@ -25,50 +25,26 @@
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
-define('PVCAST_PATH', DRUPAL_ROOT . '/sites/all/modules/pvcast');
-define('PVCAST_FORECAST_PATH', PVCAST_PATH . '/data');
-
-
-/**
- * Queries the PV plant forecast for a period of time.
- *
- * @param $alias      The PV plant alias.
- * @param $start_time The forecast period start time.
- * @param $end_time   The forecast period end time.
- * @return the forecast data filtered by the parameters, as an array.
- */
-function pvcast_query_forecast($alias, $start_time, $end_time) {
-
-  $forecast = array();
-  $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
-
-  if (!file_exists($file_path) || date('d-m-Y-G', filemtime($file_path)) != date('d-m-Y-G', time())) {
-    pvcast_download_forecast($alias);
-  }
-
-  $content = json_decode(file_get_contents($file_path));
-  if (!empty($content)) {
-
-    foreach ($content as $values) {
-      $time = $values[0];
-      if ($time >= $start_time && $time <= $end_time) {
-        $value = $values[1];
-        $forecast[$time] = $value;
-      }
-    }
-  }
-  return $forecast;
-}
 
 /**
  * Gets a PV plant forecast.
- * 
- * @param $alias      The plant alias.
- * @return the server response in json format.
+ *
+ * @param $alias      The PV plant alias.
+ * @param $start_time The forecast period start time (optional).
+ * @param $end_time   The forecast period end time (optional).
+ * @return the PV plant forecast as an array (timestamp => value).
  */
-function pvcast_get_forecast($alias) {
+function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
 
-  return pvcast_request('GET', "/plants/alias/$alias/forecast");
+  //TODO: start_time and end_time should be URL parameters
+  $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
+  $forecast = json_decode($response->data);
+
+  return !isset($start_time) && !isset($end_time) ? $forecast :
+    array_filter($forecast, function ($time, $value) {
+      return $time >= $start_time && $time <= $end_time;
+    }
+  );
 }
 
 /**
@@ -77,69 +53,68 @@ function pvcast_get_forecast($alias) {
  * @param $alias      The plant alias.
  * @param $latitude   The plant latitude.
  * @param $longitude  The plant longitude.
- * @return the server response.
+ * @return the HTTP response code.
  */
 function pvcast_create_plant($alias, $latitude, $longitude) {
 
-  return pvcast_request('POST', '/plants',
+  $response = pvcast_request('POST', '/plants',
     '{"plant":{"alias":"' . $alias . '","latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
+
+  return $response->code;
 }
 
 /**
  * Deletes a PV plant.
  * 
  * @param $alias      The plant alias.
- * @return the server response.
- */
+ * @return the HTTP response code.
+*/
 function pvcast_delete_plant($alias) {
 
-  $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
-  if (file_exists($file_path)) {
-    unlink($file_path);
-  }
-  return pvcast_request('DELETE', "/plants/alias/$alias");
+  $response = pvcast_request('DELETE', "/plants/alias/$alias");
+
+  return $response->code;
 }
 
 /**
- * Updates a PV plant.
+ * Updates the properties of a PV plant.
  * 
  * @param $alias      The plant alias.
  * @param $latitude   The plant latitude.
  * @param $longitude  The plant longitude.
- * @return the server response.
+ * @return the HTTP response code.
  */
 function pvcast_update_plant($alias, $latitude, $longitude) {
 
-  return pvcast_request('PUT', "/plants/alias/$alias",
+  $response = pvcast_request('PUT', "/plants/alias/$alias",
     '{"plant":{"latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
+
+  return $response->code;
 }
 
 /**
- * Updates a PV plant model.
+ * Submits historical measurements of a PV plant to the PVCast service.
+ * This method must be invoked at least once a day, so the service is able to make more accurate forecasts.
  *
  * @param $alias         The plant alias.
  * @param $measurements  The plant measurements (timestamp => value).
- * @return the server response.
+ * @return the HTTP response code.
  */
 function pvcast_update_model($alias, $measurements) {
 
-  $pairs = '';
-  foreach ($measurements as $timestamp => $value) {
-    $pairs .= empty($pairs) ? '' : ',';
-    $pairs .= "[$timestamp,$value]";
-  }
+  $response = pvcast_request('POST', "/plants/alias/$alias/updateModel",
+    '{"measurements":[' . json_encode($measurements) . ']}');
 
-  return pvcast_request('POST', "/plants/alias/$alias/updateModel",
-    '{"measurements":[' . $pairs . ']}');
+  return $response->code;
 }
 
 /**
- * Sends a request to myPowerGrid.
+ * Sends a request to the PVCast service.
  *
  * @param $method  The HTTP method.
  * @param $path    The URL path.
  * @param $body    The request body (optional).
- * @return the server response.
+ * @return the Drupal HTTP response object.
  */
 function pvcast_request($method, $path, $body = NULL) {
 
@@ -149,46 +124,22 @@ function pvcast_request($method, $path, $body = NULL) {
   $response = drupal_http_request($url, array(
     'method' => $method,
     'data' => $body,
-    'headers' => array(
-      'Content-type' => 'application/json',
-      'X-API-KEY' => $key
-    )));
+    'headers' => array('X-API-KEY' => $key)
+  ));
 
-  watchdog('pvcast.request', 'Request: %method %url using key: %key has returned %size characters. Error Message: "%error".',
-    array(
-      '%method' => $method,
-      '%url' => $url,
-      '%key' => $key,
-      '%size' => strlen($response->data),
-      '%error' => isset($response->error) ? $response->error : '',
-      WATCHDOG_NOTICE));
-
-  return $response->data;
-}
-
-/**
- * Downloads a PV plant forecast to the data directory.
- *
- * @param $alias  The plant alias.
- */
-function pvcast_download_forecast($alias) {
-
-  $content = pvcast_get_forecast($alias);
-
-  if (empty($content)) {
-    watchdog('pvcast.forecast', 'Forecast for PV plant %alias downloaded from myPowerGrid is empty',
-      array('%alias' => $alias), WATCHDOG_ERROR);
+  if ($body) {
+    $response['headers']['Content-type'] = 'application/json';
   }
-  else {
-    watchdog('pvcast.forecast', 'Forecast for PV plant %alias has been downloaded from myPowerGrid.',
-      array('%alias' => $alias), WATCHDOG_NOTICE);
 
-    $file_path = PVCAST_FORECAST_PATH . "/$alias.json";
-
-    save_file($file_path, $content);
+  if ($response->code != 200) {
+    watchdog('pvcast.request', 'Request: %method %url has failed. HTTP response code: %code - error message: "%error".',
+      array(
+        '%method' => $method,
+        '%url' => $url,
+        '%code' => $response->code,
+        '%error' => isset($response->error) ? $response->error : '',
+        WATCHDOG_ERROR
+    ));
   }
-}
-
-function pvcast_cron() {
-  rmoldfiles(PVCAST_FORECAST_PATH, DAY);
+  return $response;
 }
