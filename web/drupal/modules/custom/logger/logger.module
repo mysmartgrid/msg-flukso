@@ -3310,7 +3310,7 @@ function logger_xmlrpc() {
 }
 
 /**
- * Authenticates a device.
+ * Authenticates a device version 1.
  * 
  * @return the authentication response.
  */
@@ -3322,7 +3322,7 @@ function logger_auth($auth) {
 }
 
 /**
- * Processes the heartbeat message.
+ * Forwards device heartbeat message to the RESTful API.
  *
  * @param $auth    The authentication data.
  * @param $monitor The device properties.
@@ -3330,56 +3330,11 @@ function logger_auth($auth) {
  */
 function logger_heartbeat($auth, $monitor) {
 
-  require_once NOTIFICATION_PATH . "/notification.module";
-
-  if (logger_authenticate_hmac_sha1($auth, $monitor)) {
-
-    notification_log_heartbeat_received($auth['device']);
-
-    $device = db_select('logger_devices', 'd')
-      ->fields('d', array('device', 'sha', 'upgrade', 'resets'))
-      ->condition('device', $auth['device'], '=')
-      ->execute()
-      ->fetchObject();
-
-    $device->resets += $monitor['reset'];
-
-    db_update('logger_devices')
-      ->fields(array(
-        'access' => REQUEST_TIME,
-        'version' => $monitor['version'],
-        'upgrade' => 0,
-        'resets' => $device->resets,
-        'uptime' => $monitor['uptime'],
-        'memtotal' => $monitor['memtotal'],
-        'memfree' => $monitor['memfree'],
-        'memcached' => $monitor['memcached'],
-        'membuffers' => $monitor['membuffers'],
-        'uart_oe' => $monitor['uart_oe'],
-      ))
-      ->condition('device', $auth['device'], '=')
-      ->execute();
-
-    $action['upgrade'] = (int) $device->upgrade;
-    if ($action['upgrade']) {
-
-      $action['timestamp'] = REQUEST_TIME;
-      $action['signature'] = hash_hmac('sha1',
-        $action['timestamp'] . ':' . $action['upgrade'] . ':' .
-        $device->sha, $device->sha);
-    }
-
-    watchdog('logger.heartbeat', 'heardbeat received: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
-
-    return $action;
-  }
-  else {
-    return xmlrpc_error(-31000, t('Authentication failed.'));
-  }
+  return logger_forward_api_request($auth, 'device', $auth['device'], $monitor);
 }
 
 /**
- * Processes device measurement messages.
+ * Forwards device measurement messages to the RESTful API.
  * 
  * @param $auth  The authentication data.
  * @param $logs  The measurements array.
@@ -3387,68 +3342,19 @@ function logger_heartbeat($auth, $monitor) {
  */
 function logger_measurement_add($auth, $logs) {
 
-  require_once LOGGER_PATH . "/logger.rrd.inc";
-  require_once NOTIFICATION_PATH . "/notification.module";
+  $keys = array_keys($logs);
+  $meter = $keys[0];
 
-  if (logger_authenticate_hmac_sha1($auth, $logs)) {
-
-    notification_log_measurement_received($auth['device']);
-
-    $info = 'added 5min interval measurements to the log';
-
-    foreach ($logs as $meter => $measurements) {
-
-      //load the normalisation factor, relative to 1pulse = 1Wh
-      $meterdata = db_select('logger_meters', 'm')
-        ->fields('m', array('device', 'factor'))
-        ->condition('meter', $meter, '=')
-        ->execute()
-        ->fetchObject();
-
-      if ($meterdata->device == $auth['device']) { // extra security check
-        ksort($measurements); // sort the key-value pairs in the associative array by key, i.e. the timestamp
-
-        foreach ($measurements as $timestamp => $value) {
-
-          if (is_numeric($timestamp) and is_numeric($value)) {
-            $values[$timestamp] = $value * $meterdata->factor;
-          }
-          else {
-            watchdog('logger.measurementAdd', 'corrupted input data for %meter : %timestamp : %value', array('%meter' => $meter, '%timestamp' => $timestamp, '%value' => $value), WATCHDOG_ERROR);
-
-            notification_log_corrupted_message($meterdata->device);
-          }
-        }
-
-        $updated = logger_rrd_update($meter, $values);
-
-        if ($updated) {
-          watchdog('logger.measurementAdd', 'successful update of base rrd. meter: %meter', array('%meter' => $meter), WATCHDOG_NOTICE);
-
-          //logger_meters is updated with the true metervalue $value, NOT $value*$meterdata->factor since we're not normalising this entry!
-          db_update('logger_meters')
-            ->fields(array(
-              'access' => REQUEST_TIME,
-              'value' => $value, //Gets the latest value stored in $value
-            ))
-            ->condition('meter', $meter)
-            ->execute();
-        }
-        else {
-          watchdog('logger.measurementAdd', 'error updating base rrd. meter: %meter ', array('%meter' => $meter), WATCHDOG_ERROR);
-        }
-      }
-    }
-    return $info;
+  $values = array();
+  foreach ($logs[$meter] as $timestamp => $value) {
+    $values[] = array($timestamp, $value);
   }
-  else {
 
-    return xmlrpc_error(-31000, t('Authentication failed.'));
-  }
+  return logger_forward_api_request($auth, 'sensor', $meter, array('measurements' => $values), $logs);
 }
 
 /**
- * Processes brownout event messages.
+ * Forwards brownout event messages to the RESTful API.
  *
  * @param $auth     The authentication data.
  * @param $message  The event message.
@@ -3456,22 +3362,45 @@ function logger_measurement_add($auth, $logs) {
  */
 function logger_brownout($auth, $message) {
 
-  require_once NOTIFICATION_PATH . "/notification.module";
+  return logger_forward_api_request($auth, 'event', BROWNOUT_EVENT_ID, $message);
+}
 
-  if (logger_authenticate_hmac_sha1($auth, $message)) {
+/**
+ * Forwards XMLRPC API requests to the RESTful API.
+ *
+ * @param $auth         The authentication data.
+ * @param $object       The entity being affected by the invocation.
+ * @param $id           The object id.
+ * @param $body         The request body, as a PHP object.
+ * @param $signed_body  The body of the XMLRPC request that has been signed (for authentication).
+ * @return the server response.
+ */
+function logger_forward_api_request($auth, $object, $id, $body, $signed_body = NULL) {
 
-    notification_log_brownout($auth['device']);
+  $signed_body = isset($signed_body) ? $signed_body : $body;
 
-    return 'Brownout message has been received.';
+  if (logger_authenticate_hmac_sha1(&$auth, $signed_body)) {
+
+    $url = variable_get('logger_msg_service_url') . "/$object/$id";
+    $body = json_encode($body);
+
+    $response = drupal_http_request($url, array(
+      'method' => 'POST',
+      'data' => $body,
+      'headers' => array(
+        'X-Version' => '1.0',
+        'X-Digest' => hash_hmac('sha1', $body, $auth['key'])
+      )));
+
+    return json_decode($response->data);
   }
   else {
-
     return xmlrpc_error(-31000, t('Authentication failed.'));
   }
 }
 
 /**
- * Authenticates a device.
+ * Authenticates a device version 1.
  *
  * @param $auth     The authentication data.
  * @param $message  The message string.
@@ -3487,19 +3416,16 @@ function logger_authenticate_hmac_sha1($auth, $message) {
 
   $auth['key'] = db_select('logger_devices', 'd')
     ->fields('d', array('sha'))
-    ->condition('device', $auth['device'], '=')
+    ->condition('device', $auth['device'])
     ->execute()
     ->fetchField();
 
   $hash = hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']);
 
   if ($auth['signature'] == $hash && $auth['timestamp'] > REQUEST_TIME - 300) {
-
-    //watchdog('logger.auth', 'HMAC-SHA1 authentication succeeded for device: %device', array('%device' => $auth['device']), WATCHDOG_NOTICE);
     return TRUE;
   }
   else {
-
     watchdog('logger.auth', 'HMAC-SHA1 authentication failed for device: %device', array('%device' => $auth['device']), WATCHDOG_ERROR);
     return FALSE;
   }
