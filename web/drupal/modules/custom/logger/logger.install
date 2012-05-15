@@ -335,6 +335,8 @@ function logger_install() {
 
   $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
   drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
+
+  variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
 }
 
 function logger_uninstall() {
@@ -470,4 +472,13 @@ function logger_update_7007() {
     ->execute();  
 
   return st('Field logger_meters.price successfully added.');
+}
+
+/**
+ * Sets variable logger_msg_service_url.
+ */
+function logger_update_7008() {
+  variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
+
+  return st('Variable logger_msg_service_url has been set.');
 }
