@@ -200,6 +200,16 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['selfconsumption'] = array(
+    'title' => 'Your power self consumption',
+    'description' => 'Show the power self consumption page',
+    'page callback' => 'logger_selfconsumption_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_producer_access',
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
   $items['forecast'] = array(
     'title' => 'Your power production forecast',
     'description' => 'Show the power consumption and production forecast page',
@@ -439,13 +449,13 @@ function logger_mobile_page() {
   global $user;
 
   if ($user->uid) {
-    $is_pv_producer = logger_forecast_access('view forecast charts');
+    $forecast_access = logger_forecast_access('view forecast charts');
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
-      ($is_pv_producer ?
+      ($forecast_access ?
       logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') : '') .
       logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
       logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
@@ -542,6 +552,43 @@ function logger_power_page($interval) {
   $sensors = logger_get_subscribed_sensors($types);
 
   $chart = logger_create_chart_object('power', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2);
+
+  $form = drupal_get_form('logger_powerchart_form', $chart);
+
+  return theme('logger_power_chart_area', array('chart' => $chart)) . drupal_render($form);
+}
+
+/**
+ * Builds the power self consumption page.
+ *
+ * @param $interval The time interval.
+ * @return the power self consumption page.
+ */
+function logger_selfconsumption_page($interval) {
+
+  global $user;
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $interval = $interval ? $interval : 'hour';
+  if (!logger_get_default_time_window($interval)) {
+    drupal_goto('power', array(), 301);
+  }
+
+  drupal_set_title(t('Your power self consumption'));
+
+  $xvalue1 = logger_get_xvalue(1);
+  $xvalue2 = logger_get_xvalue(2);
+  $yvalue1 = logger_get_yvalue(1);
+  $yvalue2 = logger_get_yvalue(2);
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $unit = logger_get_variable('powerchart_unit', 'watt');
+  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
+  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
+  $sensors = logger_get_sensors($types, array($user->uid));
+
+  $chart = logger_create_chart_object('selfconsumption', $types, $interval, $unit, FALSE, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2, TRUE);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -801,9 +848,10 @@ function logger_energy_page($interval) {
  * @param $aggregate_sensors  Whether the sensors series should be aggregated.
  * @param $price1             The price of KWh, for sensor type 'consumption', used when the unit is 'eur' or 'eur/year'.
  * @param $price2             The price of KWh, for sensor type 'production', used when the unit is 'eur' or 'eur/year'.
+ * @param $filled             Whether the chart lines should be filled.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $stacked, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL) {
+function logger_create_chart_object($context, $types, $interval, $unit, $stacked, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $filled = FALSE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -819,6 +867,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $chart->colors = logger_get_series_colors($context);
   $chart->sensors = $sensors;
   $chart->aggregate_sensors = $aggregate_sensors;
+  $chart->filled = $filled;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
 
@@ -1232,6 +1281,42 @@ function logger_get_power_chart_data($chart) {
 }
 
 /**
+ * Returns an array containing all self consumption chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_selfconsumption_chart_data($chart) {
+
+  global $user;
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $groups = array();
+  foreach ($chart->sensors as &$sensor) {
+    $groups[$sensor->type_id][] = $sensor;
+  }
+
+  $data = array();
+  $i = 0;
+
+  foreach ($groups as $type_id => $sensors) {
+
+    if (!empty($sensors)) {
+      $type = $sensors[0]->type;
+      $price = ($type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
+
+      $measurements = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);
+      $values = logger_format_power_series_data($chart, $measurements);
+
+      $data['series'][$user->uid][$user->name][t('All')][$type] = $values;
+      $data['legend'][] = logger_create_power_legend_line($user->name, t('All'), $type, $i++);
+    }
+  }
+  return $data;
+}
+
+/**
  * Returns an array containing all power production forecast chart data.
  *
  * @param $chart  The chart object with the parameters for the data query.
@@ -1556,6 +1641,7 @@ function theme_logger_power_chart_area($variables) {
   //FIXME: move these lines to the calling functions
   $step_plot = logger_get_variable('step_plot', 0);
   $smooting_level = logger_get_variable('smooting_level', 1);
+  $filled = $chart->filled ? 'true' : 'false';
 
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
@@ -1564,6 +1650,7 @@ function theme_logger_power_chart_area($variables) {
     'pointClickCallback' => 'addPowerAnnotation',
     'stepPlot' => $step_plot,
     'rollPeriod' => $smooting_level,
+    'fillGraph' => $filled 
   );
 
   if ($yvalue1 >= 0 && $yvalue2 > 0) {
@@ -1578,6 +1665,7 @@ function theme_logger_power_chart_area($variables) {
     'underlayCallback' => 'highlightPowerChart',
     'stepPlot' => $step_plot,
     'rollPeriod' => $smooting_level,
+    'fillGraph' => $filled
   );
 
   $options = logger_get_power_units_options();
@@ -2013,14 +2101,17 @@ function logger_powerchart_form($form, &$form_state, $chart) {
 
   global $base_path;
 
-  $form['new_user'] = array(
-    '#type' => 'select',
-    '#title' => t('Add User'),
-    '#description' => t('Select a user to be added to the chart.'),
-    '#options' => logger_get_users_options(),
-    '#default_value' => 0,
-    '#attributes' => array('onchange' => 'submitPowerChartForm(true)'),
-  );
+  if ($chart->context == 'power') {
+
+    $form['new_user'] = array(
+      '#type' => 'select',
+      '#title' => t('Add User'),
+      '#description' => t('Select a user to be added to the chart.'),
+      '#options' => logger_get_users_options(),
+      '#default_value' => 0,
+      '#attributes' => array('onchange' => 'submitPowerChartForm(true)'),
+    );
+  }
 
   $form['unit'] = array(
     '#type' => 'select',
@@ -2874,6 +2965,25 @@ function logger_device_access($permission, $device) {
   else {
     return $uid == $GLOBALS['user']->uid && user_access($permission);
   }
+}
+
+/**
+ * Access callback ensuring the producer pages are accessible only to users who have production sensors.
+ */
+function logger_producer_access($permission) {
+
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
+
+  $sensor = db_select('logger_meters', 'm')
+    ->fields('m', array('uid'))
+    ->condition('m.uid', $GLOBALS['user']->uid, '=')
+    ->condition('m.type', PRODUCTION_SENSOR_TYPE)
+    ->execute()
+    ->fetchObject();
+
+  return $sensor && user_access($permission);
 }
 
 /**
