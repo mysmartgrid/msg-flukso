@@ -6,6 +6,7 @@ core = 7.x
 version = 7.x-0.1
 php = 5.3
 
+dependencies[] = mobile_tools
 dependencies[] = pvcast
 dependencies[] = msgcommons
 dependencies[] = notification
