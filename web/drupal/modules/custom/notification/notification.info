@@ -7,5 +7,6 @@ version = 7.x-0.1
 php = 5.3
 
 dependencies[] = msgcommons
+dependencies[] = jobqueue
 dependencies[] = logger
 dependencies[] = pchart

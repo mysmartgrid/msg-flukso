@@ -1244,7 +1244,7 @@ function logger_get_selfconsumption_chart_data($chart) {
   foreach ($groups as $type_id => $sensors) {
 
     if (!empty($sensors)) {
-      $type = $sensors[0]->type;
+      $type = t($sensors[0]->type);
       $price = ($type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
 
       $measurements = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);

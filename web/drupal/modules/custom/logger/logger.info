@@ -9,6 +9,7 @@ php = 5.3
 dependencies[] = mobile_tools
 dependencies[] = pvcast
 dependencies[] = msgcommons
+dependencies[] = jobqueue
 dependencies[] = notification
 
 files[] = logger.test
