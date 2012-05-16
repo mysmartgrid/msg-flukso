@@ -299,10 +299,10 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
             end,
 
             %debugging
-            UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
-            logger(Uid, <<"rrdupdate.base">>,
-              string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
-              ?INFO, ReqData),
+            %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
+            %logger(Uid, <<"rrdupdate.base">>,
+            %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+            %  ?INFO, ReqData),
 
             case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
