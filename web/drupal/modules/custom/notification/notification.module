@@ -1550,7 +1550,7 @@ function notification_create_forecast_chart($notifiable) {
 
   $content = NULL;
   $file_path = NOTIFICATION_REL_PATH . '/tmp/' . $notifiable['meter'] . '.png';
-  $forecast = pvcast_query_forecast($notifiable['meter'], $notifiable['since_time'], $notifiable['until_time']);
+  $forecast = pvcast_get_forecast($notifiable['meter'], $notifiable['since_time'], $notifiable['until_time']);
 
   if (!empty($forecast)) {
 

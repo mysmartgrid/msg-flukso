@@ -1277,7 +1277,7 @@ function logger_get_forecast_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $forecast = pvcast_query_forecast($sensor->meter, $chart->period['start'], $chart->period['end']);
+    $forecast = pvcast_get_forecast($sensor->meter, $chart->period['start'], $chart->period['end']);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
