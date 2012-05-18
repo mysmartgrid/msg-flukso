@@ -24,7 +24,7 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL); //FIXME
+//error_reporting(E_ALL);
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
@@ -552,18 +552,20 @@ function logger_power_page($interval, $context = 'power', $title = NULL, $types 
   $yvalue1 = logger_get_yvalue(1);
   $yvalue2 = logger_get_yvalue(2);
   $unit = logger_get_variable('powerchart_unit', 'watt');
+
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
+  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
+
   $filled = logger_get_variable('filled_graph', 0) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smooting_level = logger_get_variable('smooting_level', 1);
-  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
-  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
 
   $sensors = $context == 'power' ?
     logger_get_subscribed_sensors($types) :
     logger_get_sensors($types, array($user->uid));
 
-  $chart = logger_create_chart_object($context, $types, $interval, $unit, FALSE, $step_plot, $smooting_level, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2, $filled);
+  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2, FALSE, $filled, $step_plot, $smooting_level);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -635,7 +637,7 @@ function logger_overview_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types);
 
-  $chart = logger_create_chart_object('overview', $types, $interval, 'watt', FALSE, FALSE, 1, $sensors);
+  $chart = logger_create_chart_object('overview', $types, $interval, 'watt', $sensors);
 
   $output .= theme('logger_power_chart_area', array('chart' => $chart));
 
@@ -673,7 +675,7 @@ function logger_relative_energy_consumption_page() {
     logger_set_variable('selected_meters', $all_meters);
   }
 
-  $chart = logger_create_chart_object('relative', $types, 'year', $unit, TRUE, FALSE, 1, $sensors, array(0, 0), array(0, 0), FALSE, $price1);
+  $chart = logger_create_chart_object('relative', $types, 'year', $unit, $sensors, array(0, 0), array(0, 0), FALSE, $price1, NULL, TRUE);
 
   drupal_set_title(t('Your relative energy consumption'));
 
@@ -740,7 +742,7 @@ function logger_energy_page($interval) {
   $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
   $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
 
-  $chart = logger_create_chart_object('energy', $types, $interval, $unit, FALSE, FALSE, 1, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price1, $price2);
+  $chart = logger_create_chart_object('energy', $types, $interval, $unit, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price1, $price2);
 
   //TODO: refactor
   $consumed = isset($chart->data['last'][CONSUMPTION_SENSOR_TYPE]) ? $chart->data['last'][CONSUMPTION_SENSOR_TYPE] : 0;
@@ -779,28 +781,25 @@ function logger_energy_page($interval) {
  * @param $types              The array of sensor types.
  * @param $interval           The time interval.
  * @param $unit               The chart unit.
- * @param $stacked            Whether the chart has stacked bars or not.
- * @param $step_plot          Whether the chart lines should be stepped.
- * @param $smooting_level     The smoothing level of the chart lines.
  * @param $sensors            The sensors whose values are plotted on the chart.
  * @param $xaxis              An array containing the minimum and maximum timestamps of the x axis.
  * @param $yaxis              An array containing the minimum and maximum values of the y axis.
  * @param $aggregate_sensors  Whether the sensors series should be aggregated.
  * @param $price1             The price of KWh, for sensor type 'consumption', used when the unit is 'eur' or 'eur/year'.
  * @param $price2             The price of KWh, for sensor type 'production', used when the unit is 'eur' or 'eur/year'.
+ * @param $stacked            Whether the chart has stacked bars or not.
  * @param $filled             Whether the chart lines should be filled.
+ * @param $step_plot          Whether the chart lines should be stepped.
+ * @param $smooting_level     The smoothing level of the chart lines.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $stacked, $step_plot, $smooting_level, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $filled = FALSE) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smooting_level = 1) {
 
   $chart = new stdClass();
   $chart->context = $context;
   $chart->types = $types;
   $chart->interval = $interval;
   $chart->unit = $unit;
-  $chart->stacked = $stacked;
-  $chart->step_plot = $step_plot;
-  $chart->smooting_level = $smooting_level;
   $chart->resolution = logger_get_resolution($interval);
   $chart->offset = get_timezone_offset();
   $chart->colors = logger_get_series_colors($context);
@@ -809,7 +808,10 @@ function logger_create_chart_object($context, $types, $interval, $unit, $stacked
   $chart->price1 = $price1;
   $chart->price2 = $price2;
   $chart->prices = array(CONSUMPTION_SENSOR_TYPE => $price1, PRODUCTION_SENSOR_TYPE => $price2);
+  $chart->stacked = $stacked;
   $chart->filled = $filled;
+  $chart->step_plot = $step_plot;
+  $chart->smooting_level = $smooting_level;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
 
