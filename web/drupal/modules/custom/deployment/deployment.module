@@ -321,7 +321,7 @@ function deployment_overview_page() {
     $row[$percentage_title] = $perc ? $perc . ' %' : '';
   }
 
-  $chart = logger_create_chart_object('deployment', array(), 'year', t('Devices'), FALSE, array());
+  $chart = logger_create_chart_object('deployment', array(), 'year', t('Devices'), FALSE, FALSE, 1, array());
   $chart->file_url = 'deployment/chart/file'; //TODO: avoid setting this property
   $chart->data['legend'] = $legend;
 
