@@ -24,9 +24,9 @@
  */
 
 //DEBUG
-error_reporting(E_ALL); //FIXME
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
+//error_reporting(E_ALL); //FIXME
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
