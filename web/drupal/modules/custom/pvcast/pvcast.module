@@ -128,7 +128,7 @@ function pvcast_request($method, $path, $body = NULL) {
   ));
 
   if ($body) {
-    $response['headers']['Content-type'] = 'application/json';
+    $response->headers['Content-type'] = 'application/json';
   }
 
   if ($response->code != 200) {
