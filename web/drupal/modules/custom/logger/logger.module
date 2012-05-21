@@ -204,7 +204,7 @@ function logger_menu() {
     'title' => 'Your power self consumption',
     'description' => 'Show the power self consumption page',
     'page callback' => 'logger_power_page',
-    'page arguments' => array(1, 'selfconsumption', t('Your power self consumption')),
+    'page arguments' => array(1, 0, t('Your power self consumption')),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -213,8 +213,8 @@ function logger_menu() {
   $items['forecast'] = array(
     'title' => 'Your power production forecast',
     'description' => 'Show the power consumption and production forecast page',
-    'page callback' => 'logger_power_page',
-    'page arguments' => array(1, 'forecast', t('Your power production forecast'), array(PRODUCTION_SENSOR_TYPE)),
+    'page callback' => 'logger_forecast_page',
+    'page arguments' => array(1),
     'access callback' => 'logger_forecast_access',
     'access arguments' => array('view forecast charts'),
     'type' => MENU_CALLBACK,
@@ -527,14 +527,59 @@ function logger_user_power_page($uid) {
  * Builds the power consumption page.
  *
  * @param $interval The time interval.
+ * @return the power consumption page.
+ */
+function logger_power_page($interval) {
+
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_subscribed_sensors($types);
+
+  return logger_power_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types);
+}
+
+/**
+ * Builds the power production forecast page.
+ *
+ * @param $interval The time interval.
+ * @return the power production forecast page.
+ */
+function logger_forecast_page($interval) {
+
+  global $user;
+
+  $types = array(PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($types, array($user->uid));
+
+  return logger_power_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types);
+}
+
+/**
+ * Builds the power self consumption page.
+ *
+ * @param $interval The time interval.
+ * @return the power self consumption page.
+ */
+function logger_selfconsumption_page($interval) {
+
+  global $user;
+
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($types, array($user->uid));
+
+  return logger_power_chart_page($interval, 'selfconsumption', t('Your power self consumption'), $sensors, $types);
+}
+
+/**
+ * Builds a power chart page.
+ *
+ * @param $interval The time interval.
  * @param $context  The chart context.
  * @param $title    The page title.
+ * @param $sernsors The sensors plotted on the chart.
  * @param $types    The types of sensors plotted on the chart.
  * @return the power consumption page.
  */
-function logger_power_page($interval, $context = 'power', $title = NULL, $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE)) {
-
-  global $user;
+function logger_power_chart_page($interval, $context, $title, $sensors, $types) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -544,7 +589,6 @@ function logger_power_page($interval, $context = 'power', $title = NULL, $types 
     drupal_goto('power', array(), 301);
   }
 
-  $title = isset($title) ? $title : t('Your power consumption and production');
   drupal_set_title($title);
 
   $xvalue1 = logger_get_xvalue(1);
@@ -561,11 +605,8 @@ function logger_power_page($interval, $context = 'power', $title = NULL, $types 
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smooting_level = logger_get_variable('smooting_level', 1);
 
-  $sensors = $context == 'power' ?
-    logger_get_subscribed_sensors($types) :
-    logger_get_sensors($types, array($user->uid));
-
-  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE, $price1, $price2, FALSE, $filled, $step_plot, $smooting_level);
+  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
+    $price1, $price2, FALSE, $filled, $step_plot, $smooting_level);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
