@@ -187,7 +187,7 @@ compose_support_tag(Device) ->
 
     case mysql:get_result_rows(_Result) of
 
-      [[User, Host, Port]] ->
+      [[User, Host, Port, TunnelPort]] ->
 
         KeysPath = string:concat(string:concat("./var/keys/", erlang:binary_to_list(Host)), "/"),
 
@@ -207,6 +207,7 @@ compose_support_tag(Device) ->
           {<<"user">>, User},
           {<<"host">>, Host},
           {<<"port">>, Port},
+          {<<"tunnelPort">>, TunnelPort},
           {<<"devicekey">>, base64:encode(DeviceKey)},
           {<<"techkey">>, TechKey},
           {<<"hostkey">>, HostKey}]},

@@ -203,7 +203,7 @@ function logger_menu() {
   $items['selfconsumption'] = array(
     'title' => 'Your power self consumption',
     'description' => 'Show the power self consumption page',
-    'page callback' => 'logger_power_page',
+    'page callback' => 'logger_selfconsumption_page',
     'page arguments' => array(1, 0, t('Your power self consumption')),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('view logger charts'),
@@ -547,6 +547,7 @@ function logger_forecast_page($interval) {
 
   global $user;
 
+  $interval = $interval ? $interval : 'f3days'; 
   $types = array(PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
@@ -2191,11 +2192,14 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#text-align' => 'center',
   );
 
+  $options = $chart->context == 'forecast' ? array(HOUR => t('Hour')) : //TODO: include other resolutions
+    logger_get_resolutions_options();
+  
   $form['resolution'] = array(
     '#type' => 'select',
     '#title' => t('Time Resolution'),
     '#description' => t('Select the amount of time represented by each point on the chart.'),
-    '#options' => logger_get_resolutions_options(),
+    '#options' => $options,
     '#attributes' => array('onchange' => 'submitPowerChartForm()'),
   );
 
@@ -3109,7 +3113,7 @@ function logger_bind_support_ports() {
   foreach ($result as $device) {
 
     //Find an available port
-    $sql = "SELECT host, port, username FROM {device_support_slot} WHERE device IS NULL";
+    $sql = "SELECT host, tunnel_port, username FROM {device_support_slot} WHERE device IS NULL";
     $slots = db_query_range($sql, 0, 1);
 
     //Only 1
@@ -3118,7 +3122,7 @@ function logger_bind_support_ports() {
       db_update('device_support_slot')
         ->fields(array('device' => $device->device ))
         ->condition('host', $slot->host)
-        ->condition('port', $slot->port)
+        ->condition('tunnel_port', $slot->tunnel_port)
         ->execute();
 
       $bindings[$slot->host] = $slot->username;
@@ -3352,13 +3356,13 @@ function logger_remove_support_key($device) {
 function logger_update_support_authorized_keys() {
 
   $query = db_select('device_support_slot', 's')
-    ->fields('s', array('host', 'username'));
+    ->fields('s', array('host', 'port'));
   $query->groupBy('host');
-  $query->groupBy('username');
+  $query->groupBy('port');
   $accounts = $query->execute();
 
   foreach ($accounts as $account) {
-    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->username");
+    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->port");
   }
 }
 
@@ -3366,6 +3370,8 @@ function logger_update_support_authorized_keys() {
  * Updates PVCast plants with sensor measurements.
  */
 function logger_update_pvcast_models() {
+
+  module_load_include('inc', 'logger', 'logger.rrd');
 
   $last = variable_get('logger_last_pvcast_model_update', 0);
   $now = time();

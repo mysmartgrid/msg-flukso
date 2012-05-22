@@ -284,7 +284,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
                 RrdTimestamp = 1
         end,
 
-        % io:fwrite(string:concat(string:concat("process_measurements sensor: ", integer_to_list(RrdTimestamp)), "\n")),
+        %io:fwrite(string:concat(string:concat("process_measurements timestamps: ", integer_to_list(RrdTimestamp)), "\n")),
 
         case parse_measurements(RrdTimestamp, Measurements) of
 

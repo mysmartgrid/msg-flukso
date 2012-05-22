@@ -286,6 +286,13 @@ function logger_schema() {
         'length' => '40',
         'not null' => TRUE,
       ),
+      'tunnel_port' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
       'port' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -306,7 +313,7 @@ function logger_schema() {
     ),
     'primary key' => array(
       'host',
-      'port',
+      'tunnel_port'
     ),
   );
 
@@ -481,4 +488,33 @@ function logger_update_7008() {
   variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
 
   return st('Variable logger_msg_service_url has been set.');
+}
+
+/**
+ * Add field tunnel_slot to table device_support_slot.
+ */
+function logger_update_7009() {
+
+  db_drop_primary_key('device_support_slot');
+
+  db_add_field('device_support_slot', 'tunnel_port', array(
+    'type' => 'float',
+    'size' => 'normal',
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+
+  db_update('device_support_slot')
+    ->expression('tunnel_port', 'port')
+    ->execute();
+
+  db_update('device_support_slot')
+    ->fields(array(
+      'port' => 22
+    ))
+    ->execute();
+
+  db_add_primary_key('device_support_slot', array('host', 'tunnel_port'));
+
+  return st('Field device_support_slot.tunnel_port successfully added.');
 }

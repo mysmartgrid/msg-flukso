@@ -38,10 +38,10 @@ function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
 
   //TODO: start_time and end_time should be URL parameters
   $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
-  $forecast = json_decode($response->data);
+  $forecast = isset($response->data) ? json_decode($response->data, TRUE) : array();
 
-  return !isset($start_time) && !isset($end_time) ? $forecast :
-    array_filter($forecast, function ($time, $value) {
+  return !$start_time && !$end_time ? $forecast['globalradiation'] :
+    array_filter($forecast['globalradiation'], function ($value, $time) {
       return $time >= $start_time && $time <= $end_time;
     }
   );
@@ -103,7 +103,7 @@ function pvcast_update_plant($alias, $latitude, $longitude) {
 function pvcast_update_model($alias, $measurements) {
 
   $response = pvcast_request('POST', "/plants/alias/$alias/updateModel",
-    '{"measurements":[' . json_encode($measurements) . ']}');
+    '{"measurements":' . json_encode($measurements) . '}');
 
   return $response->code;
 }
@@ -121,23 +121,27 @@ function pvcast_request($method, $path, $body = NULL) {
   $url = variable_get('pvcast_forecast_service_url') . "$path.json";
   $key = variable_get('pvcast_key');
 
+  $headers = array('X-API-KEY' => $key);
+  if ($body) {
+    $headers['Content-type'] = 'application/json';
+  }
+
   $response = drupal_http_request($url, array(
     'method' => $method,
     'data' => $body,
-    'headers' => array('X-API-KEY' => $key)
+    'headers' => $headers
   ));
 
-  if ($body) {
-    $response->headers['Content-type'] = 'application/json';
-  }
-
-  if ($response->code != 200) {
-    watchdog('pvcast.request', 'Request: %method %url has failed. HTTP response code: %code - error message: "%error".',
+  //If error
+  if ($response->code >= 300 || $response->code < 200) {
+    watchdog('pvcast.request', 'Request: %method %url - HTTP response code: %code - message: "%message" - data: "%data" - body: "%body"',
       array(
         '%method' => $method,
         '%url' => $url,
         '%code' => $response->code,
-        '%error' => isset($response->error) ? $response->error : '',
+        '%message' => isset($response->error) ? $response->error : '',
+        '%data' => isset($response->data) ? $response->data : '',
+        '%body' => isset($body) ? $body : '',
         WATCHDOG_ERROR
     ));
   }
