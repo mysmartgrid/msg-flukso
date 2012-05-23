@@ -39,12 +39,16 @@ function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
   //TODO: start_time and end_time should be URL parameters
   $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
   $forecast = isset($response->data) ? json_decode($response->data, TRUE) : array();
+  $forecast = $forecast['globalradiation'];
 
-  return !$start_time && !$end_time ? $forecast['globalradiation'] :
-    array_filter($forecast['globalradiation'], function ($value, $time) {
-      return $time >= $start_time && $time <= $end_time;
+  if (isset($start_time) && isset($end_time)) {
+    foreach (array_keys($forecast) as $time) {
+      if (!isset($time) || $time < $start_time || $time > $end_time) {
+        unset($forecast[$time]);
+      }
     }
-  );
+  }
+  return $forecast;
 }
 
 /**

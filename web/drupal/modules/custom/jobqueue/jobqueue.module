@@ -25,6 +25,7 @@
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
+
 /**
  * Forwards a remote execution to a JobQueue System.
  * 
@@ -34,43 +35,28 @@
  */
 function jobqueue_produce($algorithm, $data) {
 
-  $command = "export HOME=/tmp; /usr/bin/producer.rb -v -c /usr/local/lib/msg-qworker/etc/qproducerrc -a $algorithm";
-  if ($data) {
-    $command .= " -p $data";
-  }
+  require_once libraries_get_path('pda-pheanstalk') . '/pheanstalk_init.php';
 
-  /*
-  //Debug
-  //Redirect error output to default output
-  $command .= " 2>&1";
-  */
+  //TODO: use more workers
+  $worker = variable_get('jobqueue_msg_worker1');
 
-  exec($command, $output, $return);
+  $pheanstalk = new Pheanstalk($worker);
 
-  $uuid = NULL;
-  foreach ($output as $line) {
-    $start = strpos($line, '{"uuid":"');
-    if ($start > 0) {
-      $start += 9;
-      $end = strpos($line, '"', $start);
-      $uuid = substr($line, $start, $end - $start);
-      break;
-    }
-  }
+  $uuid = md5(uniqid());
+  $payload = json_encode(array(
+    array(
+      'uuid' => $uuid,
+      'type' => $algorithm
+    ),
+    array(
+      'foo' => 'bar',
+      '23' => '42',
+      'payload' => $data
+    )));
 
-  /*
-  //Debug
-  $file = "/tmp/jobqueue.txt";
-  fwrite($fh, "command:\n");
-  fwrite($fh, $command);
-
-  foreach($output as $line) {
-    fwrite($fh, "\n$line");
-  }
-
-  fwrite($fh, "\n return: $return \n");
-  fclose($fh);
-  */
+  $pheanstalk
+    ->useTube('default')
+    ->put($payload);
 
   return $uuid;
 }
