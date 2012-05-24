@@ -251,10 +251,14 @@ function deployment_list_page() {
 
   $data = deployment_get_devices($filter, $header, $page_limit);
   foreach ($data as &$device) {
+
+    $name = wordwrap($device['name'], 13, "\n", TRUE);
+    $device['name'] = l($name, 'power/user/' . $device['uid']);
+
     $device['serial'] = l($device['serial'], 'deployment/checkup/serial/' . $device['serial']);
-    $device['device'] = format_hashcode($device['device']);
-    $device['name'] = l($device['name'], 'power/user/' . $device['uid']);
-    $device['email'] = preg_replace("/@/", '@<br>', $device['email']);
+    $device['device'] = wordwrap($device['device'], 16, "\n", TRUE);
+    $device['email'] = wordwrap($device['email'], 18, "\n", TRUE);
+    $device['state'] = str_replace(" ", "<br>", $device['state']);
     unset($device['uid']);
     unset($device['state_id']);
   }
@@ -409,7 +413,7 @@ function deployment_get_devices($filter = array(), $header = NULL, $page_limit =
   while ($device = $result->fetchAssoc()) {
 
     $device['state'] = $states[$device['state_id']];
-    $device['latest'] = date('d-m-Y H:i', $device['latest']);
+    $device['latest'] = date('d.m.y H:i', $device['latest']);
     $data[] = $device;
   }
   return $data;
