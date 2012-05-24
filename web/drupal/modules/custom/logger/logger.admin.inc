@@ -65,7 +65,7 @@ function logger_userdevices_page() {
 
     $row = array();
     $row[] = $device->serial;
-    $row[] = format_hashcode($device->device);
+    $row[] = wordwrap($device->device, 16, "\n", TRUE);
     $row[] = $device->resets;
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
@@ -115,7 +115,7 @@ function logger_usersensors_page() {
   foreach ($sensors as $sensor) {
 
     $row = array();
-    $row[] = format_hashcode($sensor->meter);
+    $row[] = wordwrap($sensor->meter, 16, "\n", TRUE);
     $operations = '';
 
     if ($sensor->function == NULL) {
@@ -134,7 +134,7 @@ function logger_usersensors_page() {
         l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
         l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
     }
-    $row[] = format_hashcode($sensor->token);
+    $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
     $row[] = $operations;
     $rows[] = $row;
   }

@@ -279,17 +279,6 @@ function seconds_to_dayshours($seconds) {
 }
 
 /**
- * Formats a hashcode for exhibition in a table.
- *
- * @param $hash The hashcode to be formatted.
- * @return the formatted code.
- */
-function format_hashcode($hash) {
-  $length = floor(strlen($hash) / 2);
-  return substr($hash, 0, $length) . '<br>' . substr($hash, $length);
-}
-
-/**
  * Finds a role by name, and returns its id.
  * 
  * @param $name  The role name.
