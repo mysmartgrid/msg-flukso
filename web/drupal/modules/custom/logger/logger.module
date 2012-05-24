@@ -549,7 +549,7 @@ function logger_forecast_page($interval) {
 
   $interval = $interval ? $interval : 'f3days'; 
   $types = array(PRODUCTION_SENSOR_TYPE);
-  $sensors = logger_get_sensors($types, array($user->uid));
+  $sensors = logger_get_sensors($types, array($user->uid), TRUE);
 
   return logger_power_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types);
 }
