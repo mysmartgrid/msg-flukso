@@ -1436,6 +1436,8 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
  */
 function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE) {
 
+  global $user;
+
   $query = db_select('logger_meters', 'm')
     ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast', 'price'))
     ->isNotNull('m.function');
@@ -1444,10 +1446,15 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   $query->addField('t', 'name', 'type');
   $query->addField('t', 'id', 'type_id');
 
-  $query->join('logger_users', 'lu', 'lu.uid = m.uid');
-  $query->addField('lu', 'private', 'private');
+  if (user_has_role('Techniker')) {
+    $query->addExpression('FALSE', 'private');
+  }
+  else {
+    $query->join('logger_users', 'lu', 'lu.uid = m.uid');
+    $query->addField('lu', 'private', 'private');
+  }
 
-  $query->join('users', 'u', 'u.uid = lu.uid');
+  $query->join('users', 'u', 'u.uid = m.uid');
   $query->addField('u', 'name', 'username');
 
   if (!empty($types)) {
