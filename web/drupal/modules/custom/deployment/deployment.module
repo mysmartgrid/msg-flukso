@@ -626,7 +626,7 @@ function deployment_checkup_form($form, &$form_state) {
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => FALSE,
-    '#description' => t('Enter the device serial number you want to check up')
+    '#description' => t('Enter the device serial number you want to check up, without the prefix leters (ex.: 97000352).')
   );
 
   $form['device'] = array(
@@ -635,7 +635,7 @@ function deployment_checkup_form($form, &$form_state) {
     '#size' => 32,
     '#maxlength' => 32,
     '#required' => FALSE,
-    '#description' => t('Enter the device id you want to check up')
+    '#description' => t('Enter the device id you want to check up.')
   );
 
   $form['submit'] = array(
@@ -669,6 +669,10 @@ function deployment_checkup_form_validate($form, &$form_state) {
 
   if (!($serial != '' && $device == '' || $serial == '' && $device != '')) {
     form_set_error('serial', t('Please enter either a serial number or a device id.')); 
+  }
+
+  if ($serial != '' && !is_numeric($serial)) {
+    form_set_error('serial', t('Please, enter the serial number without the prefix leters (ex.: 97000352).'));
   }
 }
 
