@@ -49,8 +49,6 @@ function jobqueue_produce($algorithm, $data) {
       'type' => $algorithm
     ),
     array(
-      'foo' => 'bar',
-      '23' => '42',
       'payload' => $data
     )));
 
