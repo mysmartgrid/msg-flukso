@@ -626,7 +626,7 @@ function deployment_checkup_form($form, &$form_state) {
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => FALSE,
-    '#description' => t('Enter the device serial number you want to check up, without the prefix leters (ex.: 97000352).')
+    '#description' => t('Enter the device serial number you want to check up, without the prefix letters (ex.: 97000352).')
   );
 
   $form['device'] = array(
