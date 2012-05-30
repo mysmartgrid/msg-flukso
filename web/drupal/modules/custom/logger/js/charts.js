@@ -164,6 +164,11 @@ function submitPowerChartForm(resetY) {
   form.submit();
 }
 
+function enableFilledGraph() {
+  var form = document.getElementById('logger-powerchart-form');
+  form.elements['filled_graph'].checked = 1;
+}
+
 function submitEnergyChartForm(clickedField) {
 
   var form = document.getElementById('logger-energychart-form');
@@ -343,7 +348,7 @@ function updatePowerLegend(chart) {
 
         value = chart.getValue(v, s);
 
-        if (value > 0) {
+        if (value != 0) {
           last = value;
           max = value > max ? value : max;
           min = value < min ? value : min;
@@ -374,7 +379,7 @@ function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   if (div) {
-    div.innerHTML = value > 0 ? value.toFixed(2) : '';
+    div.innerHTML = value == 0 ? '' : value.toFixed(2);
   }
 }
 

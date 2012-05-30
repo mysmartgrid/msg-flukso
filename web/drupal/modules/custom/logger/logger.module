@@ -2222,7 +2222,7 @@ function logger_powerchart_form($form, &$form_state, $chart) {
       '#description' => t('Do you want the chart series to show your net energy production?'),
       '#default_value' => logger_get_variable('net_production', 0),
       '#return_value' => 1,
-      '#attributes' => array('onclick' => 'submitPowerChartForm(true)'), //In IE, onchange does not work
+      '#attributes' => array('onclick' => 'enableFilledGraph(); submitPowerChartForm(true);'), //In IE, onchange does not work
     );
   }
 
