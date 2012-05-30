@@ -605,9 +605,10 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types) 
   $filled = logger_get_variable('filled_graph', 0) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smooting_level = logger_get_variable('smooting_level', 1);
+  $net_production = logger_get_variable('net_production', 0) == 1;
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
-    $price1, $price2, FALSE, $filled, $step_plot, $smooting_level);
+    $price1, $price2, FALSE, $filled, $step_plot, $smooting_level, $net_production);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -833,9 +834,10 @@ function logger_energy_page($interval) {
  * @param $filled             Whether the chart lines should be filled.
  * @param $step_plot          Whether the chart lines should be stepped.
  * @param $smooting_level     The smoothing level of the chart lines.
+ * @param $net_production     Whether the chart should show net production.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smooting_level = 1) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smooting_level = 1, $net_production = FALSE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -854,6 +856,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $chart->filled = $filled;
   $chart->step_plot = $step_plot;
   $chart->smooting_level = $smooting_level;
+  $chart->net_production = $net_production;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
 
@@ -875,7 +878,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
-  $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors";
+  $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors $net_production";
   foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter $sensor->type $sensor->forecast";
   }
@@ -1278,28 +1281,59 @@ function logger_get_selfconsumption_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $groups = array();
+  $groups = array(PRODUCTION_SENSOR_TYPE => array(), CONSUMPTION_SENSOR_TYPE => array());
   foreach ($chart->sensors as &$sensor) {
     $groups[$sensor->type_id][] = $sensor;
   }
 
-  $data = array();
-  $i = 0;
-
+  $type_names = array();
+  $all_values = array();
   foreach ($groups as $type_id => $sensors) {
 
     if (!empty($sensors)) {
-      $type = t($sensors[0]->type);
+      $type_names[$type_id] = $sensors[0]->type;
       $price = ($type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
 
       $measurements = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);
-      $values = logger_format_power_series_data($chart, $measurements);
-
-      $data['series'][$user->uid][$user->name][t('All')][$type] = $values;
-      $data['legend'][] = logger_create_power_legend_line($user->name, t('All'), $type, $i++);
+      $all_values[$type_id] = logger_format_power_series_data($chart, $measurements);
     }
   }
+
+  if ($chart->net_production) {
+    $all_values = logger_get_net_production_consumption($all_values);
+    $type_names[PRODUCTION_SENSOR_TYPE] = 'Power Grid Supply';
+    $type_names[CONSUMPTION_SENSOR_TYPE] = 'Power Grid Demand';
+  }
+
+  $data = array();
+  $i = 0;
+  foreach ($all_values as $type_id => $values) {
+
+    $type_name = t($type_names[$type_id]);
+    $data['series'][$user->uid][$user->name][t('All')][$type_name] = $values;
+    $data['legend'][] = logger_create_power_legend_line($user->name, t('All'), $type_name, $i++);
+  }
   return $data;
+}
+
+function logger_get_net_production_consumption($all_values) {
+
+  $net_production = array();
+  foreach ($all_values as $type_id => $values) {
+    foreach ($values as $time => $value) {
+
+      $net_production[$time] = isset($net_production[$time]) ? $net_production[$time] : 0;
+      $net_production[$time] += $value * ($type_id == CONSUMPTION_SENSOR_TYPE ? -1 : 1);
+    }
+  }
+
+  $net_consumption = array();
+  foreach ($net_production as $time => $value) {
+
+    $net_consumption[$time] = $value > 0 ? NULL : $net_production[$time];
+    $net_production[$time] = $value < 0 ? 0 : $net_production[$time];
+  }
+  return array(PRODUCTION_SENSOR_TYPE => $net_production, CONSUMPTION_SENSOR_TYPE => $net_consumption);
 }
 
 /**
@@ -2181,6 +2215,17 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
 
+  if ($chart->context == 'selfconsumption') {
+    $form['net_production'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Net Energy Production'),
+      '#description' => t('Do you want the chart series to show your net energy production?'),
+      '#default_value' => logger_get_variable('net_production', 0),
+      '#return_value' => 1,
+      '#attributes' => array('onclick' => 'submitPowerChartForm(true)'), //In IE, onchange does not work
+    );
+  }
+
   $form['yvalue'] = array(
     '#type' => 'textfield',
     '#theme' => 'logger_value_range',
@@ -2437,14 +2482,14 @@ function logger_powerchart_form_validate($form, &$form_state) {
   $yvalue1 = logger_get_yvalue(1);
   $yvalue2 = logger_get_yvalue(2);
 
-  if (!($yvalue1 == '' && $yvalue2 == '') && !($yvalue1 >= 0 && $yvalue2 > $yvalue1)) {
+  if (!($yvalue1 == '' && $yvalue2 == '') && !($yvalue2 > $yvalue1)) {
     form_set_error('yvalue', t('The value range is invalid.'));
   }
 
   $xvalue1 = logger_get_xvalue(1);
   $xvalue2 = logger_get_xvalue(2);
 
-  if (!($xvalue1 > 0 && $xvalue2 > 0 && $xvalue2 > $xvalue1)) {
+  if (!($xvalue2 > $xvalue1)) {
     form_set_error('xvalue', t('Time period is invalid.'));
   }
 
@@ -2498,6 +2543,7 @@ function logger_powerchart_form_submit($form, &$form_state) {
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
   logger_set_variable('filled_graph', $form_state['values']['filled_graph']);
   logger_set_variable('smooting_level', $form_state['values']['smoothing_level']);
+  logger_set_variable('net_production', $form_state['values']['net_production']);//FIXME
 
   //FIXME: get rid of this redirection
   $form_state['redirect'] = array($_GET['q'], array('query' => $_REQUEST));
