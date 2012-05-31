@@ -348,7 +348,7 @@ function updatePowerLegend(chart) {
 
         value = chart.getValue(v, s);
 
-        if (value != 0) {
+        if (value && value != 0) {
           last = value;
           max = value > max ? value : max;
           min = value < min ? value : min;
@@ -379,7 +379,7 @@ function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   if (div) {
-    div.innerHTML = value > 0 || value < 0 ? value.toFixed(2) : '';
+    div.innerHTML = !value || value < 0.01 ? '' : value.toFixed(2);
   }
 }
 
