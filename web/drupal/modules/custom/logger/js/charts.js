@@ -379,7 +379,7 @@ function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   if (div) {
-    div.innerHTML = value == 0 ? '' : value.toFixed(2);
+    div.innerHTML = value > 0 || value < 0 ? value.toFixed(2) : '';
   }
 }
 

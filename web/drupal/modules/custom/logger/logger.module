@@ -1255,9 +1255,7 @@ function logger_get_power_chart_data($chart) {
       $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution, $price);
     }
 
-    $values = logger_format_power_series_data($chart, $measurements);
-
-    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = $values;
+    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
@@ -1294,32 +1292,31 @@ function logger_get_selfconsumption_chart_data($chart) {
       $type_names[$type_id] = $sensors[0]->type;
       $price = ($type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
 
-      $measurements = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);
-      $all_values[$type_id] = logger_format_power_series_data($chart, $measurements);
+      $measurements[$type_id] = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);
     }
   }
 
   if ($chart->net_production) {
-    $all_values = logger_get_net_production_consumption($all_values);
+    $measurements = logger_get_net_production_consumption($measurements, $chart->resolution);
     $type_names[PRODUCTION_SENSOR_TYPE] = 'Power Grid Supply';
     $type_names[CONSUMPTION_SENSOR_TYPE] = 'Power Grid Demand';
   }
 
   $data = array();
   $i = 0;
-  foreach ($all_values as $type_id => $values) {
+  foreach ($measurements as $type_id => $values) {
 
     $type_name = t($type_names[$type_id]);
-    $data['series'][$user->uid][$user->name][t('All')][$type_name] = $values;
+    $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_power_series_data($chart, $values);
     $data['legend'][] = logger_create_power_legend_line($user->name, t('All'), $type_name, $i++);
   }
   return $data;
 }
 
-function logger_get_net_production_consumption($all_values) {
+function logger_get_net_production_consumption($measurements, $resolution) {
 
   $net_production = array();
-  foreach ($all_values as $type_id => $values) {
+  foreach ($measurements as $type_id => $values) {
     foreach ($values as $time => $value) {
 
       $net_production[$time] = isset($net_production[$time]) ? $net_production[$time] : 0;
@@ -1327,12 +1324,23 @@ function logger_get_net_production_consumption($all_values) {
     }
   }
 
+  $negative = FALSE;
   $net_consumption = array();
   foreach ($net_production as $time => $value) {
 
+    if ($value < 0 && !$negative || $value > 0 && $negative) {
+      $interception_time = $time - (int) ($resolution / 2);
+      $net_production[$interception_time] = 0;
+      $net_consumption[$interception_time] = 0;
+      $negative = !$negative;
+    }
+
     $net_consumption[$time] = $value > 0 ? NULL : $net_production[$time];
-    $net_production[$time] = $value < 0 ? 0 : $net_production[$time];
+    $net_production[$time] = $value < 0 ? NULL : $net_production[$time];
   }
+  ksort($net_production);
+  ksort($net_consumption);
+
   return array(PRODUCTION_SENSOR_TYPE => $net_production, CONSUMPTION_SENSOR_TYPE => $net_consumption);
 }
 
@@ -1414,18 +1422,22 @@ function logger_get_overview_chart_data($chart) {
  */
 function logger_format_power_series_data($chart, $measurements) {
 
-  $start = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
-  $end   = $chart->period['end']   - $chart->period['end']   % $chart->resolution;
-
   $diff = $chart->offset / HOUR;
   $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
 
-  $formatted = array();
+  //Complete data points
+  $start = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
+  $end   = $chart->period['end']   - $chart->period['end']   % $chart->resolution;
+
   for ($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
+    $measurements[$timestamp] = isset($measurements[$timestamp]) ? $measurements[$timestamp] : NULL;
+  }
 
-    $key = date('Y-m-d H:i', $timestamp) . " $tz";
-    $value = isset($measurements[$timestamp]) ? $measurements[$timestamp] : NULL;
+  //Not all timestamps are multiples of $chart->resolution
+  $formatted = array();
+  foreach ($measurements as $timestamp => $value) {
 
+    $key = date('Y-m-d H:i:s', $timestamp) . " $tz";
     $formatted[$key] = isset($value) ? number_format($value, 3, '.', '') : '';
   }
   return $formatted;
