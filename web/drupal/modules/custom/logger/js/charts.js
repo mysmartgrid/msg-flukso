@@ -340,7 +340,7 @@ function updatePowerLegend(chart) {
     total = 0;
 
     //sensor's values
-    for(var v = 0; v < chart.numRows(); v++) {
+    for (var v = 0; v < chart.numRows(); v++) {
 
       var timestamp = chart.getValue(v, 0);
 
@@ -358,7 +358,7 @@ function updatePowerLegend(chart) {
       }
     }
 
-    if(total > 0) {
+    if (total > 0) {
       avg = sum / total;
 
     } else {
@@ -378,8 +378,9 @@ function updatePowerLegend(chart) {
 function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
-  if (div) {
-    div.innerHTML = !value || value < 0.01 ? '' : value.toFixed(2);
+  if (div && !isNaN(value - 0)) {
+    value = value.toFixed(2);
+    div.innerHTML = value == 0.00 ? '' : value;
   }
 }
 
