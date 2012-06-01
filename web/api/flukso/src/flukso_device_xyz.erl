@@ -102,14 +102,19 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 %
 % Heartbeat message example:
 %
-% JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1}
+% JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1,
+%        "firmware":{"version":"2.3.1-1","releasetime":"20120131_1845"}}
 % Mochijson2: {struct,[{<<"memtotal">>,   13572},
 %                      {<<"version">>,      210},
 %                      {<<"memcached">>,   3280},
 %                      {<<"membuffers">>,  1076},
 %                      {<<"memfree">>,      812},
 %                      {<<"uptime">>,     17394},
-%                      {<<"reset">>,          1}]}
+%                      {<<"reset">>,          1},
+%                      {<<"firmware">>,  {struct, [{<<"version">>,     "2.3.1-1"},
+%                                                  {<<"releasetime">>, "20120131_1845"},
+%                                                  {<<"build">>,       "f0ba69e4fea1d0c411a068e5a19d0734511805bd"},
+%                                                  {<<"tag">>,         "flukso-2.0.3-rc1-19-gf0ba69e"}]}]}}
 %
 % Config message example:
 %
@@ -125,12 +130,12 @@ process_post(ReqData, #state{device = Device} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets]] ->
+      [[Key, Upgrade, Resets, OldFirmwareVersion]] ->
 
         IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
 
         if
-          %New Device Message - 2nd invocation
+           %New Device Message - 2nd invocation
            IsKeyInformed == true ->
 
             %Key can be changed, but the encryption is based on the formed key
@@ -145,7 +150,6 @@ process_post(ReqData, #state{device = Device} = State) ->
             
           %Heartbeat Message
           true ->
-
             NewKey = Key, %Key is not changed
             Version = proplists:get_value(<<"version">>, JsonData),
             Reset = proplists:get_value(<<"reset">>, JsonData),
@@ -157,8 +161,20 @@ process_post(ReqData, #state{device = Device} = State) ->
             NewResets = Resets + Reset
         end,
 
+        IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
+
+        if
+          IsFirmwareInformed == true ->
+            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
+            FirmwareVersion = proplists:get_value(<<"version">>, Firmware);
+            %TODO: process <<"build">> and <<"tag">>
+
+          true ->
+            FirmwareVersion = OldFirmwareVersion
+        end,
+
         mysql:execute(pool, device_update,
-            [Timestamp, Version, 0, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, Device]),
+          [Timestamp, Version, 0, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -166,12 +182,11 @@ process_post(ReqData, #state{device = Device} = State) ->
       _ ->
         %Function unix_time() returns unique ids (as long as this code runs on a single machine).
         Serial = Timestamp,
-
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
 
         mysql:execute(pool, device_insert,
-            [Device, Serial, 0, Key, Timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
+          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
     end,
 
     Support = compose_support_tag(Device),

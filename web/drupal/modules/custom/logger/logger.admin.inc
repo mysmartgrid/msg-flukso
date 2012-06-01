@@ -35,7 +35,7 @@ function logger_userdevices_page() {
   drupal_set_title(t('My Devices'));
 
   $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'access', 'resets', 'uptime'))
+    ->fields('d', array('device', 'serial', 'access', 'firmware_version', 'uptime'))
     ->condition('d.uid', $user->uid, '=')
     ->orderBy('d.serial');
   $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
@@ -66,7 +66,7 @@ function logger_userdevices_page() {
     $row = array();
     $row[] = $device->serial;
     $row[] = wordwrap($device->device, 16, "\n", TRUE);
-    $row[] = $device->resets;
+    $row[] = $device->firmware_version;
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
     $row[] = $links;
@@ -74,7 +74,7 @@ function logger_userdevices_page() {
     $rows[] = $row;
   }
  
-  $header = array(t('Serial'), t('Device Id'), t('Resets'), t('Last heartbeat'), t('Uptime'), t('Operations'));
+  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
   $options = array('type' => 'inline', 'scope' => 'header');
 
   drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);

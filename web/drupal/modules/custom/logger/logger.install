@@ -54,6 +54,11 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '5',
       ),
+      'firmware_version' => array(
+        'type' => 'varchar',
+        'length' => '10',
+        'not null' => TRUE,
+      ),
       'upgrade' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -517,4 +522,39 @@ function logger_update_7009() {
   db_add_primary_key('device_support_slot', array('host', 'tunnel_port'));
 
   return st('Field device_support_slot.tunnel_port successfully added.');
+}
+
+/**
+ * Add field firmware_version to table logger_devices.
+ */
+function logger_update_7010() {
+
+  db_add_field('logger_devices', 'firmware_version', array(
+    'type' => 'varchar',
+    'length' => 10,
+    'not null' => FALSE,
+    'default' => ''
+  ));
+
+  db_update('logger_devices')
+    ->fields(array(
+      'firmware_version' => '1.0.0-0'
+    ))
+    ->condition('serial', 100000000, '<')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'firmware_version' => '2.0.0-0'
+    ))
+    ->condition('serial', 100000000, '>=')
+    ->execute();
+
+  db_change_field('logger_devices', 'firmware_version', 'firmware_version', array(
+    'type' => 'varchar',
+    'length' => 10,
+    'not null' => TRUE
+  ));
+
+  return st('Field logger_devices.firmware_version successfully added.');
 }

@@ -44,10 +44,10 @@ mysql_prepare() ->
     mysql:prepare(sensor_config, <<"UPDATE logger_meters SET function = ? WHERE meter = ?">>),
     mysql:prepare(timezone, <<"SELECT timezone FROM users WHERE uid = ?">>),
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ? WHERE device = ?">>),
+    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_version = ? WHERE device = ?">>),
     mysql:prepare(event_insert, <<"INSERT INTO event_log (device, event_id, time) VALUES (?, ?, ?)">>),
-    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, function, phase, constant, value, factor, unit, price, latitude, longitude) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
     mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),
     mysql:prepare(support_slot, <<"SELECT username, host, port, tunnel_port FROM device_support_slot WHERE device = ?">>).
