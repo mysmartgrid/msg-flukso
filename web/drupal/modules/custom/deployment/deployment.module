@@ -177,6 +177,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
       $rows = array(
         array(t('Serial Number'), $device['serial']),
         array(t('Device Id'), $device['device']),
+        array(t('Version'), $device['firmware_version']),
         array(t('User'), $device['name']),
         array(t('E-mail'), $device['email']),
         array(t('Status'), $device['state'] . "<br>$message"),
@@ -449,7 +450,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   $query->join($corrupted_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
-  $query->fields('d', array('serial', 'device'))
+  $query->fields('d', array('serial', 'device', 'firmware_version'))
     ->fields('u', array('name', 'uid'))
     ->addField('u', 'mail', 'email');
 
