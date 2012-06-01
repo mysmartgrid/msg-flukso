@@ -378,7 +378,7 @@ function updatePowerLegend(chart) {
 function updatePowerLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
-  if (div && !isNaN(value - 0)) {
+  if (div && value && !isNaN(value - 0)) {
     value = value.toFixed(2);
     div.innerHTML = value == 0.00 ? '' : value;
   }
