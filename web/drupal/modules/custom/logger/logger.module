@@ -3079,7 +3079,7 @@ function logger_query_device_measurements($interval, $device) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $sql = "SELECT meter, function FROM {logger_meters} WHERE device = :device";
+  $sql = "SELECT meter, function, price FROM {logger_meters} WHERE device = :device";
   $sensors = db_query($sql, array(':device' => $device));
 
   $resolution = logger_get_resolution($interval);
