@@ -3232,7 +3232,7 @@ function logger_support_requests_page() {
       u.name AS requester,
       d.serial,
       s.host,
-      s.port,
+      s.tunnel_port,
       FROM_UNIXTIME(r.requested + u.timezone, :time_format) AS requested
     FROM
       {users} u,
@@ -3281,7 +3281,7 @@ function logger_support_requests_page() {
       l(t('Remove'), "device/support/remove/$req->device") . '<br>' .
       l(t('Postpone'), "device/support/postpone/$req->device");
 
-    $command = "ssh root@localhost -p $req->port -i $req->device" . "_tech_id";
+    $command = "ssh root@localhost -p $req->tunnel_port -i $req->device" . "_tech_id";
 
     $rows[] = array(
       'requested' => $req->requested,
