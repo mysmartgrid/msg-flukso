@@ -24,9 +24,9 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
-//ini_set('display_errors', TRUE);
-//ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
@@ -605,7 +605,7 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types) 
   $filled = logger_get_variable('filled_graph', 0) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smooting_level = logger_get_variable('smooting_level', 1);
-  $net_production = logger_get_variable('net_production', 0) == 1;
+  $net_production = logger_get_variable('net_production', 1) == 1;
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
     $price1, $price2, FALSE, $filled, $step_plot, $smooting_level, $net_production);
@@ -1673,6 +1673,9 @@ function theme_logger_power_chart_area($variables) {
 
   $chart = $variables['chart'];
 
+  //TODO: create a proper argument in function create_chart_object
+  $chart->show_slider = ($chart->context != "forecast");
+
   $xvalue1 = $chart->xaxis[0] * 1000;
   $xvalue2 = $chart->xaxis[1] * 1000;
   $yvalue1 = $chart->yaxis[0] + 0;
@@ -1681,7 +1684,7 @@ function theme_logger_power_chart_area($variables) {
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
     'drawCallback' => 'updatePowerChartForm',
-    'zoomCallback' => 'updateSliderChart',
+    //'zoomCallback' => 'updateSliderChart',
     'pointClickCallback' => 'addPowerAnnotation',
     'stepPlot' => $chart->step_plot ? 'true' : 'false' ,
     'rollPeriod' => $chart->smooting_level,
@@ -1692,30 +1695,35 @@ function theme_logger_power_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $slider_properties = array(
-    'gridLineColor' => '"transparent"',
-    'yValueFormatter' => 'hideZero',
-    'zoomCallback' => 'updatePowerChart',
-    'clickCallback' => 'slidePowerChart',
-    'underlayCallback' => 'highlightPowerChart',
-    'stepPlot' => $chart_properties['stepPlot'],
-    'rollPeriod' => $chart_properties['rollPeriod'],
-    'fillGraph' => $chart_properties['fillGraph']
-  );
-
   $options = logger_get_power_units_options();
   $unit = $options[$chart->unit];
 
   $icons = "<a href='javascript: expandPowerChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
 
-  return logger_create_interval_menu($chart->context) .
+  $output = logger_create_interval_menu($chart->context) .
     '<div style="float: right;">' . $icons . '</div>' .
     '<div>' . t($unit) . '</div>' .
+    logger_create_dygraph($chart, TRUE, $chart_properties);
 
-    logger_create_dygraph($chart, TRUE, $chart_properties) .
-    logger_create_dygraph($chart, FALSE, $slider_properties, TRUE) .
+  if ($chart->show_slider) {
 
-    logger_create_chart_legend($chart);
+    $slider_properties = array(
+      'gridLineColor' => '"transparent"',
+      'yValueFormatter' => 'hideZero',
+      'zoomCallback' => 'updatePowerChart',
+      'clickCallback' => 'slidePowerChart',
+      'underlayCallback' => 'highlightPowerChart',
+      'stepPlot' => $chart_properties['stepPlot'],
+      'rollPeriod' => $chart_properties['rollPeriod'],
+      'fillGraph' => $chart_properties['fillGraph']
+    );
+
+    $output .= logger_create_dygraph($chart, FALSE, $slider_properties, TRUE);
+  }
+
+  $output .= logger_create_chart_legend($chart);
+
+  return $output;
 }
 
 /**
@@ -2027,6 +2035,8 @@ function logger_energychart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitEnergyChartForm(this)'),
   );
 
+  //TODO: enable these fields for experts
+  /*
   if (strpos(" $chart->unit", 'eur') > 0) {
     $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
@@ -2065,6 +2075,7 @@ function logger_energychart_form($form, &$form_state, $chart) {
       }
     }
   }
+  */
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -2099,6 +2110,8 @@ function logger_relativechart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitRelativeChartForm(this)'),
   );
 
+  //TODO: enable these fields for experts
+  /*
   if (strpos(" $chart->unit", 'eur') > 0) {
     $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
@@ -2124,6 +2137,7 @@ function logger_relativechart_form($form, &$form_state, $chart) {
       );
     }
   }
+  */
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -2158,6 +2172,8 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitPowerChartForm(true)'),
   );
 
+  //TODO: enable these fields for an expert role
+  /*
   if (strpos(" $chart->unit", 'eur') > 0) {
     $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
@@ -2196,6 +2212,7 @@ function logger_powerchart_form($form, &$form_state, $chart) {
       }
     }
   }
+  */
 
   $form['smoothing_level'] = array(
     '#type' => 'textfield',
@@ -2227,16 +2244,19 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
 
+  //TODO: enable this field for experts
+  /*
   if ($chart->context == 'selfconsumption') {
     $form['net_production'] = array(
       '#type' => 'checkbox',
       '#title' => t('Net Energy Production'),
       '#description' => t('Do you want the chart series to show your net energy production?'),
-      '#default_value' => logger_get_variable('net_production', 0),
+      '#default_value' => logger_get_variable('net_production', 1),
       '#return_value' => 1,
       '#attributes' => array('onclick' => 'enableFilledGraph(); submitPowerChartForm(true);'), //In IE, onchange does not work
     );
   }
+  */
 
   $form['yvalue'] = array(
     '#type' => 'textfield',
@@ -2550,12 +2570,14 @@ function logger_powerchart_form_submit($form, &$form_state) {
   if (isset($form_state['values']['price2'])) {
     logger_set_variable('price2', $form_state['values']['price2']);
   }
+  if (isset($form_state['values']['net_production'])) {
+    logger_set_variable('net_production', $form_state['values']['net_production']);
+  }
 
   logger_set_variable('powerchart_unit', $form_state['values']['unit']);
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
   logger_set_variable('filled_graph', $form_state['values']['filled_graph']);
   logger_set_variable('smooting_level', $form_state['values']['smoothing_level']);
-  logger_set_variable('net_production', $form_state['values']['net_production']);//FIXME
 
   //FIXME: get rid of this redirection
   $form_state['redirect'] = array($_GET['q'], array('query' => $_REQUEST));
