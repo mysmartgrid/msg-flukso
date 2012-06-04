@@ -106,8 +106,13 @@ function pvcast_update_plant($alias, $latitude, $longitude) {
  */
 function pvcast_update_model($alias, $measurements) {
 
+  $pairs = "";
+  foreach ($measurements as $time => $value) {
+    $pairs .= (empty($pairs) ? '' : ',') . "\"$time\":$value";
+  }
+
   $response = pvcast_request('POST', "/plants/alias/$alias/updateModel",
-    '{"measurements":' . json_encode($measurements) . '}');
+    '{"measurements":{' . $pairs . '}}');
 
   return $response->code;
 }
