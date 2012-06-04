@@ -282,30 +282,32 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
         '#required' => TRUE
       );
     }
+    else {
+      //TODO: enable these fields for experts
+      $form['prev_forecast'] = array(
+        '#type' => 'hidden',
+        '#default_value' => array($sensor->forecast)
+      );
 
-    $form['prev_forecast'] = array(
-      '#type' => 'hidden',
-      '#default_value' => array($sensor->forecast)
-    );
+      $form['forecast'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Forecast'),
+        '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
+        '#options' => array(
+          '1' => t('Activate'),
+        ),
+        '#default_value' => array($sensor->forecast)
+      );
 
-    $form['forecast'] = array(
-      '#type' => 'checkboxes',
-      '#title' => t('Forecast'),
-      '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
-      '#options' => array(
-        '1' => t('Activate'),
-      ),
-      '#default_value' => array($sensor->forecast)
-    );
-
-    $form['coordinates'] = array(
-      '#type' => 'textfield',
-      '#theme' => 'logger_geo_location',
-      '#title' => t('Location'),
-      '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
-      '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
-      '#text-align' => 'center'
-    );
+      $form['coordinates'] = array(
+        '#type' => 'textfield',
+        '#theme' => 'logger_geo_location',
+        '#title' => t('Location'),
+        '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
+        '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
+        '#text-align' => 'center'
+      );
+    }
   }
 
   $form['submit'] = array(
@@ -385,24 +387,26 @@ function logger_sensor_form_validate($form, &$form_state) {
 
   if (user_has_role('PV Producer')) {
 
-    $forecast = $form_state['values']['forecast'][1];
-    $latitude = $_REQUEST['coordinates_latitude'];
-    $longitude = $_REQUEST['coordinates_longitude'];
-    $type = $form_state['values']['type'];
+    if (isset($form_state['values']['forecast'])) {
+      $forecast = $form_state['values']['forecast'][1];
+      $latitude = $_REQUEST['coordinates_latitude'];
+      $longitude = $_REQUEST['coordinates_longitude'];
+      $type = $form_state['values']['type'];
 
-    if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
+      if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
 
-      form_set_error('coordinates', t('Invalid geographic coordinates.'));
-    }
+        form_set_error('coordinates', t('Invalid geographic coordinates.'));
+      }
 
-    if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
+      if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
 
-      form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
-    }
+        form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
+      }
 
-    if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
+      if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
 
-      form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
+        form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
+      }
     }
 
     if (!$in_edition) {
@@ -422,6 +426,8 @@ function logger_deviceactivation_form_submit($form, &$form_state) {
 
 function logger_sensor_form_submit($form, &$form_state) {
 
+  //TODO: refactor this function
+
   global $user;
 
   $is_procuder = user_has_role('PV Producer');
@@ -440,9 +446,9 @@ function logger_sensor_form_submit($form, &$form_state) {
       'price' => $price
     );
     if ($is_procuder) {
-      $forecast = $form_state['values']['forecast'][1];
-      $latitude = $_REQUEST['coordinates_latitude'];
-      $longitude = $_REQUEST['coordinates_longitude'];
+      $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
+      $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
+      $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
       $fields['forecast'] = $forecast;
       $fields['latitude'] = $latitude;
@@ -459,9 +465,9 @@ function logger_sensor_form_submit($form, &$form_state) {
     $meter = md5(uniqid(rand(), TRUE));
     $token = md5(uniqid(rand(), TRUE));
     $device = $form_state['values']['device'];
-    $forecast = $form_state['values']['forecast'][1];
-    $latitude = $_REQUEST['coordinates_latitude'];
-    $longitude = $_REQUEST['coordinates_longitude'];
+    $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
+    $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
+    $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
     logger_sensor_add($meter, $user->uid, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
   }
