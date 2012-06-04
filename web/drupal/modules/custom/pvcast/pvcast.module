@@ -39,7 +39,7 @@ function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
   //TODO: start_time and end_time should be URL parameters
   $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
   $forecast = isset($response->data) ? json_decode($response->data, TRUE) : array();
-  $forecast = $forecast['globalradiation'];
+  $forecast = $forecast['power'];
 
   if (isset($start_time) && isset($end_time)) {
     foreach (array_keys($forecast) as $time) {
