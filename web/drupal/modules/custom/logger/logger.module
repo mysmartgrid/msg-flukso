@@ -3301,8 +3301,8 @@ function logger_support_requests_page() {
       'requested' => $req->requested,
       'requester' => $req->requester,
       'serial' => $req->serial,
-      'host' => $req->host,
-      'command' => "<input type='text' value='$command' style='width: 130px;'>",
+      'host' => wordwrap($req->host, 12, "\n", TRUE),
+      'command' => "<input type='text' value='$command' style='width: 140px;'>",
       'operations' => $operations,
     );
   }
