@@ -6,7 +6,7 @@
  */
 
 function pvcast_install() {
-  variable_set('pvcast_forecast_service_url', "https://dev1.mypowergrid.de:3000");
+  variable_set('pvcast_forecast_service_url', "https://dev1.mypowergrid.de:8443");
   variable_set('pvcast_key', '*');
 }
 
@@ -39,4 +39,14 @@ function pvcast_update_7004() {
   rrmdir($file_path);
 
   return st("The data directory has been removed.");
+}
+
+/**
+ * Updates the PVCast URL variable.
+ */
+function pvcast_update_7005() {
+
+  variable_set('pvcast_forecast_service_url', 'https://dev1.mypowergrid.de:8443');
+
+  return st("Variable 'pvcast_forecast_service_url' has been updated.");
 }
