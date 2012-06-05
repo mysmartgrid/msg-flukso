@@ -58,7 +58,7 @@ function logger_userdevices_page() {
 
       $support_link = $device->support_requested ?
         l(t('Suspend Support'), "device/support/suspend/$device->device") :
-        l(t('Request Support'), "device/support/confirm/$device->device");
+        l(t('Request Support'), "device/support/confirm/$device->device/$device->serial");
 
       $links .= "<br><span style='white-space: nowrap;'>$support_link</span>";
     }

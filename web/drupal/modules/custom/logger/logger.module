@@ -276,7 +276,7 @@ function logger_menu() {
     'title' => $support_title,
     'description' => 'Show the device support request confirmation page',
     'page callback' => 'logger_support_confirmation_page',
-    'page arguments' => array(3),
+    'page arguments' => array(3, 4),
     'access callback' => 'logger_device_access',
     'access arguments' => array('request device remote support', 3),
     'type' => MENU_CALLBACK,
@@ -285,7 +285,7 @@ function logger_menu() {
   $items['device/support/request'] = array(
     'title' => $device_title,
     'page callback' => 'logger_request_support',
-    'page arguments' => array(3),
+    'page arguments' => array(3, 4),
     'access callback' => 'logger_device_access',
     'access arguments' => array('request device remote support', 3),
     'type' => MENU_CALLBACK,
@@ -3299,22 +3299,23 @@ function logger_support_requests_page() {
 /**
  * Builds the device support request confirmation page.
  *
- * @param $device The device id.
+ * @param $device     The device id.
+ * @param $serial     The device serial number.
  * @return the device support requests page.
  */
-function logger_support_confirmation_page($device) {
+function logger_support_confirmation_page($device, $serial) {
 
-  return t('You are about to request remote support for your Flukso device. ' .
+  return t('You are about to request remote support for your Flukso device (Serial Number %serial). ' .
       'If so, the device will open a reverse SSH connection with our ' .
       'server that enables our technicians to log into it ' .
-      'in order to check and possibly fix configuration issues.') . '<br><br>' .
+      'in order to check and possibly fix configuration issues.', array('%serial' => $serial)) . '<br><br>' .
 
     t('This authorization lasts until either you suspend it on the ' .
       'previous page or the period of 2 days is elapsed.') . '<br><br>' .
 
     t('Do you allow our technicians to log into your Flukso device?') . '<br><br>' .
 
-    l(t('Yes'), "device/support/request/$device") . ' ' .
+    l(t('Yes'), "device/support/request/$device/$serial") . ' ' .
     l(t('No'), "device/mylist");
 }
 
@@ -3323,8 +3324,9 @@ function logger_support_confirmation_page($device) {
  * Any existing request of the same device is previously removed.
  *
  * @param $device The device id.
+ * @param $serial The device serial number. 
  */
-function logger_request_support($device) {
+function logger_request_support($device, $serial) {
 
   db_update('device_support_slot')
     ->fields(array(
@@ -3344,7 +3346,12 @@ function logger_request_support($device) {
     ))
     ->execute();
 
-  drupal_goto("device/mylist");
+  logger_send_remote_support_email($device, $serial);
+
+  return t('Thank you! Your support request has been registered.' .
+      'Our technicians are going to contact you as soon as possible via email.') . '<br><br>' .
+
+      l(t('Return to the devices page.'), "device/mylist");
 }
 
 /**
@@ -3413,6 +3420,37 @@ function logger_remove_support($device) {
   logger_remove_support_key($device);
 
   drupal_goto('device/support/requests');
+}
+
+/**
+ * Send an email to the mySmartGrid ticket system.
+ *
+ * @param $device The device id.
+ * @param $serial The device serial number.
+ */
+function logger_send_remote_support_email($device, $serial) {
+
+  global $user;
+  global $base_url;
+
+  $variables = array(
+    "!device" => $device,
+    "%serial" => $serial,
+    "%username" => $user->name,
+    "!base_url" => $base_url
+  );
+
+  $subject = t('Remote Support') . ' - ' . t('Device') . ": $serial";
+  $body = t(
+    'Dear technician,' . '<br><br>' .
+    'The user %username has requested remote support for the device %serial.' . '<br>' .
+    "Click <a href='!base_url/deployment/checkup/device/!device '>here</a> to see the device status page." . '<br><br>' .
+    'Best regards' . '<br>' .
+    'mySmartGrid System',
+    $variables
+  );
+
+  jobqueue_send_email('msg-support@itwm.fhg.de', $subject, $body);
 }
 
 /**
