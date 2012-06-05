@@ -3144,8 +3144,9 @@ function logger_cron() {
  */
 function logger_remove_expired_support_requests() {
 
+  //FIXME: return the timeout to 2 days, after the Intersolar
   //Remove old requests
-  $timeout = REQUEST_TIME - 2 * DAY;
+  $timeout = REQUEST_TIME - 7 * DAY;
 
   db_delete('device_support_request')
     ->condition('requested', $timeout, '<')
