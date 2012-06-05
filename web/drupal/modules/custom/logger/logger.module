@@ -578,6 +578,7 @@ function logger_selfconsumption_page($interval) {
 
   global $user;
 
+  $interval = $interval ? $interval : '3days';
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
