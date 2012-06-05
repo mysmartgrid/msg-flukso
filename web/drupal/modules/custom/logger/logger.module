@@ -616,7 +616,7 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types) 
   $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
   $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
 
-  $filled = logger_get_variable('filled_graph', 0) == 1;
+  $filled = logger_get_variable('filled_graph', 1) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smooting_level = logger_get_variable('smooting_level', 1);
   $net_production = logger_get_variable('net_production', 1) == 1;
