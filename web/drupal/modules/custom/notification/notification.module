@@ -811,13 +811,21 @@ function notification_limit_up_validate($field, $form_state) {
 
     $converted_limit = $limit_up * $factor;
 
-    if ($event_id == NO_COMMUNICATION_EVENT_ID && $converted_limit < 30 * MINUTE) {
+    if (($event_id == NO_COMMUNICATION_EVENT_ID || $event_id == COMMUNICATION_RESTORED_EVENT_ID) && $converted_limit < 30 * MINUTE) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
     }
     elseif ($event_id == PEAK_CONSUMPTION_EVENT_ID && $converted_limit <= 0) {
 
       form_error($field, t('Peak consumption can not be lesser than 0 watt / min.'));
+    }
+    elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
+
+      form_error($field, t('The minimum period for the summary report is 1 day.'));
+    }
+    elseif ($event_id == FORECAST_REPORT_EVENT_ID && $converted_limit > 3 * DAY || $converted_limit < DAY) {
+
+      form_error($field, t('The period for the forecast report must be between 1 and 3 days.'));
     }
   }
 }
