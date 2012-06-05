@@ -619,11 +619,11 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types) 
 
   $filled = logger_get_variable('filled_graph', 1) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
-  $smooting_level = logger_get_variable('smoothing_level', 1);
+  $smoothing_level = logger_get_variable('smoothing_level', 1);
   $net_production = logger_get_variable('net_production', 1) == 1;
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
-    $price1, $price2, FALSE, $filled, $step_plot, $smooting_level, $net_production);
+    $price1, $price2, FALSE, $filled, $step_plot, $smoothing_level, $net_production);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -848,11 +848,11 @@ function logger_energy_page($interval) {
  * @param $stacked            Whether the chart has stacked bars or not.
  * @param $filled             Whether the chart lines should be filled.
  * @param $step_plot          Whether the chart lines should be stepped.
- * @param $smooting_level     The smoothing level of the chart lines.
+ * @param $smoothing_level    The smoothing level of the chart lines.
  * @param $net_production     Whether the chart should show net production.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smooting_level = 1, $net_production = FALSE) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $net_production = FALSE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -870,7 +870,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $chart->stacked = $stacked;
   $chart->filled = $filled;
   $chart->step_plot = $step_plot;
-  $chart->smooting_level = $smooting_level;
+  $chart->smoothing_level = $smoothing_level;
   $chart->net_production = $net_production;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
@@ -1702,7 +1702,7 @@ function theme_logger_power_chart_area($variables) {
     //'zoomCallback' => 'updateSliderChart',
     'pointClickCallback' => 'addPowerAnnotation',
     'stepPlot' => $chart->step_plot ? 'true' : 'false' ,
-    'rollPeriod' => $chart->smooting_level,
+    'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false' 
   );
 
@@ -2237,7 +2237,7 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#maxlength' => 3,
     '#size' => 3,
     '#text-align' => 'center',
-    '#default_value' => logger_get_variable('smooting_level', 1),
+    '#default_value' => logger_get_variable('smoothing_level', 1),
     '#required' => TRUE,
   );
 
@@ -2593,7 +2593,7 @@ function logger_powerchart_form_submit($form, &$form_state) {
   logger_set_variable('powerchart_unit', $form_state['values']['unit']);
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
   logger_set_variable('filled_graph', $form_state['values']['filled_graph']);
-  logger_set_variable('smooting_level', $form_state['values']['smoothing_level']);
+  logger_set_variable('smoothing_level', $form_state['values']['smoothing_level']);
 
   //FIXME: get rid of this redirection
   $form_state['redirect'] = array($_GET['q'], array('query' => $_REQUEST));
