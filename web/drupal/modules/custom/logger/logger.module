@@ -3264,32 +3264,7 @@ function logger_support_requests_page() {
 
   $result = db_query($sql, array(':time_format' => LOGGER_TIMESTAMP_FORMAT_SQL));
 
-  $header = array(
-    array(
-      'data' => t('Requested'),
-      'field' => 'requested',
-    ),
-    array(
-      'data' => t('Requester'),
-      'field' => 'requester',
-    ),
-    array(
-      'data' => t('Serial'),
-      'field' => 'serial',
-    ),
-    array(
-      'data' => t('Host'),
-      'field' => 'host',
-    ),
-    array(
-      'data' => t('Command'),
-      'field' => 'command',
-    ),
-    array(
-      'data' => t('Operations'),
-      'field' => 'operations',
-    ),
-  );
+  $header = array(t('Requested'), t('Requester'), t('Serial'), t('Host'), t('Command'), t('Operations'));
 
   $rows = array();
   foreach ($result as $req) {
