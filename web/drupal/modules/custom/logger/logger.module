@@ -618,7 +618,7 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types) 
 
   $filled = logger_get_variable('filled_graph', 1) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
-  $smooting_level = logger_get_variable('smooting_level', 1);
+  $smooting_level = logger_get_variable('smoothing_level', 1);
   $net_production = logger_get_variable('net_production', 1) == 1;
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
@@ -2515,8 +2515,9 @@ function logger_create_custom_field($element, $suffix, $value, $size = 0, $maxle
 
 function logger_powerchart_form_validate($form, &$form_state) {
 
-  if ($form_state['values']['smoothing_level'] < 1) {
-    form_set_error('smoothing_level', t('The smoothing level must be greater than 0.'));
+  $smoothing_level = $form_state['values']['smoothing_level'];
+  if (!is_numeric($smoothing_level) || $smoothing_level < 1) {
+    form_set_error('smoothing_level', t('The smoothing level must be an integer number greater than 0.'));
   }
   if ($form_state['values']['step_plot'] != 1 && $form_state['values']['step_plot'] != 0) {
     form_set_error('step_plot', t('The stepped lines option must be either 0 or 1.'));
