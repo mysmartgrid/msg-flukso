@@ -3291,7 +3291,9 @@ function logger_support_requests_page() {
   $rows = array();
   foreach ($result as $req) {
 
-    $operations =
+    //FIXME: remove this conditional when the intersolar is over
+    $operations = $req->serial == 1338822243 || $req->serial == 1326120502 ? '' :
+
       l(t('Remove'), "device/support/remove/$req->device") . '<br>' .
       l(t('Postpone'), "device/support/postpone/$req->device");
 
