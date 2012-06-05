@@ -2253,7 +2253,7 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#type' => 'checkbox',
     '#title' => t('Filled Lines'),
     '#description' => t('Do you want the chart series to use filled lines?'),
-    '#default_value' => logger_get_variable('filled_graph', 0),
+    '#default_value' => logger_get_variable('filled_graph', 1),
     '#return_value' => 1,
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
