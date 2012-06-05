@@ -2517,7 +2517,7 @@ function logger_create_custom_field($element, $suffix, $value, $size = 0, $maxle
 function logger_powerchart_form_validate($form, &$form_state) {
 
   $smoothing_level = $form_state['values']['smoothing_level'];
-  if (!is_numeric($smoothing_level) || $smoothing_level < 1) {
+  if (!is_int($smoothing_level) || $smoothing_level < 1) {
     form_set_error('smoothing_level', t('The smoothing level must be an integer number greater than 0.'));
   }
   if ($form_state['values']['step_plot'] != 1 && $form_state['values']['step_plot'] != 0) {
