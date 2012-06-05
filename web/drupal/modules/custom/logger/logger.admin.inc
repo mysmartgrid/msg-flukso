@@ -709,9 +709,10 @@ function logger_device_clone($device_id) {
         'device' => $new_device_id,
         'meter' => $new_meter,
         'uid' => 0,
-        'function' => empty($sensor->function) ? '' : "Cloned $sensor->function",
+        'function' => empty($sensor->function) ? NULL : "Cloned $sensor->function",
         'created' => $sensor->created,
         'access' => $sensor->access,
+        'price' => $sensor->price,
         'forecast' => $sensor->forecast,
         'latitude' => $sensor->latitude,
         'longitude' => $sensor->longitude
