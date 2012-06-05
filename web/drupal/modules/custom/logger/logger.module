@@ -101,6 +101,10 @@ function logger_permission() {
       'title' => t('remove devices'),
       'description' => t('Remove a device and all related data.'),
     ),
+    'clone devices' => array(
+      'title' => t('clone devices'),
+      'description' => t('Clone a device and all its sensors.'),
+    ),
     'list sensors' => array(
       'title' => t('list sensors'),
       'description' => t('Access the list of user device sensors.'),
@@ -267,6 +271,16 @@ function logger_menu() {
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
     'access arguments' => array('remove devices', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['device/clone'] = array(
+    'title' => $device_title,
+    'page callback' => 'logger_device_clone',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('clone devices', 2),
     'type' => MENU_CALLBACK,
     'file' => 'logger.admin.inc',
   );

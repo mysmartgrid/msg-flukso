@@ -663,6 +663,81 @@ function logger_device_remove($device) {
 }
 
 /**
+ * Creates a copy of a device and its sensors. This function is used for creating demo users' devices.
+ * The sensors' RRD files are actually symbolic links that point to the original ones.
+ *
+ * @param $device_id  The id of the device to be cloned.
+ */
+function logger_device_clone($device_id) {
+
+  $device = db_select('logger_devices', 'd')
+    ->fields('d')
+    ->condition('device', $device_id)
+    ->execute()
+    ->fetchObject();
+
+  $new_device_id = md5(uniqid(rand(), TRUE));
+  $new_serial = time() + 5000000000;
+
+  db_insert('logger_devices')
+    ->fields(array(
+      'device' => $new_device_id,
+      'serial' => $new_serial,
+      'uid' => 0,
+      'sha' => $new_device_id,
+      'created' => $device->created,
+      'access' => $device->access,
+      'version' => $device->version,
+      'resets' => $device->resets,
+      'country' => $device->country,
+      'firmware_version' => $device->firmware_version
+    ))
+    ->execute();
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m')
+    ->condition('device', $device_id)
+    ->condition('virtual', 0)
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    $new_meter = md5(uniqid(rand(), TRUE));
+
+    db_insert('logger_meters')
+      ->fields(array(
+        'device' => $new_device_id,
+        'meter' => $new_meter,
+        'uid' => 0,
+        'function' => empty($sensor->function) ? '' : "Cloned $sensor->function",
+        'created' => $sensor->created,
+        'access' => $sensor->access,
+        'forecast' => $sensor->forecast,
+        'latitude' => $sensor->latitude,
+        'longitude' => $sensor->longitude
+      ))
+      ->execute();
+
+    $new_token = md5(uniqid(rand(), TRUE));
+
+    db_insert('logger_tokens')
+      ->fields(array(
+        'token' => $new_token,
+        'meter' => $new_meter,
+        'permissions' => 62
+    ))
+    ->execute();
+
+    system('/bin/ln -s ' . LOGGER_PATH . "/data/base/$sensor->meter.rrd " . LOGGER_PATH . "/data/base/$new_meter.rrd");
+  }
+
+  return t("Device %device has been successfuly cloned. The cloned device id is: %new_device_id.", array(
+    '%device' => $device,
+    '%new_device_id' => $new_device_id
+  ));
+}
+
+/**
  * Checks whether the user is still a fluksonian. If not, remove entries in users_roles and logger_users.
  *
  * @param $uid The user id.
