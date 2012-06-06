@@ -1402,10 +1402,23 @@ function logger_get_forecast_chart_data($chart) {
  * @return the link code.
  */
 function logger_create_remove_power_series_link($uid, $i, $username) {
-  return $uid > 0 ?
-    '<a href="javascript: void(0)"
-      OnClick="javascript: removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' .
-      t('Remove') . '</a>' : '';
+
+  global $user;
+
+  $link = '';
+  if ($uid > 0) {
+
+    $link = '<a href="javascript: void(0)" id="hide-legend-row' . $i . '" OnClick="javascript: ';
+
+    if ($user->uid == $uid) {
+      $link .= 'hidePowerSeries(' . "$uid, $i, '$username', '" . t('Hide') . "', '" . t('Show') . "'" . ');">' . t('Hide');
+    }
+    else {
+      $link .= 'removePowerSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' . t('Remove');
+    }
+    $link .= '</a>';
+  }
+  return $link;
 }
 
 /**

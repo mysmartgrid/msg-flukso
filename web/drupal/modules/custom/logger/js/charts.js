@@ -247,6 +247,31 @@ function removePowerSeries(uid, i, username, tableId) {
   }
 }
 
+function hidePowerSeries(uid, i, username, hideText, showText) {
+
+  var visible = !lineChart.visibility()[i];
+
+  lineChart.setVisibility(i, visible);
+  if (sliderChart) {
+    sliderChart.setVisibility(i, visible);
+  }
+
+  document.getElementById('hide-legend-row' + i).innerHTML = visible ? hideText : showText;
+ 
+  if (visible) { 
+    document.getElementById('max' + i).style.visibility = 'visible';
+    document.getElementById('min' + i).style.visibility = 'visible';
+    document.getElementById('avg' + i).style.visibility = 'visible';
+    document.getElementById('last' + i).style.visibility = 'visible';
+
+  } else {
+    document.getElementById('max' + i).style.visibility = 'hidden';
+    document.getElementById('min' + i).style.visibility = 'hidden';
+    document.getElementById('avg' + i).style.visibility = 'hidden';
+    document.getElementById('last' + i).style.visibility = 'hidden';
+  }
+}
+
 function updateSmoothingLevel(fieldId, step) {
 
   var field = document.getElementById(fieldId);
