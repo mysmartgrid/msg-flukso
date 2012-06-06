@@ -3002,9 +3002,18 @@ function logger_get_appliances($meter, $timestamp) {
 
   $appliances = array();
 
+  /* //TODO: use logger_request_appliance_detection($meter, $measurements)
   if (user_has_role('Techniker')) { 
-    $appliances = array(1, 2, 3, 4);
+
+    $type = db_select('logger_meters', 'm')
+      ->fields('m', array('type'))
+      ->condition('m.function', $meter)
+      ->execute()
+      ->fetchField();
+
+    $appliances = $type == CONSUMPTION_SENSOR_TYPE ? array(1, 2, 3, 4) : array(10);
   }
+  */
 
   print json_encode($appliances);
 
