@@ -470,7 +470,8 @@ function logger_mobile_page() {
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
       ($forecast_access ?
-      logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') : '') .
+      logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') .
+      logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/selfconsumption') : '') .
       logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
       logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
       logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
