@@ -719,6 +719,8 @@ function logger_device_clone($device_id) {
       ))
       ->execute();
 
+    pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
+
     $new_token = md5(uniqid(rand(), TRUE));
 
     db_insert('logger_tokens')

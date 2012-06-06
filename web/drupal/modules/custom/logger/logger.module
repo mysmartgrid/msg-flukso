@@ -3515,7 +3515,7 @@ function logger_update_pvcast_models() {
         pvcast_update_model($sensor->meter, $measurements);
       }
     }
-    variable_set('logger_last_pvcast_model_update', $now);
+    variable_set('logger_last_pvcast_model_update', $now - ($now % HOUR));
   }
 }
 
