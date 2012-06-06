@@ -99,57 +99,68 @@ function logger_usersensors_page() {
 
   drupal_set_title(t('My Sensors'));
 
-  $query = db_select('logger_meters', 'lm');
-  $query->join('logger_tokens', 'lt', 'lm.meter = lt.meter');
-  $query->leftJoin('logger_meter_type', 'st', 'lm.type = st.id');
-  $query->addField('st', 'name', 'type');
-
-  $sensors = $query
-    ->fields('lm', array('meter', 'function', 'virtual'))
-    ->fields('lt', array('token', 'permissions'))
-    ->condition('lm.uid', $user->uid, '=')
-    ->orderBy('lm.function', 'DESC')
-    ->execute();
-
-  $rows = array();
-  foreach ($sensors as $sensor) {
-
-    $row = array();
-    $row[] = wordwrap($sensor->meter, 16, "\n", TRUE);
-    $operations = '';
-
-    if ($sensor->function == NULL) {
-      $row[] = '';
-      $row[] = '';
-      $row[] = t('Inactive');
-      $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
-    }
-    else {
-      $row[] = $sensor->function;
-      $row[] = t($sensor->type);
-      $row[] = t('Active');
-      $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
-
-      $operations .= $sensor->virtual ? 
-        l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
-        l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
-    }
-    $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
-    $row[] = $operations;
-    $rows[] = $row;
-  }
-
   $header = array(t('Sensor'), t('Function'), t('Type'), t('Status'), t('Token'), t('Operation'));
   $options = array('type' => 'inline', 'scope' => 'header');
+  $output = user_has_role('PV Producer') ? '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br></p>' : '';
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  $devices = db_select('logger_devices', 'd')
+    ->fields('d', array('serial', 'device'))
+    ->condition('d.uid', $user->uid)
+    ->execute();
 
-  $caption = user_has_role('PV Producer') ? '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br><br></p>' : '';
+  foreach ($devices as $device) {
 
-  return theme_table(array('header' => $header, 'rows' => $rows, 'caption' => $caption,
-   'empty' => t('No sensors available.'), 'sticky' => FALSE, 'colgroups' => array(),
-   'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
+    $table_id = LOGGER_LEGEND_TABLE_ID . "$device->serial";
+    drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . $table_id . "'); } );", $options);
+    drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . $table_id . "'); } );", $options);
+
+    $output .= '<br><br>' . t('Device') . ": $device->serial <br><br>";
+
+    $query = db_select('logger_meters', 'lm');
+    $query->join('logger_tokens', 'lt', 'lm.meter = lt.meter');
+    $query->leftJoin('logger_meter_type', 'st', 'lm.type = st.id');
+    $query->addField('st', 'name', 'type');
+
+    $sensors = $query
+      ->fields('lm', array('meter', 'function', 'virtual'))
+      ->fields('lt', array('token', 'permissions'))
+      ->condition('lm.device', $device->device, '=')
+      ->orderBy('lm.function', 'DESC')
+      ->execute();
+
+    $rows = array();
+    foreach ($sensors as $sensor) {
+
+      $row = array();
+      $row[] = wordwrap($sensor->meter, 16, "\n", TRUE);
+      $operations = '';
+
+      if ($sensor->function == NULL) {
+        $row[] = '';
+        $row[] = '';
+        $row[] = t('Inactive');
+        $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
+      }
+      else {
+        $row[] = $sensor->function;
+        $row[] = t($sensor->type);
+        $row[] = t('Active');
+        $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
+
+        $operations .= $sensor->virtual ? 
+          l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
+          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
+      }
+      $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
+      $row[] = $operations;
+      $rows[] = $row;
+    }
+
+    $output .= theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+     'empty' => t('No sensors available.'), 'sticky' => FALSE, 'colgroups' => array(),
+     'attributes' => array('id' => $table_id, 'class' => 'resizable')));
+  }
+  return $output;
 }
 
 /**
