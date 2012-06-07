@@ -628,6 +628,8 @@ function logger_device_deactivate($device) {
 
   logger_check_fluksonian($user->uid);
 
+  logger_free_support_slot($device);
+
   drupal_goto("device/mylist");
 }
 

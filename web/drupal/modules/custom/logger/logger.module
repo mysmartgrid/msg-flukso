@@ -3444,18 +3444,7 @@ function logger_support_requested_page() {
  */
 function logger_suspend_support($device) {
 
-  db_update('device_support_slot')
-    ->fields(array(
-      'device' =>  NULL,
-    ))
-    ->condition('device', $device)
-    ->execute();
-
-  db_delete('device_support_request')
-    ->condition('device', $device)
-    ->execute();
-
-  logger_remove_support_key($device);
+  logger_free_support_slot($device);
 
   drupal_goto("device/mylist");
 }
@@ -3468,14 +3457,7 @@ function logger_suspend_support($device) {
  */
 function logger_postpone_support($device) {
 
-  db_update('device_support_slot')
-    ->fields(array(
-      'device' =>  NULL,
-    ))
-    ->condition('device', $device)
-    ->execute();
-
-  logger_remove_support_key($device);
+  logger_free_support_slot($device, FALSE);
 
   drupal_goto('device/support/requests');
 }
@@ -3488,6 +3470,20 @@ function logger_postpone_support($device) {
  */
 function logger_remove_support($device) {
 
+  logger_free_support_slot($device);
+
+  drupal_goto('device/support/requests');
+}
+
+/**
+ * Removes the association of a port with a device support request.
+ * Optionally also removes the request.
+ *
+ * @param $device          The device id.
+ * @param $delete_request  Whether the support request needs to be removed.
+ */
+function logger_free_support_slot($device, $delete_request = TRUE) {
+
   db_update('device_support_slot')
     ->fields(array(
       'device' =>  NULL,
@@ -3495,13 +3491,13 @@ function logger_remove_support($device) {
     ->condition('device', $device)
     ->execute();
 
-  db_delete('device_support_request')
-    ->condition('device', $device)
-    ->execute();
+  if ($delete_request) {
+    db_delete('device_support_request')
+      ->condition('device', $device)
+      ->execute();
+  }
 
   logger_remove_support_key($device);
-
-  drupal_goto('device/support/requests');
 }
 
 /**
