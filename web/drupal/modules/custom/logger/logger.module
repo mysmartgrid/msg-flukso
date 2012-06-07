@@ -285,23 +285,22 @@ function logger_menu() {
     'file' => 'logger.admin.inc',
   );
 
-  $support_title = 'Support Requests';
+  $support_title = 'Support Request';
+
   $items['device/support/confirm'] = array(
     'title' => $support_title,
     'description' => 'Show the device support request confirmation page',
-    'page callback' => 'logger_support_confirmation_page',
-    'page arguments' => array(3, 4),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('logger_supportrequest_form', 3, 4),
     'access callback' => 'logger_device_access',
     'access arguments' => array('request device remote support', 3),
     'type' => MENU_CALLBACK,
   );
 
-  $items['device/support/request'] = array(
-    'title' => $device_title,
-    'page callback' => 'logger_request_support',
-    'page arguments' => array(3, 4),
-    'access callback' => 'logger_device_access',
-    'access arguments' => array('request device remote support', 3),
+  $items['device/support/requested'] = array(
+    'title' => $support_title,
+    'page callback' => 'logger_support_requested_page',
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
 
@@ -313,6 +312,8 @@ function logger_menu() {
     'access arguments' => array('request device remote support', 3),
     'type' => MENU_CALLBACK,
   );
+
+  $support_title = 'Support Requests';
 
   $items['device/support/requests'] = array(
     'title' => $support_title,
@@ -3318,26 +3319,82 @@ function logger_support_requests_page() {
 }
 
 /**
- * Builds the device support request confirmation page.
+ * Builds the device support request confirmation form.
  *
  * @param $device     The device id.
  * @param $serial     The device serial number.
  * @return the device support requests page.
  */
-function logger_support_confirmation_page($device, $serial) {
+function logger_supportrequest_form($form, &$form_state, $device, $serial) {
 
-  return t('You are about to request remote support for your Flukso device (Serial Number %serial). ' .
+  $form['explanation'] = array(
+    '#markup' => t('You are about to request remote support for your Flukso device (Serial Number %serial). ' .
       'If so, the device will open a reverse SSH connection with our ' .
       'server that enables our technicians to log into it ' .
       'in order to check and possibly fix configuration issues.', array('%serial' => $serial)) . '<br><br>' .
 
-    t('This authorization lasts until either you suspend it on the ' .
-      'previous page or the period of 2 days is elapsed.') . '<br><br>' .
+    t('This authorization expires after 2 days. You can also suspend it on the previous page.') . '<br><br>' .
 
-    t('Do you allow our technicians to log into your Flukso device?') . '<br><br>' .
+    t('Please, explain the problem in the field bellow. The more details you provide, the easier ' .
+      'for the technician to solve the problem.') . '<br><br>'
+  );
 
-    l(t('Yes'), "device/support/request/$device/$serial") . ' ' .
-    l(t('No'), "device/mylist");
+  $form['device'] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $device
+  );
+
+  $form['serial'] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $serial
+  );
+
+  $form['description'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Problem description'),
+    '#rows' => 4
+  );
+
+  $form['question'] = array(
+    '#markup' => '<br>' . t('Do you allow our technicians to log into your Flukso device?') . '<br>'
+  );
+
+  $form['actions'] = array(
+    '#type' => 'actions'
+  );
+
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Yes')
+  );
+
+  $form['actions']['cancel'] = array(
+    '#type' => 'submit',
+    '#value' => t('No'),
+    '#submit' => array('logger_supportrequest_form_cancel')
+  );
+
+  return $form;
+}
+
+function logger_supportrequest_form_submit($form, &$form_state) {
+
+  $device = $form_state['values']['device'];
+  $serial = $form_state['values']['serial'];
+  $description = $form_state['values']['description'];
+
+  logger_request_support($device, $serial);
+
+  logger_send_remote_support_email($device, $serial, $description);
+
+  $form_state['redirect'] = 'device/support/requested';
+}
+
+function logger_supportrequest_form_cancel($form, &$form_state) {
+
+  $form_state['redirect'] = 'device/mylist';
 }
 
 /**
@@ -3366,13 +3423,17 @@ function logger_request_support($device, $serial) {
       'requested' => REQUEST_TIME 
     ))
     ->execute();
+}
 
-  logger_send_remote_support_email($device, $serial);
+/**
+ * Builds a page to inform the user that his support request has been registered.
+ */
+function logger_support_requested_page() {
 
   return t('Thank you! Your support request has been registered.' .
       'Our technicians are going to contact you as soon as possible via email.') . '<br><br>' .
 
-      l(t('Return to the devices page.'), "device/mylist");
+      l(t('Return to the devices page.'), 'device/mylist');
 }
 
 /**
@@ -3446,10 +3507,11 @@ function logger_remove_support($device) {
 /**
  * Send an email to the mySmartGrid ticket system.
  *
- * @param $device The device id.
- * @param $serial The device serial number.
+ * @param $device      The device id.
+ * @param $serial      The device serial number.
+ * @param $description The device problem description.
  */
-function logger_send_remote_support_email($device, $serial) {
+function logger_send_remote_support_email($device, $serial, $description) {
 
   global $user;
   global $base_url;
@@ -3457,6 +3519,7 @@ function logger_send_remote_support_email($device, $serial) {
   $variables = array(
     "!device" => $device,
     "%serial" => $serial,
+    "%description" => $description,
     "%username" => $user->name,
     "!base_url" => $base_url
   );
@@ -3464,7 +3527,8 @@ function logger_send_remote_support_email($device, $serial) {
   $subject = t('Remote Support') . ' - ' . t('Device') . ": $serial";
   $body = t(
     'Dear technician,' . '<br><br>' .
-    'The user %username has requested remote support for the device %serial.' . '<br>' .
+    'The user %username has requested remote support for the device %serial.' . '<br><br>' .
+    "Problem description:<br> %description <br><br>" .
     "Click <a href='!base_url/deployment/checkup/device/!device '>here</a> to see the device status page." . '<br><br>' .
     'Best regards' . '<br>' .
     'mySmartGrid System',

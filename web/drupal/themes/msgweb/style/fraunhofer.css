@@ -2731,18 +2731,19 @@ ol#footnotes li { list-style-type: decimal; margin-left: 1.9em; }
 }
 
 #main #edit-submit {
-  margin: 1em 0;
   float: right;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 
-/* Added by Ely de Oliveira (19/08/2010) */
-#main #edit-preview {
-  margin: 1em 0;
+#main #edit-cancel {
   float: right;
-  margin-right: 4px;
+  margin-right: 6px;
 }
-/* End Added */
+
+#main #edit-preview {
+  float: right;
+  margin-right: 6px;
+}
 
 #section {
   height: 34px;
