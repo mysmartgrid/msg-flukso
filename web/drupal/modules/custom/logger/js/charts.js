@@ -145,9 +145,6 @@ function updatePowerChartForm(chart) {
     value = new Date(Math.round(chart.xAxisRange(0)[1]));
     form.elements['xvalue2date'].value = formatDate(value);
     form.elements['xvalue2time'].value = formatTime(value);
-
-    value = (chart.getValue(1, 0) - chart.getValue(0, 0)) / 1000;
-    form.elements['resolution'].value = value;
   }
 
   updatePowerLegend(chart);

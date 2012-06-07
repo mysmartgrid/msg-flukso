@@ -1713,12 +1713,14 @@ function theme_logger_power_chart_area($variables) {
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
     'drawCallback' => 'updatePowerChartForm',
-    //'zoomCallback' => 'updateSliderChart',
     'pointClickCallback' => 'addPowerAnnotation',
     'stepPlot' => $chart->step_plot ? 'true' : 'false' ,
     'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false' 
   );
+  if ($chart->show_slider) {
+    $chart_properties['zoomCallback'] = 'updateSliderChart';
+  }
 
   if ($yvalue1 >= 0 && $yvalue2 > 0) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
@@ -2313,6 +2315,8 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#title' => t('Time Resolution'),
     '#description' => t('Select the amount of time represented by each point on the chart.'),
     '#options' => $options,
+    '#default_value' => $chart->resolution,
+    '#required' => TRUE,
     '#attributes' => array('onchange' => 'submitPowerChartForm()'),
   );
 
