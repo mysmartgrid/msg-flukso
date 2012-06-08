@@ -549,7 +549,9 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
       $latest_field = "
         IF(m.corrupted IS NOT NULL, m.corrupted,
           IF(d.access = 0, d.created,
-            IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access, d.access)
+            IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access,
+              IF (m.access = 0, d.created, d.access)
+            )
           )
         )";
 
@@ -590,7 +592,7 @@ function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, 
 
   $form['state_id'] = array(
     '#type' => 'select',
-    '#title' => t('State'),
+    '#title' => t('Status'),
     '#description' => t('Select the device state.'),
     '#options' => $states,
     '#default_value' => $state_id,
