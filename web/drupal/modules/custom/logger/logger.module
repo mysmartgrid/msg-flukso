@@ -890,7 +890,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   }
   $chart->yaxis = $yaxis;
   $chart->xaxis = $xaxis;
-  $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1]);
+  $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1], ($context != 'forecast')); //FIXME: remove this when Intersolar is over
 
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
@@ -2833,13 +2833,14 @@ function logger_get_sub_interval($interval) {
  * Returns an array containing two timestamps representing period of time of
  * the slider chart.
  *
- * @param $interval    The time interval menu option.
- * @param $resolution  The time resolution.
- * @param $start       The initial timestamp, if known.
- * @param $end         The final timestamp, if known.
+ * @param $interval     The time interval menu option.
+ * @param $resolution   The time resolution.
+ * @param $start        The initial timestamp, if known.
+ * @param $end          The final timestamp, if known.
+ * @param $fill_slider  Whether to expand the period to fill chart slider. //FIXME: remove this when Intersolar is over
  * @return the period of time as an array.
  */
-function logger_get_period($interval, $resolution, $start = 0, $end = 0) {
+function logger_get_period($interval, $resolution, $start = 0, $end = 0, $fill_slider = TRUE) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
   $storage_period = logger_rrd_get_storage_period($resolution);
@@ -2852,8 +2853,10 @@ function logger_get_period($interval, $resolution, $start = 0, $end = 0) {
     $end = $now;
   }
 
-  //Expand window to fill slider
-  $window *= 7;
+  if ($fill_slider) {
+    //Expand window to fill slider
+    $window *= 7;
+  }
 
   //RRD requires the time window to be covered by RRD
   $max_window = $storage_period - ($now - $end);
@@ -3298,7 +3301,7 @@ function logger_support_requests_page() {
   foreach ($result as $req) {
 
     //FIXME: remove this conditional when the intersolar is over
-    $operations = $req->serial == 1338822243 || $req->serial == 1326120502 ? 
+    $operations = $req->serial == 1338822243 || $req->serial == 1326120502 ?
       t('Remove') . '<br>' .
       t('Postpone') :
 
@@ -3586,7 +3589,7 @@ function logger_update_pvcast_models() {
 
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
-    $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now);
+    $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor('day', $sensor, 'watt', $period, HOUR);
