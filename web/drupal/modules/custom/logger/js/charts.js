@@ -192,23 +192,17 @@ function submitRelativeChartForm(clickedField) {
 
 function removePowerSeries(uid, i, username, tableId) {
 
-  var table = document.getElementById(tableId);
+  var visibilities = lineChart.visibility();
 
-  //Check if it is the last visible one
-  var visibleOnes = 0;
-  for (var v = 1; v < table.rows.length; v++) {
-    visibleOnes += (table.rows[v].style.display == 'none') ? 0 : 1;
-  }
-  if (visibleOnes == 1) {
+  if (isLastVisibleLine(i, visibilities)) {
     return;
   }
 
+  //Remove the table line as soon as possible
+  var table = document.getElementById(tableId);
   table.rows[i + 1].style.display = 'none';
 
-  lineChart.setVisibility(i, false);
-  if (sliderChart) {
-    sliderChart.setVisibility(i, false);
-  }
+  setLineVisibility(i, false);
 
   var form = document.getElementById('logger-powerchart-form');
   var field = form.elements['new_user'];
@@ -246,26 +240,48 @@ function removePowerSeries(uid, i, username, tableId) {
 
 function hidePowerSeries(uid, i, username, hideText, showText) {
 
-  var visible = !lineChart.visibility()[i];
+  var visibilities = lineChart.visibility();
+
+  if (isLastVisibleLine(i, visibilities)) {
+    return;
+  }
+
+  var style, text, visible = !visibilities[i];
+
+  if (visible) {
+    text = hideText;
+    style = 'visible';
+
+  } else {
+    text = showText;
+    style = 'hidden';
+  }
+
+  //Remove the table line as soon as possible
+  document.getElementById('hide-legend-row' + i).innerHTML = text;
+
+  setLineVisibility(i, visible);
+
+  document.getElementById('max' + i).style.visibility = style;
+  document.getElementById('min' + i).style.visibility = style;
+  document.getElementById('avg' + i).style.visibility = style;
+  document.getElementById('last' + i).style.visibility = style;
+}
+
+function isLastVisibleLine(i, visibilities) {
+
+  var visibleOnes = 0;
+  for (var s = 0; s < visibilities.length; s++) {
+    visibleOnes += visibilities[s] ? 1 : 0;
+  }
+  return visibilities[i] &&  visibleOnes == 1;
+}
+
+function setLineVisibility(i, visible) {
 
   lineChart.setVisibility(i, visible);
   if (sliderChart) {
     sliderChart.setVisibility(i, visible);
-  }
-
-  document.getElementById('hide-legend-row' + i).innerHTML = visible ? hideText : showText;
- 
-  if (visible) { 
-    document.getElementById('max' + i).style.visibility = 'visible';
-    document.getElementById('min' + i).style.visibility = 'visible';
-    document.getElementById('avg' + i).style.visibility = 'visible';
-    document.getElementById('last' + i).style.visibility = 'visible';
-
-  } else {
-    document.getElementById('max' + i).style.visibility = 'hidden';
-    document.getElementById('min' + i).style.visibility = 'hidden';
-    document.getElementById('avg' + i).style.visibility = 'hidden';
-    document.getElementById('last' + i).style.visibility = 'hidden';
   }
 }
 
@@ -690,23 +706,25 @@ function setSeriesColor(chartId, i, color) {
     barChart.plot();
 
   } else {
-    //FIXME: improve this code
-    if (lineChart) {
-      updateDygraphColor(lineChart, i, color);
-    }
-    if (sliderChart) {
-      updateDygraphColor(sliderChart, i, color);
-    }
+    //FIXME: update only one color
+    updateDygraphColors();
   }
 
   jQuery.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
 }
 
-function updateDygraphColor(chart, i, color) {
+function updateDygraphColors() {
 
-  var values = chart.getColors();
-  values[i] = color;
-  chart.updateOptions({colors: values});
+  var colorValues = new Array();
+  var series = lineChart.visibility();
+  for (var c = 0; c < series.length; c++) {
+    colorValues[c] = '#' + document.getElementById('series_color' + c).value;
+  }
+
+  lineChart.updateOptions({colors: colorValues});
+  if (sliderChart) {
+    sliderChart.updateOptions({colors: colorValues});
+  }
 }
 
 function resizeCharts() {
