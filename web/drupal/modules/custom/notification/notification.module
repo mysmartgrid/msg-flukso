@@ -543,7 +543,7 @@ function notification_registration_form($form, &$form_state) {
     'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
 
   $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
-    'Messages containing invalid data, produced when the device is malfunctioning or not properly installed.');
+    'A message containing invalid data, produced when the device is malfunctioning or not properly installed.');
 
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
