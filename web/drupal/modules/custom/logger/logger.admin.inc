@@ -294,7 +294,6 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       );
     }
     else {
-      //TODO: enable these fields for experts
       $form['prev_forecast'] = array(
         '#type' => 'hidden',
         '#default_value' => array($sensor->forecast)
