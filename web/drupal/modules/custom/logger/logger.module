@@ -2067,47 +2067,47 @@ function logger_energychart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitEnergyChartForm(this)'),
   );
 
-  //TODO: enable these fields for experts
-  /*
-  if (strpos(" $chart->unit", 'eur') > 0) {
-    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  if (user_has_role('Expert')) {
 
-    $form['use_sensor_prices'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Use sensor prices'),
-      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
-      '#default_value' => $use_sensor_prices,
-      '#return_value' => 1,
-      '#attributes' => array('onclick' => 'submitEnergyChartForm()'), //In IE, onchange does not work
-    );
+    if (strpos(" $chart->unit", 'eur') > 0) {
+      $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    if (!$use_sensor_prices) {
+      $form['use_sensor_prices'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Use sensor prices'),
+        '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+        '#default_value' => $use_sensor_prices,
+        '#return_value' => 1,
+        '#attributes' => array('onclick' => 'submitEnergyChartForm()'), //In IE, onchange does not work
+      );
 
-      if (in_array(CONSUMPTION_SENSOR_TYPE, $selected_types)) {
-        $form['price1'] = array(
-          '#type' => 'textfield',
-          '#title' => t('Energy Consumption Price'),
-          '#description' => t("Enter the energy consumption price."),
-          '#maxlength' => 6,
-          '#field_prefix' => '€ ',
-          '#default_value' => $chart->price1,
-          '#field_suffix' => ' / kWh',
-        );
-      }
-      if (in_array(PRODUCTION_SENSOR_TYPE, $selected_types)) {
-        $form['price2'] = array(
-          '#type' => 'textfield',
-          '#title' => t('Energy Production Price'),
-          '#description' => t("Enter the energy production price."),
-          '#maxlength' => 6,
-          '#field_prefix' => '€ ',
-          '#default_value' => $chart->price2,
-          '#field_suffix' => ' / kWh',
-        );
+      if (!$use_sensor_prices) {
+
+        if (in_array(CONSUMPTION_SENSOR_TYPE, $selected_types)) {
+          $form['price1'] = array(
+            '#type' => 'textfield',
+            '#title' => t('Energy Consumption Price'),
+            '#description' => t("Enter the energy consumption price."),
+            '#maxlength' => 6,
+            '#field_prefix' => '€ ',
+            '#default_value' => $chart->price1,
+            '#field_suffix' => ' / kWh',
+          );
+        }
+        if (in_array(PRODUCTION_SENSOR_TYPE, $selected_types)) {
+          $form['price2'] = array(
+            '#type' => 'textfield',
+            '#title' => t('Energy Production Price'),
+            '#description' => t("Enter the energy production price."),
+            '#maxlength' => 6,
+            '#field_prefix' => '€ ',
+            '#default_value' => $chart->price2,
+            '#field_suffix' => ' / kWh',
+          );
+        }
       }
     }
   }
-  */
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -2142,34 +2142,34 @@ function logger_relativechart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitRelativeChartForm(this)'),
   );
 
-  //TODO: enable these fields for experts
-  /*
-  if (strpos(" $chart->unit", 'eur') > 0) {
-    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  if (user_has_role('Expert')) {
 
-    $form['use_sensor_prices'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Use sensor prices'),
-      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
-      '#default_value' => $use_sensor_prices,
-      '#return_value' => 1,
-      '#attributes' => array('onclick' => 'submitRelativeChartForm()'), //In IE, onchange does not work
-    );
+    if (strpos(" $chart->unit", 'eur') > 0) {
+      $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    if (!$use_sensor_prices) {
-      $form['price1'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Energy Consumption Price'),
-        '#description' => t("Enter the energy consumption price."),
-        '#maxlength' => 6,
-        '#size' => 6,
-        '#field_prefix' => '€ ',
-        '#default_value' => $chart->price1,
-        '#field_suffix' => ' / kWh',
+      $form['use_sensor_prices'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Use sensor prices'),
+        '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+        '#default_value' => $use_sensor_prices,
+        '#return_value' => 1,
+        '#attributes' => array('onclick' => 'submitRelativeChartForm()'), //In IE, onchange does not work
       );
+
+      if (!$use_sensor_prices) {
+        $form['price1'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Energy Consumption Price'),
+          '#description' => t("Enter the energy consumption price."),
+          '#maxlength' => 6,
+          '#size' => 6,
+          '#field_prefix' => '€ ',
+          '#default_value' => $chart->price1,
+          '#field_suffix' => ' / kWh',
+        );
+      }
     }
   }
-  */
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -2204,47 +2204,47 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#attributes' => array('onchange' => 'submitPowerChartForm(true)'),
   );
 
-  //TODO: enable these fields for an expert role
-  /*
-  if (strpos(" $chart->unit", 'eur') > 0) {
-    $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  if (user_has_role('Expert')) {
 
-    $form['use_sensor_prices'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Use sensor prices'),
-      '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
-      '#default_value' => $use_sensor_prices,
-      '#return_value' => 1,
-      '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
-    );
+    if (strpos(" $chart->unit", 'eur') > 0) {
+      $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-    if (!$use_sensor_prices) {
+      $form['use_sensor_prices'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Use sensor prices'),
+        '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
+        '#default_value' => $use_sensor_prices,
+        '#return_value' => 1,
+        '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
+      );
 
-      if ($chart->price1) {
-        $form['price1'] = array(
-          '#type' => 'textfield',
-          '#title' => t('Energy Consumption Price'),
-          '#description' => t("Enter the energy consumption price."),
-          '#maxlength' => 6,
-          '#field_prefix' => '€ ',
-          '#default_value' => $chart->price1,
-          '#field_suffix' => ' / kWh',
-        );
-      }
-      if ($chart->price2) {
-        $form['price2'] = array(
-          '#type' => 'textfield',
-          '#title' => t('Energy Production Price'),
-          '#description' => t("Enter the energy production price."),
-          '#maxlength' => 6,
-          '#field_prefix' => '€ ',
-          '#default_value' => $chart->price2,
-          '#field_suffix' => ' / kWh',
-        );
+      if (!$use_sensor_prices) {
+
+        if ($chart->price1) {
+          $form['price1'] = array(
+            '#type' => 'textfield',
+            '#title' => t('Energy Consumption Price'),
+            '#description' => t("Enter the energy consumption price."),
+            '#maxlength' => 6,
+            '#field_prefix' => '€ ',
+            '#default_value' => $chart->price1,
+            '#field_suffix' => ' / kWh',
+          );
+        }
+        if ($chart->price2) {
+          $form['price2'] = array(
+            '#type' => 'textfield',
+            '#title' => t('Energy Production Price'),
+            '#description' => t("Enter the energy production price."),
+            '#maxlength' => 6,
+            '#field_prefix' => '€ ',
+            '#default_value' => $chart->price2,
+            '#field_suffix' => ' / kWh',
+          );
+        }
       }
     }
   }
-  */
 
   $form['smoothing_level'] = array(
     '#type' => 'textfield',
@@ -2276,9 +2276,7 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
 
-  //TODO: enable this field for experts
-  /*
-  if ($chart->context == 'selfconsumption') {
+  if (user_has_role('Expert') && $chart->context == 'selfconsumption') {
     $form['net_production'] = array(
       '#type' => 'checkbox',
       '#title' => t('Net Energy Production'),
@@ -2288,7 +2286,6 @@ function logger_powerchart_form($form, &$form_state, $chart) {
       '#attributes' => array('onclick' => 'enableFilledGraph(); submitPowerChartForm(true);'), //In IE, onchange does not work
     );
   }
-  */
 
   $form['yvalue'] = array(
     '#type' => 'textfield',
