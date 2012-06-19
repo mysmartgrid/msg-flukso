@@ -34,13 +34,13 @@
 -include("flukso.hrl").
 
 
-init([]) -> 
-    {ok, undefined}.
+%init([]) -> 
+%    {ok, undefined}.
 
 
-% debugging
-%init(Config) ->
-%   {{trace, "/tmp"}, Config}.
+%Logging
+init(Config) ->
+   {{trace, "/var/log/erlang/flukso-api/trace"}, Config}.
 
 
 allowed_methods(ReqData, State) ->
@@ -184,7 +184,7 @@ process_post(ReqData, State) ->
 
     case Payload of
         {undefined, undefined} ->
-            {false, ReqData, State};
+            {badarg, ReqData, State};
 
         {Measurements, undefined} ->
             process_measurements(Measurements, ReqData, State);
@@ -193,7 +193,7 @@ process_post(ReqData, State) ->
             process_config(Config, ReqData, State);
 
         {_Measurements, _Config} ->
-            {false, ReqData, State}
+            {badarg, ReqData, State}
     end.
 
 

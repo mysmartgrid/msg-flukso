@@ -32,13 +32,12 @@
 -include("flukso.hrl").
 
 
-init([]) ->
-    {ok, undefined}.
+%init([]) ->
+%    {ok, undefined}.
 
-
-% debugging
-%init(Config) ->
-%   {{trace, "/tmp"}, Config}.
+%Logging
+init(Config) ->
+   {{trace, "/var/log/erlang/flukso-api/trace"}, Config}.
 
 
 allowed_methods(ReqData, State) ->
