@@ -108,6 +108,7 @@ check_digest(Digest) ->
     check_hex(Digest, 40).
 
 check_hex(String, Length) ->
+    io:write(String),
     case re:run(String, "[0-9a-f]+", []) of 
         {match, [{0, Length}]} -> {String, true};
         _ -> {false, false}
@@ -180,16 +181,24 @@ check_digest(Key, ReqData, ClientDigest) ->
     end.
 
 digest_response(Key, Properties, ReqData, State) ->
+    digest_response(Key, Properties, ReqData, State, true).
 
-      JsonResponse = mochijson2:encode({struct, Properties}),
+digest_response(Key, Properties, ReqData, State, Embody) ->
 
-      <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
-      Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
+    JsonResponse = mochijson2:encode({struct, Properties}),
 
-      DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
-      EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
+    <<X:160/big-unsigned-integer>> = crypto:sha_mac(Key, JsonResponse),
+    Digest = lists:flatten(io_lib:format("~40.16.0b", [X])),
 
-      {true , EmbodiedReqData, State}.
+    DigestedReqData = wrq:set_resp_header("X-Digest", Digest, ReqData),
+
+    case Embody of
+      false ->
+        {JsonResponse, DigestedReqData, State};
+      true ->
+        EmbodiedReqData = wrq:set_resp_body(JsonResponse, DigestedReqData),
+        {true , EmbodiedReqData, State}
+    end.
 
 
 %% helper functions

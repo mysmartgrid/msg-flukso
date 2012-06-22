@@ -7,7 +7,8 @@
     flukso_sup,
     flukso_deps,
     flukso_sensor_xyz,
-    flukso_device_xyz
+    flukso_device_xyz,
+    flukso_firmware_xyz
   ]},
   {registered, []},
   {mod, {flukso_app, []}},
