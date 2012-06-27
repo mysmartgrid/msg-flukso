@@ -220,6 +220,20 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
+      'id' => 105,
+      'name' => 'Firmware Upgraded',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 106,
+      'name' => 'Failed Firmware Upgrade',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
       'id' => 10,
       'name' => 'Summary Report',
     ))
@@ -439,4 +453,26 @@ function notification_update_7001() {
   mkdir($dir_path, 0777, TRUE);
 
   return st("The event 'Forecast Report' has been added. Directory notification/tmp has been created.");
+}
+
+/**
+ * Adds the events 'Firmware Upgraded' and 'Failed Firmware Upgrade'.
+ */
+function notification_update_7002() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 105,
+      'name' => 'Firmware Upgraded',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 106,
+      'name' => 'Failed Firmware Upgrade',
+    ))
+    ->execute();
+
+  return st("The events 'Firmware Upgraded' and 'Failed Firmware Upgrade' have been added.");
 }

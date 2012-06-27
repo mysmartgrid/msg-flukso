@@ -94,16 +94,32 @@ to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     case mysql:get_result_rows(Result) of
 
-      [[Key, NextVersion, Resets, CurrentVersion]] ->
+      [[Key, Upgrade, Resets, CurrentVersion]] ->
 
-        %FIXME: Prepare upgrade file with cumulative upgrades
-        Path = string:concat(string:concat("./var/upgrades/", integer_to_list(NextVersion)), ".sh"),
-        {ok, File} = file:read_file(Path),
+        if
+          Upgrade > 0 ->
 
-        Answer = [{<<"data">>, base64:encode(File)}],
-        digest_response(Key, Answer, ReqData, State, false);
+            Path = string:concat(?FIRMWARE_UPGRADES_PATH, "archives/"),
+            Args = string:concat(Device, string:concat(" ", erlang:binary_to_list(CurrentVersion))),
+            os:cmd(string:concat(string:concat(Path, "create-archive.sh "), Args)),
+            FilePath = string:concat(Path, Device),
+            
+            case file:read_file(FilePath) of
+
+              {ok, File} ->
+                file:delete(FilePath),
+                Answer = [{<<"data">>, base64:encode(File)}],
+                digest_response(Key, Answer, ReqData, State, false);
+
+              _ ->
+                {{halt, 404}, ReqData, State}
+            end;
+
+          true ->
+            {{halt, 404}, ReqData, State}
+        end;
 
       _ ->
-        %Internal Server Error (logical error)
+        %Internal Server Error (logical error, that must never occur)
         {{halt, 500}, ReqData, State}
     end.

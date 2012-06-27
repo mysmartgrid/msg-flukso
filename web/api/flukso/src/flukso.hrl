@@ -19,7 +19,8 @@
 %% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 %%
 
--define(BASE_PATH,  "var/data/base/").
+-define(BASE_PATH,               "var/data/base/").
+-define(FIRMWARE_UPGRADES_PATH,  "var/upgrades/").
 
 -define(MINUTE,     60).
 -define(QUARTER,   900).
@@ -33,12 +34,13 @@
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
 -define(PEAK_CONSUMPTION_EVENT_ID,       4).
 
--define(MESSAGE_RECEIVED_EVENT_ID,       100).
--define(HEARTBEAT_RECEIVED_EVENT_ID,     101).
--define(MEASUREMENT_RECEIVED_EVENT_ID,   102).
--define(CORRUPTED_MESSAGE_EVENT_ID,      103).
--define(BROWNOUT_EVENT_ID,               104).
-
+-define(MESSAGE_RECEIVED_EVENT_ID,            100).
+-define(HEARTBEAT_RECEIVED_EVENT_ID,          101).
+-define(MEASUREMENT_RECEIVED_EVENT_ID,        102).
+-define(CORRUPTED_MESSAGE_EVENT_ID,           103).
+-define(BROWNOUT_EVENT_ID,                    104).
+-define(FIRMWARE_UPGRADED_EVENT_ID,           105).
+-define(FAILED_FIRMWARE_UPGRADE_EVENT_ID,     106).
 
 -record(state,
         {rrdSensor,
@@ -73,6 +75,8 @@ check_version(_, _) ->
 check_event(Event) ->
     case Event of
         BROWNOUT_EVENT_ID -> {Event, true};
+        FIRMWARE_UPGRADED_EVENT_ID -> {Event, true};
+        FAILED_FIRMWARE_UPGRADE_EVENT_ID -> {Event, true};
         _ -> {false, false}
     end.
 

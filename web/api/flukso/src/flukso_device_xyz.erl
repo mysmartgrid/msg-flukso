@@ -174,7 +174,7 @@ process_post(ReqData, #state{device = Device} = State) ->
         end,
 
         mysql:execute(pool, device_update,
-          [Timestamp, Version, 0, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Device]),
+          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
