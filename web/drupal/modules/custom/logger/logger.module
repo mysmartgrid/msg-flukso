@@ -2675,7 +2675,7 @@ function logger_energychart_form_submit($form, &$form_state) {
 
 function logger_powerchart_form_submit($form, &$form_state) {
 
-  if ($form_state['values']['new_user'] > 0) {
+  if (isset($form_state['values']['new_user']) && $form_state['values']['new_user'] > 0) {
     logger_add_user($form_state['values']['new_user']);
   }
   if (isset($form_state['values']['use_sensor_prices'])) {
