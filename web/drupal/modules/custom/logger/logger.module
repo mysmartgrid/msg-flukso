@@ -81,6 +81,10 @@ function logger_permission() {
       'title' => t('view forecast charts'),
       'description' => t('View forecast charts.'),
     ),
+    'detect anomalies' => array(
+      'title' => t('detect anomalies'),
+      'description' => t('Detect anomalous measurements'),
+    ),
     'set user preferences' => array(
       'title' => t('set user preferences'),
       'description' => t('Set user preferences.'),
@@ -208,7 +212,7 @@ function logger_menu() {
     'title' => 'Your power self consumption',
     'description' => 'Show the power self consumption page',
     'page callback' => 'logger_selfconsumption_page',
-    'page arguments' => array(1, 0, t('Your power self consumption')),
+    'page arguments' => array(1),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -221,6 +225,16 @@ function logger_menu() {
     'page arguments' => array(1),
     'access callback' => 'logger_forecast_access',
     'access arguments' => array('view forecast charts'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['anomaly'] = array(
+    'title' => 'Your Power Production Anomalies',
+    'description' => 'Show power production anomalies page',
+    'page callback' => 'logger_anomaly_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_producer_access',
+    'access arguments' => array('detect anomalies'),
     'type' => MENU_CALLBACK,
   );
 
@@ -571,6 +585,22 @@ function logger_forecast_page($interval) {
 }
 
 /**
+ * Builds the power production anomalies page.
+ * 
+ * @param $interval The time interval.
+ * @return the power production anomalies page.
+ */
+function logger_anomaly_page($interval) {
+
+  global $user;
+
+  $types = array(PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($types, array($user->uid));
+
+  return logger_power_chart_page($interval, 'anomaly', t('Detected power production anomalies'), $sensors, $types);
+}
+
+/**
  * Builds the power self consumption page.
  *
  * @param $interval The time interval.
@@ -593,7 +623,7 @@ function logger_selfconsumption_page($interval) {
  * @param $interval     The time interval.
  * @param $context      The chart context.
  * @param $title        The page title.
- * @param $sernsors     The sensors plotted on the chart.
+ * @param $sensors      The sensors plotted on the chart.
  * @param $types        The types of sensors plotted on the chart.
  * @param $show_slider  Whether or not the chart has a slider.
  * @return the power consumption page.
@@ -1398,6 +1428,41 @@ function logger_get_forecast_chart_data($chart) {
 }
 
 /**
+ * Returns an array containing all power production anomalies chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_anomaly_chart_data($chart) {
+
+  global $user;
+
+  module_load_include('inc', 'logger', 'logger.anomaly');
+
+  $is_visitor = user_has_role('Visitor');
+  $data = logger_get_power_chart_data($chart);
+  $total = count($chart->sensors);
+  $i = $total;
+
+  foreach ($chart->sensors as &$sensor) {
+
+    $anomalies = logger_detect_anomalies($sensor, $chart->unit, $chart->period, $chart->resolution);
+
+    //Hide usernames for Visitors
+    $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
+
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
+
+    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
+      logger_format_power_series_data($chart, $anomalies);
+
+    $data['legend'][] =
+      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Anomalies') . ')', t($sensor->type), $i++, $operations);
+  }
+  return $data;
+}
+
+/**
  * Creates a link to remove power chart series.
  *
  * @param $uid      The user id.
@@ -1507,18 +1572,21 @@ function logger_create_power_legend_line($username, $function, $type, $i, $opera
 /**
  * Returns an array containing sensors owned by the informed users.
  *
- * @param $types         The types of sensors to be returned (default: all).
- * @param $user_ids      The user ids of sensor owners (default: all).
- * @param $virtual       Whether virtual sensors should be returned (default: false).
- * @param $only_forecast Whether only forecast sensors should be returned (default: false).
+ * @param $types             The types of sensors to be returned (default: all).
+ * @param $user_ids          The user ids of sensor owners (default: all).
+ * @param $virtual           Whether virtual sensors can be returned (default: false).
+ * @param $only_forecast     Whether only forecast sensors can be returned (default: false).
+ * @param $include_visitors  Whether sensors belonging to users with role 'Visitor' can be returned (default: true).
+ * @param $area              The geographical area where the sensors must be located.
+                             (format: array('latitude' => array(min, max), 'longitude' => array(min, max))).
  * @return the array of sensors.
  */
-function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE) {
+function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE, $include_visitors = TRUE, $area = array()) {
 
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast', 'price'))
+    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
     ->isNotNull('m.function');
 
   $query->join('logger_meter_type', 't', 't.id = m.type');
@@ -1547,6 +1615,23 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   }
   if ($only_forecast) {
     $query->condition('m.forecast', 1);
+  }
+  if (!empty($area)) {
+    $query
+    ->condition('m.latitude', $area['latitude'], 'BETWEEN')
+    ->condition('m.longitude', $area['longitude'], 'BETWEEN');
+  }
+
+  if (!$include_visitors) {
+
+    $visitor = db_select('users_roles', 'ur')
+      ->fields('ur', array('uid'))
+      ->condition('ur.uid', 'm.uid');
+
+    $visitor->join('role', 'r', 'r.rid = ur.rid');
+    $visitor->condition('r.name', 'Visitor');
+
+    $query->notExists($visitor);
   }
 
   $query->orderBy('u.name');
@@ -3705,7 +3790,12 @@ function logger_forward_api_request($auth, $object, $id, $body, $signed_body = N
         'X-Digest' => hash_hmac('sha1', $body, $auth['key'])
       )));
 
-    return json_decode($response->data);
+    if (isset($response->error)) {
+      return xmlrpc_error(-32601, t('Server error.') . ' ' . $response->error);
+    }
+    else {
+      return json_decode($response->data);
+    }
   }
   else {
     return xmlrpc_error(-31000, t('Authentication failed.'));

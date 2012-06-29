@@ -415,3 +415,48 @@ function db_query_objects($query) {
   }
   return $objects;
 }
+
+/**
+ * Calculates the median of an array of numbers.
+ *
+ * @param $values  The array of numbers.
+ * @return the median.
+ */
+function median($values) {
+  sort($values, SORT_NUMERIC);
+  return (count($values) % 2) ?
+    $values[floor(count($values)/2)] :
+    ($values[floor(count($values)/2)] + $values[floor(count($values)/2) - 1]) / 2;
+}
+
+/**
+ * Calculates the median deviation of an array of numbers.
+ *
+ * @param $values The array of numbers.
+ * @param $median The median value, if known already (optional).
+ * @return the median deviation.
+ */
+function median_deviation($values, $median = NULL) {
+  $median = $median == NULL ? median($values) : $median;
+  $deviations = array();
+  foreach ($values as $timestamp => $value) {
+    if (isset($value)) {
+      $deviations[] = abs($median - $value);
+    }
+  }
+  return median($deviations);
+}
+
+function mean($values) {
+  return array_sum($values) / count($values);
+}
+
+function standard_deviation($values, $mean = NULL) {
+
+  $mean = $mean == NULL ? mean($values)  : $mean;
+  $devs = array();
+  foreach ($values as $value) {
+    $devs[] = pow($value - $mean, 2);
+  }
+  return sqrt(mean($devs));
+}
