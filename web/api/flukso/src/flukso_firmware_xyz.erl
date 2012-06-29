@@ -109,6 +109,9 @@ to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
               {ok, File} ->
                 file:delete(FilePath),
                 Answer = [{<<"data">>, base64:encode(File)}],
+
+                mysql:execute(pool, device_upgrade_update, [0, Device]),
+
                 digest_response(Key, Answer, ReqData, State, false);
 
               _ ->
