@@ -447,10 +447,23 @@ function median_deviation($values, $median = NULL) {
   return median($deviations);
 }
 
+/**
+ * Calculates the arithmetic mean of an array of numbers.
+ *
+ * @param $values  The array of numbers.
+ * @return the mean.
+ */
 function mean($values) {
   return array_sum($values) / count($values);
 }
 
+/**
+ * Calculates the standard deviation of an array of numbers.
+ *
+ * @param $values The array of numbers.
+ * @param $median The mean value, if known already (optional).
+ * @return the standard deviation.
+ */
 function standard_deviation($values, $mean = NULL) {
 
   $mean = $mean == NULL ? mean($values)  : $mean;
