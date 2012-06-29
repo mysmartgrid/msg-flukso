@@ -597,7 +597,7 @@ function logger_anomaly_page($interval) {
   $types = array(PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
-  return logger_power_chart_page($interval, 'anomaly', t('Detected power production anomalies'), $sensors, $types);
+  return logger_power_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types);
 }
 
 /**
