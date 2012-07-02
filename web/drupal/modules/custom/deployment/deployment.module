@@ -252,8 +252,9 @@ function deployment_list_page() {
   $state_id = isset($_REQUEST['state_id']) ? $_REQUEST['state_id'] : 0;
   $user_name = isset($_REQUEST['user_name']) ? $_REQUEST['user_name'] : NULL;
   $email = isset($_REQUEST['email']) ? $_REQUEST['email'] : NULL;
+  $type_id = isset($_REQUEST['type_id']) ? $_REQUEST['type_id'] : 0;
 
-  $filter = array('state_id' => $state_id, 'user_name' => $user_name, 'email' => $email);
+  $filter = array('state_id' => $state_id, 'user_name' => $user_name, 'email' => $email, 'type_id' => $type_id);
 
   $data = deployment_get_devices($filter, $header, $page_limit);
   foreach ($data as &$device) {
@@ -271,7 +272,7 @@ function deployment_list_page() {
   }
   $_SESSION['deployment_list_lines'] = $data;
 
-  $form = drupal_get_form('deployment_listfilter_form', $state_id, $user_name, $email);
+  $form = drupal_get_form('deployment_listfilter_form', $state_id, $user_name, $email, $type_id);
 
   return 
     drupal_render($form) .
@@ -476,6 +477,11 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
     $query->condition('d.device', $filter['device'], '=');
   }
 
+  if (isset($filter['type_id']) && $filter['type_id'] > 0) {
+    $query->join('logger_meters', 'mt', 'mt.device = d.device');
+    $query->condition('mt.type', $filter['type_id']);
+  }
+
   $sql = "SELECT u.uid FROM {users_roles} u, {role} r WHERE u.rid = r.rid AND r.name = :name";
   $visitors = db_query($sql, array(':name' => 'Visitor'));
   foreach ($visitors as $visitor) {
@@ -585,7 +591,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   return $query->execute();
 }
 
-function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, $email) {
+function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, $email, $type_id) {
 
   $states = deployment_get_all_states();
   $states[0] = t('All');
@@ -618,6 +624,19 @@ function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, 
     '#default_value' => $email,
     '#required' => FALSE,
     '#description' => t('Enter part of the user email.')
+  );
+
+  $types = logger_get_sensor_types_options();
+  $types[0] = t('All');
+
+  $form['type_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Type'),
+    '#description' => t('Select the sensor type.'),
+    '#options' => $types,
+    '#default_value' => $type_id,
+    '#required' => TRUE,
+    '#attributes' => array('onchange' => "document.getElementById('deployment-listfilter-form').submit();")
   );
 
   $form['submit'] = array(
@@ -691,7 +710,8 @@ function deployment_listfilter_form_submit($form, &$form_state) {
     'query' => array(
       'state_id' => $form_state['values']['state_id'],
       'user_name' => $form_state['values']['user_name'],
-      'email' => $form_state['values']['email']
+      'email' => $form_state['values']['email'],
+      'type_id' => $form_state['values']['type_id']
   )));
 }
 
