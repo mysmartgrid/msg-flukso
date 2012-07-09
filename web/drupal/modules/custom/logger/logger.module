@@ -1423,15 +1423,6 @@ function logger_get_forecast_chart_data($chart) {
 
     $data['legend'][] =
       logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i++, $operations);
-
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
-
-    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Global Radiation"][$sensor->type] =
-      logger_format_power_series_data($chart, $forecast['globalradiation']);
-
-    $data['legend'][] =
-      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t('Global Radiation'), $i++, $operations);
-
   }
   return $data;
 }
