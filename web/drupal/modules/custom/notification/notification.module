@@ -21,9 +21,9 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
-//ini_set('display_errors', TRUE);
-//ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
 
 //Constants
 define('NO_COMMUNICATION_EVENT_ID',        1);
@@ -42,6 +42,9 @@ define('CORRUPTED_MESSAGE_EVENT_ID',        103);
 define('BROWNOUT_EVENT_ID',                 104);
 define('FIRMWARE_UPGRADED_EVENT_ID',        105);
 define('FAILED_FIRMWARE_UPGRADE_EVENT_ID',  106);
+
+//Anomalies
+define('PRODUCTION_ANOMALY_EVENT_ID',       202);
 
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
@@ -556,7 +559,10 @@ function notification_registration_form($form, &$form_state) {
   if (user_has_role('PV Producer')) {
 
     $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
-    'Here you can set the period of time in which you want to receive energy production forecast reports.');
+      'Here you can set the period of time in which you want to receive energy production forecast reports.');
+
+    $form['events'] += notification_create_event_fields(PRODUCTION_ANOMALY_EVENT_ID, NULL, NULL,
+      'An anomalous series of measurements, produced when the PV plant is malfunctioning or not properly installed.');
   }
 
   $form['min_interval'] = array(
@@ -861,6 +867,7 @@ function notification_registration_form_submit($form, &$form_state) {
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
   notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
+  notification_register_event($_REQUEST, PRODUCTION_ANOMALY_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -1164,6 +1171,7 @@ function notification_cron() {
   notification_send_peak_consumption_emails();
   notification_send_summary_report_emails();
   notification_send_forecast_report_emails();
+  notification_send_production_anomaly_emails();
   notification_eventlog_clear_old();
 }
 
@@ -1608,6 +1616,37 @@ function notification_create_forecast_chart($notifiable) {
 }
 
 /**
+ * Sends e-mails notifying users of 'Production Anomaly' events.
+ */
+function notification_send_production_anomaly_emails() {
+
+  $query = notification_compose_base_query(PRODUCTION_ANOMALY_EVENT_ID);
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $query->fields('m', array('uid', 'meter', 'price', 'function', 'latitude', 'longitude'));
+  $query->condition('m.type', PRODUCTION_SENSOR_TYPE);
+
+  $result = $query->execute();
+
+  $notifiables = array();
+  while ($notifiable = $result->fetchAssoc()) {
+
+    $notifiable['event_time'] = REQUEST_TIME;
+    $notifiable['anomalies'] = notification_query_production_anomalies($notifiable);
+
+    if (!empty($notifiable['anomalies'])) {
+      $notifiables[] = $notifiable;
+    }
+  }
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has sent the following anomalous measurements.<br><br>" .
+    "!anomalies", "Check your PV installation.");
+
+  notification_send_emails($message, $notifiables);
+}
+
+/**
  * Notifies the administrator of the occurrence of a system error.
  *
  * @param $context     The page or function where the error occurred.
@@ -1831,6 +1870,31 @@ function notification_query_peak_consumption_violations($notifiable) {
     }
   }
   return $list ? array('timestamp' => $timestamp, 'list' => $list) : NULL;
+}
+
+/**
+ * Returns a list of anomalous power production measurements.
+ *
+ * @param $notifiable  The user notifiable of the Production Anomaly Event.
+ * @return the HTML list of measurements.
+ */
+function notification_query_production_anomalies($notifiable) {
+
+  require_once LOGGER_PATH . "/logger.anomaly.inc"; 
+
+  $period = array('start' => $notifiable['base_time'], 'end' => time());
+  $anomalies = logger_detect_production_anomalies((object) $notifiable, 'watt', $period, MINUTE);
+
+  $list = '';
+  foreach ($anomalies as $timestamp => $value) {
+
+    date_default_timezone_set($notifiable['timezone']);
+
+    $list = $list ? $list : t('Sensor') . ': ' . $notifiable['function'] . '<br> ';
+    $list .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
+      number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
+  }
+  return $list;
 }
 
 function notification_create_chart($file_path) {

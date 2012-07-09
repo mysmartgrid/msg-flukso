@@ -248,6 +248,13 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
+      'id' => 202,
+      'name' => 'Power Production Anomaly'
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
       'id' => 999,
       'name' => 'System Error',
     ))
@@ -475,4 +482,19 @@ function notification_update_7002() {
     ->execute();
 
   return st("The events 'Firmware Upgraded' and 'Failed Firmware Upgrade' have been added.");
+}
+
+/**
+ * Adds the event 'Power Production Anomaly'.
+ */
+function notification_update_7003() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Power Production Anomaly',
+    ))
+    ->execute();
+
+  return st("The event 'Power Production Anomaly' has been added.");
 }

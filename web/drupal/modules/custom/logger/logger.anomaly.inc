@@ -27,10 +27,10 @@
 //ini_set('display_startup_errors', TRUE);
 
 #TODO: get rid of these magic numbers
-define('ANOMALY_MIN_TOLERANCE',   10);
-define('NEIGHBOUR_DISTANCE',     0.7);
-define('ANOMALY_MIN_SAMPLE_SIZE',  6);
-
+define('ANOMALY_MIN_TOLERANCE',       10);
+define('NEIGHBOUR_DISTANCE',         0.7);
+define('ANOMALY_MIN_SAMPLE_SIZE',      6);
+define('FLAT_LINE_ANOMALY_MIN_VALUES', 5);
 
 /**
  * Detects anomalies on power production measurements.
@@ -41,24 +41,75 @@ define('ANOMALY_MIN_SAMPLE_SIZE',  6);
  * @param $resolution The measurement resolution.
  * @return the array of anomalous values, indexed by timestamp.
  */
-function logger_detect_anomalies($sensor, $unit, $period, $resolution) {
+function logger_detect_production_anomalies($sensor, $unit, $period, $resolution) {
 
   module_load_include('inc', 'logger', 'logger.rrd');  
 
   $measurements = logger_rrd_query_sensor(NULL, $sensor, $unit, $period, $resolution);
-  $historical_anomalies = logger_detect_historical_anomalies($measurements);
-  $neighbor_anomalies = logger_detect_neighbor_anomalies($measurements, $sensor, $unit, $period, $resolution);
+
+  $standard_anomalies = logger_detect_standard_anomalies($measurements, $sensor, $resolution);
+  //$historical_anomalies = logger_detect_historical_anomalies($measurements);
+  //$neighbor_anomalies = logger_detect_neighbor_anomalies($measurements, $sensor, $unit, $period, $resolution);
 
   $anomalies = array();
   foreach ($measurements as $timestamp => $value) {
 
-    //No model considers $value normal
-    if (isset($historical_anomalies[$timestamp]) && isset($neighbor_anomalies[$timestamp])) {
+    if (
+      //the other models need to agree that this is an anomaly
+      //isset($historical_anomalies[$timestamp]) && isset($neighbor_anomalies[$timestamp]) ||
+
+      //standard anomalies are always reported
+      isset($standard_anomalies[$timestamp])) {
 
       //Mark a segment as anomalous
       $anomalies[$timestamp - $resolution] = $measurements[$timestamp - $resolution];
       $anomalies[$timestamp] = $value;
       $anomalies[$timestamp + $resolution] = $measurements[$timestamp + $resolution];
+    }
+  }
+  return $anomalies;
+}
+
+/**
+ * Detects standard anomalies on power production measurements.
+ *
+ * @param $measurements The sensor measurements, indexed by timestamp.
+ * @param $sensor       The sensor whose measurements will be analyzed.
+ * @param $resolution   The measurement resolution.
+ * @return the array of sets, indexed by timestamp.
+ */
+function logger_detect_standard_anomalies($measurements, $sensor, $resolution) {
+
+  $anomalies = array();
+  $repetitions = 0;
+
+  foreach ($measurements as $timestamp => $value) {
+
+    $sun = date_sun_info($timestamp, $sensor->latitude, $sensor->longitude);
+
+    //during the day
+    if ($timestamp > $sun['sunrise'] + HOUR && $timestamp < $sun['sunset'] - HOUR) {
+
+      //zero
+      if ($value <= 0) {
+        $anomalies[$timestamp] = $value;
+      }
+
+      //flat line
+      if (isset($measurements[$timestamp - $resolution]) && $value == $measurements[$timestamp - $resolution]) {
+
+        if (++$repetitions >= FLAT_LINE_ANOMALY_MIN_VALUES) {
+
+          for ($t = $timestamp - ($repetitions * $resolution); $t <= $timestamp; $t++) {
+            if (isset($measurements[$t])) {
+              $anomalies[$t] = $measurements[$t];
+            }
+          }
+        }
+      }
+      else {
+        $repetitions = 0;
+      }
     }
   }
   return $anomalies;
@@ -144,11 +195,7 @@ function logger_detect_series_anomalies($measurements, $series) {
       $median = median($values);
       $median_deviation = median_deviation($values, $median);
 
-      $mean = mean($values);
-      $standard_deviation = standard_deviation($values, $mean);
- 
-      if (logger_is_anomalous($measurements[$timestamp], $median, $median_deviation) &&
-          logger_is_anomalous($measurements[$timestamp], $mean, $standard_deviation)) {
+      if (logger_is_anomalous($measurements[$timestamp], $median, $median_deviation)) {
 
         $anomalies[$timestamp] = $measurements[$timestamp];
       }
