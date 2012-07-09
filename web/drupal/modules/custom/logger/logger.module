@@ -1419,10 +1419,19 @@ function logger_get_forecast_chart_data($chart) {
     $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
-      logger_format_power_series_data($chart, $forecast);
+      logger_format_power_series_data($chart, $forecast['power']);
 
     $data['legend'][] =
       logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i++, $operations);
+
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
+
+    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Global Radiation"][$sensor->type] =
+      logger_format_power_series_data($chart, $forecast['globalradiation']);
+
+    $data['legend'][] =
+      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t('Global Radiation'), $i++, $operations);
+
   }
   return $data;
 }
@@ -1446,7 +1455,7 @@ function logger_get_anomaly_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $anomalies = logger_pv_detect_anomalies($sensor, $chart->unit, $chart->period, $chart->resolution);
+    $anomalies = logger_detect_production_anomalies($sensor, $chart->unit, $chart->period, $chart->resolution);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
