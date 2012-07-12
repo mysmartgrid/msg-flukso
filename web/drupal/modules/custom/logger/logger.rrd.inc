@@ -191,7 +191,6 @@ function logger_rrd_update($meter, $values) {
 /**
  * Queries the RRDs for sensor's measurements.
  *
- * @param $interval     The time interval. This argument is used to select the RRA.
  * @param $sensor       The sensor.
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
@@ -199,24 +198,23 @@ function logger_rrd_update($meter, $values) {
  * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price = NULL) {
+function logger_rrd_query_sensor($sensor, $unit, $period, $step, $price = NULL) {
 
   $series_id = METER;
-  $def = logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price);
+  $def = logger_rrd_sensor_def($series_id, $sensor, $unit, $price);
 
-  $latest = logger_rrd_latest_timestamp($interval, $sensor);
+  $latest = logger_rrd_latest_timestamp($sensor);
 
-  return logger_rrd_export($interval, $def, $series_id, $latest, TRUE, $period, $step);
+  return logger_rrd_export($def, $series_id, $latest, TRUE, $period, $step);
 }
 
 /**
  * Returns the timestamp of the latest update of a sensor.
  *
- * @param $interval  The time interval.
  * @param $sensor    The sensor.
  * @return the latest update timestamp.
  */
-function logger_rrd_latest_timestamp($interval, $sensor) {
+function logger_rrd_latest_timestamp($sensor) {
 
   $file_path = logger_rrd_file($sensor->meter);
 
@@ -229,7 +227,6 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
 /**
  * Queries the RRDs for sensors' aggregated measurements.
  *
- * @param $interval     The time interval.
  * @param $sensors      The array of sensors.
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
@@ -237,7 +234,7 @@ function logger_rrd_latest_timestamp($interval, $sensor) {
  * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'. 
  * @return the array of sensor's measurements.
  */
-function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price = NULL) {
+function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
 
   //Latest measurements are not considered, in order to tolerate message delays.
   $end_time = REQUEST_TIME - 5 * MINUTE;
@@ -249,7 +246,7 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price
 
     $sensor_cdef = METER . $i;
 
-    $sensor_def = logger_rrd_sensor_def($interval, $sensor_cdef, $sensor, $unit, $price);
+    $sensor_def = logger_rrd_sensor_def($sensor_cdef, $sensor, $unit, $price);
 
     if ($sensor_def) {
 
@@ -273,46 +270,60 @@ function logger_rrd_query_agg($interval, $sensors, $unit, $period, $step, $price
   //Sum all measurements of a particular time
   $def .= "CDEF:$series_id=$variables$operators ";
 
-  return logger_rrd_export($interval, $def, $series_id, REQUEST_TIME, FALSE, $period, $step);
+  return logger_rrd_export($def, $series_id, REQUEST_TIME, FALSE, $period, $step);
 }
 
 /**
- * Queries the total energy consumption during the specified time period, in watt-hour.
+ * Queries the total energy consumption measured by a set of sensors during the specified time period, in watt-hour.
  *
  * @param $sensors    The sensors whose measurements are to be summed up.
  * @param $unit       The energy unit.
- * @param $interval   The time interval menu option.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
  * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
- * @return the summed power consumption.
+ * @return the summed energy consumption.
  */
-function logger_rrd_query_energy($sensors, $unit, $interval, $period, $step, $prices = NULL) {
+function logger_rrd_query_total_energy($sensors, $unit, $period, $step, $prices = NULL) {
 
-  $total = 0;
+  $measurements = logger_rrd_query_energy($sensors, $unit, $period, $step, $prices);
+  return array_sum($measurements);
+}
+
+/**
+ * Queries the energy consumption of a set of sensors during the specified time period, in watt-hour.
+ *
+ * @param $sensors    The sensors whose measurements are to be summed up, for each timestamp.
+ * @param $unit       The energy unit.
+ * @param $period     An array containing a period of time to be queried.
+ * @param $step       The amount of time aggregated in a single point.
+ * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
+ * @return the array of energy consumption, indexed by timestamp.
+ */
+function logger_rrd_query_energy($sensors, $unit, $period, $step, $prices = NULL) {
+
+  $measurements = array();
 
   foreach ($sensors as $sensor) {
     $price = isset($prices[$sensor->type_id]) ? $prices[$sensor->type_id] : NULL;
-    $measurements = logger_rrd_query_sensor($interval, $sensor, $unit, $period, $step, $price);
+    $m = logger_rrd_query_sensor($sensor, $unit, $period, $step, $price);
 
-    foreach ($measurements as $timestamp => $value) {
-      $total += $value * $step;
+    foreach ($m as $timestamp => $value) {
+      $measurements[$timestamp] = (isset($measurements[$timestamp]) ? $measurements[$timestamp] : 0) + $value * $step;
     }
   }
-  return $total;
+  return $measurements;
 }
 
 /**
  * Creates a DEF tag to represent sensor's measurements plotted in a chart series.
  *
- * @param $interval    The time interval.
  * @param $series_id   The series id.
  * @param $sensor      The sensor.
  * @param $unit        The unit.
  * @param $price       The price of kWh, when the unit id either 'eur' or 'eur/year'.
  * @return the DEF tag.
  */
-function logger_rrd_sensor_def($interval, $series_id, $sensor, $unit, $price = NULL) {
+function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
 
   global $user;
 
@@ -351,7 +362,7 @@ function logger_rrd_file($meter) {
  * @param $step          The amount of time aggregated in a single point.
  * @return the array of sensors' measurements.
  */
-function logger_rrd_export($interval, $def, $exported_cdef, $latest, $include_nan, $period, $step) {
+function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period, $step) {
 
   if (!$def) {
     return array();

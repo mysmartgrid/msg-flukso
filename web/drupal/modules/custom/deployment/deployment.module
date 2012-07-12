@@ -217,7 +217,6 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
  *   state_id   The state id.
  *   user_name  The user name.
  *   email      Part of the user email.
- *   type_id    The sensor type id.
  * @return the device list page.
  */
 function deployment_list_page() {

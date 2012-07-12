@@ -184,6 +184,26 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['balance'] = array(
+    'title' => 'Your power balance',
+    'description' => 'Show the power balance page',
+    'page callback' => 'logger_balance_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_producer_access',
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['selfconsumption'] = array(
+    'title' => 'Your power self consumption',
+    'description' => 'Show the power self consumption page',
+    'page callback' => 'logger_selfconsumption_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_producer_access',
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
   $items['logger/setvariable'] = array(
     'title' => 'Sets a logger variable',
     'page callback' => 'logger_set_variable',
@@ -205,16 +225,6 @@ function logger_menu() {
     'page callback' => 'logger_download_chart_data_file',
     'page arguments' => array(2),
     'access callback' => TRUE,
-    'type' => MENU_CALLBACK,
-  );
-
-  $items['selfconsumption'] = array(
-    'title' => 'Your power self consumption',
-    'description' => 'Show the power self consumption page',
-    'page callback' => 'logger_selfconsumption_page',
-    'page arguments' => array(1),
-    'access callback' => 'logger_producer_access',
-    'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
   );
 
@@ -486,7 +496,7 @@ function logger_mobile_page() {
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
       ($forecast_access ?
       logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') .
-      logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/selfconsumption') : '') .
+      logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/power/balance') : '') .
       logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
       logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
       logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
@@ -601,12 +611,12 @@ function logger_anomaly_page($interval) {
 }
 
 /**
- * Builds the power self consumption page.
+ * Builds the power balance page.
  *
  * @param $interval The time interval.
- * @return the power self consumption page.
+ * @return the power balance page.
  */
-function logger_selfconsumption_page($interval) {
+function logger_balance_page($interval) {
 
   global $user;
 
@@ -614,7 +624,7 @@ function logger_selfconsumption_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
-  return logger_power_chart_page($interval, 'selfconsumption', t('Your power self consumption'), $sensors, $types);
+  return logger_power_chart_page($interval, 'balance', t('Your power balance'), $sensors, $types);
 }
 
 /**
@@ -655,8 +665,8 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types, 
   $smoothing_level = logger_get_variable('smoothing_level', 1);
   $net_production = logger_get_variable('net_production', 1) == 1;
 
-  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2), array($yvalue1, $yvalue2), FALSE,
-    $price1, $price2, FALSE, $filled, $step_plot, $smoothing_level, $net_production, $show_slider);
+  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2),
+    array($yvalue1, $yvalue2), FALSE, $price1, $price2, FALSE, $filled, $step_plot, $smoothing_level, $net_production, $show_slider);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -749,9 +759,6 @@ function logger_relative_energy_consumption_page() {
 
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $all_sensors = logger_get_sensors($types, array($user->uid));
-  $unit = logger_get_variable('relativechart_unit', 'kWh');
-  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
-  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
 
   $sensors = array();
   foreach ($all_sensors as $sensor) {
@@ -766,19 +773,11 @@ function logger_relative_energy_consumption_page() {
     logger_set_variable('selected_meters', $all_meters);
   }
 
-  $chart = logger_create_chart_object('relative', $types, 'year', $unit, $sensors, array(0, 0), array(0, 0), FALSE, $price1, NULL, TRUE);
-
-  drupal_set_title(t('Your relative energy consumption'));
-
-  $form = drupal_get_form('logger_relativechart_form', $chart);
-
-  return t('The following chart allows you to compare current and previous levels of ' .
+  $introduction = t('The following chart allows you to compare current and previous levels of ' .
     'energy consumption in six different time frames: hour, day, week, month, and year. ' .
-    'The bars are explained in the legend bellow.') . '<br><br>' .
+    'The bars are explained in the legend bellow.');
 
-    theme('logger_energy_chart_area', array('chart' => $chart)) .
-
-    drupal_render($form);
+  return logger_energy_chart_page('year', 'relative', t('Your relative energy consumption'), $sensors, $types, TRUE, $introduction);
 }
 
 /**
@@ -790,27 +789,6 @@ function logger_relative_energy_consumption_page() {
 function logger_energy_page($interval) {
 
   global $user;
-
-  $interval = $interval ? $interval : 'week';
-  $window = logger_get_default_time_window($interval);
-  if (!$window) {
-    drupal_goto('energy', array(), 301);
-  }
-
-  if ($interval == 'year') {
-    $start = mktime(0, 0, 0, date('n') - 11, 1);
-    $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
-  }
-  else {
-    $sub_interval = logger_get_sub_interval($interval);
-    $sub_time_window = logger_get_default_time_window($sub_interval);
-
-    $now = REQUEST_TIME;
-    //The offset is subtracted here to assure the hour 00:00 on the user timezone, and not on UTC
-    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - ($now % $sub_time_window) - get_timezone_offset();
-    $start -= $interval == 'month' ? 3 * DAY : 0;
-    $end = $start + round($window / $sub_time_window) * $sub_time_window;
-  }
 
   $all_types_options = logger_get_sensor_types_options($user->uid);
   $selected_types_options = logger_get_variable('selected_sensor_types', $all_types_options);
@@ -827,19 +805,10 @@ function logger_energy_page($interval) {
   }
 
   $sensors = logger_get_sensors($types, array($user->uid));
-  $aggregate_sensors = logger_get_variable('aggregate_sensors', 1);
-  $unit = logger_get_variable('energychart_unit', 'kWh');
-  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
-  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
-  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
-
-  $chart = logger_create_chart_object('energy', $types, $interval, $unit, $sensors, array($start, $end), array(0, 0), $aggregate_sensors, $price1, $price2);
 
   //TODO: refactor
   $consumed = isset($chart->data['last'][CONSUMPTION_SENSOR_TYPE]) ? $chart->data['last'][CONSUMPTION_SENSOR_TYPE] : 0;
   $produced = isset($chart->data['last'][PRODUCTION_SENSOR_TYPE]) ? $chart->data['last'][PRODUCTION_SENSOR_TYPE] : 0;
-
-  drupal_set_title(t('Your energy consumption and production'));
 
   $today = array(
     'day' => 'In the last 6 hours',
@@ -847,10 +816,8 @@ function logger_energy_page($interval) {
     'month' => 'This week',
     'year' => 'This month',
   );
-  
-  $form = drupal_get_form('logger_energychart_form', $chart);
 
-  return t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
+  $introduction = t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
     "The following chart shows your energy consumption and production !interval.",
     array(
       '!today' => t($today[$interval]),
@@ -858,7 +825,78 @@ function logger_energy_page($interval) {
       '%produced' => number_format($produced, 2, '.', ''),
       '%unit' => t($unit),
       '!interval' => t("along the $interval"),
-    )) . '<br><br>' .
+    ));
+
+  return logger_energy_chart_page($interval, 'energy', t('Your energy consumption and production'), $sensors, $types, FALSE, $introduction);
+}
+
+/**
+ * Builds the power self consumption page.
+ *
+ * @param $interval The time interval.
+ * @return the power self consumption page.
+ */
+function logger_selfconsumption_page($interval) {
+
+  global $user;
+
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($types, array($user->uid));
+  $introduction = t('The following chart allows you to compare your energy self consumption, power grid supply, and power grid demand.');
+
+  return logger_energy_chart_page($interval, 'selfconsumption', t('Your energy self consumption'), $sensors, $types, FALSE, $introduction);
+}
+
+/**
+ * Builds an energy chart page.
+ *
+ * @param $interval      The time interval.
+ * @param $context       The chart context.
+ * @param $title         The page title.
+ * @param $sensors       The sensors plotted on the chart.
+ * @param $types         The types of sensors plotted on the chart.
+ * @param $stacked       Whether the chart has stacked bars or not.
+ * @param $introduction  A paragraph that introduces the user to the page.
+ * @return the power consumption page.
+ */
+function logger_energy_chart_page($interval, $context, $title, $sensors, $types, $stacked, $introduction) {
+
+  $interval = $interval ? $interval : 'week';
+  $window = logger_get_default_time_window($interval);
+  if (!$window) {
+    drupal_goto('energy', array(), 301);
+  }
+
+  //FIXME: refactor this
+  if ($interval == 'year') {
+    $start = mktime(0, 0, 0, date('n') - 11, 1);
+    $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
+  }
+  else {
+    $sub_interval = logger_get_sub_interval($interval);
+    $sub_time_window = logger_get_default_time_window($sub_interval);
+
+    $now = REQUEST_TIME;
+    //The offset is subtracted here to assure the hour 00:00 on the user timezone, and not on UTC
+    $start = $now - (round($window / $sub_time_window) - 1) * $sub_time_window - ($now % $sub_time_window) - get_timezone_offset();
+    $start -= $interval == 'month' ? 3 * DAY : 0;
+    $end = $start + round($window / $sub_time_window) * $sub_time_window;
+  }
+
+  $unit = logger_get_variable('energychart_unit', 'kWh');
+  $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
+  $price1 = $use_sensor_prices ? NULL : logger_get_variable('price1', 0.18);
+  $price2 = $use_sensor_prices ? NULL : logger_get_variable('price2', 0.18);
+  $aggregate_sensors = logger_get_variable('aggregate_sensors', 1);
+
+  $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($start, $end),
+    array(0, 0), $aggregate_sensors, $price1, $price2, $stacked, TRUE, FALSE, 1, FALSE, FALSE);
+
+  drupal_set_title($title);
+
+  $form = drupal_get_form('logger_energychart_form', $chart);
+
+  return $introduction . '<br><br>' .
 
     theme('logger_energy_chart_area', array('chart' => $chart)) .
 
@@ -1040,8 +1078,8 @@ function logger_get_relative_chart_data($chart) {
     $period1 = array('start' => $time1, 'end' => $time2);
     $period2 = array('start' => $time2, 'end' => $time3);
 
-    $current  = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period2, $resolution, $chart->prices);
-    $previous = logger_rrd_query_energy($chart->sensors, $chart->unit, $interval, $period1, $resolution, $chart->prices);
+    $current  = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period2, $resolution, $chart->prices);
+    $previous = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period1, $resolution, $chart->prices);
 
     $so_far    = min($previous, $current);
     $remaining = max($previous - $current, 0);
@@ -1166,7 +1204,7 @@ function logger_get_energy_chart_data(&$chart) {
       }
 
       $period = array('start' => $start, 'end' => $end);
-      $value = logger_rrd_query_energy($series_sensors, $chart->unit, $sub_interval, $period, $chart->resolution, $chart->prices);
+      $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $chart->resolution, $chart->prices);
 
       $end -= 1; //from 00:00:00 until 23:59:59 on user timezone
       $period['end'] = $end;
@@ -1223,7 +1261,7 @@ function logger_get_energy_chart_data(&$chart) {
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][t($sensor->type)] = $series;
     $data['labels'][$sensor->meter][t($sensor->type)] = $data_labels;
-    $data['legend'][] = logger_create_energy_legend_line($sensor, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
+    $data['legend'][] = logger_create_energy_legend_line($sensor->username, $sensor->function, $sensor->type, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
   }
   $data['last'] = $last;
 
@@ -1231,9 +1269,101 @@ function logger_get_energy_chart_data(&$chart) {
 }
 
 /**
+ * Returns an array containing all power self consumption chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_selfconsumption_chart_data($chart) {
+
+  global $user;
+
+  module_load_include('inc', 'logger', 'logger.rrd');
+
+  $groups = array();
+  foreach ($chart->sensors as &$sensor) {
+    $type = $sensor->type_id;
+    $groups[$type][] = $sensor;
+  }
+
+  $sub_interval = logger_get_sub_interval($chart->interval);
+  $sub_time_window = logger_get_default_time_window($sub_interval);
+  $chart->period = array('start' => $chart->xaxis[0], 'end' => $chart->xaxis[1] - $sub_time_window);//FIXME: get rid of this line
+
+  $group_values = array();
+  foreach ($groups as $type => $group_sensors) {
+    $group_values[$type] = logger_rrd_query_energy($group_sensors, $chart->unit, $chart->period, MINUTE, $chart->prices);
+  }
+
+  $consumed = array();
+  $produced = array();
+
+  foreach ($group_values as $type => $type_values) {
+    foreach ($type_values as $time => $value) {
+
+      if ($type == CONSUMPTION_SENSOR_TYPE) {
+        $consumed[$time] = $value;
+        $produced[$time] = isset($produced[$time]) ? $produced[$time] : 0;
+      }
+      else {
+        $produced[$time] = $value;
+        $consumed[$time] = isset($consumed[$time]) ? $consumed[$time] : 0;
+      }
+    }
+  }
+
+  $self_consumption = array();
+  $grid_supply = array();
+  $grid_demand = array();
+
+  foreach (array_keys($consumed) as $time) {
+
+    $title = $time - ($time % $sub_time_window) + $sub_time_window - get_timezone_offset();
+    $title = t(date("l", $title)) . '<br>' . date("d", $title) . '-' . t(date("M", $title));
+
+    if (!isset($self_consumption[$title])) {
+      $self_consumption[$title] = 0;
+      $grid_supply[$title] = 0;
+      $grid_demand[$title] = 0;
+    }
+
+    if ($consumed[$time] < $produced[$time]) {
+      $self_consumption[$title] += $consumed[$time];
+      $grid_supply[$title] += $produced[$time] - $consumed[$time];
+    }
+    else {
+      $self_consumption[$title] += $produced[$time];
+      $grid_demand[$title] = $consumed[$time] - $produced[$time];
+    }
+  }
+
+  $series = array(
+    'Self Consumption' => $self_consumption,
+    'Power Grid Supply' => $grid_supply,
+    'Power Grid Demand' => $grid_demand);
+
+  foreach ($series as $name => $values) {
+
+    $sum = array_sum($values);
+    $min = min($values);
+    $max = max($values);
+    $total = count($values);
+    $min_day = strtok(array_search($min, $values), '<');
+    $max_day = strtok(array_search($max, $values), '<');
+
+    $data['series'][$user->uid][$user->name][t('All')][t($name)] = $values;
+    $data['labels'][t('All')][t($name)] = $values;
+    $data['legend'][] = logger_create_energy_legend_line($user->name, t('All'), t($name), $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
+  }
+  return $data;
+}
+
+/**
  * Creates a line for the energy consumption chart legend.
  * 
- * @param $sensor      The sensor object.
+ * @param $username    The user name.
+ * @param $function    The sensor function.
+ * @param $type        The sensor type.
  * @param $min         The minimum value on the period.
  * @param $max         The maximum value on the period.
  * @param $total       The number of values.
@@ -1243,12 +1373,12 @@ function logger_get_energy_chart_data(&$chart) {
  * @param $interval    The chart time interval name.
  * @return the legend line.
  */
-function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $min_time, $max_time, $interval) {
+function logger_create_energy_legend_line($username, $function, $type, $min, $max, $total, $sum, $min_time = NULL, $max_time = NULL, $interval = NULL) {
 
   return array(
-    t('User') => $sensor->username,
-    t('Sensor') => $sensor->function,
-    t('Type') => t($sensor->type),
+    t('User') => $username,
+    t('Sensor') => $function,
+    t('Type') => t($type),
     t('Min') => $total > 0 ? logger_format_energy_legend_record($min, $min_time, $interval) : '',
     t('Max') => $total > 0 ? logger_format_energy_legend_record($max, $max_time, $interval) : '',
     t('Avg') => $total > 0 ? $sum / $total : '',
@@ -1260,19 +1390,20 @@ function logger_create_energy_legend_line(&$sensor, $min, $max, $total, $sum, $m
  * Formats a record consumption (either min or max) to be shown on a cell of 
  * the energy consumption chart legend.
  *  
- * @param $min         The record value.
+ * @param $value       The record value.
  * @param $record_time The record time.
  * @param $interval    The chart time interval name.
  * @return the formatted record.
  */
 function logger_format_energy_legend_record($value, $record_time, $interval) {
 
-  $prep = $interval == 'year' ? 'in' : 'am';
+  $value = number_format($value, 2, '.', '');
 
-  return t("%value $prep %day", array(
-    '%value' => number_format($value, 2, '.', ''),
-    '%day' => $record_time,
-  ));
+  if ($record_time && $interval) {
+    $prep = $interval == 'year' ? 'in' : 'am';
+    $value = t("%value $prep %day", array('%value' => $value, '%day' => $record_time));
+  }
+  return $value;
 }
 
 /**
@@ -1299,10 +1430,10 @@ function logger_get_power_chart_data($chart) {
     //TODO: make a single call
     if ($sensor->virtual) {
       $aggregated = logger_get_aggregated_sensors($sensor->meter);
-      $measurements = logger_rrd_query_agg($chart->interval, $aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
+      $measurements = logger_rrd_query_agg($aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
     }
     else {
-      $measurements = logger_rrd_query_sensor($chart->interval, $sensor, $chart->unit, $chart->period, $chart->resolution, $price);
+      $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, $price);
     }
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
@@ -1318,12 +1449,12 @@ function logger_get_power_chart_data($chart) {
 }
 
 /**
- * Returns an array containing all self consumption chart data.
+ * Returns an array containing all power balance chart data.
  *
  * @param $chart  The chart object with the parameters for the data query.
  * @return the chart data.
  */
-function logger_get_selfconsumption_chart_data($chart) {
+function logger_get_balance_chart_data($chart) {
 
   global $user;
 
@@ -1342,7 +1473,7 @@ function logger_get_selfconsumption_chart_data($chart) {
       $type_names[$type_id] = $sensors[0]->type;
       $price = ($type_id == CONSUMPTION_SENSOR_TYPE) ? $chart->price1 : $chart->price2;
 
-      $measurements[$type_id] = logger_rrd_query_agg($chart->interval, $sensors, $chart->unit, $chart->period, $chart->resolution, $price);
+      $measurements[$type_id] = logger_rrd_query_agg($sensors, $chart->unit, $chart->period, $chart->resolution, $price);
     }
   }
 
@@ -1500,7 +1631,7 @@ function logger_get_overview_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $measurements = logger_rrd_query_agg($chart->interval, $chart->sensors, $chart->unit, $chart->period, $chart->resolution);
+  $measurements = logger_rrd_query_agg($chart->sensors, $chart->unit, $chart->period, $chart->resolution);
 
   $values = logger_format_power_series_data($chart, $measurements);
   $type = $chart->sensors[0]->type; //For instance, just consumption
@@ -1844,9 +1975,9 @@ function theme_logger_power_chart_area($variables) {
 }
 
 /**
- * Builds the energy consumption chart area.
+ * Builds the energy chart area.
  *
- * @param $chart   The energy consumption chart object.
+ * @param $chart   The energy chart object.
  * @return the chart area output.
  */
 function theme_logger_energy_chart_area($variables) {
@@ -2050,6 +2181,7 @@ function logger_get_series_colors($chart_id) {
   $palettes['energy'] = array_reverse($palettes['power']);
   $palettes['overview'] = $palettes['power'];
   $palettes['relative'] = $palettes['energy'];
+  $palettes['selfconsumption'] = $palettes['energy'];
 
   $palette = isset($palettes[$chart_id]) ? $palettes[$chart_id] : $palettes['power'];
 
@@ -2118,29 +2250,50 @@ function logger_energychart_form($form, &$form_state, $chart) {
 
   global $user;
 
-  $types_options = logger_get_sensor_types_options($user->uid);
-  $selected_types = logger_get_variable('selected_sensor_types', array_keys($types_options));
-
   $form['#validate'] = array('logger_chartform_validate');
 
-  $form['aggregate_sensors'] = array(
-    '#type' => 'checkbox',
-    '#title' => t("Sum of sensor readings"),
-    '#description' => t('Do you want to sum up all sensors?'),
-    '#default_value' => logger_get_variable('aggregate_sensors', 1),
-    '#return_value' => 1,
-    '#attributes' => array('onclick' => 'submitEnergyChartForm(this)'), //In IE, onchange does not work
-  );
+  $submitjs = $chart->context == 'relative' ? 'submitRelativeChartForm(this)' : 'submitEnergyChartForm(this)';
 
-  $form['selected_sensor_types'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Sensor types'),
-    '#description' => t('Select the types of sensors to be shown on the chart.'),
-    '#default_value' => $selected_types,
-    '#options' => $types_options,
-    '#required' => TRUE,
-    '#attributes' => array('onclick' => 'submitEnergyChartForm(this)'), //In IE, onchange does not work
-  );
+  if ($chart->context == 'energy') {
+
+    $types_options = logger_get_sensor_types_options($user->uid);
+    $selected_types = logger_get_variable('selected_sensor_types', array_keys($types_options));
+
+    $form['aggregate_sensors'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Sum of sensor readings"),
+      '#description' => t('Do you want to sum up all sensors?'),
+      '#default_value' => logger_get_variable('aggregate_sensors', 1),
+      '#return_value' => 1,
+      '#attributes' => array('onclick' => $submitjs), //In IE, onchange does not work
+    );
+
+    $form['selected_sensor_types'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Sensor types'),
+      '#description' => t('Select the types of sensors to be shown on the chart.'),
+      '#default_value' => $selected_types,
+      '#options' => $types_options,
+      '#required' => TRUE,
+      '#attributes' => array('onclick' => $submitjs), //In IE, onchange does not work
+    );
+  }
+
+  if ($chart->context == 'relative') {
+
+    $meter_options = logger_get_meters_options($chart->types);
+
+    $form['selected_meters'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Sensors'),
+      '#description' => t('Select the sensors you want to plot on the chart.'),
+      '#default_value' => logger_get_variable('selected_meters', array_keys($meter_options)),
+      '#options' => $meter_options,
+      '#required' => TRUE,
+      '#attributes' => array('onclick' => $submitjs), //In IE, onchange does not work
+    );
+    $selected_types = array(CONSUMPTION_SENSOR_TYPE);
+  }
 
   $form['unit'] = array(
     '#type' => 'select',
@@ -2149,7 +2302,7 @@ function logger_energychart_form($form, &$form_state, $chart) {
     '#options' => logger_get_energy_units_options(),
     '#default_value' => $chart->unit,
     '#required' => TRUE,
-    '#attributes' => array('onchange' => 'submitEnergyChartForm(this)'),
+    '#attributes' => array('onchange' => $submitjs),
   );
 
   if (user_has_role('Expert')) {
@@ -2163,7 +2316,7 @@ function logger_energychart_form($form, &$form_state, $chart) {
         '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
         '#default_value' => $use_sensor_prices,
         '#return_value' => 1,
-        '#attributes' => array('onclick' => 'submitEnergyChartForm()'), //In IE, onchange does not work
+        '#attributes' => array('onclick' => $submitjs), //In IE, onchange does not work
       );
 
       if (!$use_sensor_prices) {
@@ -2190,68 +2343,6 @@ function logger_energychart_form($form, &$form_state, $chart) {
             '#field_suffix' => ' / kWh',
           );
         }
-      }
-    }
-  }
-
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Refresh'),
-  );
-  return $form;
-}
-
-function logger_relativechart_form($form, &$form_state, $chart) {
-
-  $meter_options = logger_get_meters_options($chart->types);
-
-  $form['#validate'] = array('logger_chartform_validate');
-
-  $form['selected_meters'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Sensors'),
-    '#description' => t('Select the sensors you want to plot on the chart.'),
-    '#default_value' => logger_get_variable('selected_meters', array_keys($meter_options)),
-    '#options' => $meter_options,
-    '#required' => TRUE,
-    '#attributes' => array('onclick' => 'submitRelativeChartForm(this)'), //In IE, onchange does not work
-  );
-
-  $form['unit'] = array(
-    '#type' => 'select',
-    '#title' => t('Unit'),
-    '#description' => t('Select the chart unit.'),
-    '#options' => logger_get_energy_units_options(),
-    '#default_value' => $chart->unit,
-    '#required' => TRUE,
-    '#attributes' => array('onchange' => 'submitRelativeChartForm(this)'),
-  );
-
-  if (user_has_role('Expert')) {
-
-    if (strpos(" $chart->unit", 'eur') > 0) {
-      $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
-
-      $form['use_sensor_prices'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Use sensor prices'),
-        '#description' => t('Do you want the chart series to use the prices defined for each sensor?'),
-        '#default_value' => $use_sensor_prices,
-        '#return_value' => 1,
-        '#attributes' => array('onclick' => 'submitRelativeChartForm()'), //In IE, onchange does not work
-      );
-
-      if (!$use_sensor_prices) {
-        $form['price1'] = array(
-          '#type' => 'textfield',
-          '#title' => t('Energy Consumption Price'),
-          '#description' => t("Enter the energy consumption price."),
-          '#maxlength' => 6,
-          '#size' => 6,
-          '#field_prefix' => '€ ',
-          '#default_value' => $chart->price1,
-          '#field_suffix' => ' / kWh',
-        );
       }
     }
   }
@@ -2667,9 +2758,15 @@ function logger_energychart_form_submit($form, &$form_state) {
   if (isset($form_state['values']['price2'])) {
     logger_set_variable('price2', $form_state['values']['price2']);
   }
-
-  logger_set_variable('aggregate_sensors', $form_state['values']['aggregate_sensors']);
-  logger_set_variable('selected_sensor_types', $form_state['values']['selected_sensor_types']);
+  if (isset($form_state['values']['selected_meters'])) {
+    logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
+  }
+  if (isset($form_state['values']['aggregate_sensors'])) {
+    logger_set_variable('aggregate_sensors', $form_state['values']['aggregate_sensors']);
+  }
+  if (isset($form_state['values']['selected_sensor_types'])) {
+    logger_set_variable('selected_sensor_types', $form_state['values']['selected_sensor_types']);
+  }
   logger_set_variable('energychart_unit', $form_state['values']['unit']);
 }
 
@@ -2698,19 +2795,6 @@ function logger_powerchart_form_submit($form, &$form_state) {
 
   //FIXME: get rid of this redirection
   $form_state['redirect'] = array($_GET['q'], array('query' => $_REQUEST));
-}
-
-function logger_relativechart_form_submit($form, &$form_state) {
-
-  if (isset($form_state['values']['use_sensor_prices'])) {
-    logger_set_variable('use_sensor_prices', $form_state['values']['use_sensor_prices']);
-  }
-  if (isset($form_state['values']['price1'])) {
-    logger_set_variable('price1', $form_state['values']['price1']);
-  }
-
-  logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
-  logger_set_variable('relativechart_unit', $form_state['values']['unit']);
 }
 
 /**
@@ -3239,7 +3323,7 @@ function logger_query_device_measurements($interval, $device) {
   $measurements = array();
   foreach ($sensors as $sensor) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($interval, $sensor, 'watt', $period, $resolution);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($sensor, 'watt', $period, $resolution);
   }
   return $measurements;
 }
@@ -3669,7 +3753,7 @@ function logger_update_pvcast_models() {
     $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
-      $measurements = logger_rrd_query_sensor('day', $sensor, 'watt', $period, HOUR);
+      $measurements = logger_rrd_query_sensor($sensor, 'watt', $period, HOUR);
       if (!empty($measurements)) {
         pvcast_update_model($sensor->meter, $measurements);
       }

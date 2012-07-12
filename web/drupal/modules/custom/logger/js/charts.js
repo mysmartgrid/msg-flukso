@@ -168,13 +168,28 @@ function enableFilledGraph() {
 
 function submitEnergyChartForm(clickedField) {
 
+  //If form contains field selected_sensor_types, at least one option must be selected
+
   var form = document.getElementById('logger-energychart-form');
+  var found = false;
+  var checked = false;
+
   for(var i = 0; i < form.elements.length; i++) {
-    if (form.elements[i].name.indexOf('selected_sensor_types', 0) == 0 && form.elements[i].checked) {
-      form.submit();
-      return;
+
+    if (form.elements[i].name.indexOf('selected_sensor_types', 0) == 0) {
+      found = true;
+      if (form.elements[i].checked) {
+        checked = true;
+        break;
+      }
     }
   }
+
+  if (!found || checked) {
+    form.submit();
+    return;
+  }
+
   clickedField.checked = true;
 }
 

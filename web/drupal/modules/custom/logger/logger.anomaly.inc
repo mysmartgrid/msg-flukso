@@ -45,7 +45,7 @@ function logger_detect_production_anomalies($sensor, $unit, $period, $resolution
 
   module_load_include('inc', 'logger', 'logger.rrd');  
 
-  $measurements = logger_rrd_query_sensor(NULL, $sensor, $unit, $period, $resolution);
+  $measurements = logger_rrd_query_sensor($sensor, $unit, $period, $resolution);
 
   $standard_anomalies = logger_detect_standard_anomalies($measurements, $sensor, $resolution);
   //$historical_anomalies = logger_detect_historical_anomalies($measurements);
@@ -143,7 +143,7 @@ function logger_detect_neighbor_anomalies($measurements, $sensor, $unit, $period
 
     if (!empty($pv->function) && $pv->meter != $sensor->meter) {
 
-      $values = logger_rrd_query_sensor(NULL, $pv, $unit, $period, $resolution);
+      $values = logger_rrd_query_sensor($pv, $unit, $period, $resolution);
 
       foreach ($values as $timestamp => $value) {
         if (isset($value)) {
