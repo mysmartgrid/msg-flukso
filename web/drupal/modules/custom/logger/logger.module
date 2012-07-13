@@ -194,10 +194,10 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['selfconsumption'] = array(
-    'title' => 'Your power self consumption',
-    'description' => 'Show the power self consumption page',
-    'page callback' => 'logger_selfconsumption_page',
+  $items['onsite'] = array(
+    'title' => 'Your on-site energy consumption',
+    'description' => 'Show the on-site energy consumption page',
+    'page callback' => 'logger_onsite_page',
     'page arguments' => array(1),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('view logger charts'),
@@ -663,10 +663,9 @@ function logger_power_chart_page($interval, $context, $title, $sensors, $types, 
   $filled = logger_get_variable('filled_graph', 1) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smoothing_level = logger_get_variable('smoothing_level', 1);
-  $net_production = logger_get_variable('net_production', 1) == 1;
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2),
-    array($yvalue1, $yvalue2), FALSE, $price1, $price2, FALSE, $filled, $step_plot, $smoothing_level, $net_production, $show_slider);
+    array($yvalue1, $yvalue2), FALSE, $price1, $price2, FALSE, $filled, $step_plot, $smoothing_level, $show_slider);
 
   $form = drupal_get_form('logger_powerchart_form', $chart);
 
@@ -809,6 +808,7 @@ function logger_energy_page($interval) {
   //TODO: refactor
   $consumed = isset($chart->data['last'][CONSUMPTION_SENSOR_TYPE]) ? $chart->data['last'][CONSUMPTION_SENSOR_TYPE] : 0;
   $produced = isset($chart->data['last'][PRODUCTION_SENSOR_TYPE]) ? $chart->data['last'][PRODUCTION_SENSOR_TYPE] : 0;
+  $interval = $interval ? $interval : 'week';
 
   $today = array(
     'day' => 'In the last 6 hours',
@@ -831,20 +831,20 @@ function logger_energy_page($interval) {
 }
 
 /**
- * Builds the power self consumption page.
+ * Builds the on-site energy consumption page.
  *
  * @param $interval The time interval.
- * @return the power self consumption page.
+ * @return the on-site energy consumption page.
  */
-function logger_selfconsumption_page($interval) {
+function logger_onsite_page($interval) {
 
   global $user;
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
-  $introduction = t('The following chart allows you to compare your energy self consumption, power grid supply, and power grid demand.');
+  $introduction = t('The following chart allows you to compare your on-site energy consumption, power grid supply, and power grid demand.');
 
-  return logger_energy_chart_page($interval, 'selfconsumption', t('Your energy self consumption'), $sensors, $types, FALSE, $introduction);
+  return logger_energy_chart_page($interval, 'onsite', t('Your on-site energy consumption'), $sensors, $types, FALSE, $introduction);
 }
 
 /**
@@ -920,11 +920,10 @@ function logger_energy_chart_page($interval, $context, $title, $sensors, $types,
  * @param $filled             Whether the chart lines should be filled.
  * @param $step_plot          Whether the chart lines should be stepped.
  * @param $smoothing_level    The smoothing level of the chart lines.
- * @param $net_production     Whether the chart should show net production.
  * @param $show_slider        Whether or not the chart has a slider.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $net_production = FALSE, $show_slider = TRUE) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $price1 = NULL, $price2 = NULL, $stacked = FALSE, $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $show_slider = TRUE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -943,7 +942,6 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $chart->filled = $filled;
   $chart->step_plot = $step_plot;
   $chart->smoothing_level = $smoothing_level;
-  $chart->net_production = $net_production;
   $chart->show_slider = $show_slider;
 
   if (!($xaxis[0] > 0 && $xaxis[1] > 0)) {
@@ -966,7 +964,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
-  $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors $net_production";
+  $unique_id = "$context " . implode(',', $types) . " $unit $price1 $price2 $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter $sensor->type $sensor->forecast";
   }
@@ -1111,6 +1109,39 @@ function logger_get_relative_chart_data($chart) {
 }
 
 /**
+ * Formats a chart series period, to be shown as a series title.
+ * 
+ * @param $interval  The chart time interval. 
+ * @param $period    The series period of time.
+ */
+function logger_format_series_period($interval, $period) {
+
+  $start = $period['start'];
+  $end = $period['end'] - 1; //from 00:00:00 until 23:59:59 on user timezone
+  $period['end'] = $end;
+
+  switch ($interval) {
+    case 'day':
+      $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
+      $complement = logger_format_period('dayquarter', $period);
+      break;
+    case 'week':
+      $formatted_time = t(date("l", $start));
+      $complement = date("d", $start) . '-' . t(date("M", $start));
+      break;
+    case 'month':
+      $formatted_time = t('Week') . ' ' . date("W", $start);
+      $complement = logger_format_period('week', $period);
+      break;
+    case 'year':
+      $formatted_time = t(date("M", $start));
+      $complement = date("Y", $start);
+      break;
+  }
+  return $formatted_time . '<br>' . $complement;
+}
+
+/**
  * Formats a period of time array for exhibition.
  * 
  * @param $interval  The time interval name.
@@ -1206,28 +1237,7 @@ function logger_get_energy_chart_data(&$chart) {
       $period = array('start' => $start, 'end' => $end);
       $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $chart->resolution, $chart->prices);
 
-      $end -= 1; //from 00:00:00 until 23:59:59 on user timezone
-      $period['end'] = $end;
-
-      switch ($chart->interval) {
-        case 'day':
-          $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
-          $complement = logger_format_period('dayquarter', $period);
-          break;
-        case 'week':
-          $formatted_time = t(date("l", $start));
-          $complement = date("d", $start) . '-' . t(date("M", $start));
-          break;
-        case 'month':
-          $formatted_time = t('Week') . ' ' . date("W", $start);
-          $complement = logger_format_period('week', $period);
-          break;
-        case 'year':
-          $formatted_time = t(date("M", $start));
-          $complement = date("Y", $start);
-          break;
-      }
-      $title = $formatted_time . '<br>' . $complement;
+      $title = logger_format_series_period($chart->interval, $period);
 
       if (!$min || ($value < $min && $time < $to)) {
         $min = $value;
@@ -1269,12 +1279,12 @@ function logger_get_energy_chart_data(&$chart) {
 }
 
 /**
- * Returns an array containing all power self consumption chart data.
+ * Returns an array containing all on-site consumption chart data.
  *
  * @param $chart  The chart object with the parameters for the data query.
  * @return the chart data.
  */
-function logger_get_selfconsumption_chart_data($chart) {
+function logger_get_onsite_chart_data($chart) {
 
   global $user;
 
@@ -1288,7 +1298,6 @@ function logger_get_selfconsumption_chart_data($chart) {
 
   $sub_interval = logger_get_sub_interval($chart->interval);
   $sub_time_window = logger_get_default_time_window($sub_interval);
-  $chart->period = array('start' => $chart->xaxis[0], 'end' => $chart->xaxis[1] - $sub_time_window);//FIXME: get rid of this line
 
   $group_values = array();
   foreach ($groups as $type => $group_sensors) {
@@ -1312,33 +1321,35 @@ function logger_get_selfconsumption_chart_data($chart) {
     }
   }
 
-  $self_consumption = array();
+  $onsite = array();
   $grid_supply = array();
   $grid_demand = array();
 
   foreach (array_keys($consumed) as $time) {
 
-    $title = $time - ($time % $sub_time_window) + $sub_time_window - get_timezone_offset();
-    $title = t(date("l", $title)) . '<br>' . date("d", $title) . '-' . t(date("M", $title));
+    $user_time = $time + get_timezone_offset();
+    $user_time = $user_time - ($user_time % $sub_time_window);
+    $period = array('start' => $user_time, 'end' => $user_time + $sub_time_window);
+    $title = logger_format_series_period($chart->interval, $period);
 
-    if (!isset($self_consumption[$title])) {
-      $self_consumption[$title] = 0;
+    if (!isset($onsite[$title])) {
+      $onsite[$title] = 0;
       $grid_supply[$title] = 0;
       $grid_demand[$title] = 0;
     }
 
     if ($consumed[$time] < $produced[$time]) {
-      $self_consumption[$title] += $consumed[$time];
+      $onsite[$title] += $consumed[$time];
       $grid_supply[$title] += $produced[$time] - $consumed[$time];
     }
     else {
-      $self_consumption[$title] += $produced[$time];
+      $onsite[$title] += $produced[$time];
       $grid_demand[$title] = $consumed[$time] - $produced[$time];
     }
   }
 
   $series = array(
-    'Self Consumption' => $self_consumption,
+    'On Site Consumption' => $onsite,
     'Power Grid Supply' => $grid_supply,
     'Power Grid Demand' => $grid_demand);
 
@@ -1477,11 +1488,9 @@ function logger_get_balance_chart_data($chart) {
     }
   }
 
-  if ($chart->net_production) {
-    $measurements = logger_get_net_production_consumption($measurements, $chart->resolution);
-    $type_names[PRODUCTION_SENSOR_TYPE] = 'Power Grid Supply';
-    $type_names[CONSUMPTION_SENSOR_TYPE] = 'Power Grid Demand';
-  }
+  $measurements = logger_get_net_production_consumption($measurements, $chart->resolution);
+  $type_names[PRODUCTION_SENSOR_TYPE] = 'Power Grid Supply';
+  $type_names[CONSUMPTION_SENSOR_TYPE] = 'Power Grid Demand';
 
   $data = array();
   $i = 0;
@@ -2008,7 +2017,7 @@ function theme_logger_energy_chart_area($variables) {
   }
 
   $id = 'barChart';
-  $menu = $chart->context == 'energy' ? logger_create_interval_menu($chart->context) : '';
+  $menu = logger_create_interval_menu($chart->context);
 
   return " $menu
     <div id='$id' class='chart'></div>
@@ -2068,32 +2077,39 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
  */
 function logger_create_interval_menu($context) {
 
-  if ($context == 'energy') {
-    $items = array(
-      l(t('Day'),     "$context/day"),
-      l(t('Week'),    "$context/week"),
-      l(t('Month'),   "$context/month"),
-      l(t('Year'),    "$context/year")
-    );
+  $items = array();
+
+  switch ($context) {
+    case 'relative':
+    case 'onsite':
+      break;
+
+    case 'energy':
+      $items = array(
+        l(t('Day'),     "$context/day"),
+        l(t('Week'),    "$context/week"),
+        l(t('Month'),   "$context/month"),
+        l(t('Year'),    "$context/year"));
+      break;
+
+    case 'forecast':
+      $items = array(
+        l(t('3 Days'), "$context/f3days"),
+        l(t('2 Days'), "$context/f2days"),
+        l(t('Today'),  "$context/f1day"));
+      break;
+
+    default:
+      $items = array(
+        l(t('Hour'),    "$context/hour"),
+        l(t('Day'),     "$context/day"),
+        l(t('3 Days'),  "$context/3days"),
+        l(t('Week'),    "$context/week"),
+        l(t('Month'),   "$context/month"),
+        l(t('Year'),    "$context/year"));
+      break;
   }
-  elseif ($context == 'forecast') {
-    $items = array(
-      l(t('3 Days'), "$context/f3days"),
-      l(t('2 Days'), "$context/f2days"),
-      l(t('Today'),  "$context/f1day")
-    );
-  }
-  else {
-    $items = array(
-      l(t('Hour'),    "$context/hour"),
-      l(t('Day'),     "$context/day"),
-      l(t('3 Days'),  "$context/3days"),
-      l(t('Week'),    "$context/week"),
-      l(t('Month'),   "$context/month"),
-      l(t('Year'),    "$context/year")
-    );
-  }
-  return theme('logger_chart_tabs', $items);
+  return empty($items) ? '' : theme('logger_chart_tabs', $items);
 }
 
 /**
@@ -2181,7 +2197,7 @@ function logger_get_series_colors($chart_id) {
   $palettes['energy'] = array_reverse($palettes['power']);
   $palettes['overview'] = $palettes['power'];
   $palettes['relative'] = $palettes['energy'];
-  $palettes['selfconsumption'] = $palettes['energy'];
+  $palettes['onsite'] = $palettes['energy'];
 
   $palette = isset($palettes[$chart_id]) ? $palettes[$chart_id] : $palettes['power'];
 
@@ -2451,17 +2467,6 @@ function logger_powerchart_form($form, &$form_state, $chart) {
     '#return_value' => 1,
     '#attributes' => array('onclick' => 'submitPowerChartForm()'), //In IE, onchange does not work
   );
-
-  if (user_has_role('Expert') && $chart->context == 'selfconsumption') {
-    $form['net_production'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Net Energy Production'),
-      '#description' => t('Do you want the chart series to show your net energy production?'),
-      '#default_value' => logger_get_variable('net_production', 1),
-      '#return_value' => 1,
-      '#attributes' => array('onclick' => 'enableFilledGraph(); submitPowerChartForm(true);'), //In IE, onchange does not work
-    );
-  }
 
   $form['yvalue'] = array(
     '#type' => 'textfield',
@@ -2783,9 +2788,6 @@ function logger_powerchart_form_submit($form, &$form_state) {
   }
   if (isset($form_state['values']['price2'])) {
     logger_set_variable('price2', $form_state['values']['price2']);
-  }
-  if (isset($form_state['values']['net_production'])) {
-    logger_set_variable('net_production', $form_state['values']['net_production']);
   }
 
   logger_set_variable('powerchart_unit', $form_state['values']['unit']);

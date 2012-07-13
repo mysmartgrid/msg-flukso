@@ -560,7 +560,7 @@ function logger_update_7010() {
 }
 
 /**
- * Removes variables 'logger_relativechart_unit%'.
+ * Removes variables 'logger_relativechart_unit%' and 'logger_net_production%'.
  */
 function logger_update_7011() {
 
@@ -568,5 +568,9 @@ function logger_update_7011() {
     ->condition('name', 'logger_relativechart_unit%', 'LIKE')
     ->execute();
 
-  return st("Variables 'logger_relativechart_unit%' have been removed.");
+  db_delete('variable')
+    ->condition('name', 'logger_net_production%', 'LIKE')
+    ->execute();
+
+  return st("Variables 'logger_relativechart_unit%' and 'logger_net_production%' have been removed.");
 }
