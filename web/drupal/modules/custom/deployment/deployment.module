@@ -700,7 +700,7 @@ function deployment_checkup_form_validate($form, &$form_state) {
   }
 
   if ($serial != '' && !is_numeric($serial)) {
-    form_set_error('serial', t('Please, enter the serial number without the prefix leters (ex.: 97000352).'));
+    form_set_error('serial', t('Please, enter the serial number without the prefix letters (ex.: 97000352).'));
   }
 }
 
