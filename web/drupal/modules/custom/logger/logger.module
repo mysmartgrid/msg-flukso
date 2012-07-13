@@ -1349,7 +1349,7 @@ function logger_get_onsite_chart_data($chart) {
   }
 
   $series = array(
-    'On Site Consumption' => $onsite,
+    'On-site Consumption' => $onsite,
     'Power Grid Supply' => $grid_supply,
     'Power Grid Demand' => $grid_demand);
 
