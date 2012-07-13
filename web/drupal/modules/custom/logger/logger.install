@@ -558,3 +558,15 @@ function logger_update_7010() {
 
   return st('Field logger_devices.firmware_version successfully added.');
 }
+
+/**
+ * Removes variables 'logger_relativechart_unit%'.
+ */
+function logger_update_7011() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_relativechart_unit%', 'LIKE')
+    ->execute();
+
+  return st("Variables 'logger_relativechart_unit%' have been removed.");
+}
