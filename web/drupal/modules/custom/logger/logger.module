@@ -804,28 +804,12 @@ function logger_energy_page($interval) {
   }
 
   $sensors = logger_get_sensors($types, array($user->uid));
-
-  //TODO: refactor
-  $consumed = isset($chart->data['last'][CONSUMPTION_SENSOR_TYPE]) ? $chart->data['last'][CONSUMPTION_SENSOR_TYPE] : 0;
-  $produced = isset($chart->data['last'][PRODUCTION_SENSOR_TYPE]) ? $chart->data['last'][PRODUCTION_SENSOR_TYPE] : 0;
   $interval = $interval ? $interval : 'week';
 
-  $today = array(
-    'day' => 'In the last 6 hours',
-    'week' => 'Today',
-    'month' => 'This week',
-    'year' => 'This month',
-  );
-
-  $introduction = t("!today you have consumed %consumed %unit and produced %produced %unit so far. " .
-    "The following chart shows your energy consumption and production !interval.",
-    array(
-      '!today' => t($today[$interval]),
-      '%consumed' => number_format($consumed, 2, '.', ''),
-      '%produced' => number_format($produced, 2, '.', ''),
-      '%unit' => t($unit),
-      '!interval' => t("along the $interval"),
-    ));
+  $introduction = t("The following chart shows your energy consumption and production !interval.", array(
+    '%unit' => t($unit),
+    '!interval' => t("along the $interval")
+  ));
 
   return logger_energy_chart_page($interval, 'energy', t('Your energy consumption and production'), $sensors, $types, FALSE, $introduction);
 }
@@ -842,9 +826,8 @@ function logger_onsite_page($interval) {
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
-  $introduction = t('The following chart allows you to compare your on-site energy consumption, power grid supply, and power grid demand.');
 
-  return logger_energy_chart_page($interval, 'onsite', t('Your on-site energy consumption'), $sensors, $types, FALSE, $introduction);
+  return logger_energy_chart_page($interval, 'onsite', t('Your on-site energy consumption'), $sensors, $types, FALSE);
 }
 
 /**
@@ -856,10 +839,10 @@ function logger_onsite_page($interval) {
  * @param $sensors       The sensors plotted on the chart.
  * @param $types         The types of sensors plotted on the chart.
  * @param $stacked       Whether the chart has stacked bars or not.
- * @param $introduction  A paragraph that introduces the user to the page.
- * @return the power consumption page.
+ * @param $introduction  A paragraph that introduces the user to the page (optional).
+ * @return the energy consumption page.
  */
-function logger_energy_chart_page($interval, $context, $title, $sensors, $types, $stacked, $introduction) {
+function logger_energy_chart_page($interval, $context, $title, $sensors, $types, $stacked, $introduction = NULL) {
 
   $interval = $interval ? $interval : 'week';
   $window = logger_get_default_time_window($interval);
@@ -896,7 +879,7 @@ function logger_energy_chart_page($interval, $context, $title, $sensors, $types,
 
   $form = drupal_get_form('logger_energychart_form', $chart);
 
-  return $introduction . '<br><br>' .
+  return (empty($introduction) ? '' : $introduction . '<br><br>') .
 
     theme('logger_energy_chart_area', array('chart' => $chart)) .
 
@@ -1290,68 +1273,48 @@ function logger_get_onsite_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $groups = array();
+  $sensors = array();
   foreach ($chart->sensors as &$sensor) {
     $type = $sensor->type_id;
-    $groups[$type][] = $sensor;
+    $sensors[$type][] = $sensor;
   }
+
+  $consumed = logger_rrd_query_energy($sensors[CONSUMPTION_SENSOR_TYPE], $chart->unit, $chart->period, MINUTE, $chart->prices);
+  $produced = logger_rrd_query_energy($sensors[PRODUCTION_SENSOR_TYPE], $chart->unit, $chart->period, MINUTE, $chart->prices);
+
+  $onsite = array();
+  $feedin = array();
+  $supply = array();
 
   $sub_interval = logger_get_sub_interval($chart->interval);
   $sub_time_window = logger_get_default_time_window($sub_interval);
 
-  $group_values = array();
-  foreach ($groups as $type => $group_sensors) {
-    $group_values[$type] = logger_rrd_query_energy($group_sensors, $chart->unit, $chart->period, MINUTE, $chart->prices);
-  }
-
-  $consumed = array();
-  $produced = array();
-
-  foreach ($group_values as $type => $type_values) {
-    foreach ($type_values as $time => $value) {
-
-      if ($type == CONSUMPTION_SENSOR_TYPE) {
-        $consumed[$time] = $value;
-        $produced[$time] = isset($produced[$time]) ? $produced[$time] : 0;
-      }
-      else {
-        $produced[$time] = $value;
-        $consumed[$time] = isset($consumed[$time]) ? $consumed[$time] : 0;
-      }
-    }
-  }
-
-  $onsite = array();
-  $grid_supply = array();
-  $grid_demand = array();
-
   foreach (array_keys($consumed) as $time) {
 
     $user_time = $time + get_timezone_offset();
-    $user_time = $user_time - ($user_time % $sub_time_window);
+    $user_time -= $user_time % $sub_time_window;
     $period = array('start' => $user_time, 'end' => $user_time + $sub_time_window);
     $title = logger_format_series_period($chart->interval, $period);
 
-    if (!isset($onsite[$title])) {
-      $onsite[$title] = 0;
-      $grid_supply[$title] = 0;
-      $grid_demand[$title] = 0;
-    }
+    $onsite[$title] = isset($onsite[$title]) ? $onsite[$title] : 0;
+    $feedin[$title] = isset($feedin[$title]) ? $feedin[$title] : 0;
+    $supply[$title] = isset($supply[$title]) ? $supply[$title] : 0;
 
     if ($consumed[$time] < $produced[$time]) {
       $onsite[$title] += $consumed[$time];
-      $grid_supply[$title] += $produced[$time] - $consumed[$time];
+      $feedin[$title] += $produced[$time] - $consumed[$time];
     }
     else {
       $onsite[$title] += $produced[$time];
-      $grid_demand[$title] = $consumed[$time] - $produced[$time];
+      $supply[$title] += $consumed[$time] - $produced[$time];
     }
   }
 
   $series = array(
     'On-site Consumption' => $onsite,
-    'Power Grid Supply' => $grid_supply,
-    'Power Grid Demand' => $grid_demand);
+    'Power Grid Feed-in' => $feedin,
+    'Power Grid Supply' => $supply
+  );
 
   foreach ($series as $name => $values) {
 
@@ -1489,8 +1452,8 @@ function logger_get_balance_chart_data($chart) {
   }
 
   $measurements = logger_get_net_production_consumption($measurements, $chart->resolution);
-  $type_names[PRODUCTION_SENSOR_TYPE] = 'Power Grid Supply';
-  $type_names[CONSUMPTION_SENSOR_TYPE] = 'Power Grid Demand';
+  $type_names[PRODUCTION_SENSOR_TYPE] = 'Production Surplus';#FIXME: find proper names.
+  $type_names[CONSUMPTION_SENSOR_TYPE] = 'Production Deficit';
 
   $data = array();
   $i = 0;
@@ -2192,12 +2155,17 @@ function logger_get_series_colors($chart_id) {
     '#5DA3CF', //BLUE2
     '#C0C0C0', //GRAY2
     '#BFD9D3', //GREEN5
-    '#4D7060'  , //GREEN4
+    '#4D7060'  //GREEN4
   );
   $palettes['energy'] = array_reverse($palettes['power']);
   $palettes['overview'] = $palettes['power'];
   $palettes['relative'] = $palettes['energy'];
-  $palettes['onsite'] = $palettes['energy'];
+
+  $palettes['onsite'] = array(
+    '#B1C800', //GREEN5
+    '#1F82C0', //BLUE3
+    '#A8AFAF', //GRAY3
+  );
 
   $palette = isset($palettes[$chart_id]) ? $palettes[$chart_id] : $palettes['power'];
 
