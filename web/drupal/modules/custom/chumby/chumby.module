@@ -122,7 +122,8 @@ function chumby_image_page1() {
     '<a href="content/häufige-fragen-und-antworten">FAQ</a> in order to fix the problem, before taking further steps.');
 
   $output .= chumby_step(4,
-    'Please, click <a href="chumby2">here</a> for more instructions.');
+    'Please, click <a href="chumby2">here</a> for more instructions on how to install the current version of the Chumby applications. ' .
+    'In case you want to test the beta release, please click <a href="http://developer.mysmartgrid.de/doku.php?id=chumbyqtcontrolpanel-de">here</a>.');
 
   return $output;
 }
