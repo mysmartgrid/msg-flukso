@@ -31,7 +31,8 @@
           
         <?php if ($page['help'] != ""): ?><p id="help"><?php render($page['help']); ?></p><?php endif; ?>
         <?php if ($messages != ""): ?><div id="message"><?php print $messages ?></div><?php endif; ?>
-            
+        <?php if ($noscript): ?><noscript><div class="messages error"><?php print $noscript; ?></div></noscript><?php endif; ?>
+    
         <div class="clearfix">
           <?php print render($page['content']); ?>
         </div>

@@ -114,6 +114,9 @@ function msgmobile_preprocess_page(&$vars) {
   $slogan_text = $vars['site_slogan'];
   $site_name_text = $vars['site_name'];
   $vars['site_name_and_slogan'] = $site_name_text . ' ' . $slogan_text;
+
+  $vars['noscript'] = t('This page requires JavaScript to be enabled, in order to work properly. ' .
+    'Please, enable this option in your browser.');
 }
 
 /**
