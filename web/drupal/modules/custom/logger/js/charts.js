@@ -684,10 +684,10 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
         }
 
         var fontSize = parseInt(labelDivClass.fontSize.replace('px', ''));
-        fontSize += (barWidth > 0.4 ? 2 : barWidth > 0.3 ? 1 : 0);
+        fontSize += barWidth > 0.3 ? 2 : 0;
 
         var value = dataLabels[d][v];
-        var precision = value < 1 ? 3 : value < 100 ? 2 : 1;
+        var precision = value < 100 ? 2 : 0;
         precision -= fontSize < 8 ? 1 : 0;
 
         value = value.toFixed(precision);
@@ -716,7 +716,7 @@ function setSeriesColor(chartId, i, color) {
   color = '#' + color;
 
   //TODO: avoid these tests
-  if (chartId == 'energy' || chartId == 'relative') {
+  if (chartId == 'energy' || chartId == 'relative' || chartId == 'onsite') {
     barChart.options['colors'][i] = color;
     barChart.plot();
 
