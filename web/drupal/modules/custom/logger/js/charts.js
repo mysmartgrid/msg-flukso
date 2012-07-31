@@ -536,10 +536,12 @@ function createLineChart(id, fileURL, properties) {
   return chart;
 }
 
-function createBarChart(id, series, names, colors, dataLabels, stacked) {
+function createBarChart(id, series, names, colors, dataLabels, stacks, percent) {
 
+  var stacked = stacks.length > 0;
   var numTicks = names.length;
-  var barWidth = stacked ? 0.5 : (1 / (series.length + 1));
+  var barsPerPoint = stacked ? (Math.max.apply(null, stacks) + 1) : series.length;
+  var barWidth = 1 / (barsPerPoint + 1);
   var xpos;
 
   var xticks = [numTicks];
@@ -551,13 +553,18 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
   var data = [series.length];
 
   for (var s = 0; s < series.length; s++) {
+
     var values = [numTicks];
+    var k = stacks[s];
 
     for (var v = 0; v < numTicks; v++) {
-      xpos = v + (stacked ? 0 : barWidth * s);
+      xpos = v + barWidth * (stacked ? k : s);
       values[v] = [xpos, series[s][v]];
     }
-    data[s] = {data: values};
+    data[s] = {
+      data: values,
+      stack: (stacked ? stacks[s] : null)
+    };
   }
 
   var options = {
@@ -584,13 +591,9 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
   options.yaxis = {
     autoscaleMargin: 0.05,
     tickFormatter: function (value, axis) {
-      return stacked ? value.toFixed(0) + '%' : value.toFixed(1);
+      return percent ? value.toFixed(0) + '%' : value.toFixed(1);
     }
   };
-
-  if (stacked) {
-    options.series.stack = 0;
-  }
 
   var chart = new Object();
   chart.id = id;
@@ -599,7 +602,7 @@ function createBarChart(id, series, names, colors, dataLabels, stacked) {
 
   chart.plot = function() {
     var plot = jQuery.plot(jQuery('#' + id), data, options);
-    showBarDataLabels(plot, stacked, dataLabels, barWidth);
+    showBarDataLabels(plot, stacks, dataLabels, barWidth);
   };
   chart.plot();
 
@@ -640,19 +643,13 @@ function getChart(id) {
   return null;
 }
 
-function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
-
-  var labelDivClass = getStyleBySelector('p.chart-label');
+function showBarDataLabels(plot, stacks, dataLabels, barWidth) {
 
   var series = plot.getData();
+  var stacked = stacks.length > 0;
   var offset = plot.pointOffset({x: 0, y: 0});
   var floor = offset.top;
-  var labelHeight = 15;
-
-  var extraOffset = new Array();
-  for(var i = 0; i < dataLabels[0].length; i++) {
-    extraOffset[i] = labelHeight;
-  }
+  var extraOffset = createBiArray(2, 20, 15);
 
   for (var d = 0; d < series.length; d++) {
 
@@ -660,6 +657,8 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
 
       function(i, point) {
 
+        //Coordinates
+        var x = point[0];
         var y = point[1];
 
         //Only positive values are shown
@@ -667,48 +666,72 @@ function showBarDataLabels(plot, stacked, dataLabels, barWidth) {
           return;
         }
 
-        var x = point[0];
-        var v = Math.round(x - (stacked ? 0 : barWidth * d));
+        //Stack index
+        var s = stacked ? stacks[d] : d;
+
+        //x-axis data point index
+        var p = Math.round(x - barWidth * s);
 
         offset = plot.pointOffset({x: x, y: y});
         var barHeight = floor - offset.top;
 
+        //Subtact previous bars' offsets
+        offset.top -= extraOffset[s][p];
+
         //If the data labels are too close
-        var top = offset.top - extraOffset[v];
-        if (barHeight < labelHeight) {
-          top += barHeight - labelHeight;
+        if (barHeight < 15) {
+          offset.top += barHeight - 15;
         }
 
         if (stacked) {
-          extraOffset[v] += barHeight;
+          extraOffset[s][p] += barHeight;
         }
 
-        var fontSize = parseInt(labelDivClass.fontSize.replace('px', ''));
-        fontSize += barWidth > 0.3 ? 2 : 0;
-
-        var value = dataLabels[d][v];
-        var precision = value < 100 ? 2 : 0;
-        precision -= fontSize < 8 ? 1 : 0;
-
-        value = value.toFixed(precision);
-
-        if (value == 0) {
-          value += '...';
-        }
-
-        var div = '<div style="font-size: ' + fontSize + 'px; font-weight: bold; width: 50px; height: ' +
-            labelHeight + 'px; text-align: center;">' + value + '</div>';
-
-        var options = {
-            position: 'absolute',
-            left: offset.left - 25,
-            top: top,
-            display: 'none'
-          };
-
-        jQuery(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
+        showDataLabel(plot, offset, barWidth, dataLabels[d][p]);
     });
   }
+}
+
+function showDataLabel(plot, offset, barWidth, value) {
+
+  if (value != null) {
+
+    //Format value
+    var precision = value < 1000 ? 2 : 0;
+    value = value.toFixed(precision);
+    if (value == 0) {
+      value += '...';
+    }
+
+    var labelDivClass = getStyleBySelector('p.chart-label');
+    var fontSize = parseInt(labelDivClass.fontSize.replace('px', ''));
+    if (barWidth > 0.3) {
+      fontSize += 2;
+    }
+
+    var div = '<div style="font-size: ' + fontSize + 'px; width: 50px; height: 15px; text-align: center;">' + value + '</div>';
+
+    var options = {
+      position: 'absolute',
+      left: offset.left - 25,
+      top: offset.top,
+      display: 'none'
+    };
+
+    jQuery(div).css(options).appendTo(plot.getPlaceholder()).fadeIn('slow');
+  }
+}
+
+function createBiArray(size1, size2, value) {
+
+  var arr = new Array(size1);
+  for (var i = 0; i < size1; i++) {
+    arr[i] = new Array(size2);
+    for (var j = 0; j < size2; j++) {
+      arr[i][j] = value;
+    }
+  }
+  return arr;
 }
 
 function setSeriesColor(chartId, i, color) {
@@ -726,6 +749,8 @@ function setSeriesColor(chartId, i, color) {
   }
 
   jQuery.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
+
+  return true;
 }
 
 function updateDygraphColors() {
