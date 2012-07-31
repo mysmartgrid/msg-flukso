@@ -1424,9 +1424,8 @@ function notification_send_summary_report_emails() {
 
     date_default_timezone_set($notifiable['timezone']);
 
-    $period = array(
-      'start' => $notifiable['since_time'],
-      'end' => $notifiable['until_time']);
+    $period = array('start' => $notifiable['since_time'], 'end' => $notifiable['until_time']);
+    $resolution = $notifiable['unit_id'] == WEEK_UNIT_ID ? DAY : MINUTE;
 
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function', 'price'))
@@ -1440,7 +1439,7 @@ function notification_send_summary_report_emails() {
     
     foreach ($sensors as $sensor) {
 
-      $energy = number_format(logger_rrd_query_total_energy(array($sensor), 'kWh', $period, MINUTE), 2, '.', '');
+      $energy = number_format(logger_rrd_query_total_energy(array($sensor), 'kWh', $period, $resolution), 2, '.', '');
       $cost = number_format($energy * $sensor->price, 2, '.', '');
 
       $lines[$sensor->type_id] = (isset($lines[$sensor->type_id]) ? $lines[$sensor->type_id] : '') .
