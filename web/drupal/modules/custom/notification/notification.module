@@ -1440,7 +1440,7 @@ function notification_send_summary_report_emails() {
     
     foreach ($sensors as $sensor) {
 
-      $energy = number_format(logger_rrd_query_total_energy(array($sensor), 'kWh', $period, DAY), 2, '.', '');
+      $energy = number_format(logger_rrd_query_total_energy(array($sensor), 'kWh', $period, MINUTE), 2, '.', '');
       $cost = number_format($energy * $sensor->price, 2, '.', '');
 
       $lines[$sensor->type_id] = (isset($lines[$sensor->type_id]) ? $lines[$sensor->type_id] : '') .
