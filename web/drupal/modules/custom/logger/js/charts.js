@@ -649,7 +649,7 @@ function showBarDataLabels(plot, stacks, dataLabels, barWidth) {
   var stacked = stacks.length > 0;
   var offset = plot.pointOffset({x: 0, y: 0});
   var floor = offset.top;
-  var extraOffset = createBiArray(2, 20, 15);
+  var extraOffset = createBiArray(20, 20, 15);
 
   for (var d = 0; d < series.length; d++) {
 
