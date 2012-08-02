@@ -1307,40 +1307,33 @@ function logger_get_onsite_chart_data($chart) {
     }
   }
 
-  $series = array(
-    'On-site Consumption' => $onsite,
-    '' => $onsite,
-    'Power Grid Supply' => $supply,
-    'Power Grid Feed-in' => $feedin
+  $all_series = array(
+    0 => array('name' => t('On-site Consumption'), 'values' => $onsite, 'labels' => $onsite, 'chartSeriesIds' => array(0, 1)),
+    1 => array('name' => '',                       'values' => $onsite, 'labels' => array()),
+    2 => array('name' => t('Power Grid Supply'),   'values' => $supply, 'labels' => $supply, 'chartSeriesIds' => array(2)),
+    3 => array('name' => t('Power Grid Feed-in'),  'values' => $feedin, 'labels' => $feedin, 'chartSeriesIds' => array(3))
   );
   $data['stacks'] = array(0, 1, 0, 1);
 
-  $line_id = 0;
-  $series_ids = array();
+  foreach ($all_series as $line_id => $series) {
 
-  foreach ($series as $name => $values) {
-
-    $labels = array();
-    $series_ids[] = $line_id;
-
+    $name = $series['name'];
     if (!empty($name)) {
-      $labels = $values;
-      $sum = array_sum($values);
-      $min = min($values);
-      $max = max($values);
-      $total = count($values);
-      $min_day = strtok(array_search($min, $values), '<');
-      $max_day = strtok(array_search($max, $values), '<');
+
+      $sum = array_sum($series['values']);
+      $min = min($series['values']);
+      $max = max($series['values']);
+      $total = count($series['values']);
+      $min_day = strtok(array_search($min, $series['values']), '<');
+      $max_day = strtok(array_search($max, $series['values']), '<');
 
       $data['legend'][$line_id] =
-        logger_create_energy_legend_line($user->name, t('All'), t($name), $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
-      $data['legend'][$line_id]['seriesIds'] = $series_ids;
-      $series_ids = array();
+        logger_create_energy_legend_line($user->name, t('All'), $name, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
+      $data['legend'][$line_id]['seriesIds'] = $series['chartSeriesIds'];
     }
-    $line_id++;
 
-    $data['series'][$user->uid][$user->name][t('All')][t($name)] = $values;
-    $data['labels'][t('All')][t($name)] = $labels;
+    $data['series'][$user->uid][$user->name][t('All')][$name] = $series['values'];
+    $data['labels'][t('All')][$name] = $series['labels'];
   }
   return $data;
 }
