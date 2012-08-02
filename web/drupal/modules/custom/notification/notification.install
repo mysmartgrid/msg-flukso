@@ -192,6 +192,20 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
+      'id' => 10,
+      'name' => 'Summary Report',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Energy Production Forecast Report',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
       'id' => 101,
       'name' => 'Heartbeat Received',
     ))
@@ -201,13 +215,6 @@ function notification_install() {
     ->fields(array(
       'id' => 102,
       'name' => 'Measurement Received',
-    ))
-    ->execute();
-
-  db_insert('event')
-    ->fields(array(
-      'id' => 103,
-      'name' => 'Corrupted Message',
     ))
     ->execute();
 
@@ -234,22 +241,15 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
-      'id' => 10,
-      'name' => 'Summary Report',
+      'id' => 200,
+      'name' => 'Measurement Anomaly'
     ))
     ->execute();
 
   db_insert('event')
     ->fields(array(
-      'id' => 11,
-      'name' => 'Energy Production Forecast Report',
-    ))
-    ->execute();
-
-  db_insert('event')
-    ->fields(array(
-      'id' => 202,
-      'name' => 'Power Production Anomaly'
+      'id' => 201,
+      'name' => 'Corrupted Measurement Anomaly',
     ))
     ->execute();
 
@@ -351,7 +351,14 @@ function notification_install() {
   db_insert('event_unit')
     ->fields(array(
       'event_id' => 3,
-      'unit_id' => 0,
+      'unit_id' => 1,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 3,
+      'unit_id' => 2,
     ))
     ->execute();
 
@@ -366,34 +373,6 @@ function notification_install() {
     ->fields(array(
       'event_id' => 4,
       'unit_id' => 4,
-    ))
-    ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
-      'event_id' => 101,
-      'unit_id' => 0,
-    ))
-    ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
-      'event_id' => 102,
-      'unit_id' => 0,
-    ))
-    ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
-      'event_id' => 103,
-      'unit_id' => 0,
-    ))
-    ->execute();
-
-  db_insert('event_unit')
-    ->fields(array(
-      'event_id' => 104,
-      'unit_id' => 0,
     ))
     ->execute();
 
@@ -415,6 +394,41 @@ function notification_install() {
     ->fields(array(
       'event_id' => 11,
       'unit_id' => 5,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 101,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 102,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 104,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 200,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 201,
+      'unit_id' => 0,
     ))
     ->execute();
 
@@ -497,4 +511,105 @@ function notification_update_7003() {
     ->execute();
 
   return st("The event 'Power Production Anomaly' has been added.");
+}
+
+/**
+ * Rename event 'Corrupted Message Received' to 'Corrupted Measurement Anomaly'.
+ */
+function notification_update_7004() {
+
+  db_update('event_log')
+    ->fields(array(
+      'event_id' => 201
+    ))
+    ->condition('event_id', 103)
+    ->execute();
+
+  db_update('notification')
+    ->fields(array(
+      'event_id' => 201
+    ))
+    ->condition('event_id', 103)
+    ->execute();
+
+  db_update('event')
+    ->fields(array(
+      'id' => 201,
+      'name' => 'Corrupted Measurement Anomaly'
+    ))
+    ->condition('id', 103)
+    ->execute();
+
+  return st("The event 'Corrupted Message Received' has been renamed.");
+}
+
+/**
+ * Rename event 'Power Production Anomaly' to 'Measurement Anomaly'.
+ */
+function notification_update_7005() {
+
+  db_delete('event_log')
+    ->condition('event_id', 202)
+    ->execute();
+
+  db_delete('notification')
+    ->condition('event_id', 202)
+    ->execute();
+
+  db_update('event')
+    ->fields(array(
+      'id' => 200,
+      'name' => 'Measurement Anomaly'
+    ))
+    ->condition('id', 202)
+    ->execute();
+
+  return st("The event 'Power Production Anomaly' has been renamed.");
+}
+
+/**
+ * Adds missing records to table 'event_unit'.
+ */
+function notification_update_7006() {
+
+  db_delete('event_unit')
+    ->condition('unit_id', 0)
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 101,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 102,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 104,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 200,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 201,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  return st("Missing records have been added to table 'event_unit'.");
 }

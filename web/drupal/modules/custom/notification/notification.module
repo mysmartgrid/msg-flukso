@@ -30,21 +30,24 @@ define('NO_COMMUNICATION_EVENT_ID',        1);
 define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
 
+//Report events
 define('SUMMARY_REPORT_EVENT_ID',          10);
 define('FORECAST_REPORT_EVENT_ID',         11);
-define('SYSTEM_ERROR_EVENT_ID',            999);
 
 //Message events
-define('MESSAGE_RECEIVED_EVENT_ID',         100);
-define('HEARTBEAT_RECEIVED_EVENT_ID',       101);
-define('MEASUREMENT_RECEIVED_EVENT_ID',     102);
-define('CORRUPTED_MESSAGE_EVENT_ID',        103);
-define('BROWNOUT_EVENT_ID',                 104);
-define('FIRMWARE_UPGRADED_EVENT_ID',        105);
-define('FAILED_FIRMWARE_UPGRADE_EVENT_ID',  106);
+define('MESSAGE_RECEIVED_EVENT_ID',        100);
+define('HEARTBEAT_RECEIVED_EVENT_ID',      101);
+define('MEASUREMENT_RECEIVED_EVENT_ID',    102);
+define('BROWNOUT_EVENT_ID',                104);
+define('FIRMWARE_UPGRADED_EVENT_ID',       105);
+define('FAILED_FIRMWARE_UPGRADE_EVENT_ID', 106);
 
-//Anomalies
-define('PRODUCTION_ANOMALY_EVENT_ID',       202);
+//Anomaly events
+define('MEASUREMENT_ANOMALY_EVENT_ID',     200);
+define('CORRUPTED_MEASUREMENT_EVENT_ID',   201);
+
+//System events
+define('SYSTEM_ERROR_EVENT_ID',            999);
 
 define('NOTIFICATION_REL_PATH', drupal_get_path('module', 'notification'));
 define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
@@ -407,63 +410,6 @@ function notification_eventlog_clear_old() {
 }
 
 /**
- * Logs the "brownout" event.
- *
- * @param $device  The device where the event occurred.
- */
-function notification_log_brownout($device) {
-
-  notification_log_event(BROWNOUT_EVENT_ID, $device);
-}
-
-/**
- * Logs the "heartbeat received" event.
- *
- * @param $device  The device where the event occurred.
- */
-function notification_log_heartbeat_received($device) {
-
-  notification_log_event(HEARTBEAT_RECEIVED_EVENT_ID, $device);
-}
-
-/**
- * Logs the "measurement received" event.
- *
- * @param $device  The device where the event occurred.
- */
-function notification_log_measurement_received($device) {
-
-  notification_log_event(MEASUREMENT_RECEIVED_EVENT_ID, $device);
-}
-
-/**
- * Logs the "corrupted message" event.
- *
- * @param $device  The device where the event occurred.
- */
-function notification_log_corrupted_message($device) {
-
-  notification_log_event(CORRUPTED_MESSAGE_EVENT_ID, $device);
-}
-
-/**
- * Logs an event.
- *
- * @param $event_id  The event id.
- * @param $device    The device where the event occurred.
- */
-function notification_log_event($event_id, $device) {
-
-  db_insert('event_log')
-    ->fields(array(
-      'device' => $device,
-      'event_id' => $event_id,
-      'time' => REQUEST_TIME,
-    ))
-    ->execute();
-}
-
-/**
  * Builds the newsletter registration page.
  *
  * @return the newsletter registration page.
@@ -547,8 +493,8 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
     'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
 
-  $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
-    'A message containing invalid data, produced when the device is malfunctioning or not properly installed.');
+  $form['events'] += notification_create_event_fields(MEASUREMENT_ANOMALY_EVENT_ID, NULL, NULL,
+    'An anomalous series of measurements, produced when the devices are malfunctioning or not properly installed.');
 
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
@@ -560,9 +506,6 @@ function notification_registration_form($form, &$form_state) {
 
     $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
       'Here you can set the period of time in which you want to receive energy production forecast reports.');
-
-    $form['events'] += notification_create_event_fields(PRODUCTION_ANOMALY_EVENT_ID, NULL, NULL,
-      'An anomalous series of measurements, produced when the PV plant is malfunctioning or not properly installed.');
   }
 
   $form['min_interval'] = array(
@@ -861,12 +804,11 @@ function notification_edition_form_validate($form, &$form_state) {
 function notification_registration_form_submit($form, &$form_state) {
 
   notification_register_event($_REQUEST, NO_COMMUNICATION_EVENT_ID);
-  notification_register_event($_REQUEST, CORRUPTED_MESSAGE_EVENT_ID);
   notification_register_event($_REQUEST, COMMUNICATION_RESTORED_EVENT_ID);
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
   notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
-  notification_register_event($_REQUEST, PRODUCTION_ANOMALY_EVENT_ID);
+  notification_register_event($_REQUEST, MEASUREMENT_ANOMALY_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
 }
@@ -1165,12 +1107,12 @@ function theme_notification_event_limit_up($variables) {
 function notification_cron() {
 
   notification_send_no_communication_emails();
-  notification_send_corrupted_message_emails();
   notification_send_communication_restored_emails();
+  notification_send_measurement_anomaly_emails();
+  notification_send_corrupted_measurement_emails();
   notification_send_peak_consumption_emails();
   notification_send_summary_report_emails();
   notification_send_forecast_report_emails();
-  notification_send_production_anomaly_emails();
   notification_eventlog_clear_old();
 }
 
@@ -1314,15 +1256,47 @@ function notification_send_communication_restored_emails() {
 }
 
 /**
- * Sends e-mails notifying users of "Corrupted Message" events.
+ * Sends e-mails notifying users of 'Measurement Anomaly' events.
  */
-function notification_send_corrupted_message_emails() {
+function notification_send_measurement_anomaly_emails() {
 
-  $query = notification_compose_base_query(CORRUPTED_MESSAGE_EVENT_ID);
+  $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $query->fields('m', array('uid', 'meter', 'price', 'function', 'latitude', 'longitude'));
+  $query->condition('m.type', PRODUCTION_SENSOR_TYPE);
 
-  $query->join('event_log', 'l', 'l.device = n.device AND l.event_id = n.event_id');
+  $result = $query->execute();
+
+  $notifiables = array();
+  while ($notifiable = $result->fetchAssoc()) {
+
+    $notifiable['event_time'] = REQUEST_TIME;
+    $notifiable['anomalies'] = notification_query_production_anomalies($notifiable);
+
+    if (!empty($notifiable['anomalies'])) {
+      $notifiables[] = $notifiable;
+    }
+  }
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has sent the following anomalous measurements.<br><br>" .
+    "!anomalies", "Check your PV installation.");
+
+  notification_send_emails($message, $notifiables);
+}
+
+/**
+ * Sends e-mails notifying users of "Corrupted Measurement" events.
+ */
+function notification_send_corrupted_measurement_emails() {
+
+  $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
+
+  $query->join('event_log', 'l', 'l.device = n.device');
   $query->addField('l', 'time', 'event_time');
   $query->where('l.time > n.base_time');
+  $query->condition('l.event_id', CORRUPTED_MEASUREMENT_EVENT_ID);
 
   $result = $query->execute();
 
@@ -1612,37 +1586,6 @@ function notification_create_forecast_chart($notifiable) {
     $content = file_get_contents("$base_url/$file_path");
   }
   return $content;
-}
-
-/**
- * Sends e-mails notifying users of 'Production Anomaly' events.
- */
-function notification_send_production_anomaly_emails() {
-
-  $query = notification_compose_base_query(PRODUCTION_ANOMALY_EVENT_ID);
-  $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->fields('m', array('uid', 'meter', 'price', 'function', 'latitude', 'longitude'));
-  $query->condition('m.type', PRODUCTION_SENSOR_TYPE);
-
-  $result = $query->execute();
-
-  $notifiables = array();
-  while ($notifiable = $result->fetchAssoc()) {
-
-    $notifiable['event_time'] = REQUEST_TIME;
-    $notifiable['anomalies'] = notification_query_production_anomalies($notifiable);
-
-    if (!empty($notifiable['anomalies'])) {
-      $notifiables[] = $notifiable;
-    }
-  }
-
-  //ATTENTION: Any change in the following message requires its translations to be redefined.
-  $message = notification_compose_error_email(
-    "Your Flukso device (serial number: %serial) has sent the following anomalous measurements.<br><br>" .
-    "!anomalies", "Check your PV installation.");
-
-  notification_send_emails($message, $notifiables);
 }
 
 /**
