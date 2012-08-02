@@ -324,7 +324,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
 
           %Measurements are corrupted
           _ ->
-            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MESSAGE_EVENT_ID, Timestamp]),
+            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, Timestamp]),
             RrdResponse = "Invalid Measurements"
         end;
 

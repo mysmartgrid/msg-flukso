@@ -37,10 +37,11 @@
 -define(MESSAGE_RECEIVED_EVENT_ID,            100).
 -define(HEARTBEAT_RECEIVED_EVENT_ID,          101).
 -define(MEASUREMENT_RECEIVED_EVENT_ID,        102).
--define(CORRUPTED_MESSAGE_EVENT_ID,           103).
 -define(BROWNOUT_EVENT_ID,                    104).
 -define(FIRMWARE_UPGRADED_EVENT_ID,           105).
 -define(FAILED_FIRMWARE_UPGRADE_EVENT_ID,     106).
+
+-define(CORRUPTED_MEASUREMENT_EVENT_ID,       201).
 
 -record(state,
         {rrdSensor,
