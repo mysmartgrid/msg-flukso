@@ -1187,11 +1187,12 @@ function logger_get_energy_chart_data(&$chart) {
 
   $sub_interval = logger_get_sub_interval($chart->interval);
   $sub_time_window = logger_get_default_time_window($sub_interval);
+  $line_id = 0;
 
   foreach ($groups as $key => &$series_sensors) {
 
-    $min_day = 0;
-    $max_day = 0;
+    $min_time = 0;
+    $max_time = 0;
     $min = NULL;
     $max = NULL;
     $sum = 0;
@@ -1219,12 +1220,12 @@ function logger_get_energy_chart_data(&$chart) {
 
       if (!$min || ($value < $min && $time < $to)) {
         $min = $value;
-        $min_day = $title;
+        $min_time = $title;
       }
 
       if (!$max || $value > $max) {
         $max = $value;
-        $max_day = $title;
+        $max_time = $title;
       }
 
       $sum += $value;
@@ -1249,11 +1250,10 @@ function logger_get_energy_chart_data(&$chart) {
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][t($sensor->type)] = $series;
     $data['labels'][$sensor->meter][t($sensor->type)] = $data_labels;
 
-    $min_day = strtok($min_day, '<');
-    $max_day = strtok($max_day, '<');
-    $data['legend'][] = logger_create_energy_legend_line($sensor->username, $sensor->function, $sensor->type, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
+    $data['legend'][$line_id] = logger_create_legend_line($sensor->username, $sensor->function, $sensor->type, $line_id, NULL, $total,
+      $min, $min_time, $max, $max_time, $sum, NULL, $chart->interval);
+    $line_id++;
   }
-
   return $data;
 }
 
@@ -1269,7 +1269,7 @@ function logger_get_onsite_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $sensors = array();
+  $sensors = array(CONSUMPTION_SENSOR_TYPE => array(), PRODUCTION_SENSOR_TYPE => array());
   foreach ($chart->sensors as &$sensor) {
     $type = $sensor->type_id;
     $sensors[$type][] = $sensor;
@@ -1320,70 +1320,22 @@ function logger_get_onsite_chart_data($chart) {
     $name = $series['name'];
     if (!empty($name)) {
 
-      $sum = array_sum($series['values']);
-      $min = min($series['values']);
-      $max = max($series['values']);
       $total = count($series['values']);
-      $min_day = strtok(array_search($min, $series['values']), '<');
-      $max_day = strtok(array_search($max, $series['values']), '<');
+      $values = $total > 0 ? $series['values'] : array(0);
+      $sum = array_sum($values);
+      $min = min($values);
+      $max = max($values);
+      $min_time = array_search($min, $values);
+      $max_time = array_search($max, $values);
 
-      $data['legend'][$line_id] =
-        logger_create_energy_legend_line($user->name, t('All'), $name, $min, $max, $total, $sum, $min_day, $max_day, $chart->interval);
-      $data['legend'][$line_id]['seriesIds'] = $series['chartSeriesIds'];
+      $data['legend'][$line_id] = logger_create_legend_line($user->name, t('All'), $name, $line_id, NULL,
+        $total, $min, $min_time, $max, $max_time, $sum, NULL, $chart->interval, $series['chartSeriesIds']);
     }
 
     $data['series'][$user->uid][$user->name][t('All')][$name] = $series['values'];
     $data['labels'][t('All')][$name] = $series['labels'];
   }
   return $data;
-}
-
-/**
- * Creates a line for the energy consumption chart legend.
- * 
- * @param $username    The user name.
- * @param $function    The sensor function.
- * @param $type        The sensor type.
- * @param $min         The minimum value on the period.
- * @param $max         The maximum value on the period.
- * @param $total       The number of values.
- * @param $sum         The total consumption on the period.
- * @param $min_time    The sub period (eg. day of the week) with the minimum consumption.
- * @param $max_time    The sub period (eg. day of the week) with the maximum consumption.
- * @param $interval    The chart time interval name.
- * @return the legend line.
- */
-function logger_create_energy_legend_line($username, $function, $type, $min, $max, $total, $sum, $min_time = NULL, $max_time = NULL, $interval = NULL) {
-
-  return array(
-    t('User') => $username,
-    t('Sensor') => $function,
-    t('Type') => t($type),
-    t('Min') => $total > 0 ? logger_format_energy_legend_record($min, $min_time, $interval) : '',
-    t('Max') => $total > 0 ? logger_format_energy_legend_record($max, $max_time, $interval) : '',
-    t('Avg') => $total > 0 ? $sum / $total : '',
-    t('Sum') => $total > 0 ? $sum : ''
-  );
-}
-
-/**
- * Formats a record consumption (either min or max) to be shown on a cell of 
- * the energy consumption chart legend.
- *  
- * @param $value       The record value.
- * @param $record_time The record time.
- * @param $interval    The chart time interval name.
- * @return the formatted record.
- */
-function logger_format_energy_legend_record($value, $record_time, $interval) {
-
-  $value = number_format($value, 2, '.', '');
-
-  if ($record_time && $interval) {
-    $prep = $interval == 'year' ? 'in' : 'am';
-    $value = t("%value $prep %day", array('%value' => $value, '%day' => $record_time));
-  }
-  return $value;
 }
 
 /**
@@ -1423,7 +1375,8 @@ function logger_get_power_chart_data($chart) {
 
     $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
 
-    $data['legend'][] = logger_create_power_legend_line($username, $sensor->function, t($sensor->type), $i++, $operations);
+    $data['legend'][$i] = logger_create_legend_line($username, $sensor->function, t($sensor->type), $i, $operations);
+    $i++;
   }
   return $data;
 }
@@ -1467,7 +1420,8 @@ function logger_get_balance_chart_data($chart) {
 
     $type_name = t($type_names[$type_id]);
     $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_power_series_data($chart, $values);
-    $data['legend'][] = logger_create_power_legend_line($user->name, t('All'), $type_name, $i++);
+    $data['legend'][$i] = logger_create_legend_line($user->name, t('All'), $type_name, $i);
+    $i++;
   }
   return $data;
 }
@@ -1530,8 +1484,9 @@ function logger_get_forecast_chart_data($chart) {
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
       logger_format_power_series_data($chart, $forecast['power']);
 
-    $data['legend'][] =
-      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i++, $operations);
+    $data['legend'][$i] =
+      logger_create_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i, $operations);
+    $i++;
   }
   return $data;
 }
@@ -1565,8 +1520,9 @@ function logger_get_anomaly_chart_data($chart) {
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
       logger_format_power_series_data($chart, $anomalies);
 
-    $data['legend'][] =
-      logger_create_power_legend_line($username, $sensor->function . '  (' . t('Anomalies') . ')', t($sensor->type), $i++, $operations);
+    $data['legend'][$i] =
+      logger_create_legend_line($username, $sensor->function . '  (' . t('Anomalies') . ')', t($sensor->type), $i, $operations);
+    $i++;
   }
   return $data;
 }
@@ -1615,7 +1571,7 @@ function logger_get_overview_chart_data($chart) {
   $type = $chart->sensors[0]->type; //For instance, just consumption
 
   $data['series'][0][t('All')][t('All')][$type] = $values;
-  $data['legend'][] = logger_create_power_legend_line(t('All'), t('All'), t($type), 0);
+  $data['legend'][0] = logger_create_legend_line(t('All'), t('All'), t($type), 0);
 
   return $data;
 }
@@ -1651,31 +1607,74 @@ function logger_format_power_series_data($chart, $measurements) {
 }
 
 /**
- * Creates a line for the power consumption chart legend.
- * 
- * @param $username    The sensor user name.
- * @param $function    The sensor object.
- * @param $type        The sensor type.
- * @param $i           The line index.
- * @param $operations  The list of links that affect the sensor.
+ * Creates a line for the energy consumption chart legend.
+ *
+ * @param $username          The user name.
+ * @param $function          The sensor function.
+ * @param $type              The sensor type.
+ * @param $i                 The legend line index.
+ * @param $operations        The list of links that affect the sensor.
+ * @param $total             The number of rows.
+ * @param $min               The minimum value on the period.
+ * @param $min_time          The sub period (eg. day of the week) with the minimum consumption.
+ * @param $max               The maximum value on the period.
+ * @param $max_time          The sub period (eg. day of the week) with the maximum consumption.
+ * @param $sum               The total consumption on the period.
+ * @param $last              The last consumption on the period.
+ * @param $interval          The chart time interval name.
+ * @param $chart_series_ids  An array of chart series ids, associated with this legend line.
  * @return the legend line.
  */
-function logger_create_power_legend_line($username, $function, $type, $i, $operations = NULL) {
+function logger_create_legend_line($username, $function, $type, $i, $operations = NULL, $total = 0, $min = '', $min_time = '', $max = '', $max_time = '', $sum = '', $last = '', $interval = NULL, $chart_series_ids = array()) {
+
+  $avg = '';
+  if ($total > 0) {
+    $min = logger_format_legend_record($min, $min_time, $interval);
+    $max = logger_format_legend_record($max, $max_time, $interval);
+    $avg = number_format($sum / $total, 2, '.', '');
+  }
 
   $line = array(
     t('User') => $username,
     t('Sensor') => $function,
     t('Type') => $type,
-    t('Max') => "<div id='max$i'/>",
-    t('Min') => "<div id='min$i'/>",
-    t('Avg') => "<div id='avg$i'/>",
-    t('Last') => "<div id='last$i'/>",
+    t('Min') => "<div id='min$i'>$min</div>",
+    t('Max') => "<div id='max$i'>$max</div>",
+    t('Avg') => "<div id='avg$i'>$avg</div>",
+    'seriesIds' => $chart_series_ids
   );
 
+  if ($sum > 0) {
+    $line[t('Sum')] = "<div id='sum$i'>" . number_format($sum, 2, '.', '') . "</div>";
+  }
+  if ($last > 0) {
+    $line[t('Last')] = "<div id='last$i'>" . number_format($last, 2, '.', '') . "</div>";
+  }
   if ($operations) {
     $line[t('Operations')] = $operations;
   }
   return $line;
+}
+
+/**
+ * Formats a record consumption (either min or max) to be shown on a cell of
+ * the chart legend.
+ *
+ * @param $value       The record value.
+ * @param $record_time The record time.
+ * @param $interval    The chart time interval name.
+ * @return the formatted record.
+ */
+function logger_format_legend_record($value, $record_time, $interval) {
+
+  $value = number_format($value, 2, '.', '');
+
+  if ($record_time && $interval) {
+    $record_time = strtok($record_time, '<');//Remove tag if it exists
+    $prep = $interval == 'year' ? 'in' : 'am';
+    $value = t("%value $prep %day", array('%value' => $value, '%day' => $record_time));
+  }
+  return $value;
 }
 
 /**
@@ -2117,7 +2116,7 @@ function logger_create_chart_legend($chart) {
         'chartId' => $chart->context,
         'index' => $line_id,
         'colors' => $chart->colors,
-        'seriesIds' => isset($cells['seriesIds']) ? $cells['seriesIds'] : array($line_id)
+        'seriesIds' => empty($cells['seriesIds']) ? array($line_id) : $cells['seriesIds']
     ))));
     unset($cells['seriesIds']);
 
