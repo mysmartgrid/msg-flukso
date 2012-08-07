@@ -168,20 +168,25 @@ function enableFilledGraph() {
 
 function submitEnergyChartForm(clickedField) {
 
-  //If form contains field selected_sensor_types, at least one option must be selected
+  //If form contains fields selected_sensor_types or selected_meters, at least one option must be selected in each
 
   var form = document.getElementById('logger-energychart-form');
-  var found = false;
+  var checkBoxes = findCheckBoxes(form, 'selected_meters');
   var checked = false;
+  var found = false;
 
-  for(var i = 0; i < form.elements.length; i++) {
+  if (checkBoxes.length > 0) {
+    found = true;
+    checked = isAnyOptionChecked(checkBoxes);
+  }
 
-    if (form.elements[i].name.indexOf('selected_sensor_types', 0) == 0) {
+  if (!found || checked) {
+    checkBoxes = findCheckBoxes(form, 'selected_sensor_types');
+    found = false;
+
+    if (checkBoxes.length > 0) {
       found = true;
-      if (form.elements[i].checked) {
-        checked = true;
-        break;
-      }
+      checked = isAnyOptionChecked(checkBoxes);
     }
   }
 
@@ -189,20 +194,31 @@ function submitEnergyChartForm(clickedField) {
     form.submit();
     return;
   }
-
   clickedField.checked = true;
 }
 
-function submitRelativeChartForm(clickedField) {
-
-  var form = document.getElementById('logger-relativechart-form');
-  for(var i = 0; i < form.elements.length; i++) {
-    if (form.elements[i].name.indexOf('selected_meters', 0) == 0 && form.elements[i].checked) {
-      form.submit();
-      return;
+function isAnyOptionChecked(checkBoxes) {
+  var checked = false;
+  for(var i = 0; i < checkBoxes.length; i++) {
+    if (checkBoxes[i].checked) {
+      checked = true;
+      break;
     }
   }
-  clickedField.checked = true;
+  return checked;
+}
+
+function findCheckBoxes(form, fieldPrefix) {
+
+  var checkBoxes = new Array();
+  var c = 0;
+  for(var i = 0; i < form.elements.length; i++) {
+
+    if (form.elements[i].name.indexOf(fieldPrefix, 0) == 0) {
+      checkBoxes[c++] = form.elements[i];
+    }
+  }
+  return checkBoxes;
 }
 
 function removePowerSeries(uid, i, username, tableId) {

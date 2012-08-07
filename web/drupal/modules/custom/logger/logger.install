@@ -574,3 +574,19 @@ function logger_update_7011() {
 
   return st("Variables 'logger_relativechart_unit%' and 'logger_net_production%' have been removed.");
 }
+
+/**
+ * Removes variables 'logger_price%' and 'logger_use_sensor_prices%'.
+ */
+function logger_update_7012() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_price%', 'LIKE')
+    ->execute();
+
+  db_delete('variable')
+    ->condition('name', 'logger_use_sensor_prices%', 'LIKE')
+    ->execute();
+
+  return st("Variables 'logger_price%' and 'logger_use_sensor_prices%' have been removed.");
+}
