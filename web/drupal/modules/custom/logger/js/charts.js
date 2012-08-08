@@ -122,9 +122,9 @@ function hideZero(value) {
   return value == 0 ? "" : value.toFixed(2);
 }
 
-function updatePowerChartForm(chart) {
+function updateLineChartForm(chart) {
 
-  var form = document.getElementById('logger-powerchart-form');
+  var form = document.getElementById('logger-linechart-form');
 
   if (form) {
     var yvalue1 = Math.round(chart.yAxisRange(0)[0]);
@@ -147,12 +147,12 @@ function updatePowerChartForm(chart) {
     form.elements['xvalue2time'].value = formatTime(value);
   }
 
-  updatePowerLegend(chart);
+  updateLineLegend(chart);
 }
 
-function submitPowerChartForm(resetY) {
+function submitLineChartForm(resetY) {
 
-  var form = document.getElementById('logger-powerchart-form');
+  var form = document.getElementById('logger-linechart-form');
   
   if (resetY) {
     form.elements['yvalue1'].value = '';
@@ -162,15 +162,15 @@ function submitPowerChartForm(resetY) {
 }
 
 function enableFilledGraph() {
-  var form = document.getElementById('logger-powerchart-form');
+  var form = document.getElementById('logger-linechart-form');
   form.elements['filled_graph'].checked = 1;
 }
 
-function submitEnergyChartForm(clickedField) {
+function submitBarChartForm(clickedField) {
 
   //If form contains fields selected_sensor_types or selected_meters, at least one option must be selected in each
 
-  var form = document.getElementById('logger-energychart-form');
+  var form = document.getElementById('logger-barchart-form');
   var checkBoxes = findCheckBoxes(form, 'selected_meters');
   var checked = false;
   var found = false;
@@ -221,7 +221,7 @@ function findCheckBoxes(form, fieldPrefix) {
   return checkBoxes;
 }
 
-function removePowerSeries(uid, i, username, tableId) {
+function removeLineSeries(uid, i, username, tableId) {
 
   var visibilities = lineChart.visibility();
 
@@ -235,7 +235,7 @@ function removePowerSeries(uid, i, username, tableId) {
 
   setLineVisibility(i, false);
 
-  var form = document.getElementById('logger-powerchart-form');
+  var form = document.getElementById('logger-linechart-form');
   var field = form.elements['new_user'];
   var found = false;
 
@@ -269,7 +269,7 @@ function removePowerSeries(uid, i, username, tableId) {
   }
 }
 
-function hidePowerSeries(uid, i, username, hideText, showText) {
+function hideLineSeries(uid, i, username, hideText, showText) {
 
   var visibilities = lineChart.visibility();
 
@@ -335,29 +335,29 @@ function updateSmoothingLevel(fieldId, step) {
   return true;
 }
 
-function updatePowerChart(xvalue1, xvalue2, yvalues) {
+function updateLineChart(xvalue1, xvalue2, yvalues) {
 
   lineChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   if (sliderChart) {
     sliderChart.updateOptions({dateWindow: null});
   }
 
-  updatePowerChartForm(lineChart);
+  updateLineChartForm(lineChart);
 }
 
 function updateSliderChart(xvalue1, xvalue2, yvalues) {
 
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
-  updatePowerChartForm(lineChart);
+  updateLineChartForm(lineChart);
 }
 
-function expandPowerChart() {
+function expandLineChart() {
   lineChart.updateOptions({dateWindow: null});
   lineChart.updateOptions({valueRange: null});
   updateSliderChart();
 }
 
-function slidePowerChart(event, center) {
+function slideLineChart(event, center) {
 
   var xvalue1 = lineChart.xAxisRange(0)[0];
   var xvalue2 = lineChart.xAxisRange(0)[1];
@@ -369,10 +369,10 @@ function slidePowerChart(event, center) {
   lineChart.updateOptions({dateWindow: [xvalue1, xvalue2]});
   sliderChart.updateOptions({dateWindow: sliderChart.xAxisRange()});
 
-  updatePowerChartForm(lineChart);
+  updateLineChartForm(lineChart);
 }
 
-function highlightPowerChart(canvas, area, sliderChart) {
+function highlightLineChart(canvas, area, sliderChart) {
 
   var xvalue1 = lineChart.xAxisRange(0)[0];
   var xvalue2 = lineChart.xAxisRange(0)[1];
@@ -388,7 +388,7 @@ function highlightPowerChart(canvas, area, sliderChart) {
   canvas.fillRect(point1, area.y, width, height);
 }
 
-function updatePowerLegend(chart) {
+function updateLineLegend(chart) {
 
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
@@ -437,14 +437,14 @@ function updatePowerLegend(chart) {
       last = null;
     }
 
-    updatePowerLegendValue("max", s, max);
-    updatePowerLegendValue("min", s, min);
-    updatePowerLegendValue("avg", s, avg);
-    updatePowerLegendValue("last", s, last);
+    updateLineLegendValue("max", s, max);
+    updateLineLegendValue("min", s, min);
+    updateLineLegendValue("avg", s, avg);
+    updateLineLegendValue("last", s, last);
   }
 }
 
-function updatePowerLegendValue(name, i, value) {
+function updateLineLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   if (div && value && !isNaN(value - 0)) {
@@ -453,7 +453,7 @@ function updatePowerLegendValue(name, i, value) {
   }
 }
 
-function addPowerAnnotation(event, point) {
+function addLineAnnotation(event, point) {
 
   var id = 'annotation' + point.name + '' + point.xval + '' + point.yval;
   var div = findAnnotationDiv(id);
@@ -482,7 +482,7 @@ function addPowerAnnotation(event, point) {
       cssClass: 'point-annotation ' + id,
       clickHandler: function(annotation, point, chart, event) {
 
-        removePowerAnnotation(chart, annotation.text);
+        removeLineAnnotation(chart, annotation.text);
       }
     });
 
@@ -493,7 +493,7 @@ function addPowerAnnotation(event, point) {
   }
 }
 
-function removePowerAnnotation(chart, text) {
+function removeLineAnnotation(chart, text) {
 
   var remaining = new Array();
   var annotations = chart.annotations();
@@ -754,13 +754,11 @@ function setSeriesColor(chartId, i, color) {
 
   color = '#' + color;
 
-  //TODO: avoid these tests
-  if (chartId == 'energy' || chartId == 'relative' || chartId == 'onsite') {
+  if (barChart) {
     barChart.options['colors'][i] = color;
     barChart.plot();
-
-  } else {
-    //FIXME: update only one color
+  }
+  if (lineChart) {
     updateDygraphColors();
   }
 
@@ -771,10 +769,13 @@ function setSeriesColor(chartId, i, color) {
 
 function updateDygraphColors() {
 
-  var colorValues = new Array();
+  var colorValues = lineChart.getColors();
   var series = lineChart.visibility();
   for (var c = 0; c < series.length; c++) {
-    colorValues[c] = '#' + document.getElementById('series_color' + c).value;
+    var field = document.getElementById('series_color' + c);
+    if (field) {
+      colorValues[c] = '#' + field.value;
+    }
   }
 
   lineChart.updateOptions({colors: colorValues});

@@ -590,3 +590,15 @@ function logger_update_7012() {
 
   return st("Variables 'logger_price%' and 'logger_use_sensor_prices%' have been removed.");
 }
+
+/**
+ * Removes variables '%unit%'.
+ */
+function logger_update_7013() {
+
+  db_delete('variable')
+    ->condition('name', '%unit%', 'LIKE')
+    ->execute();
+
+  return st("Variables '%unit%' have been removed.");
+}
