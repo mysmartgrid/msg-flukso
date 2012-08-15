@@ -1308,16 +1308,18 @@ function logger_get_onsite_chart_data($chart) {
   $sub_time_window = logger_get_default_time_window($sub_interval);
 
   //For every measurement
-  foreach (array_keys($consumed) as $time) {
+  for ($time = $chart->period['start']; $time < $chart->period['end']; $time += MINUTE) {
 
     $user_time = $time + $chart->offset;
-    $user_time -= $user_time % $sub_time_window;
-    $period = array('start' => $user_time, 'end' => $user_time + $sub_time_window);
+    $user_time -= ($user_time % $sub_time_window) + $chart->offset;
+    $user_time -= $chart->interval == 'month' ? 3 * DAY : 0;
+    $period = array('start' => $user_time, 'end' => $user_time + $sub_time_window - 1);//Until 23:59:59
     $title = logger_format_series_period($chart->interval, $period, $chart->offset);
 
     $onsite[$title] = isset($onsite[$title]) ? $onsite[$title] : 0;
     $feedin[$title] = isset($feedin[$title]) ? $feedin[$title] : 0;
     $supply[$title] = isset($supply[$title]) ? $supply[$title] : 0;
+    $consumed[$time] = isset($consumed[$time]) ? $consumed[$time] : 0;
     $produced[$time] = isset($produced[$time]) ? $produced[$time] : 0;
 
     if ($consumed[$time] < $produced[$time]) {
