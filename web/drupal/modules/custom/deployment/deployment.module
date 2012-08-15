@@ -34,6 +34,7 @@ define('WORKING_STATE_ID',            5);
 define('OFFLINE_STATE_ID',            6);
 define('NO_MEASUREMENT_STATE_ID',     7);
 define('NO_HEARTBEAT_STATE_ID',       8);
+define('INVALID_TIMESTAMP_STATE_ID',  9);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_PATH', DRUPAL_ROOT . '/' . DEPLOYMENT_REL_PATH);
@@ -160,6 +161,10 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 
         case CORRUPTED_STATE_ID:
           $message = t('This device has sent a message with corrupted data at %latest.', $latest);
+          break;
+
+        case INVALID_TIMESTAMP_STATE_ID:
+          $message = t('This device has sent a measurement with an invalid time at %latest.', $latest);
           break;
 
         case WORKING_STATE_ID:
@@ -392,7 +397,7 @@ function deployment_download_list_file() {
  *
  * @return an array of device states.
  */
-function deployment_get_all_states() {
+ function deployment_get_all_states() {
 
   $result = db_query("SELECT SQL_CACHE id, name FROM {deployment_state}");
 
@@ -437,23 +442,33 @@ function deployment_get_devices($filter = array(), $header = NULL, $page_limit =
 function deployment_query_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
   $now = REQUEST_TIME;
-  $corrupted_events_query = db_select('event_log', 'l');
-  $corrupted_events_query->groupBy('l.device');
-  $corrupted_events_query->addExpression('MAX(l.time)', 'corrupted');
-  $corrupted_events_query->fields('l', array('device'))
-    ->condition('l.event_id', CORRUPTED_MESSAGE_EVENT_ID, '=')
-    ->condition('l.time', $now - 15 * MINUTE, '>');
 
-  $corrupted_query = db_select('logger_meters', 'm');
-  $corrupted_query->leftJoin($corrupted_events_query, 'e', 'm.device = e.device');
-  $corrupted_query->groupBy('m.device');
-  $corrupted_query->fields('m', array('device'));
-  $corrupted_query->addExpression('MAX(m.access)', 'access');
-  $corrupted_query->addExpression('MAX(e.corrupted)', 'corrupted');
+  $corrupted_events_query = db_select('event_log', 'l')
+    ->fields('l', array('device'))
+    ->condition('l.event_id', CORRUPTED_MESSAGE_EVENT_ID)
+    ->condition('l.time', $now - 15 * MINUTE, '>')
+    ->groupBy('l.device');
+  $corrupted_events_query->addExpression('MAX(l.time)', 'corrupted');
+
+  $invalid_time_events_query = db_select('event_log', 'l')
+    ->fields('l', array('device'))
+    ->condition('l.event_id', INVALID_TIMESTAMP_EVENT_ID)
+    ->condition('l.time', $now - 15 * MINUTE, '>')
+    ->groupBy('l.device');
+  $invalid_time_events_query->addExpression('MAX(l.time)', 'unsynchronized');
+
+  $sensor_query = db_select('logger_meters', 'm')
+    ->fields('m', array('device'))
+    ->groupBy('m.device');
+  $sensor_query->leftJoin($corrupted_events_query, 'c', 'm.device = c.device');
+  $sensor_query->leftJoin($invalid_time_events_query, 't', 'm.device = t.device');
+  $sensor_query->addExpression('MAX(m.access)', 'access');
+  $sensor_query->addExpression('MAX(c.corrupted)', 'corrupted');
+  $sensor_query->addExpression('MAX(t.unsynchronized)', 'unsynchronized');
 
   $query = db_select('logger_devices', 'd');
   $query->leftJoin('users', 'u', 'u.uid = d.uid');
-  $query->join($corrupted_query, 'm', 'm.device = d.device');
+  $query->join($sensor_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
   $query->fields('d', array('serial', 'device', 'firmware_version'))
@@ -512,9 +527,16 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
       $latest_field = "m.corrupted";
       break;
 
+    case INVALID_TIMESTAMP_STATE_ID:
+      $query->condition('d.uid', 0, '>')
+        ->isNotNull('m.unsynchronized');
+      $latest_field = "m.unsynchronized";
+      break;
+
     case OFFLINE_STATE_ID:
       $query->condition('d.uid', 0, '>')
         ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
         ->condition('d.access', $offline_timeout, '<')
         ->condition('m.access', $offline_timeout, '<');
       break;
@@ -522,52 +544,64 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
     case NO_HEARTBEAT_STATE_ID:
       $query->condition('d.uid', 0, '>')
         ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
         ->condition('d.access', $offline_timeout, '<')
         ->condition('m.access', $offline_timeout, '>=');
+      $latest_field = "m.access";
+      break;
+
+    case NO_MEASUREMENT_STATE_ID:
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
+        ->condition('d.access', $offline_timeout, '>=')
+        ->condition('m.access', 0, '>')
+        ->condition('m.access', $offline_timeout, '<');
       $latest_field = "m.access";
       break;
 
     case NO_COMMUNICATION_STATE_ID:
       $query->condition('d.uid', 0, '>')
         ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
         ->condition('d.access', $offline_timeout, '>=')
+        ->condition('m.access', $offline_timeout, '>=')
+        ->condition('d.access', $communication_timeout, '<')
         ->condition('m.access', $communication_timeout, '<');
-      break;
-
-    case NO_MEASUREMENT_STATE_ID:
-      $query->condition('d.uid', 0, '>')
-        ->isNull('m.corrupted')
-        ->condition('d.access', $communication_timeout, '>=')
-        ->condition('m.access', 0, '>')
-        ->condition('m.access', $offline_timeout, '<');
-      $latest_field = "m.access";
       break;
 
     case WORKING_STATE_ID:
       $query->condition('d.uid', 0, '>')
         ->isNull('m.corrupted')
-        ->condition('d.access', $communication_timeout, '>=')
-        ->condition('m.access', $offline_timeout, '>=');
+        ->isNull('m.unsynchronized')
+        ->condition(
+          db_or()
+            ->condition('d.access', $communication_timeout, '>=')
+            ->condition('m.access', $communication_timeout, '>='));
       break;
 
     default:
       $latest_field = "
-        IF(m.corrupted IS NOT NULL, m.corrupted,
-          IF(d.access = 0, d.created,
-            IF(d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access,
-              IF (m.access = 0, d.created, d.access)
+        IF (m.corrupted IS NOT NULL, m.corrupted,
+          IF (m.unsynchronized IS NOT NULL, m.unsynchronized,
+            IF (d.access = 0, d.created,
+              IF (d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access,
+                IF (m.access = 0, d.created, d.access)
+              )
             )
           )
         )";
 
       $state_id_field = "
-        IF(d.uid = 0,
-          IF(d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
-          IF(m.corrupted IS NOT NULL, " . CORRUPTED_STATE_ID . " ,
-            IF(d.access < $offline_timeout,
-              IF(m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
-              IF(d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ",
-                 IF(m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
+        IF (d.uid = 0,
+          IF (d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
+          IF (m.corrupted IS NOT NULL, " . CORRUPTED_STATE_ID . ",
+            IF (m.unsynchronized IS NOT NULL, " . INVALID_TIMESTAMP_STATE_ID . ",
+              IF (d.access < $offline_timeout,
+                IF (m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
+                IF (d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ",
+                   IF (m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
+                )
               )
             )
           )

@@ -130,6 +130,14 @@ function deployment_install() {
     ))
     ->execute();
 
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Invalid Timestamp',
+      'description' => "This device has sent a measurement with an invalid time.",
+    ))
+    ->execute();
+
   //FIXME: PDF generation libraries
 
   $file_path = drupal_get_path('module', 'deployment') . '/pdf';
@@ -150,4 +158,20 @@ function deployment_update_7000() {
   // hook_update_N() no longer returns a $ret array. Instead, return
   // nothing or a translated string indicating the update ran successfully.
   // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Create deployment state 'Invalid Timestamp'.
+ */
+function deployment_update_7001() {
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Invalid Timestamp',
+      'description' => "This device has sent a measurement with an invalid time.",
+    ))
+    ->execute();
+
+  return st("The deployment state 'Invalid Timestamp' has been created.");
 }
