@@ -102,7 +102,7 @@ function deployment_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['deployment/chart/file'] = array(
+  $items['deployment/file'] = array(
     'title' => 'Downloads a deployment chart file',
     'page callback' => 'deployment_download_chart_file',
     'access callback' => TRUE,
@@ -291,7 +291,7 @@ function deployment_list_page() {
  * @return the deployment overview page.
  */
 function deployment_overview_page() {
-  
+
   global $user;
 
   $legend = array();
@@ -333,9 +333,8 @@ function deployment_overview_page() {
     $row[$percentage_title] = $perc ? $perc . ' %' : '';
   }
 
-  $chart = logger_create_chart_object('deployment', array(), 'year', t('Devices'), array());
-  $chart->file_url = 'deployment/chart/file'; //TODO: avoid setting this property
-  $chart->data['legend'] = $legend;
+  $chart = logger_create_chart_object('deployment_overview', array(), 'year', t('Devices'), array());
+  $chart->data = array('legend' => $legend);
 
   drupal_set_title(t('Deployment Overview'));
 

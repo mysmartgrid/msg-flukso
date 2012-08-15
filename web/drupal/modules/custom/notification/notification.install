@@ -613,3 +613,18 @@ function notification_update_7006() {
 
   return st("Missing records have been added to table 'event_unit'.");
 }
+
+/**
+ * Create event 'Invalid Timestamp'.
+ */
+function notification_update_7007() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Invalid Timestamp'
+    ))
+    ->execute();
+
+  return st("The event 'Invalid Timestamp' has been created.");
+}

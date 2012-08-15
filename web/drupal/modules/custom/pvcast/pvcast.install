@@ -50,3 +50,13 @@ function pvcast_update_7005() {
 
   return st("Variable 'pvcast_forecast_service_url' has been updated.");
 }
+
+/**
+ * Updates the PVCast URL variable.
+ */
+function pvcast_update_7006() {
+
+  variable_set('pvcast_forecast_service_url', 'https://www.pvcast.de:443');
+
+  return st("Variable 'pvcast_forecast_service_url' has been updated.");
+}

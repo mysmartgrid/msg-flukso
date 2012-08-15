@@ -270,63 +270,61 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
       %Sensor is found
       [[Uid, Device]] ->
 
-        Timestamp = unix_time(),
+        ServerTimestamp = unix_time(),
 
-      case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
-        % valid
-        {ok, Response} ->
-                %io:fwrite(string:concat(string:concat("rrdtool last successfull : ", integer_to_list(RrdTimestamp)), "\n"));
-                RrdTimestamp = Response;
+        case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
+          % valid
+          {ok, Response} ->
+            %io:fwrite(string:concat(string:concat("rrdtool last successfull : ", integer_to_list(RrdTimestamp)), "\n"));
+            RrdTimestamp = Response;
 
-        % error
-        {error, Reason} ->
-                %io:fwrite("rrdtool last failed\n"),
-                RrdTimestamp = 1
-        end,
+          % error
+          {error, Reason} ->
+            %io:fwrite("rrdtool last failed\n"),
+            RrdTimestamp = 1
+          end,
 
-        %io:fwrite(string:concat(string:concat("process_measurements timestamps: ", integer_to_list(RrdTimestamp)), "\n")),
+          %io:fwrite(string:concat(string:concat("process_measurements timestamps: ", integer_to_list(RrdTimestamp)), "\n")),
 
-        case parse_measurements(RrdTimestamp, Measurements) of
+          case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) of
 
-          %Measurements are valid
-          {ok, FilterState, RrdData} ->
+            %Measurements are valid
+            {ok, RrdData} ->
 
-            case FilterState of
-              false ->
-                      logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData);
-              true ->
-                      Dummy = 1
-            end,
+              %debugging
+              %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
+              %logger(Uid, <<"rrdupdate.base">>,
+              %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+              %  ?INFO, ReqData),
 
-            %debugging
-            %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
-            %logger(Uid, <<"rrdupdate.base">>,
-            %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
-            %  ?INFO, ReqData),
-
-            case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
+              case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
                 %RRD files were successfully updated
                 {ok, _RrdResponse} ->
-                    RrdResponse = "ok",
+                  RrdResponse = "ok",
                     [LastTimestamp, LastValue] = lists:last(Measurements),
 
                     %debugging
                     %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
 
-                    mysql:execute(pool, sensor_update, [Timestamp, LastValue, RrdSensor]),
-                    mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, Timestamp]);
+                    mysql:execute(pool, sensor_update, [ServerTimestamp, LastValue, RrdSensor]),
+                    mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, ServerTimestamp]);
     
-                %RRD files were not successfully updated
-                {error, RrdResponse} ->
+                  %RRD files were not successfully updated
+                  {error, RrdResponse} ->
                     logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
-            end;
+              end;
 
-          %Measurements are corrupted
-          _ ->
-            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, Timestamp]),
-            RrdResponse = "Invalid Measurements"
-        end;
+            %Invalid Timestamp
+            {error, RrdData} ->
+              mysql:execute(pool, event_insert, [Device, ?INVALID_TIMESTAMP_EVENT_ID, ServerTimestamp]),
+              RrdResponse = "Invalid Timestamp";
+
+            %Invalid Measurements
+            _ ->
+              mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, ServerTimestamp]),
+              RrdResponse = "Invalid Measurements"
+          end;
 
       %Unknown sensor
       _ ->
@@ -337,14 +335,31 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(RrdTimestamp, Measurements) ->
+parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
+
   try
-    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
-    {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
-    FilterState = length(MultipleSend) == 0,
-    {ok, FilterState, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]}
+    %Valid timestamp: from -7 days to +10 minutes
+    FromTime = ServerTimestamp - 604800,
+    ToTime = ServerTimestamp + 600,
+    InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+
+    case length(InvalidTimestamps) of
+      0 ->
+        Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
+        {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
+
+        %debuging
+        %if
+        %  length(MultipleSend) == 0 ->
+        %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
+        %end,
+
+        {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
+      _ ->
+        {error, Measurements} 
+    end
   catch
     _:_ ->
-      {error, false, error}
+      {error, error}
   end.
 

@@ -464,10 +464,16 @@ function addLineAnnotation(event, point) {
     var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
     var width = 50 * ('' + yval).length / 6;
 
-    var appliances = getAppliances(point.name, date);
+    var appliances = getAppliances(point.name, date);//FIXME: point.name sends sensor.function and not sensor.meter
     var icons = '';
     for (var i = 0; i < appliances.length; i++) {
       icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + appliances[i] + '.jpg"/>';
+      width += 35;
+    }
+
+    var weather = getWeather(point.name, date);//FIXME: point.name sends sensor.function and not sensor.meter
+    if (weather > 0) {
+      icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/weather/icon-' + weather + '.jpg"/>';
       width += 35;
     }
 
@@ -532,6 +538,13 @@ function getAppliances(meter, timestamp) {
     }
   });
   return apps;
+}
+
+function getWeather(meter, timestamp) {
+
+  var weather = 1;
+  //FIXME:
+  return weather;
 }
 
 function createLineChart(id, fileURL, properties) {

@@ -953,7 +953,9 @@ Dygraph.prototype.createDragInterface_ = function() {
             var p = self.selPoints_[i];
             var distance = Math.pow(p.canvasx - dragEndX, 2) +
                            Math.pow(p.canvasy - dragEndY, 2);
-            if (closestIdx == -1 || distance < closestDistance) {
+
+            //FIXME: if (closestIdx == -1 || distance < closestDistance) {
+            if ((closestIdx == -1 && distance > 0) || distance < closestDistance) {
               closestDistance = distance;
               closestIdx = i;
             }

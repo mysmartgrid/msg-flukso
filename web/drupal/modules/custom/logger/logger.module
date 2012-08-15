@@ -24,12 +24,16 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
-//ini_set('display_errors', TRUE);
-//ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
+
+define('SUN_WEATHER_ID',  1);
+define('RAIN_WEATHER_ID', 2);
+define('MOON_WEATHER_ID', 3);
 
 define('LOGGER_REL_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
@@ -948,23 +952,23 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
-  $unique_id = "$context " . implode(',', $types) . " $unit " . implode(',', $prices) . " $chart->resolution $t1 $t2 $aggregate_sensors";
+  $unique_id = "$context $interval" . implode(',', $types) . " $unit " . implode(',', $prices) . " $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
     $unique_id .= " $sensor->meter $sensor->type $sensor->forecast $sensor->price";
   }
 
-  $chart->id = 'logger_' . $interval . '_chart_data_' . md5($unique_id);
+  $i = strpos($context, '_');
+  $module = $i == FALSE ? 'logger' : substr($context, 0, $i);
+
+  $chart->id = $module . '_chart_data_' . md5($unique_id);
   $cache = cache_get($chart->id, 'cache_page');
   $chart->data = $cache ? $cache->data : FALSE;
-  $chart->file_url = 'logger/file/' . $chart->id;
+  $chart->file_url = "$module/file/" . $chart->id;
 
-  if (!$chart->data) {
+  if (!$chart->data && !empty($types)) {
     $get_data = 'logger_get_' . $chart->context . '_chart_data';
-
-    if (!empty($types)) {
-      $chart->data = $get_data($chart);
-      cache_set($chart->id, $chart->data, 'cache_page', REQUEST_TIME + $lifetime);
-    }
+    $chart->data = $get_data($chart);
+    cache_set($chart->id, $chart->data, 'cache_page', REQUEST_TIME + $lifetime);
   }
   return $chart;
 }
@@ -1517,9 +1521,17 @@ function logger_get_forecast_chart_data($chart) {
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
       logger_format_power_series_data($chart, $forecast['power']);
 
+    foreach ($forecast['precipitation'] as $time => $rain) {
+      $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
+      $data['weather'][$i][$time] = $rain > 0 ? RAIN_WEATHER_ID : 
+        $time > $sun['sunrise'] && $time < $sun['sunset'] ? SUN_WEATHER_ID : MOON_WEATHER_ID;
+    }
+    $data['temperature'][$i] = $forecast['temperature'];
+
     $data['legend'][$i] =
       logger_create_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
+
     $i++;
   }
   return $data;
@@ -2041,13 +2053,27 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   $properties = array_merge($properties, array(
     'labelsDiv' => '"chartLabels"',
     'colors' => '["' . implode('","', $chart->colors) . '"]',
-    'includeZero' => 'true',
+    'includeZero' => 'true'
   ));
 
   $labels_output = isset($create_labels) ? '<div id=' . $properties['labelsDiv'] . ' class="legend"></div>' : '';
 
+  $pairs = array();
   foreach ($properties as $key => $value) {
     $pairs[] = "$key: $value";
+  }
+  $properties = $pairs;
+
+  $weather = array();
+  if (isset($chart->data['weather'])) {
+    foreach ($chart->data['weather'] as $i => $values) {
+      $pairs = array();
+      foreach ($values as $time => $icon) {
+        $degrees = $chart->data['temperature'][$i][$time];
+        $pairs[] = "[$time, $icon, $degrees]";
+      }
+      $weather[] = "[ $i, [" . implode (', ', $pairs) . "] ]";
+    }
   }
 
   $cssClass = $slider ? 'slider' : 'chart';
@@ -2056,7 +2082,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   return '<div id="' . $id . '" class="' . $cssClass . '"></div><br>' .
     $labels_output .
     '<script type="text/javascript">
-       createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $pairs) . ' });
+       createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $properties) . '}, [' . implode(', ', $weather) . ']);
     </script> ';
 }
 
@@ -3137,21 +3163,21 @@ function logger_get_appliances($meter, $timestamp) {
 
   $appliances = array();
 
-  /* //TODO: use logger_request_appliance_detection($meter, $measurements)
   if (user_has_role('Techniker')) { 
 
     $type = db_select('logger_meters', 'm')
       ->fields('m', array('type'))
-      ->condition('m.function', $meter)
+      ->condition('m.meter', $meter)
       ->execute()
       ->fetchField();
 
-    $appliances = $type == CONSUMPTION_SENSOR_TYPE ? array(1, 2, 3, 4) : array(10);
+    if ($type == CONSUMPTION_SENSOR_TYPE) {
+      //TODO: use logger_request_appliance_detection($meter, $measurements)
+      $appliances = array(1, 2, 3, 4);
+    }
   }
-  */
 
   print json_encode($appliances);
-
   exit(0);
 }
 

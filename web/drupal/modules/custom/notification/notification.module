@@ -45,6 +45,7 @@ define('FAILED_FIRMWARE_UPGRADE_EVENT_ID', 106);
 //Anomaly events
 define('MEASUREMENT_ANOMALY_EVENT_ID',     200);
 define('CORRUPTED_MEASUREMENT_EVENT_ID',   201);
+define('INVALID_TIMESTAMP_EVENT_ID',       202);
 
 //System events
 define('SYSTEM_ERROR_EVENT_ID',            999);
@@ -1110,6 +1111,7 @@ function notification_cron() {
   notification_send_communication_restored_emails();
   notification_send_measurement_anomaly_emails();
   notification_send_corrupted_measurement_emails();
+  notification_send_invalid_timestamp_emails();
   notification_send_peak_consumption_emails();
   notification_send_summary_report_emails();
   notification_send_forecast_report_emails();
@@ -1309,6 +1311,33 @@ function notification_send_corrupted_measurement_emails() {
   $message = notification_compose_error_email(
     "Your Flukso device (serial number: %serial) has sent either a " .
     "measurement or a heartbeat with corrupted data at %event_time.");
+
+  notification_send_emails($message, $notifiables);
+}
+
+/**
+ * Sends e-mails notifying users of "Invalid Timestamp" events.
+ */
+function notification_send_invalid_timestamp_emails() {
+
+  $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
+
+  $query->join('event_log', 'l', 'l.device = n.device');
+  $query->addField('l', 'time', 'event_time');
+  $query->where('l.time > n.base_time');
+  $query->condition('l.event_id', INVALID_TIMESTAMP_EVENT_ID);
+
+  $result = $query->execute();
+
+  $notifiables = array();
+  while ($notifiable = $result->fetchAssoc()) {
+    $notifiables[] = $notifiable;
+  }
+
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has sent a " .
+    "measurement with an invalid time at %event_time.");
 
   notification_send_emails($message, $notifiables);
 }

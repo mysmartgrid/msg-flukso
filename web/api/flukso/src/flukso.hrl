@@ -42,6 +42,7 @@
 -define(FAILED_FIRMWARE_UPGRADE_EVENT_ID,     106).
 
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,       201).
+-define(INVALID_TIMESTAMP_EVENT_ID,           202).
 
 -record(state,
         {rrdSensor,
