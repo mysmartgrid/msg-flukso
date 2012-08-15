@@ -24,9 +24,9 @@
  */
 
 //DEBUG
-error_reporting(E_ALL);
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
 
 define('CONSUMPTION_SENSOR_TYPE', 1);
 define('PRODUCTION_SENSOR_TYPE',  2);
@@ -1299,21 +1299,24 @@ function logger_get_onsite_chart_data($chart) {
 
   $consumed = logger_rrd_query_energy($sensors[CONSUMPTION_SENSOR_TYPE], $chart->unit, $chart->period, $chart->resolution, $chart->prices);
   $produced = logger_rrd_query_energy($sensors[PRODUCTION_SENSOR_TYPE], $chart->unit, $chart->period, $chart->resolution, $chart->prices);
-
   $onsite = array();
   $feedin = array();
   $supply = array();
 
   $sub_interval = logger_get_sub_interval($chart->interval);
   $sub_time_window = logger_get_default_time_window($sub_interval);
+  $from = $chart->period['start'] - ($chart->period['start'] % MINUTE);
 
   //For every measurement
-  for ($time = $chart->period['start']; $time < $chart->period['end']; $time += MINUTE) {
+  for ($time = $from; $time < $chart->period['end']; $time += MINUTE) {
 
-    $user_time = $time + $chart->offset;
-    $user_time -= ($user_time % $sub_time_window) + $chart->offset;
-    $user_time -= $chart->interval == 'month' ? 3 * DAY : 0;
-    $period = array('start' => $user_time, 'end' => $user_time + $sub_time_window - 1);//Until 23:59:59
+    //Format time
+    $start = $time + $chart->offset;
+    $start -= ($start % $sub_time_window) + $chart->offset;
+    $start -= $chart->interval == 'month' ? 3 * DAY : 0;
+    $end = $start + $sub_time_window;
+    $end -= $chart->interval == '24hours' ? 0 : 1; //Until 23:59:59
+    $period = array('start' => $start, 'end' => $end);
     $title = logger_format_series_period($chart->interval, $period, $chart->offset);
 
     $onsite[$title] = isset($onsite[$title]) ? $onsite[$title] : 0;

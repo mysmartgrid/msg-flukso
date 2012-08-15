@@ -382,7 +382,7 @@ function highlightLineChart(canvas, area, sliderChart) {
   var point1 = sliderChart.toDomCoords(xvalue1, 0)[0];
   var point2 = sliderChart.toDomCoords(xvalue2, 0)[0];
   var width = point2 - point1;
-  var height = yvalue2 - yvalue1;
+  var height = yvalue2 - yvalue1 + 100;
 
   canvas.fillStyle = "#a5d2d9";
   canvas.fillRect(point1, area.y, width, height);
@@ -463,18 +463,21 @@ function addLineAnnotation(event, point) {
     var yval = point.yval.toFixed(2);
     var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
     var width = 50 * ('' + yval).length / 6;
-
-    var appliances = getAppliances(point.name, date);//FIXME: point.name sends sensor.function and not sensor.meter
     var icons = '';
-    for (var i = 0; i < appliances.length; i++) {
-      icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + appliances[i] + '.jpg"/>';
+
+    var appliances = getAppliances(point.name, date);
+    if (appliances) {
+      icons += appliances;
       width += 35;
     }
 
-    var weather = getWeather(point.name, date);//FIXME: point.name sends sensor.function and not sensor.meter
-    if (weather > 0) {
-      icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/weather/icon-' + weather + '.jpg"/>';
-      width += 35;
+    var seriesId = point.name.substring(1) - 1;
+    var hour = (point.xval - (point.xval % 3600000)) / 1000;
+
+    var weather = getWeather(seriesId, hour);
+    if (weather) {
+      icons += weather;
+      width += 75;
     }
 
     var annotations = new Array();
@@ -495,7 +498,7 @@ function addLineAnnotation(event, point) {
     lineChart.setAnnotations(annotations);
 
     div = findAnnotationDiv(id);
-    div.innerHTML = '<span class="point-annotation">' + div.innerHTML + '</span>' + icons;
+    div.innerHTML = '<span class="point-annotation"><b>' + div.innerHTML + '</b></span>' + icons;
   }
 }
 
@@ -526,6 +529,8 @@ function findAnnotationDiv(className) {
 
 function getAppliances(meter, timestamp) {
 
+  /*
+  //TODO: implement this function
   var apps = new Array();
 
   jQuery.ajax({
@@ -537,17 +542,32 @@ function getAppliances(meter, timestamp) {
       });
     }
   });
-  return apps;
+
+  '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + appliances[i] + '.jpg"/>'
+  */
+  return '';
 }
 
-function getWeather(meter, timestamp) {
+function getWeather(seriesIndex, time) {
 
-  var weather = 1;
-  //FIXME:
-  return weather;
+  var weather = lineChart.weather;
+
+  for (var i = 0; i < weather.length; i++) {
+    if (weather[i][0] == seriesIndex) {
+      for (var j = 0; j < weather[i][1].length; j++) {
+        if (weather[i][1][j][0] == time) {
+          var iconId = weather[i][1][j][1];
+          var temperature = weather[i][1][j][2];
+          return '<span class="point-annotation">&nbsp;&nbsp;(' + temperature + '°)</span>' +
+            '<img class="point-annotation" src="/sites/all/modules/logger/img/weather/icon-' + iconId + '.jpg"/>';
+        }
+      }
+    }
+  }
+  return null;
 }
 
-function createLineChart(id, fileURL, properties) {
+function createLineChart(id, fileURL, properties, weather) {
 
   var div = document.getElementById(id);
   var clazz = getStyleBySelector('div.' + div.className);
@@ -560,6 +580,7 @@ function createLineChart(id, fileURL, properties) {
   properties.yAxisLabelWidth = properties.axisLabelFontSize * 4;
 
   var chart = new Dygraph(div, '/' + fileURL, properties);
+  chart.weather = weather;
   storeChart(id, chart);
 
   return chart;
