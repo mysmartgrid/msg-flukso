@@ -61,7 +61,7 @@ function chumby_menu() {
   $items['chumby1'] = array(
     'title' => "Chumby Image",
     'description' => 'Shows the chumby image download page.',
-    'page callback' => 'chumby_image_page1',
+    'page callback' => 'chumby_image_page_beta',
     'access arguments' => array('chumby image'),
     'type' => MENU_NORMAL_ITEM
   );
@@ -93,6 +93,36 @@ function chumby_menu() {
     'type' => MENU_CALLBACK
   );
   return $items;
+}
+
+function chumby_image_page_beta() {
+
+  global $base_url;
+
+  $output = t('This wizard provides you with a step-by-step explanation on how to enable a Chumby device ' .
+    'to display Flukso measurements.') . '<br><br>';
+
+  $output .= chumby_step(1, 'Make sure you have the following devices at hand.',
+    '<table><tr align="center">' .
+    "<td><img src=\"$base_url/files/images/memory-stick.jpg\"/></td>" .
+    "<td><img src=\"$base_url/files/images/chumby-one.jpg\"/></td>" .
+    "<td><img src=\"$base_url/files/images/flukso-v2.jpg\"/></td>" .
+    '</tr><tr align="center">' .
+    '<td>' . t('USB Memory stick') . '</td>' .
+    '<td>' . t('Chumby One') . '</td>' .
+    '<td>' . t('Flukso device (version 1 or 2)') . '</td>' .
+    '</tr></table>');
+
+  $output .= chumby_step(2,
+    'Make sure your Flukso device is working properly, by checking its <a href="power">latest measurements</a>. ' .
+    'If not, please read the <a href="content/installationsanleitung-des-fluksos">installation procedure</a> and ' .
+    '<a href="content/häufige-fragen-und-antworten">FAQ</a> in order to fix the problem, before taking further steps.');
+
+  $output .= chumby_step(3,
+    'Please, click <a href="http://developer.mysmartgrid.de/doku.php?id=chumbyqtcontrolpanel-de">here</a> for more ' . 
+    'instructions on how to install the current version (beta) of the Chumby applications.');
+
+  return $output;
 }
 
 function chumby_image_page1() {
