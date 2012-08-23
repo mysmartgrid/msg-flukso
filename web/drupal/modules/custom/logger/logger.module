@@ -2302,6 +2302,11 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $unit_type = logger_get_unit_type($chart->unit);
   $units = $unit_type == 'power' ? logger_get_power_units_options() : logger_get_energy_units_options();
 
+  //FIXME: the units array should be informed by a caller function
+  if ($chart->context == 'balance') {
+    unset($units['eur/year']);
+  }
+
   $form[$unit_type . '_unit'] = array(
     '#type' => 'select',
     '#title' => t('Unit'),
