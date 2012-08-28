@@ -61,7 +61,7 @@ function chumby_menu() {
   $items['chumby1'] = array(
     'title' => "Chumby Image",
     'description' => 'Shows the chumby image download page.',
-    'page callback' => 'chumby_image_page_beta',
+    'page callback' => 'chumby_image_page1',
     'access arguments' => array('chumby image'),
     'type' => MENU_NORMAL_ITEM
   );
