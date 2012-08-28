@@ -272,6 +272,13 @@ function msgdump_remove_by_sensor($meter) {
 
 function msgdump_cron() {
 
+  $rest = REQUEST_TIME % HOUR;
+
+  //Run only in the second quarter of an hour
+  if ($rest >= 45 * MINUTE || $rest < 30 * MINUTE) {
+    return;    
+  }
+
   $now = new DateTime('now');
   $now = $now->format('U');
   $time_limit = 3 * MONTH;
@@ -299,10 +306,10 @@ function msgdump_cron() {
 
       //otherwise execute dump
       $res = exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc');
-      watchdog('cron', '[msgdump_cron] ' . $dump->file . ': ' . $res);
+      //watchdog('cron', '[msgdump_cron] ' . $dump->file . ': ' . $res);
     }
     else {
-      watchdog('cron', '[msgdump_cron] Nothing to do for ' . $dump->file);
+      //watchdog('cron', '[msgdump_cron] Nothing to do for ' . $dump->file);
     }
   }
 }

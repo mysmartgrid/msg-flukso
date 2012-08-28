@@ -3314,11 +3314,17 @@ function logger_query_device_measurements($interval, $device) {
 
 function logger_cron() {
 
-  logger_remove_expired_support_requests();
-  logger_bind_support_ports();
+  $rest = REQUEST_TIME % HOUR;
 
+  //Run only in the first quarter of an hour
+  if ($rest >= 45 * MINUTE) {
+    logger_remove_expired_support_requests();
+  }
+
+  logger_bind_support_ports();
   logger_update_support_authorized_keys();
 
+  //Runs only once a day
   logger_update_pvcast_models();
 }
 
@@ -3730,7 +3736,7 @@ function logger_update_pvcast_models() {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $last = variable_get('logger_last_pvcast_model_update', 0);
-  $now = time();
+  $now = REQUEST_TIME;
 
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);

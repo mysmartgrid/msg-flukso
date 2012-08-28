@@ -525,6 +525,11 @@ function chumby_download_file($image_id) {
 }
 
 function chumby_cron() {
-  rmoldfiles(CHUMBY_PATH . '/files', HOUR);
+
+  //Runs only in the last 15 minutes
+  if (REQUEST_TIME % HOUR <= 15 * MINUTE) {
+
+    rmoldfiles(CHUMBY_PATH . '/files', HOUR);
+  }
 }
 

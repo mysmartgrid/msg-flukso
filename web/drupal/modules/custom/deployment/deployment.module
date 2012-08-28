@@ -819,8 +819,13 @@ function deployment_printcode_form_submit($form, &$form_state) {
 }
 
 function deployment_cron() {
-  cleardir(DEPLOYMENT_PATH . '/pdf/*');
-  deployment_create_summary();
+
+  //Runs only in the first 15 minutes
+  if (REQUEST_TIME % HOUR >= 45 * MINUTE) {
+
+    cleardir(DEPLOYMENT_PATH . '/pdf/*');
+    deployment_create_summary();
+  }
 }
 
 /**
@@ -829,12 +834,13 @@ function deployment_cron() {
 function deployment_create_summary() {
 
   $now = REQUEST_TIME;
-  $now = $now - ($now % HOUR);
+  $now = $now - (REQUEST_TIME % HOUR);
 
   $sql = "SELECT COUNT(*) FROM {deployment_summary} WHERE time = :time";
   $result = db_query($sql, array(':time' => $now))->fetchField();
 
   if ($result == 0) {
+
     $totals = array();
     $devices = deployment_get_devices();
 
@@ -850,12 +856,12 @@ function deployment_create_summary() {
       $total = $total > 0 ? $total : 0;
 
       db_insert('deployment_summary')
-      ->fields(array(
-        'time' => $now,
-        'state_id' => $state_id,
-        'total' => $total
-      ))
-      ->execute();
+        ->fields(array(
+          'time' => $now,
+          'state_id' => $state_id,
+          'total' => $total
+        ))
+        ->execute();
     }
 
     db_delete('deployment_summary')
