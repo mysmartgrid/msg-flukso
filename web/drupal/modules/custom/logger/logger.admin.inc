@@ -101,7 +101,7 @@ function logger_usersensors_page() {
 
   $header = array(t('Sensor'), t('Function'), t('Type'), t('Status'), t('Token'), t('Operation'));
   $options = array('type' => 'inline', 'scope' => 'header');
-  $output = user_has_role('PV Producer') ? '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br></p>' : '';
+  $output = '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br></p>';
 
   $devices = db_select('logger_devices', 'd')
     ->fields('d', array('serial', 'device'))

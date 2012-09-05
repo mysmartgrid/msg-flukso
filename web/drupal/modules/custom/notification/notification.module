@@ -1113,32 +1113,24 @@ function notification_cron() {
   notification_send_communication_restored_emails();
   notification_send_peak_consumption_emails();
 
-  //Run only in the first quarter of an hour
-  if ($rest >= 45 * MINUTE) {
-    notification_send_measurement_anomaly_emails();
-  }
-
   //Run only in the second quarter of an hour
   if ($rest < 45 * MINUTE || $rest >= 30 * MINUTE) {
     notification_send_corrupted_measurement_emails();
+    notification_send_measurement_anomaly_emails();
   }
 
   //Run only in the third quarter of an hour
   if ($rest >= 30 * MINUTE || $rest <= 15 * MINUTE) {
     notification_send_invalid_timestamp_emails();
+    notification_send_forecast_report_emails();
   }
 
   //Run only in the last quarter of an hour
   if ($rest > 15 * MINUTE) {
     notification_send_summary_report_emails();
-    notification_send_forecast_report_emails();
   }
 
-  //Run only in the last 15 minutes of the day
-  $rest = REQUEST_TIME % DAY;
-  if ($rest < 15 * MINUTE) {
-    notification_eventlog_clear_old();
-  }
+  notification_eventlog_clear_old();
 }
 
 function notification_compose_base_query($event_id) {

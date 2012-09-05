@@ -3740,7 +3740,7 @@ function logger_update_pvcast_models() {
 
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
-    $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now, FALSE);
+    $period = logger_get_period('day', HOUR, $now - 2 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor($sensor, 'watt', $period, HOUR);

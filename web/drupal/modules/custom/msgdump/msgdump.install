@@ -131,3 +131,18 @@ function msgdump_update_7001() {
   return $output;
 }
 
+/**
+ * Adds field 'updated' to table msgdump.
+ */
+function msgdump_update_7002() {
+
+  db_add_field('msgdump', 'updated', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+    'disp-width' => '10'
+  ));
+
+  return st("Field 'updated' has been added to table msgdump.");
+}

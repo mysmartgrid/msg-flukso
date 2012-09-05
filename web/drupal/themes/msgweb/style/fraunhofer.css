@@ -1950,7 +1950,6 @@ li.error label {
 }
 
 
-/*added by Stephan Platz, 12.04.2010*/
 /* Message */
 div.status {
 	background-color: #a5d2d9;
@@ -1964,7 +1963,7 @@ div.status {
 div.error {
 	margin-bottom:1em;
 }
-/*end added*/
+
 
 /**********
  * Footer *

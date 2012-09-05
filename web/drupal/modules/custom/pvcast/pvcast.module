@@ -32,19 +32,29 @@
  * @param $alias      The PV plant alias.
  * @param $start_time The forecast period start time (optional).
  * @param $end_time   The forecast period end time (optional).
- * @return the PV plant forecast as a bidimensional array (type => (timestamp => value)), where type may be: 'power', 'globalradiation', and 'temperature'.
+ * @return the PV plant forecast as a bidimensional array (type => (timestamp => value)), where type may be: 'power', 'precipitation', and 'temperature'.
  */
 function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
 
   //TODO: start_time and end_time should be URL parameters
   $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
-  $forecast = isset($response->data) ? json_decode($response->data, TRUE) : array();
+
+  $data = isset($response->data) ? json_decode($response->data, TRUE) : array();
+  $forecast = array(
+    'power' => array(),
+    'temperature' => array(),
+    'precipitation' => array()
+  );
 
   if (isset($start_time) && isset($end_time)) {
-    foreach ($forecast as $type => $values) {
-      foreach ($values as $time => $value) {
-        if (!isset($time) || $time < $start_time || $time > $end_time) {
-          unset($forecast[$type][$time]);
+    foreach ($data as $time => $values) {
+
+      if ($time >= $start_time && $time <= $end_time) {
+        foreach ($values as $type => $value) {
+
+          if (isset($forecast[$type])) {
+            $forecast[$type][$time] = $data[$time][$type];
+          }
         }
       }
     }
@@ -109,10 +119,10 @@ function pvcast_update_model($alias, $measurements) {
 
   $pairs = "";
   foreach ($measurements as $time => $value) {
-    $pairs .= (empty($pairs) ? '' : ',') . "\"$time\":$value";
+    $pairs .= (empty($pairs) ? '' : ',') . "\"$time\":{\"power\":$value}";
   }
 
-  $response = pvcast_request('POST', "/plants/alias/$alias/updateModel",
+  $response = pvcast_request('POST', "/plants/alias/$alias/measurements",
     '{"measurements":{' . $pairs . '}}');
 
   return $response->code;
@@ -144,12 +154,18 @@ function pvcast_request($method, $path, $body = NULL) {
 
   //If error
   if ($response->code >= 300 || $response->code < 200) {
-    watchdog('pvcast.request', 'Request: %method %url - HTTP response code: %code - message: "%message" - data: "%data" - body: "%body"',
+    watchdog('pvcast.request', 'Request: %method %url -
+      HTTP response code: %code -
+      message: "%message" -
+      status: "%status" -
+      data: "%data" -
+      body: "%body"',
       array(
         '%method' => $method,
         '%url' => $url,
         '%code' => $response->code,
         '%message' => isset($response->error) ? $response->error : '',
+        '%status' => isset($response->status_message) ? $response->status_message : '',
         '%data' => isset($response->data) ? $response->data : '',
         '%body' => isset($body) ? $body : '',
         WATCHDOG_ERROR
