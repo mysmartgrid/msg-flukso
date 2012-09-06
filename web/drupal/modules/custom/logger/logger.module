@@ -1305,8 +1305,13 @@ function logger_get_onsite_chart_data($chart) {
   $feedin = array();
   $supply = array();
 
-  $sub_interval = logger_get_sub_interval($chart->interval);
-  $sub_time_window = logger_get_default_time_window($sub_interval);
+  if ($chart->interval == 'hour') {# Hour has no subinterval
+    $sub_time_window = 1;
+  }
+  else {
+    $sub_interval = logger_get_sub_interval($chart->interval);
+    $sub_time_window = logger_get_default_time_window($sub_interval);
+  }
   $from = $chart->period['start'] - ($chart->period['start'] % MINUTE);
 
   $hour_interval = !(strrpos($chart->interval, 'hour') === FALSE);
