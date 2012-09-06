@@ -429,7 +429,6 @@ function updateLineLegend(chart) {
 
     if (total > 0) {
       avg = sum / total;
-
     } else {
       max = null;
       min = null;
@@ -441,15 +440,20 @@ function updateLineLegend(chart) {
     updateLineLegendValue("min", s, min);
     updateLineLegendValue("avg", s, avg);
     updateLineLegendValue("last", s, last);
+    updateLineLegendValue("sum", s, sum);
   }
 }
 
 function updateLineLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
-  if (div && value && !isNaN(value - 0)) {
-    value = value.toFixed(2);
-    div.innerHTML = value == 0.00 ? '' : value;
+  if (div) {
+    if (value && !isNaN(value - 0)) {
+      value = value.toFixed(2);
+      div.innerHTML = value == 0.00 ? '' : value;
+    } else {
+      div.innerHTML = '';
+    }
   }
 }
 

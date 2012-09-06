@@ -775,9 +775,9 @@ function logger_onsite_page($interval) {
   $sensors = logger_get_sensors($types, array($user->uid));
   $title = t('Your on-site energy consumption');
 
-  return $interval == '24hours' ?
-    logger_line_chart_page($interval, 'onsite', $title, $sensors, $types, 'kWh') :
-    logger_bar_chart_page($interval, 'onsite', $title, $sensors, $types, 'kWh');
+  return strrpos($interval, 'hour') === FALSE ?
+    logger_bar_chart_page($interval, 'onsite', $title, $sensors, $types, 'kWh') :
+    logger_line_chart_page($interval, 'onsite', $title, $sensors, $types, 'kWh');
 }
 
 /**
@@ -1112,6 +1112,8 @@ function logger_format_series_period($interval, $period, $offset = 0) {
   $period['end'] = $end;
 
   switch ($interval) {
+    case 'hour':
+    case '72hours':
     case '24hours':
       $diff = $offset / HOUR;
       $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
@@ -1307,15 +1309,19 @@ function logger_get_onsite_chart_data($chart) {
   $sub_time_window = logger_get_default_time_window($sub_interval);
   $from = $chart->period['start'] - ($chart->period['start'] % MINUTE);
 
+  $hour_interval = !(strrpos($chart->interval, 'hour') === FALSE);
+  $last_minute = $hour_interval ? 0 : 1; //Until 23:59:59
+  $first_minute = $chart->interval == 'month' ? 3 * DAY : 0;
+
   //For every measurement
   for ($time = $from; $time < $chart->period['end']; $time += MINUTE) {
 
     //Format time
     $start = $time + $chart->offset;
     $start -= ($start % $sub_time_window) + $chart->offset;
-    $start -= $chart->interval == 'month' ? 3 * DAY : 0;
+    $start -= $first_minute;
     $end = $start + $sub_time_window;
-    $end -= $chart->interval == '24hours' ? 0 : 1; //Until 23:59:59
+    $end -= $last_minute;
     $period = array('start' => $start, 'end' => $end);
     $title = logger_format_series_period($chart->interval, $period, $chart->offset);
 
@@ -1335,7 +1341,7 @@ function logger_get_onsite_chart_data($chart) {
     }
   }
 
-  if ($chart->interval == '24hours') {
+  if ($hour_interval) {
     foreach ($onsite as $title => $value) {
       $supply[$title] += $value;
       $feedin[$title] += $value;
@@ -1356,7 +1362,7 @@ function logger_get_onsite_chart_data($chart) {
     if (!empty($name)) {
       $cells = array('Min' => 0, 'Max' => 0, 'Avg' => 0);
 
-      if ($chart->interval != '24hours') {
+      if (!$hour_interval) {
         $total = count($series['values']);
         $values = $total > 0 ? $series['values'] : array(0);
         $min = min($values);
@@ -2108,9 +2114,12 @@ function logger_create_interval_menu($context) {
 
     case 'onsite':
       $items = array(
-        l(t('Day'),   "$context/24hours"),
+        l(t('Hour'),    "$context/hour"),
+        l(t('Day'),     "$context/24hours"),
+        l(t('3 Days'),  "$context/72hours"),
         l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"));
+        l(t('Month'),   "$context/month"),
+        l(t('Year'),    "$context/year"));
       break;
 
     case 'energy':
@@ -2904,6 +2913,7 @@ function logger_get_resolution($interval) {
     'hour' => 1 * MINUTE,
     'day' => 15 * MINUTE,
     '24hours' => 1 * MINUTE,
+    '72hours' => 1 * MINUTE,
     '3days' => 15 * MINUTE,
     'week' => 15 * MINUTE,
     'month' => 1 * DAY,
@@ -2945,6 +2955,7 @@ function logger_get_default_time_window($interval, $absolute = TRUE) {
     'dayquarter' => -6 * HOUR,
     'day' => -1 * DAY,
     '24hours' => -1 * DAY,
+    '72hours' => -3 * DAY,
     '3days' => -3 * DAY,
     'week' => -7 * DAY,
     'month' => -30 * DAY,
@@ -2969,6 +2980,7 @@ function logger_get_sub_interval($interval) {
     'dayquarter' => 'hour',
     'day' => 'dayquarter',
     '24hours' => 'hour',
+    '72hours' => 'hour',
     '3days' => 'day',
     'week' => 'day',
     'month' => 'week',
