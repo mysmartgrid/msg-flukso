@@ -1938,12 +1938,11 @@ li.error label {
 
 /* Message */
 div.status {
-	background-color: #a5d2d9;
-	border-color:#009474;
-	border-width:1px;
-	border-style:solid;
-	padding:12px;
-	margin-bottom:1em;
+        background-color: #a5d2d9;
+        border-color: #009474;
+        border-width: 1px;
+        border-style: solid;
+        margin-bottom: 1em;
 }
 div.error {
 	margin-bottom:1em;

@@ -1440,6 +1440,7 @@ function logger_get_balance_chart_data($chart) {
 
   $type_names = array();
   $all_values = array();
+  $measurements = array();
   foreach ($groups as $type_id => $sensors) {
 
     if (!empty($sensors)) {
