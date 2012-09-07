@@ -275,6 +275,7 @@ function deployment_list_page() {
     unset($device['uid']);
     unset($device['state_id']);
     unset($device['firmware_version']);
+    unset($device['description']);
   }
   $_SESSION['deployment_list_lines'] = $data;
 
