@@ -51,7 +51,8 @@ function logger_userdevices_page() {
       array('attributes' => array('onclick' => "javascript: return confirm('" .
         t('This device and all its related data is going to be permanently removed. Do you want to proceed?') . "');"))) . '<br>' .
 
-      l(t('History'), "event/log/list/$device->device");
+      l(t('History'), "event/log/list/$device->device") . '<br>' .
+      l(t('Edit'), "device/edit/$device->device");
 
     //TODO: use a version field
     if ($device->serial > 100000000 && user_access('request device remote support', $user)) {
@@ -164,6 +165,25 @@ function logger_usersensors_page() {
 }
 
 /**
+ * Builds the device edition page.
+ *
+ * @param $id  The device id.
+ * @return the device edition page.
+ */
+function logger_device_edition_page($id) {
+
+  $device = db_select('logger_devices', 'd')
+    ->fields('d', array('device', 'serial', 'description'))
+    ->condition('d.device', $id)
+    ->execute()
+    ->fetchObject();
+
+  $form = drupal_get_form('logger_device_form', $device);
+
+  return drupal_render($form);
+}
+
+/**
  * Builds the sensor edition page.
  *
  * @param $meter  The sensor id.
@@ -194,6 +214,47 @@ function logger_sensor_edition_page($meter = NULL) {
   $form = drupal_get_form('logger_sensor_form', $sensor);
 
   return drupal_render($form);
+}
+
+function logger_device_form($form, &$form_state, $device) {
+
+  $form['device'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Id'),
+    '#description' => t("The device id."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE,
+    '#default_value' => $device->device,
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['serial'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Serial'),
+    '#description' => t("The device serial number."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE,
+    '#default_value' => $device->serial,
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['description'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Description'),
+    '#description' => t("The device description."),
+    '#maxlength' => 60,
+    '#size' => 60,
+    '#required' => TRUE,
+    '#default_value' => $device->description
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
 }
 
 function logger_deviceactivation_form($form, &$form_state) {
@@ -427,6 +488,18 @@ function logger_sensor_form_validate($form, &$form_state) {
       }
     }
   }
+}
+
+function logger_device_form_submit($form, &$form_state) {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'description' => $form_state['values']['description']
+    ))
+    ->condition('device', $form_state['values']['device'])
+    ->execute();
+
+  $form_state['redirect'] = 'device/mylist';
 }
 
 function logger_deviceactivation_form_submit($form, &$form_state) {

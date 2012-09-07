@@ -191,6 +191,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
         array(t('User'), $device['name']),
         array(t('E-mail'), $device['email']),
         array(t('Status'), $device['state'] . "<br>$message"),
+        array(t('Description'), $device['description']),
         array(t('Operations'), $operations));
 
       $output .= '<br><br><br><br>' . theme_table(array('header' => NULL, 'rows' => $rows, 'attributes' => array(),
@@ -471,7 +472,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   $query->join($sensor_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
-  $query->fields('d', array('serial', 'device', 'firmware_version'))
+  $query->fields('d', array('serial', 'device', 'firmware_version', 'description'))
     ->fields('u', array('name', 'uid'))
     ->addField('u', 'mail', 'email');
 

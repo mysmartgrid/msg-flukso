@@ -94,7 +94,7 @@ function deployment_install() {
     ->fields(array(
       'id' => 4,
       'name' => 'Corrupted Message',
-      'description' => "The device is registered, but the latest heartbeat or measurement received from it contained invalid times or non numeric values.",
+      'description' => "The device is registered, but its latest measurement contained non numeric values.",
     ))
     ->execute();
 
@@ -134,7 +134,7 @@ function deployment_install() {
     ->fields(array(
       'id' => 9,
       'name' => 'Invalid Timestamp',
-      'description' => "This device has sent a measurement with an invalid time.",
+      'description' => "The device is registered, but its latest measurement contained an invalid timestamp.",
     ))
     ->execute();
 
@@ -174,4 +174,26 @@ function deployment_update_7001() {
     ->execute();
 
   return st("The deployment state 'Invalid Timestamp' has been created.");
+}
+
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7002() {
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but the latest measurement received from it contained non numeric values.",
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but has sent a measurement with an invalid time.",
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
 }

@@ -109,6 +109,10 @@ function logger_permission() {
       'title' => t('remove devices'),
       'description' => t('Remove a device and all related data.'),
     ),
+    'edit devices' => array(
+      'title' => t('edit devices'),
+      'description' => t('Edit device properties.'),
+    ),
     'clone devices' => array(
       'title' => t('clone devices'),
       'description' => t('Clone a device and all its sensors.'),
@@ -289,6 +293,16 @@ function logger_menu() {
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
     'access arguments' => array('deactivate devices', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc'
+  );
+
+  $items['device/edit'] = array(
+    'title' => $device_title,
+    'page callback' => 'logger_device_edition_page',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('edit devices', 2),
     'type' => MENU_CALLBACK,
     'file' => 'logger.admin.inc'
   );
@@ -1225,8 +1239,9 @@ function logger_get_energy_chart_data(&$chart) {
     for ($time = $from; $time <= $to; $time += $sub_time_window) {
 
       if ($chart->interval == 'year') {
-        $start = mktime(0, 0, 0, date('n', $time + WEEK),     1, date('Y', $time + WEEK));
-        $end   = mktime(0, 0, 0, date('n', $time + WEEK) + 1, 1, date('Y', $time + WEEK));
+        $day = $time + WEEK; //A day surelly in the current month
+        $start = mktime(0, 0, 0, date('n', $day),     1, date('Y', $day));
+        $end   = mktime(0, 0, 0, date('n', $day) + 1, 1, date('Y', $day));
       }
       else {
         $start = $time;
@@ -1305,18 +1320,14 @@ function logger_get_onsite_chart_data($chart) {
   $feedin = array();
   $supply = array();
 
-  if ($chart->interval == 'hour') {# Hour has no subinterval
-    $sub_time_window = 1;
-  }
-  else {
-    $sub_interval = logger_get_sub_interval($chart->interval);
-    $sub_time_window = logger_get_default_time_window($sub_interval);
-  }
+  $sub_interval = logger_get_sub_interval($chart->interval);
+  $sub_time_window = logger_get_default_time_window($sub_interval);
+
   $from = $chart->period['start'] - ($chart->period['start'] % MINUTE);
 
   $hour_interval = !(strrpos($chart->interval, 'hour') === FALSE);
   $last_minute = $hour_interval ? 0 : 1; //Until 23:59:59
-  $first_minute = $chart->interval == 'month' ? 3 * DAY : 0;
+  $extra_time = $chart->interval == 'month' ? 3 * DAY : 0; //Week starts on monday
 
   //For every measurement
   for ($time = $from; $time < $chart->period['end']; $time += MINUTE) {
@@ -1324,17 +1335,21 @@ function logger_get_onsite_chart_data($chart) {
     //Format time
     $start = $time + $chart->offset;
     $start -= ($start % $sub_time_window) + $chart->offset;
-    $start -= $first_minute;
+    $start -= $extra_time;
     $end = $start + $sub_time_window;
     $end -= $last_minute;
     $period = array('start' => $start, 'end' => $end);
     $title = logger_format_series_period($chart->interval, $period, $chart->offset);
 
-    $onsite[$title] = isset($onsite[$title]) ? $onsite[$title] : 0;
-    $feedin[$title] = isset($feedin[$title]) ? $feedin[$title] : 0;
-    $supply[$title] = isset($supply[$title]) ? $supply[$title] : 0;
-    $consumed[$time] = isset($consumed[$time]) ? $consumed[$time] : 0;
-    $produced[$time] = isset($produced[$time]) ? $produced[$time] : 0;
+    if (!isset($onsite[$title])) {
+      $onsite[$title] = 0;
+      $feedin[$title] = 0;
+      $supply[$title] = 0;
+    }
+    if (!isset($consumed[$time])) {
+      $consumed[$time] = 0;
+      $produced[$time] = 0;
+    }
 
     if ($consumed[$time] < $produced[$time]) {
       $onsite[$title] += $consumed[$time];
@@ -2123,8 +2138,7 @@ function logger_create_interval_menu($context) {
         l(t('Day'),     "$context/24hours"),
         l(t('3 Days'),  "$context/72hours"),
         l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"),
-        l(t('Year'),    "$context/year"));
+        l(t('Month'),   "$context/month"));
       break;
 
     case 'energy':
@@ -2956,6 +2970,7 @@ function logger_get_resolutions_options() {
 function logger_get_default_time_window($interval, $absolute = TRUE) {
 
   $windows = array(
+    'minute' => -1 * MINUTE,
     'hour' => -1 * HOUR,
     'dayquarter' => -6 * HOUR,
     'day' => -1 * DAY,
@@ -2982,6 +2997,7 @@ function logger_get_default_time_window($interval, $absolute = TRUE) {
 function logger_get_sub_interval($interval) {
 
   $windows = array(
+    'hour' => 'minute',
     'dayquarter' => 'hour',
     'day' => 'dayquarter',
     '24hours' => 'hour',

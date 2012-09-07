@@ -39,6 +39,13 @@ function msgdump_schema() {
         'not null' => TRUE,
         'disp-width' => '10',
       ),
+      'updated' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10'
+      ),
       'file' => array(
         'type' => 'varchar',
         'length' => '32',
