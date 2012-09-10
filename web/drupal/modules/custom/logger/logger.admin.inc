@@ -332,53 +332,50 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->function
   );
 
-  if (user_has_role('PV Producer')) {
+  //If creating or editing a virtual sensor
+  if ($sensor->virtual) {
 
-    //If creating or editing a virtual sensor
-    if ($sensor->virtual) {
+    $meters_options = logger_get_meters_options(array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE));
+    $aggregated = logger_get_aggregated_sensors($sensor->meter);
 
-      $meters_options = logger_get_meters_options(array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE));
-      $aggregated = logger_get_aggregated_sensors($sensor->meter);
-
-      $selected_options = array();
-      foreach ($aggregated as $agg_sensor) {
-        $selected_options[] = $agg_sensor->meter;
-      }
-
-      $form['aggregated_meters'] = array(
-        '#type' => 'checkboxes',
-        '#title' => t('Aggregated Sensors'),
-        '#description' => t('Select the sensors that are aggregated by this virtual sensor.'),
-        '#default_value' => $selected_options,
-        '#options' => $meters_options,
-        '#required' => TRUE
-      );
+    $selected_options = array();
+    foreach ($aggregated as $agg_sensor) {
+      $selected_options[] = $agg_sensor->meter;
     }
-    else {
-      $form['prev_forecast'] = array(
-        '#type' => 'hidden',
-        '#default_value' => array($sensor->forecast)
-      );
 
-      $form['forecast'] = array(
-        '#type' => 'checkboxes',
-        '#title' => t('Forecast'),
-        '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
-        '#options' => array(
-          '1' => t('Activate'),
-        ),
-        '#default_value' => array($sensor->forecast)
-      );
+    $form['aggregated_meters'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Aggregated Sensors'),
+      '#description' => t('Select the sensors that are aggregated by this virtual sensor.'),
+      '#default_value' => $selected_options,
+      '#options' => $meters_options,
+      '#required' => TRUE
+    );
+  }
+  else {
+    $form['prev_forecast'] = array(
+      '#type' => 'hidden',
+      '#default_value' => array($sensor->forecast)
+    );
 
-      $form['coordinates'] = array(
-        '#type' => 'textfield',
-        '#theme' => 'logger_geo_location',
-        '#title' => t('Location'),
-        '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
-        '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
-        '#text-align' => 'center'
-      );
-    }
+    $form['forecast'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Forecast'),
+      '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
+      '#options' => array(
+        '1' => t('Activate'),
+      ),
+      '#default_value' => array($sensor->forecast)
+    );
+
+    $form['coordinates'] = array(
+      '#type' => 'textfield',
+      '#theme' => 'logger_geo_location',
+      '#title' => t('Location'),
+      '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
+      '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
+      '#text-align' => 'center'
+    );
   }
 
   $form['submit'] = array(
