@@ -512,12 +512,17 @@ function chumby_create_profile($values, $tmp_path) {
 
 function chumby_download_file($image_id) {
 
-  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
-  drupal_add_http_header('Content-disposition', "attachment; filename=chumby-image.zip");
-
   $file_path = CHUMBY_PATH . "/files/$image_id.zip";
+  $size = filesize($file_path);
+
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'application/zip; charset=utf-8');
+  drupal_add_http_header('Content-Disposition', 'attachment; filename="chumby-image.zip"');
+  drupal_add_http_header('Content-Length', $size);
+  drupal_add_http_header('Cache-Control', 'public');
+
   $handle = fopen($file_path, "r");
-  $content = fread($handle, filesize($file_path));
+  $content = fread($handle, $size);
   fclose($handle);
 
   print $content;
