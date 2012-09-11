@@ -1555,8 +1555,7 @@ function logger_get_forecast_chart_data($chart) {
 
     foreach ($forecast['precipitation'] as $time => $rain) {
       $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
-      $data['weather'][$i][$time] = $rain > 0 ? RAIN_WEATHER_ID : 
-        $time > $sun['sunrise'] && $time < $sun['sunset'] ? SUN_WEATHER_ID : MOON_WEATHER_ID;
+      $data['weather'][$i][$time] = $rain > 0 ? RAIN_WEATHER_ID : ($time > $sun['sunrise'] && $time < $sun['sunset'] ? SUN_WEATHER_ID : MOON_WEATHER_ID);
     }
     $data['temperature'][$i] = $forecast['temperature'];
 
