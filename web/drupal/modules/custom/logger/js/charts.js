@@ -398,7 +398,7 @@ function updateLineLegend(chart) {
   var max;
   var min;
   var avg;
-  var last;
+  var last = null;
 
   //sensors
   for (var s = 1; s < chart.numColumns(); s++) {
@@ -429,6 +429,8 @@ function updateLineLegend(chart) {
 
     if (total > 0) {
       avg = sum / total;
+      max = max == Number.MIN_VALUE ? null : max;
+      min = min == Number.MAX_VALUE ? null : min;
     } else {
       max = null;
       min = null;
