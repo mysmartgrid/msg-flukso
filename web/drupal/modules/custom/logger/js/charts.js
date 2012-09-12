@@ -449,8 +449,9 @@ function updateLineLegendValue(name, i, value) {
   var div = document.getElementById(name + --i);
   if (div) {
     if (value && !isNaN(value - 0)) {
-      value = value.toFixed(2);
-      div.innerHTML = value == 0.00 ? '' : value;
+      var abs = Math.abs(value);
+      value = abs >= 0.01 ? value.toFixed(2) : abs >= 0.001 ? value.toFixed(3) : value;
+      div.innerHTML = abs == 0 ? '' : abs < 0.001 ? '0.000...' : value;
     } else {
       div.innerHTML = '';
     }
