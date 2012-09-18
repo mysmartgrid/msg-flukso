@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "post INST Package"
+
+drush cc all
+drush cc all
+drush updb
+drush cc all
