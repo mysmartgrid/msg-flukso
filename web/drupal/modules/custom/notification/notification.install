@@ -192,6 +192,13 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
+      'id' => 9,
+      'name' => 'Any Device Issue'
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
       'id' => 10,
       'name' => 'Summary Report',
     ))
@@ -249,7 +256,14 @@ function notification_install() {
   db_insert('event')
     ->fields(array(
       'id' => 201,
-      'name' => 'Corrupted Measurement Anomaly',
+      'name' => 'Corrupted Message',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Invalid Timestamp'
     ))
     ->execute();
 
@@ -373,6 +387,13 @@ function notification_install() {
     ->fields(array(
       'event_id' => 4,
       'unit_id' => 4,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 9,
+      'unit_id' => 0,
     ))
     ->execute();
 
@@ -628,3 +649,41 @@ function notification_update_7007() {
 
   return st("The event 'Invalid Timestamp' has been created.");
 }
+
+/**
+ * Update event 'Corrupted Message'.
+ */
+function notification_update_7008() {
+
+  db_update('event')
+    ->fields(array(
+      'name' => 'Corrupted Message'
+    ))
+    ->condition('id', 201)
+    ->execute();
+
+  return st("The event 'Corrupted Message' has been updated.");
+}
+
+/**
+ * Create event 'Any Device Issue'.
+ */
+function notification_update_7009() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Any Device Issue'
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 9,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  return st("The event 'Any Device Issue' has been created.");
+}
+

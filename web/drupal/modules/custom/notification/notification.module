@@ -29,6 +29,7 @@
 define('NO_COMMUNICATION_EVENT_ID',        1);
 define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
+define('ANY_DEVICE_ISSUE_EVENT_ID',        9);
 
 //Report events
 define('SUMMARY_REPORT_EVENT_ID',          10);
@@ -42,7 +43,7 @@ define('BROWNOUT_EVENT_ID',                104);
 define('FIRMWARE_UPGRADED_EVENT_ID',       105);
 define('FAILED_FIRMWARE_UPGRADE_EVENT_ID', 106);
 
-//Anomaly events
+//Anomaly and data corruption events
 define('MEASUREMENT_ANOMALY_EVENT_ID',     200);
 define('CORRUPTED_MESSAGE_EVENT_ID',       201);
 define('INVALID_TIMESTAMP_EVENT_ID',       202);
@@ -488,14 +489,20 @@ function notification_registration_form($form, &$form_state) {
     '#suffix' => '</table>',
   );
 
+  $form['events'] += notification_create_event_fields(ANY_DEVICE_ISSUE_EVENT_ID, NULL, NULL,
+    'Any problem that prevents the device from working properly, such as inadequate installation, malfunctioning components, and communication issues.');
+
   $form['events'] += notification_create_event_fields(NO_COMMUNICATION_EVENT_ID, 2, HOUR_UNIT_ID,
-    'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.');
+    'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.', TRUE);
 
   $form['events'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
+    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.', TRUE);
+
+  $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
+    'When  the device sends invalid data, such as non-numeric measurements and invalid timestamps, probably because it is defect, misconfigured, or not properly installed.', TRUE);
 
   $form['events'] += notification_create_event_fields(MEASUREMENT_ANOMALY_EVENT_ID, NULL, NULL,
-    'An anomalous series of measurements, produced when the devices are malfunctioning or not properly installed.');
+    'An anomalous series of measurements, produced when the devices are malfunctioning or not properly installed.', TRUE);
 
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
@@ -532,23 +539,25 @@ function notification_registration_form($form, &$form_state) {
  * @param $default_limit_up      The default limit up.
  * @param $default_unit_id       The default unit id.
  * @param $limit_up_description  The limit up description.
+ * @param $idented               Whether the field is idented.
  * @return the array of fields. 
  */
-function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description) {
+function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description, $idented = FALSE) {
 
   $fields = array();
   $fields["event_id$event_id"] = array(
     '#title' => check_plain(notification_get_event_name($event_id)),
     '#type' => 'checkbox',
     '#default_value' => FALSE,
-    '#prefix' => '<tr><td>',
-    '#suffix' => '</td>'
+    '#prefix' => '<tr><td>' . ($idented ? '</td><td>' : ''),
+    '#suffix' => '</td>',
+    '#attributes' => array('onchange' => 'checkDeviceIssueEvents(this)')
   );
 
   if ($default_unit_id) {
 
     $fields["event_id$event_id"]['#attributes'] = array(
-      'onchange' => "selectEvent($event_id, $default_limit_up, $default_unit_id, this)"
+      'onchange' => "selectEvent(this.checked, $event_id, $default_limit_up, $default_unit_id)"
     );
 
     $fields["limit_up$event_id"] = array(
@@ -557,7 +566,7 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
       '#description' => t($limit_up_description),
       '#maxlength' => 9,
       '#size' => 12,
-      '#prefix' => '<td>',
+      '#prefix' => ($idented ? '<td>' : '<td colspan="2">'),
       '#suffix' => '</td></tr>',
       '#related_event_id' => $event_id,
       '#unit_id' => $default_unit_id,
@@ -570,7 +579,7 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
     $fields["eventdesc$event_id"] = array(
       '#type' => 'markup',
       '#markup' => t($limit_up_description),
-      '#prefix' => '<td><div class="form-item"><div class="description">',
+      '#prefix' => ($idented ? '<td>' : '<td colspan="2">') . '<div class="form-item"><div class="description">',
       '#suffix' => '</div></div></td></tr>'
     );
   }
@@ -809,6 +818,7 @@ function notification_registration_form_submit($form, &$form_state) {
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
   notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
+  notification_register_event($_REQUEST, CORRUPTED_MESSAGE_EVENT_ID);
   notification_register_event($_REQUEST, MEASUREMENT_ANOMALY_EVENT_ID);
 
   $form_state['redirect'] = 'notification/list';
@@ -1115,13 +1125,12 @@ function notification_cron() {
 
   //Run only in the second quarter of an hour
   if ($rest < 45 * MINUTE || $rest >= 30 * MINUTE) {
-    notification_send_corrupted_measurement_emails();
+    notification_send_corrupted_message_emails();
     notification_send_measurement_anomaly_emails();
   }
 
   //Run only in the third quarter of an hour
   if ($rest >= 30 * MINUTE || $rest <= 15 * MINUTE) {
-    notification_send_invalid_timestamp_emails();
     notification_send_forecast_report_emails();
   }
 
@@ -1306,33 +1315,18 @@ function notification_send_measurement_anomaly_emails() {
 /**
  * Sends e-mails notifying users of "Corrupted Message" events.
  */
-function notification_send_corrupted_measurement_emails() {
+function notification_send_corrupted_message_emails() {
 
-  //ATTENTION: Any change in the following message requires its translations to be redefined.
-  notification_send_simple_anomaly_emails(CORRUPTED_MESSAGE_EVENT_ID,
-    "Your Flukso device (serial number: %serial) has sent either a " .
-    "measurement or a heartbeat with corrupted data at %event_time.");
-}
-
-/**
- * Sends e-mails notifying users of "Invalid Timestamp" events.
- */
-function notification_send_invalid_timestamp_emails() {
-
-  //ATTENTION: Any change in the following message requires its translations to be redefined.
-  notification_send_simple_anomaly_emails(INVALID_TIMESTAMP_EVENT_ID,
-    "Your Flukso device (serial number: %serial) has sent a " .
-    "measurement with an invalid time at %event_time.");
-}
-
-function notification_send_simple_anomaly_emails($event_id, $message) {
-
-  $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
+  $query = notification_compose_base_query(CORRUPTED_MESSAGE_EVENT_ID);
 
   $query->join('event_log', 'l', 'l.device = n.device');
   $query->addField('l', 'time', 'event_time');
   $query->where('l.time > n.base_time');
-  $query->condition('l.event_id', $event_id);
+
+  $query->condition(db_or()
+    ->condition('l.event_id', CORRUPTED_MESSAGE_EVENT_ID)
+    ->condition('l.event_id', INVALID_TIMESTAMP_EVENT_ID)
+  );
 
   $result = $query->execute();
 
@@ -1341,7 +1335,11 @@ function notification_send_simple_anomaly_emails($event_id, $message) {
     $notifiables[] = $notifiable;
   }
 
-  $message = notification_compose_error_email($message);
+  //ATTENTION: Any change in the following message requires its translations to be redefined.
+  $message = notification_compose_error_email(
+    "Your Flukso device (serial number: %serial) has sent either a " .
+    "measurement or a heartbeat with corrupted data at %event_time.");
+
   notification_send_emails($message, $notifiables);
 }
 

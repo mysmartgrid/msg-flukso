@@ -1183,7 +1183,7 @@ function logger_format_period($interval, $period) {
       return t(date('F', $start));
 
     case 'year':
-      return t(date('Y', $start)) . '<br>';
+      return t(date('Y', $end)) . '<br>';
   }
 }
 

@@ -18,22 +18,47 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-function selectEvent(eventId, defaultLimitUp, defaultUnitId, field) {
+function selectEvent(checked, eventId, defaultLimitUp, defaultUnitId) {
 
   var limitUpField = document.getElementById('edit-limit-up' + eventId);
   var unitIdField  = document.getElementById('edit-unit-id'  + eventId);
 
   if (limitUpField) {
-    limitUpField.readOnly = !field.checked;
-    limitUpField.value = field.checked ? defaultLimitUp : '';
+    limitUpField.readOnly = !checked;
+    limitUpField.value = checked ? defaultLimitUp : '';
   }
   
   if (unitIdField) {
     unitIdField.value = defaultUnitId;
   }
+
+  if (!checked) {
+    var anyIssueField = getEventIdField(9);
+    anyIssueField.checked = false;
+  }
 }
 
 function changeLimitUp(eventId, field) {
-  var eventIdField = document.getElementById('edit-event-id' + eventId);
+  var eventIdField = getEventIdField(eventId);
   field.readOnly = !eventIdField.checked;
+}
+
+function checkDeviceIssueEvents(field) {
+
+  checkDeviceIssueEvent(field.checked, 1, 2, 1);
+  checkDeviceIssueEvent(field.checked, 3, 2, 1);
+  checkDeviceIssueEvent(field.checked, 201);
+  checkDeviceIssueEvent(field.checked, 200);
+}
+
+function checkDeviceIssueEvent(checked, eventId, defaultLimitUp, defaultUnitId) {
+
+  var eventIdField = getEventIdField(eventId);
+  eventIdField.checked = checked;
+
+  selectEvent(checked, eventId, defaultLimitUp, defaultUnitId);
+}
+
+function getEventIdField(eventId) {
+  return document.getElementById('edit-event-id' + eventId);
 }
