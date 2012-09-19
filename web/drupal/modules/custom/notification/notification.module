@@ -485,23 +485,33 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] = array(
     '#type' => 'fieldset',
     '#title' => t('Events'),
-    '#prefix' => '<br><table width="100%">',
+    '#prefix' => '<br><table class="events">',
     '#suffix' => '</table>',
   );
 
+  $show_details_link = '<br><a id="showDetails" href="javascript: showDeviceIssueEvents(true);">' . t('Show details') . '</a>';
+  $hide_details_link = '<a id="hideDetails" style="display: none" href="javascript: showDeviceIssueEvents(false);">' . t('Hide details') . '</a>';
+ 
   $form['events'] += notification_create_event_fields(ANY_DEVICE_ISSUE_EVENT_ID, NULL, NULL,
-    'Any problem that prevents the device from working properly, such as inadequate installation, malfunctioning components, and communication issues.');
+    'Any problem that prevents the device from working properly, such as inadequate installation, malfunctioning components, and communication issues.',
+    FALSE, $show_details_link . $hide_details_link);
 
-  $form['events'] += notification_create_event_fields(NO_COMMUNICATION_EVENT_ID, 2, HOUR_UNIT_ID,
+  $form['events']['issues'] = array(
+    '#type' => 'fieldset',
+    '#prefix' => '</table><div id="issues" style="display: none"><table class="events">',
+    '#suffix' => '</table></div><table class="events">',
+  );
+
+  $form['events']['issues'] += notification_create_event_fields(NO_COMMUNICATION_EVENT_ID, 2, HOUR_UNIT_ID,
     'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.', TRUE);
 
-  $form['events'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
+  $form['events']['issues'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
     'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.', TRUE);
 
-  $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
+  $form['events']['issues'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
     'When  the device sends invalid data, such as non-numeric measurements and invalid timestamps, probably because it is defect, misconfigured, or not properly installed.', TRUE);
 
-  $form['events'] += notification_create_event_fields(MEASUREMENT_ANOMALY_EVENT_ID, NULL, NULL,
+  $form['events']['issues'] += notification_create_event_fields(MEASUREMENT_ANOMALY_EVENT_ID, NULL, NULL,
     'An anomalous series of measurements, produced when the devices are malfunctioning or not properly installed.', TRUE);
 
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
@@ -540,16 +550,17 @@ function notification_registration_form($form, &$form_state) {
  * @param $default_unit_id       The default unit id.
  * @param $limit_up_description  The limit up description.
  * @param $idented               Whether the field is idented.
+ * @param $link                  A link to be shown close to the description.
  * @return the array of fields. 
  */
-function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description, $idented = FALSE) {
+function notification_create_event_fields($event_id, $default_limit_up, $default_unit_id, $limit_up_description, $idented = FALSE, $link = '') {
 
   $fields = array();
   $fields["event_id$event_id"] = array(
     '#title' => check_plain(notification_get_event_name($event_id)),
     '#type' => 'checkbox',
     '#default_value' => FALSE,
-    '#prefix' => '<tr><td>' . ($idented ? '</td><td>' : ''),
+    '#prefix' => '<tr><td>' . ($idented ? '</td><td width="120"></td><td>' : ''),
     '#suffix' => '</td>',
     '#attributes' => array('onchange' => 'checkDeviceIssueEvents(this)')
   );
@@ -563,10 +574,10 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
     $fields["limit_up$event_id"] = array(
       '#type' => 'textfield',
       '#theme' => 'notification_event_limit_up',
-      '#description' => t($limit_up_description),
+      '#description' => t($limit_up_description) . $link,
       '#maxlength' => 9,
       '#size' => 12,
-      '#prefix' => ($idented ? '<td>' : '<td colspan="2">'),
+      '#prefix' => ($idented ? '<td>' : '<td colspan="3">'),
       '#suffix' => '</td></tr>',
       '#related_event_id' => $event_id,
       '#unit_id' => $default_unit_id,
@@ -578,8 +589,8 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
   else {
     $fields["eventdesc$event_id"] = array(
       '#type' => 'markup',
-      '#markup' => t($limit_up_description),
-      '#prefix' => ($idented ? '<td>' : '<td colspan="2">') . '<div class="form-item"><div class="description">',
+      '#markup' => t($limit_up_description) . $link,
+      '#prefix' => ($idented ? '<td>' : '<td colspan="3">') . '<div class="form-item"><div class="description">',
       '#suffix' => '</div></div></td></tr>'
     );
   }

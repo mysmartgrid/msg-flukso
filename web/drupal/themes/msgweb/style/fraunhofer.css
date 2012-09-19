@@ -1664,7 +1664,7 @@ thead th, thead td {
 	padding: 0.1em 0.923em;
 }
 tbody td, tbody th {
-	border-bottom: 1px solid #C5C7C6;
+ 	border-bottom: 1px solid #C5C7C6;
 	padding: 0.3em 0.923em;
 }
 
@@ -1672,6 +1672,9 @@ td.highlight, tr.highlight td {
 	/*border-right: 1px solid #fff;*/
 }
 
+table.events tbody {
+	border-top: none;
+}
 
 #page tfoot td,
 #shadowbox_content tfoot td {
@@ -1950,18 +1953,21 @@ li.error label {
 }
 
 
+/*added by Stephan Platz, 12.04.2010*/
 /* Message */
 div.status {
-        background-color: #a5d2d9;
-        border-color: #009474;
-        border-width: 1px;
-        border-style: solid;
-        margin-bottom: 1em;
+	background-color: #a5d2d9;
+	background-color: rgba(158,212,218,0.8);
+	border-color:#009474;
+	border-width:1px;
+	border-style:solid;
+	padding:12px;
+	margin-bottom:1em;
 }
 div.error {
 	margin-bottom:1em;
 }
-
+/*end added*/
 
 /**********
  * Footer *

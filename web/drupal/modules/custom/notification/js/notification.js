@@ -45,8 +45,8 @@ function changeLimitUp(eventId, field) {
 
 function checkDeviceIssueEvents(field) {
 
-  checkDeviceIssueEvent(field.checked, 1, 2, 1);
-  checkDeviceIssueEvent(field.checked, 3, 2, 1);
+  checkDeviceIssueEvent(field.checked, 1, 2, 2);
+  checkDeviceIssueEvent(field.checked, 3, 2, 2);
   checkDeviceIssueEvent(field.checked, 201);
   checkDeviceIssueEvent(field.checked, 200);
 }
@@ -61,4 +61,21 @@ function checkDeviceIssueEvent(checked, eventId, defaultLimitUp, defaultUnitId) 
 
 function getEventIdField(eventId) {
   return document.getElementById('edit-event-id' + eventId);
+}
+
+function showDeviceIssueEvents(show) {
+
+  var issuesDiv = document.getElementById('issues');
+  var showDetailsLink = document.getElementById('showDetails');
+  var hideDetailsLink = document.getElementById('hideDetails');
+
+  if (show) {
+    issuesDiv.style.display = "";
+    showDetailsLink.style.display = "none";
+    hideDetailsLink.style.display = "";
+  } else {
+    issuesDiv.style.display = "none";
+    showDetailsLink.style.display = "";
+    hideDetailsLink.style.display = "none";
+  }
 }
