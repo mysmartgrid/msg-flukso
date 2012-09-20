@@ -361,7 +361,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     $form['forecast'] = array(
       '#type' => 'checkboxes',
       '#title' => t('Forecast'),
-      '#description' => t('Check this option if you want to receive measurement forecast for this sensor.'),
+      '#description' => t('Check this option if you want to see measurement forecast for this sensor. The first forecast data will be available within one day.'),
       '#options' => array(
         '1' => t('Activate'),
       ),

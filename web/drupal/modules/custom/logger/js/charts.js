@@ -392,51 +392,37 @@ function updateLineLegend(chart) {
 
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
-  var value;
-  var total;
-  var sum;
-  var max;
-  var min;
-  var avg;
-  var last = null;
 
   //sensors
   for (var s = 1; s < chart.numColumns(); s++) {
 
-    max = Number.MIN_VALUE;
-    min = Number.MAX_VALUE;
-    sum = 0;
-    total = 0;
+    var max = Number.MIN_VALUE;
+    var min = Number.MAX_VALUE;
+    var sum = 0;
+    var total = 0;
+    var last = null;
 
     //sensor's values
     for (var v = 0; v < chart.numRows(); v++) {
-
       var timestamp = chart.getValue(v, 0);
 
       if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
 
-        value = chart.getValue(v, s);
+        var value = chart.getValue(v, s);
+        value = value ? value : 0;
+        last = value;
+        max = value > max ? value : max;
+        min = value < min ? value : min;
 
-        if (value && value != 0) {
-          last = value;
-          max = value > max ? value : max;
-          min = value < min ? value : min;
+        if (value != 0) {
           sum += value;
           total++;
         }
       }
     }
-
-    if (total > 0) {
-      avg = sum / total;
-      max = max == Number.MIN_VALUE ? null : max;
-      min = min == Number.MAX_VALUE ? null : min;
-    } else {
-      max = null;
-      min = null;
-      avg = null;
-      last = null;
-    }
+    max = max == Number.MIN_VALUE ? null : max;
+    min = min == Number.MAX_VALUE ? null : min;
+    avg = total > 0 ? (sum / total) : null;
 
     updateLineLegendValue("max", s, max);
     updateLineLegendValue("min", s, min);

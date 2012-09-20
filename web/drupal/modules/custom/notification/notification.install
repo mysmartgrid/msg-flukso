@@ -78,6 +78,16 @@ function notification_schema() {
   $schema['notification'] = array(
     'description' => 'Stores event notifications',
     'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'parent_id' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
       'device' => array(
         'type' => 'varchar',
         'length' => '32',
@@ -127,9 +137,15 @@ function notification_schema() {
       ),
     ),
     'primary key' => array(
-      'device',
-      'event_id, limit_up, unit_id',
+      'id',
     ),
+    'unique keys' => array(
+      'uk_device_event_limit_unit' => array('device', 'event_id, limit_up, unit_id'),
+    ),
+    'foreign keys' => array('fk_parent_notification_id' => array(
+      'table' => 'notification',
+      'columns' => array('parent_id' => 'id')
+    ))
   );
 
   $schema['event_log'] = array(
@@ -687,3 +703,29 @@ function notification_update_7009() {
   return st("The event 'Any Device Issue' has been created.");
 }
 
+/**
+ * Add fields id and parent_id to table notification.
+ */
+function notification_update_7010() {
+
+  db_drop_primary_key('notification');
+
+  db_add_field('notification', 'id', array(
+    'type' => 'serial',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+  ),
+  array(
+    'primary key' => array('id'),
+  ));
+
+  db_add_field('notification', 'parent_id', array(
+    'type' => 'int',
+    'not null' => FALSE,
+    'unasigned' => TRUE,
+  ));
+
+  db_add_unique_key('notification', 'uk_device_event_limit_unit', array('device', 'event_id', 'limit_up', 'unit_id'));
+
+  return st("Fields id and parent_id have been successfully added to table notification.");
+}

@@ -1017,6 +1017,7 @@ function logger_download_chart_data_file($cache_id) {
         }
       }
     }
+    ksort($values); //Sorted CSV increases the performance of JS libraries
 
     foreach ($values as $timestamp => $values_list) {
       $lines .= str_replace(array('&nbsp;', '<br>'), ' ', $timestamp); //Removes HTML tags
@@ -1544,6 +1545,18 @@ function logger_get_forecast_chart_data($chart) {
   foreach ($chart->sensors as &$sensor) {
 
     $forecast = pvcast_get_forecast($sensor->meter, $chart->period['start'], $chart->period['end']);
+
+    #FIXME: move unit conversion to the pvcast module.
+    $factor = 1;
+    if ($chart->unit == 'eur/year') {
+      $factor = $sensor->price * 24 * 365 / 1000;
+    }
+    else if ($chart->unit == 'kWh/year') {
+      $factor = 24 * 365 / 1000;
+    }
+    foreach ($forecast['power'] as $time => $value) {
+      $forecast['power'][$time] = $value * $factor;
+    }
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
@@ -2441,7 +2454,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
 
   $on_change_reset_js = 'submitLineChartForm(true)';
   $on_change_js = 'submitLineChartForm()';
-  $form = logger_create_chart_form($form, $on_change_js, $chart);
+  $form = logger_create_chart_form($form, $on_change_reset_js, $chart);
   $resolutions = $chart->context == 'forecast' ? array(HOUR => t('Hour')) : logger_get_resolutions_options();
 
   $form['new_user'] = array(

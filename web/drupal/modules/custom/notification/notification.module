@@ -824,6 +824,7 @@ function notification_edition_form_validate($form, &$form_state) {
 
 function notification_registration_form_submit($form, &$form_state) {
 
+  notification_register_event($_REQUEST, ANY_DEVICE_ISSUE_EVENT_ID);
   notification_register_event($_REQUEST, NO_COMMUNICATION_EVENT_ID);
   notification_register_event($_REQUEST, COMMUNICATION_RESTORED_EVENT_ID);
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
