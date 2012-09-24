@@ -30,7 +30,7 @@
 define('ANOMALY_MIN_TOLERANCE',       10);
 define('NEIGHBOUR_DISTANCE',         0.7);
 define('ANOMALY_MIN_SAMPLE_SIZE',      6);
-define('FLAT_LINE_ANOMALY_MIN_VALUES', 5);
+define('FLAT_LINE_ANOMALY_MIN_VALUES', 15);
 
 /**
  * Detects anomalies on power production measurements.
