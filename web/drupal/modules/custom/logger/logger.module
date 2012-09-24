@@ -3786,7 +3786,7 @@ function logger_update_pvcast_models() {
 
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
-    $period = logger_get_period('day', HOUR, $now - 2 * WEEK, $now, FALSE);
+    $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor($sensor, 'watt', $period, HOUR);
@@ -3911,6 +3911,9 @@ function logger_forward_api_request($auth, $object, $id, $body, $signed_body = N
       )));
 
     if (isset($response->error)) {
+
+      watchdog('logger.forward', "Error forwarding to %url. %error", array('%url' => $url, '%error' => $response->error), WATCHDOG_ERROR);
+
       return xmlrpc_error(-32601, t('Server error.') . ' ' . $response->error);
     }
     else {
