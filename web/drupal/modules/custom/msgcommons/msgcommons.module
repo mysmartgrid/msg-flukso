@@ -360,30 +360,47 @@ function check_browser_support() {
     return TRUE;
   }
 
-  $supported = FALSE;
-  $supported_browsers = array(
-    array('name' => 'Firefox',  'version' => 3),
-    array('name' => 'MSIE',     'version' => 7),
-    array('name' => 'Chrome',   'version' => 1),
-    array('name' => 'Chromium', 'version' => 1),
-    array('name' => 'Safari',   'version' => 4),
-    array('name' => 'Webkit',   'version' => 5)
+  $supported = TRUE;
+  $unsupported_browsers = array(
+    'Android 4.0',
   );
 
-  foreach ($supported_browsers as $browser) {
-    $pos = strpos($agent, $browser['name']);
+  foreach ($unsupported_browsers as $browser) {
+    $pos = strpos($agent, $browser);
     if ($pos > 0) {
-      $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
-      $version = str_replace('.', '', $version);
-      $supported = $version >= $browser['version'];
+      $supported = FALSE;
       break;
+    }
+  }
+  
+  if ($supported) {
+
+    $supported = FALSE;
+    $supported_browsers = array(
+      array('name' => 'Firefox',  'version' => 3),
+      array('name' => 'MSIE',     'version' => 7),
+      array('name' => 'Chrome',   'version' => 1),
+      array('name' => 'Chromium', 'version' => 1),
+      array('name' => 'Safari',   'version' => 4),
+      array('name' => 'Webkit',   'version' => 5)
+    );
+
+    foreach ($supported_browsers as $browser) {
+      $pos = strpos($agent, $browser['name']);
+      if ($pos > 0) {
+        $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
+        $version = str_replace('.', '', $version);
+        $supported = $version >= $browser['version'];
+        break;
+      }
     }
   }
 
   if (!$supported) {
     drupal_set_message(t('Warning: you are using an outdated browser. ' . 
       'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' . 
-      'Internet Explorer 7, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11 (or a later version).'), 'error', FALSE);
+      'Internet Explorer 7, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11, Android 2.3.4, Android 4.1 (or a later version).'),
+      'error', FALSE);
   }
 }
 
