@@ -1252,13 +1252,12 @@ function notification_cron() {
 
   //Run only in the third quarter of an hour
   if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
-    notification_send_corrupted_measurement_emails();
+    notification_send_corrupted_message_emails();
     notification_send_measurement_anomaly_emails();
   }
 
   //Run only in the second quarter of an hour
   if ($rest < 30 * MINUTE && $rest >= 15 * MINUTE) {
-    #notification_send_invalid_timestamp_emails();
     notification_send_forecast_report_emails();
   }
 
@@ -1273,8 +1272,8 @@ function notification_cron() {
 function notification_compose_base_query($event_id) {
   
   $query = db_select('notification', 'n')
-    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent'))
-    ->condition('n.event_id', $event_id, '=')
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id'))
+    ->condition('n.event_id', $event_id)
     ->where('n.last_sent + n.min_interval < :now', array(':now' => REQUEST_TIME))
     ->groupBy('n.device')
     ->groupBy('n.limit_up')
@@ -1936,6 +1935,10 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       }
 
       notification_update($notifiable['device'], $notifiable['event_id'], $notifiable['limit_up'], $notifiable['unit_id'], $times);
+
+      if ($notifiable['parent_id'] > 0) {
+        notification_update($notifiable['device'], ANY_DEVICE_ISSUE_EVENT_ID, 0, 0, $times);
+      }
     }
   }
 }
