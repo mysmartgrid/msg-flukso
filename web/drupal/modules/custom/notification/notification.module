@@ -21,9 +21,9 @@
  */
 
 //DEBUG
-error_reporting(E_ALL);
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
 
 //Constants
 define('NO_COMMUNICATION_EVENT_ID',        1);
@@ -497,8 +497,8 @@ function notification_registration_form($form, &$form_state) {
   $hide_details_link = '<a id="hideDetails" style="display: none" href="javascript: showDeviceIssueEvents(false);">' . t('Hide details') . '</a>';
  
   $form['events'] += notification_create_event_fields(ANY_DEVICE_ISSUE_EVENT_ID, NULL, NULL,
-    'Any problem that prevents the device from working properly, such as inadequate installation, malfunctioning components, and communication issues.',
-    FALSE, $show_details_link . $hide_details_link);
+    'Any problem that prevents the device from working properly, such as inadequate installation, malfunctioning ' . 
+    'components, and communication issues.', FALSE, $show_details_link . $hide_details_link);
 
   $form['events']['issues'] = array(
     '#type' => 'fieldset',
@@ -510,10 +510,12 @@ function notification_registration_form($form, &$form_state) {
     'Here you can set the maximum message delay. Beyond this limit, the device is considered faulty.', TRUE);
 
   $form['events']['issues'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-    'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.', TRUE);
+    'Here you can set the maximum period of time acceptable for a device to be offline. ' . 
+    'Beyond this limit, when the first message is received, the communication is considered reestablished.', TRUE);
 
   $form['events']['issues'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
-    'When  the device sends invalid data, such as non-numeric measurements and invalid timestamps, probably because it is defect, misconfigured, or not properly installed.', TRUE);
+    'When  the device sends invalid data, such as non-numeric measurements and invalid timestamps, probably ' . 
+    'because it is defect, misconfigured, or not properly installed.', TRUE);
 
   $form['events']['issues'] += notification_create_event_fields(MEASUREMENT_ANOMALY_EVENT_ID, NULL, NULL,
     'An anomalous series of measurements, produced when the devices are malfunctioning or not properly installed.', TRUE);
@@ -653,7 +655,8 @@ function notification_edition_form($form, &$form_state, $notification) {
   $form['emails'] = array(
     '#type' => 'textarea',
     '#title' => t('E-mails'),
-    '#description' => t('Enter the e-mails to which the notification will be sent. The emails must be specified either in multiple lines or separated by space.'),
+    '#description' => t('Enter the e-mails to which the notification will be sent. ' . 
+      'The emails must be specified either in multiple lines or separated by space.'),
     '#rows' => 3,
     '#resizable' => FALSE,
     '#required' => TRUE,
@@ -717,12 +720,14 @@ function notification_edition_form($form, &$form_state, $notification) {
 
     case COMMUNICATION_RESTORED_EVENT_ID:
       $form['limit_up']['#title'] = t('Maximum Delay');
-      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, when the first message is received, the communication is considered reestablished.');
+      $form['limit_up']['#description'] = t('Here you can set the maximum period of time acceptable for a device to be offline. ' . 
+        'Beyond this limit, when the first message is received, the communication is considered reestablished.');
       break;
 
     case PEAK_CONSUMPTION_EVENT_ID:
       $form['limit_up']['#title'] = t('Maximum Consumption');
-      $form['limit_up']['#description'] = t('Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
+      $form['limit_up']['#description'] = t('Here you can set the maximum electricity consumption. ' .
+        'Beyond this limit, the device is considered faulty.');
       break;
 
     case SUMMARY_REPORT_EVENT_ID:
@@ -916,7 +921,8 @@ function notification_newsletter_form_submit($form, &$form_state) {
 
   if ($response == "RECORD_CREATED") {
 
-    drupal_set_message(t('Almost Finished... We need to confirm your email address. To complete the subscription process, please click the link in the email we just sent you.'));
+    drupal_set_message(t('Almost Finished... We need to confirm your email address. ' .
+      'To complete the subscription process, please click the link in the email we just sent you.'));
   }
   elseif ($response == "RECORD_UPDATED") {
 
