@@ -32,9 +32,15 @@ function selectEvent(checked, eventId, defaultLimitUp, defaultUnitId) {
     unitIdField.value = defaultUnitId;
   }
 
-  if (!checked) {
+  if ((eventId == 1 || eventId == 3 || eventId == 201 || eventId == 200) && !checked) {
+
     var anyIssueField = getEventIdField(9);
-    anyIssueField.checked = false;
+    if (anyIssueField) {
+      anyIssueField.checked = false;
+    }
+
+  } else if (eventId == 9) {
+    checkDeviceIssueEvents();
   }
 }
 
@@ -43,8 +49,9 @@ function changeLimitUp(eventId, field) {
   field.readOnly = !eventIdField.checked;
 }
 
-function checkDeviceIssueEvents(field) {
+function checkDeviceIssueEvents() {
 
+  var field = getEventIdField(9);
   checkDeviceIssueEvent(field.checked, 1, 2, 2);
   checkDeviceIssueEvent(field.checked, 3, 2, 2);
   checkDeviceIssueEvent(field.checked, 201);
