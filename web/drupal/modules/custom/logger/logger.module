@@ -42,7 +42,7 @@ define('LOGGER_DEFAULT_LONGITUDE', 7.769031);
 
 define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
-define('LOGGER_DEVICE_CERT_PATH', '../flukso-api/flukso/var/keys');
+define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
 
 function logger_init() {
