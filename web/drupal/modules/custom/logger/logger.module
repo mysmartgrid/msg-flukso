@@ -1287,7 +1287,7 @@ function logger_get_energy_chart_data(&$chart) {
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][t($sensor->type)] = $series;
     $data['labels'][$sensor->meter][t($sensor->type)] = $data_labels;
 
-    $data['legend'][$line_id] = logger_create_legend_line($sensor->username, $sensor->function, $sensor->type, $line_id, array(
+    $data['legend'][$line_id] = logger_create_legend_line($sensor->username, $sensor->function, t($sensor->type), $line_id, array(
       'Min' => logger_format_legend_record($min, $min_time, $chart->interval),
       'Max' => logger_format_legend_record($max, $max_time, $chart->interval),
       'Avg' => $avg, 'Sum' => $sum
