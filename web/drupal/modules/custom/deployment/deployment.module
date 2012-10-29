@@ -189,7 +189,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
         array(t('Device Id'), $device['device']),
         array(t('Version'), $device['firmware_version']),
         array(t('User Id'), $device['uid']),
-        array(t('User'), $device['name']),
+        array(t('User'), l($device['name'], 'user/' . $device['uid'])),
         array(t('E-mail'), $device['email']),
         array(t('Status'), $device['state'] . "<br>$message"),
         array(t('Description'), $device['description']),
