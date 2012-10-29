@@ -188,6 +188,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
         array(t('Serial Number'), $device['serial']),
         array(t('Device Id'), $device['device']),
         array(t('Version'), $device['firmware_version']),
+        array(t('User Id'), $device['uid']),
         array(t('User'), $device['name']),
         array(t('E-mail'), $device['email']),
         array(t('Status'), $device['state'] . "<br>$message"),
@@ -244,6 +245,10 @@ function deployment_list_page() {
       'field' => 'name'
     ),
     array(
+      'data' => 'User Id',
+      'field' => 'uid'
+    ),
+    array(
       'data' => t('E-mail'),
       'field' => 'email'
     ),
@@ -265,14 +270,14 @@ function deployment_list_page() {
   $data = deployment_get_devices($filter, $header, $page_limit);
   foreach ($data as &$device) {
 
-    $name = wordwrap($device['name'], 13, "\n", TRUE);
-    $device['name'] = l($name, 'power/user/' . $device['uid']);
+    $name = wordwrap($device['name'], 12, "<br>", TRUE);
+    $device['name'] = l($name, 'user/' . $device['uid'], array('html' => TRUE));
+    $device['uid'] = $device['uid'] > 0 ? $device['uid'] : '';
 
     $device['serial'] = l($device['serial'], 'deployment/checkup/serial/' . $device['serial']);
-    $device['device'] = wordwrap($device['device'], 16, "\n", TRUE);
-    $device['email'] = wordwrap($device['email'], 18, "\n", TRUE);
+    $device['device'] = wordwrap($device['device'], 11, "<br>", TRUE);
+    $device['email'] = wordwrap($device['email'], 16, "<br>", TRUE);
     $device['state'] = str_replace(" ", "<br>", $device['state']);
-    unset($device['uid']);
     unset($device['state_id']);
     unset($device['firmware_version']);
     unset($device['description']);

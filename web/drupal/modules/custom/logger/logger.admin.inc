@@ -307,7 +307,10 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#options' => logger_get_sensor_types_options(),
     '#default_value' => $sensor->type,
     '#required' => TRUE,
-    '#attributes' => array('readonly' => 'readonly')
+    '#attributes' => array(
+      'readonly' => 'readonly',
+      'onchange' => 'showSensorForecastFields()'
+    )
   );
 
   $form['price'] = array(
@@ -355,7 +358,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
   else {
     $form['prev_forecast'] = array(
       '#type' => 'hidden',
-      '#default_value' => array($sensor->forecast)
+      '#default_value' => array($sensor->forecast),
+      '#prefix' => '<div id="forecast-options">'
     );
 
     $form['forecast'] = array(
@@ -374,7 +378,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#title' => t('Location'),
       '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
       '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
-      '#text-align' => 'center'
+      '#text-align' => 'center',
+      '#suffix' => '</div>'
     );
   }
 
@@ -382,6 +387,9 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#type' => 'submit',
     '#value' => t("Save"),
   );
+
+  drupal_add_js("jQuery(document).ready( function() { showSensorForecastFields(); } );", array('type' => 'inline', 'scope' => 'footer'));
+
   return $form;
 }
 
@@ -453,36 +461,33 @@ function logger_sensor_form_validate($form, &$form_state) {
     form_set_error('price', t('The informed price is invalid.'));
   }
 
-  if (user_has_role('PV Producer')) {
+  if (isset($form_state['values']['forecast'])) {
+    $forecast = $form_state['values']['forecast'][1];
+    $latitude = $_REQUEST['coordinates_latitude'];
+    $longitude = $_REQUEST['coordinates_longitude'];
+    $type = $form_state['values']['type'];
 
-    if (isset($form_state['values']['forecast'])) {
-      $forecast = $form_state['values']['forecast'][1];
-      $latitude = $_REQUEST['coordinates_latitude'];
-      $longitude = $_REQUEST['coordinates_longitude'];
-      $type = $form_state['values']['type'];
+    if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
 
-      if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
-
-        form_set_error('coordinates', t('Invalid geographic coordinates.'));
-      }
-
-      if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
-
-        form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
-      }
-
-      if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
-
-        form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
-      }
+      form_set_error('coordinates', t('Invalid geographic coordinates.'));
     }
 
-    if (!$in_edition) {
-      $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
+    if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
 
-      if (count($aggregated_meters) < 2) {
-        form_set_error('aggregated_meters', t('Please, select at least 2 meters for aggregation.'));
-      }
+      form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
+    }
+
+    if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
+
+      form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
+    }
+  }
+
+  if (!$in_edition) {
+    $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
+
+    if (count($aggregated_meters) < 2) {
+      form_set_error('aggregated_meters', t('Please, select at least 2 meters for aggregation.'));
     }
   }
 }
@@ -510,7 +515,6 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   global $user;
 
-  $is_procuder = user_has_role('PV Producer');
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
   $price = $form_state['values']['price'];
@@ -525,15 +529,14 @@ function logger_sensor_form_submit($form, &$form_state) {
       'type' => $type,
       'price' => $price
     );
-    if ($is_procuder) {
-      $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
-      $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
-      $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
-      $fields['forecast'] = $forecast;
-      $fields['latitude'] = $latitude;
-      $fields['longitude'] = $longitude;
-    }
+    $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
+    $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
+    $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
+
+    $fields['forecast'] = $forecast;
+    $fields['latitude'] = $latitude;
+    $fields['longitude'] = $longitude;
 
     db_update('logger_meters')
       ->fields($fields)
@@ -558,18 +561,16 @@ function logger_sensor_form_submit($form, &$form_state) {
     logger_set_virtual_sensor_aggregations($meter, $aggregated_meters);
   }
 
-  if ($is_procuder) {
-    $prev_forecast = $form_state['values']['prev_forecast'];
+  $prev_forecast = $form_state['values']['prev_forecast'];
 
-    if ($prev_forecast == 1 && $forecast == 0) {
-      pvcast_delete_plant($meter);
-    }
-    elseif ($prev_forecast == 0 && $forecast == 1) {
-      pvcast_create_plant($meter, $latitude, $longitude);
-    }
-    elseif ($prev_forecast == 1 && $forecast == 1) {
-      pvcast_update_plant($meter, $latitude, $longitude);
-    }
+  if ($prev_forecast == 1 && $forecast == 0) {
+    pvcast_delete_plant($meter);
+  }
+  elseif ($prev_forecast == 0 && $forecast == 1) {
+    pvcast_create_plant($meter, $latitude, $longitude);
+  }
+  elseif ($prev_forecast == 1 && $forecast == 1) {
+    pvcast_update_plant($meter, $latitude, $longitude);
   }
 
   $form_state['redirect'] = "sensor/mylist";
