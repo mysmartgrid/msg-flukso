@@ -42,6 +42,7 @@ mysql_prepare() ->
     mysql:prepare(sensor_update, <<"UPDATE logger_meters SET access = ?, value = ? WHERE meter = ?">>),
     %TODO: mysql:prepare(sensor_config, <<"UPDATE logger_meters SET class = ?, type = ?, function = ?, voltage = ?, current = ?, phase = ?, constant = ?, enabled = ? WHERE meter = ?">>),
     mysql:prepare(sensor_config, <<"UPDATE logger_meters SET function = ? WHERE meter = ?">>),
+    mysql:prepare(sensor_agg, <<"SELECT meter FROM logger_aggregated_meters WHERE virtual_meter = ?">>),
     mysql:prepare(timezone, <<"SELECT timezone FROM users WHERE uid = ?">>),
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version FROM logger_devices WHERE device = ?">>),

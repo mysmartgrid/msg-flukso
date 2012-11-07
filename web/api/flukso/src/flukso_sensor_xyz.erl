@@ -154,24 +154,67 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
         _Interval -> Path = ?BASE_PATH
     end,
 
+    % Check if sensor is virtual
+    {data, Result} = mysql:execute(pool, sensor_agg, [RrdSensor]),
+
+    AggSeries = case mysql:get_result_rows(Result) of
+
+        % Ordinary sensor
+        [] ->
+            {ok, Series} = query_sensor(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor),
+            Series;
+
+        % Virtual sensor
+        RrdSensors ->
+            AggSensors = RrdSensors,
+
+            % Create a list of [Timestamp, Value] for every sensor
+            AllSeries = [[query_sensor(Path, AggSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor)] || [AggSensor] <- AggSensors],
+
+            % Merge all pairs [Timestamp, Value]
+            Merged = lists:merge([Series || [{ok, Series}] <- AllSeries]),
+
+            % Convert NaN to zero
+            ToNumber = fun (V) ->
+                case is_number(V) of true -> V; false -> 0 end
+            end,
+            Converted = [[Timestamp, ToNumber(Value)] || [Timestamp, Value] <- Merged],
+
+            % Form a sorted list of unique timestamps
+            Timestamps = lists:usort([Timestamp || [Timestamp, Value] <- Converted]),
+
+            % Sum values for every timestamp
+            SumValues = fun (T) ->
+                lists:sum([Value || [Timestamp, Value] <- Converted, Timestamp =:= T])
+            end,
+            [[Timestamp, SumValues(Timestamp)] || Timestamp <- Timestamps]
+    end,
+
+    Encoded = mochijson2:encode(AggSeries),
+
+    {case JsonpCallback of
+        undefined -> Encoded;
+            _ -> [JsonpCallback, "(", Encoded, ");"]
+    end,
+    ReqData, State}.
+
+
+query_sensor(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor) ->
+
     %debugging
     %io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
 
     case rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
-        {ok, Response} ->
-            Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-            Datapoints = [[list_to_integer(X), round(list_to_float(Y) * RrdFactor)] || [X, Y] <- Filtered, string:len(Y) /= 4],
-            Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
-            Final = mochijson2:encode(lists:merge(Datapoints, Nans)),
-            {case JsonpCallback of
-                undefined -> Final;
-                _ -> [JsonpCallback, "(", Final, ");"]
-             end,
-            ReqData, State};
+       {ok, Response} ->
+           Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
+           Datapoints = [[list_to_integer(X), round(list_to_float(Y) * RrdFactor)] || [X, Y] <- Filtered, string:len(Y) /= 4],
+           Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
+           Final = lists:merge(Datapoints, Nans),
+           {ok, Final};
 
-        {error, _Reason} ->
-            {{halt, 404}, ReqData, State}
-    end.
+       {error, _Reason} ->
+           {error, _Reason}
+   end.
 
 
 process_post(ReqData, State) ->
