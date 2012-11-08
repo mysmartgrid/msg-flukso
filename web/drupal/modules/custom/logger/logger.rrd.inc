@@ -200,28 +200,31 @@ function logger_rrd_update($meter, $values) {
  */
 function logger_rrd_query_sensor($sensor, $unit, $period, $step, $price = NULL) {
 
-  $series_id = METER;
-  $def = logger_rrd_sensor_def($series_id, $sensor, $unit, $price);
-
+  $def = logger_rrd_sensor_def(METER, $sensor, $unit, $price);
   $latest = logger_rrd_latest_timestamp($sensor);
 
-  return logger_rrd_export($def, $series_id, $latest, TRUE, $period, $step);
+  return logger_rrd_export($def, METER, $latest, TRUE, $period, $step);
 }
 
 /**
- * Returns the timestamp of the latest update of a sensor.
+ * Returns the timestamp of the latest update of a sensor or an appliance.
  *
- * @param $sensor    The sensor.
+ * @param $sensor       The sensor.
+ * @paran $appliance_id The appliance id, if any.
  * @return the latest update timestamp.
  */
-function logger_rrd_latest_timestamp($sensor) {
+function logger_rrd_latest_timestamp($sensor, $appliance_id = NULL) {
 
-  $file_path = logger_rrd_file($sensor->meter);
+  $file_path = logger_rrd_file($sensor->meter, $appliance_id);
+  if (file_exists($file_path)) {
 
-  $command = RRDTOOL . " last $file_path";
-  exec($command, $lines);
-
-  return $lines[0];
+    $command = RRDTOOL . " last $file_path";
+    exec($command, $lines);
+    return $lines[0];
+  }
+  else {
+    return 0;
+  }
 }
 
 /**
@@ -315,6 +318,22 @@ function logger_rrd_query_energy($sensors, $unit, $period, $step, $prices = NULL
 }
 
 /**
+ * Queries the RRDs for appliance detection flags.
+ *
+ * @param $sensor       The sensor.
+ * @param $period       An array containing a period of time to be queried.
+ * @param $appliance_id The appliance id.
+ * @return the array associating timestamps with detection flags: either 0 (not detected) or 1 (detected).
+ */
+function logger_rrd_query_appliance($sensor, $period, $appliance_id) {
+
+  $def = logger_rrd_appliance_def(METER, $appliance_id, $sensor);
+  $latest = logger_rrd_latest_timestamp($sensor, $appliance_id);
+
+  return logger_rrd_export($def, METER, $latest, TRUE, $period, 60);
+}
+
+/**
  * Creates a DEF tag to represent sensor's measurements plotted in a chart series.
  *
  * @param $series_id   The series id.
@@ -334,21 +353,57 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
   $price = isset($price) ? $price : $sensor->price;
 
   $factor = logger_rrd_get_unit_factor($unit, $price);
-  $file_path = logger_rrd_file($sensor->meter);
 
-  return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
-    "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
+  $file_path = logger_rrd_file($sensor->meter);
+  if (file_exists($file_path)) {
+
+    return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
+      "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
+  }
+  else {
+    return NULL;
+  }
+}
+
+/**
+ * Creates a DEF tag to represent a series of appliance detection flags plotted in a chart series.
+ *
+ * @param $series_id    The series id.
+ * @param $appliance_id The appliance id.
+ * @param $sensor       The sensor.
+ * @return the DEF tag.
+ */
+function logger_rrd_appliance_def($series_id, $appliance_id, $sensor) {
+
+  global $user;
+
+  if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid) {
+    return NULL;
+  }
+
+  $file_path = logger_rrd_file($sensor->meter, $appliance_id);
+  if (file_exists($file_path)) {
+
+    return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
+      "CDEF:$series_id=" . "data$series_id";
+  }
+  else {
+    return NULL;
+  }
 }
 
 /**
  * Composes RRD file path.
  *
- * @param $meter     The sensor id.
+ * @param $meter        The sensor id.
+ * @param $appliance_id The appliance id, if any.
  * @return the RRD file path.
  */
-function logger_rrd_file($meter) {
+function logger_rrd_file($meter, $appliance_id = NULL) {
 
-  return RRDTOOL_PATH . "/data/base/$meter.rrd";
+  $dir = $appliance_id == NULL ? 'base' : "appliances/$appliance_id";
+
+  return RRDTOOL_PATH . "/data/$dir/$meter.rrd";
 }
 
 /**

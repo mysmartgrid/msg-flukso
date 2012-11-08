@@ -452,20 +452,20 @@ function addLineAnnotation(event, point) {
   var div = findAnnotationDiv(id);
 
   if (!div) {
+    var seriesId = point.name.substring(1) - 1;
+    var hour = (point.xval - (point.xval % 3600000)) / 1000;
     var date = new Date(point.xval);
+    var timestamp = (date.getTime() - date.getTime() % 1000) / 1000;
     var yval = point.yval.toFixed(2);
     var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
     var width = 50 * ('' + yval).length / 6;
     var icons = '';
 
-    var appliances = getAppliances(point.name, date);
+    var appliances = getAppliances(seriesId, timestamp);
     if (appliances) {
       icons += appliances;
-      width += 35;
+      width += 45 * (appliances.length / 100);
     }
-
-    var seriesId = point.name.substring(1) - 1;
-    var hour = (point.xval - (point.xval % 3600000)) / 1000;
 
     var weather = getWeather(seriesId, hour);
     if (weather) {
@@ -520,25 +520,28 @@ function findAnnotationDiv(className) {
   return null;
 }
 
-function getAppliances(meter, timestamp) {
+function getAppliances(seriesIndex, timestamp) {
 
-  /*
-  //TODO: implement this function
   var apps = new Array();
+  var cache_id = lineChart.fileURL.substring(lineChart.fileURL.lastIndexOf('/') + 1);
 
   jQuery.ajax({
     async: false,
-    url: '/logger/getappliances/' + meter + '/' + timestamp, 
+    url: '/logger/getappliances/' + cache_id, 
     success: function (result) {
-      jQuery.each(result, function(i, id) {
-        apps[i] = id;
-      });
+      apps = result;
     }
   });
 
-  '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + appliances[i] + '.jpg"/>'
-  */
-  return '';
+  var icons = '';
+
+  for (a in apps[seriesIndex]) {
+    var flag = parseInt(apps[seriesIndex][a][timestamp]);
+    if (flag > 0) {
+      icons += '<img class="point-annotation" src="/sites/all/modules/logger/img/appliances/icon-' + a + '.jpg"/>';
+    }
+  }
+  return icons;
 }
 
 function getWeather(seriesIndex, time) {
@@ -574,6 +577,7 @@ function createLineChart(id, fileURL, properties, weather) {
 
   var chart = new Dygraph(div, '/' + fileURL, properties);
   chart.weather = weather;
+  chart.fileURL = fileURL;
   storeChart(id, chart);
 
   return chart;

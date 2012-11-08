@@ -35,6 +35,11 @@ define('SUN_WEATHER_ID',  1);
 define('RAIN_WEATHER_ID', 2);
 define('MOON_WEATHER_ID', 3);
 
+define('FRIDGE_APPLIANCE_ID',      1);
+define('SHOWER_APPLIANCE_ID',      2);
+define('DISH_WASHER_APPLIANCE_ID', 3);
+define('KETTLE_APPLIANCE_ID',      4);
+
 define('LOGGER_REL_PATH', drupal_get_path('module', 'logger'));
 define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
 define('LOGGER_DEFAULT_LATITUDE', 49.444710);
@@ -260,7 +265,7 @@ function logger_menu() {
   $items['logger/getappliances'] = array(
     'title' => 'Returns list of appliances',
     'page callback' => 'logger_get_appliances',
-    'page arguments' => array(2, 3),
+    'page arguments' => array(2),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
@@ -1437,6 +1442,10 @@ function logger_get_power_chart_data($chart) {
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
 
+    foreach (logger_get_appliance_ids() as $app) {
+      $data['appliances'][$i][$app] = logger_rrd_query_appliance($sensor, $chart->period, $app);
+    }
+
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
@@ -2280,6 +2289,16 @@ function logger_get_series_colors($chart_id) {
     $user_palette[$i] = logger_get_variable("series_color_$chart_id" . "_$i", $default);
   }
   return $user_palette;
+}
+
+function logger_get_appliance_ids() {
+
+  return array(
+    FRIDGE_APPLIANCE_ID,
+    SHOWER_APPLIANCE_ID,
+    DISH_WASHER_APPLIANCE_ID,
+    KETTLE_APPLIANCE_ID
+  );
 }
 
 function logger_block_info() {
@@ -3201,41 +3220,26 @@ function logger_set_variable($id, $value) {
   }
 }
 
-function logger_request_appliance_detection($meter, $measurements) {
-
-  $data = json_encode(array($meter => $measurements));
-
-  //jobqueue_produce('appdetect', $data);
-}
-
 /**
  * Returns list detected appliances at a specific moment in time.
  *
- * @param $meter      The sensor id.
- * @param $timestamp  The timestamp.
+ * @param $cache_id  The cache id.
  */
-function logger_get_appliances($meter, $timestamp) {
+function logger_get_appliances($cache_id) {
 
   drupal_add_http_header('Content-Type', 'application/json;');
 
-  $appliances = array();
+  $cache = cache_get($cache_id, 'cache_page');
 
-  if (user_has_role('Techniker')) { 
+  if ($cache->data && isset($cache->data['appliances'])) {
+    $detected = $cache->data['appliances'];
 
-    $type = db_select('logger_meters', 'm')
-      ->fields('m', array('type'))
-      ->condition('m.meter', $meter)
-      ->execute()
-      ->fetchField();
-
-    if ($type == CONSUMPTION_SENSOR_TYPE) {
-      //TODO: use logger_request_appliance_detection($meter, $measurements)
-      $appliances = array(1, 2, 3, 4);
-    }
+  } else {
+    $detected = array();
   }
 
-  print json_encode($appliances);
-  exit(0);
+  print json_encode($detected);
+  exit(0);  
 }
 
 function logger_form_alter(&$form, &$form_state, $form_id) {
