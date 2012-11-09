@@ -146,7 +146,7 @@ function updateLineChartForm(chart) {
     form.elements['xvalue2date'].value = formatDate(value);
     form.elements['xvalue2time'].value = formatTime(value);
   }
-
+  refreshLineAnnotations();
   updateLineLegend(chart);
 }
 
@@ -446,66 +446,86 @@ function updateLineLegendValue(name, i, value) {
   }
 }
 
+var annotationDivs = {};
+
 function addLineAnnotation(event, point) {
 
-  var id = 'annotation' + point.name + '' + point.xval + '' + point.yval;
-  var div = findAnnotationDiv(id);
+  var seriesId = point.name.substring(1) - 1;
+  var annotationId = 'annotation' + seriesId + '' + point.xval;
 
-  if (!div) {
-    var seriesId = point.name.substring(1) - 1;
-    var hour = (point.xval - (point.xval % 3600000)) / 1000;
-    var date = new Date(point.xval);
-    var timestamp = (date.getTime() - date.getTime() % 1000) / 1000;
-    var yval = point.yval.toFixed(2);
-    var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
-    var width = 50 * ('' + yval).length / 6;
-    var icons = '';
+  var hour = (point.xval - (point.xval % 3600000)) / 1000;
+  var date = new Date(point.xval);
+  var timestamp = (date.getTime() - date.getTime() % 1000) / 1000;
+  var yval = point.yval.toFixed(2);
+  var text = point.name + ': ' + formatDate(date) + ' - ' + yval;
+  var width = 50 * ('' + yval).length / 6;
+  var height = 15;
+  var icons = '';
 
-    var appliances = getAppliances(seriesId, timestamp);
-    if (appliances) {
-      icons += appliances;
-      width += 45 * (appliances.length / 100);
+  var appliances = getAppliances(seriesId, timestamp);
+  if (appliances) {
+    icons += appliances;
+    width += 45 * (appliances.length / 100);
+    height = 30;    
+  }
+
+  var weather = getWeather(seriesId, hour);
+  if (weather) {
+    icons += weather;
+    width += 75;
+    height = 30;
+  }
+
+  var annotation = {
+    series: point.name,
+    x: formatCVSTimeStamp(date),
+    shortText: yval,
+    text: text,
+    width: width,
+    height: height,
+    cssClass: 'point-annotation ' + annotationId,
+    clickHandler: function(annotation, point, chart, event) {
+
+      removeLineAnnotation(chart, annotationId);
     }
+  };
 
-    var weather = getWeather(seriesId, hour);
-    if (weather) {
-      icons += weather;
-      width += 75;
+  var annotations = lineChart.annotations();
+  annotations.push(annotation);
+
+  lineChart.setAnnotations(annotations);
+
+  var div = findAnnotationDiv(annotationId);
+  if (weather || appliances) {
+    div.innerHTML = '<span class="point-annotation">' + yval + '</span>' + icons;
+  }
+  annotationDivs[annotationId] = div.innerHTML;
+
+  refreshLineAnnotations();
+}
+
+function refreshLineAnnotations() {
+
+  for (id in annotationDivs) {
+    var div = findAnnotationDiv(id);
+    if (div) {
+      div.innerHTML = annotationDivs[id];
     }
-
-    var annotations = new Array();
-    annotations.push({
-      series: point.name,
-      x: formatCVSTimeStamp(date),
-      shortText: yval,
-      text: text,
-      width: width,
-      height: 30,
-      cssClass: 'point-annotation ' + id,
-      clickHandler: function(annotation, point, chart, event) {
-
-        removeLineAnnotation(chart, annotation.text);
-      }
-    });
-
-    lineChart.setAnnotations(annotations);
-
-    div = findAnnotationDiv(id);
-    div.innerHTML = '<span class="point-annotation"><b>' + div.innerHTML + '</b></span>' + icons;
   }
 }
 
-function removeLineAnnotation(chart, text) {
+function removeLineAnnotation(chart, annotationId) {
 
   var remaining = new Array();
   var annotations = chart.annotations();
 
   for (var i = 0; i < annotations.length; i++) {
-    if (annotations[i].text != text) {
+    if (annotations[i].cssClass.indexOf(annotationId) < 0) {
       remaining.push(annotations[i]);
     }
   }
   chart.setAnnotations(remaining);
+  refreshLineAnnotations();
 }
 
 function findAnnotationDiv(className) {
