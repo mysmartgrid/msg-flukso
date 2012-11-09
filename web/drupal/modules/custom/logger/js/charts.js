@@ -221,7 +221,7 @@ function findCheckBoxes(form, fieldPrefix) {
   return checkBoxes;
 }
 
-function removeLineSeries(uid, i, username, tableId) {
+function removeLineSeries(uid, i, username, meter, tableId) {
 
   var visibilities = lineChart.visibility();
 
@@ -236,40 +236,11 @@ function removeLineSeries(uid, i, username, tableId) {
   setLineVisibility(i, false);
 
   var form = document.getElementById('logger-linechart-form');
-  var field = form.elements['new_user'];
-  var found = false;
 
-  for (var p = 0; !found && p < field.options.length; p++) {
-    found = (field.options[p].text == username);
-  }
-
-  if (!found) {
-    jQuery.get('/logger/remove/user/' + uid);
-
-    //IE makes it necessary to use an auxiliary array
-    var sorted = new Array(field.length + 1);
-    for(var s = 0; s < field.length; s++){
-      sorted[s] = field.options[s];
-    }
-    sorted[s] = new Option(username, uid);
-
-    Array.prototype.sort.call(
-      sorted,
-      function (option1, option2) {
-        var text1 = option1.text.toLowerCase();
-        var text2 = option2.text.toLowerCase();
-        return text1 < text2 ? -1 : text1 > text2 ? 1 : 0;
-      }
-    );
-
-    field.length = 0;
-    for(s = 0; s < sorted.length; s++){
-      field.options[s] = sorted[s];
-    }
-  }
+  jQuery.get('/logger/remove/sensor/' + meter);
 }
 
-function hideLineSeries(uid, i, username, hideText, showText) {
+function hideLineSeries(uid, i, username, meter, hideText, showText) {
 
   var visibilities = lineChart.visibility();
 
@@ -297,6 +268,8 @@ function hideLineSeries(uid, i, username, hideText, showText) {
   document.getElementById('min' + i).style.visibility = style;
   document.getElementById('avg' + i).style.visibility = style;
   document.getElementById('last' + i).style.visibility = style;
+
+  jQuery.get('/logger/hide/sensor/' + meter);
 }
 
 function isLastVisibleLine(i, visibilities) {

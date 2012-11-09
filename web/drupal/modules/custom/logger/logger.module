@@ -226,9 +226,9 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['logger/remove/user'] = array(
+  $items['logger/remove/sensor'] = array(
     'title' => 'Removes a chart series',
-    'page callback' => 'logger_remove_user',
+    'page callback' => 'logger_remove_sensor_series',
     'page arguments' => array(3),
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -583,7 +583,10 @@ function logger_is_mobile_device() {
  * @return the power consumption page. 
  */
 function logger_user_power_page($uid) {
-  logger_set_variable('selected_users', array($uid));
+
+  logger_set_variable('selected_sensors', array());
+  logger_add_user_series($uid);
+
   return logger_power_page('hour');
 }
 
@@ -1449,7 +1452,7 @@ function logger_get_power_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
 
     $data['legend'][$i] = logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
@@ -1571,7 +1574,7 @@ function logger_get_forecast_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
       logger_format_power_series_data($chart, $forecast['power']);
@@ -1615,7 +1618,7 @@ function logger_get_anomaly_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
       logger_format_power_series_data($chart, $anomalies);
@@ -1634,9 +1637,10 @@ function logger_get_anomaly_chart_data($chart) {
  * @param $uid      The user id.
  * @param $username The user name.
  * @param $i        The series number.
+ * @param $meter    The sensor id.
  * @return the link code.
  */
-function logger_create_remove_power_series_link($uid, $i, $username) {
+function logger_create_remove_power_series_link($uid, $i, $username, $meter) {
 
   global $user;
 
@@ -1649,7 +1653,7 @@ function logger_create_remove_power_series_link($uid, $i, $username) {
       $link .= 'hideLineSeries(' . "$uid, $i, '$username', '" . t('Hide') . "', '" . t('Show') . "'" . ');">' . t('Hide');
     }
     else {
-      $link .= 'removeLineSeries(' . "$uid, $i, '$username', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' . t('Remove');
+      $link .= 'removeLineSeries(' . "$uid, $i, '$username', '" . $meter . "', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' . t('Remove');
     }
     $link .= '</a>';
   }
@@ -1843,15 +1847,14 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
 function logger_get_subscribed_sensors($types) {
 
   global $user;
+  $selected_sensors = logger_get_variable('selected_sensors', array());
 
-  $selected_users = logger_get_variable('selected_users', array());
+  if (empty($selected_sensors)) {
 
-  if (empty($selected_users)) {
-    $selected_users = array($user->uid);
-    logger_set_variable('selected_users', $selected_users);
+    $selected_sensors = logger_get_sensors($types, array($user->uid), TRUE);
+    logger_set_variable('selected_sensors', $selected_sensors);
   }
-
-  return logger_get_sensors($types, $selected_users, TRUE);
+  return $selected_sensors;
 }
 
 /**
@@ -2805,7 +2808,7 @@ function logger_linechart_form_submit($form, &$form_state) {
   logger_chart_form_submit($form, $form_state);
 
   if (isset($form_state['values']['new_user']) && $form_state['values']['new_user'] > 0) {
-    logger_add_user($form_state['values']['new_user']);
+    logger_add_user_series($form_state['values']['new_user']);
   }
 
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
@@ -3091,27 +3094,24 @@ function logger_get_users_options() {
 
   global $user;
 
-  $selected_users = logger_get_variable('selected_users', array($user->uid));
   $is_visitor = user_has_role('Visitor');
 
-  $sql = "
-    SELECT
-      u.uid,
-      u.name
-    FROM
-      {users} u,
-      {logger_meters} m
-    WHERE
-      m.function IS NOT NULL AND
-      m.uid = u.uid AND
-      u.uid NOT IN (:selected_users) AND
-      u.uid > 0
-    GROUP BY
-      u.uid
-    ORDER BY " .
-      ($is_visitor ? 'u.uid' : 'u.name');
+  $query = db_select('users', 'u')
+    ->fields('u', array('uid', 'name'))
+    ->groupBy('u.uid');
 
-  $fluksonians = db_query($sql, array(':selected_users' => $selected_users));
+  $query->join('logger_meters', 'm', 'm.uid = u.uid');
+  $query->isNotNull('m.function')
+    ->condition('m.uid', 0, '>');
+
+  if ($is_visitor) {
+    $query->orderBy('u.uid');
+  }
+  else {
+    $query->orderBy('u.name');
+  }
+
+  $fluksonians = $query->execute();
 
   $options = array(0 => '');
   foreach ($fluksonians as $fluksonian) {
@@ -3128,31 +3128,40 @@ function logger_get_users_options() {
  *
  * @param $uid  The id of the user to be added.
  */
-function logger_add_user($uid) {
+function logger_add_user_series($uid) {
 
   global $user;
 
-  $selected_users = logger_get_variable('selected_users', array($user->uid));
-  if (!in_array($uid, $selected_users)) {
-    $selected_users[] = $uid;
-    logger_set_variable('selected_users', $selected_users);
+  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($types, array($uid), TRUE);
+  $selected_sensors = logger_get_variable('selected_sensors', array());
+
+  foreach ($sensors as $sensor) {
+
+    if (!in_array($sensor, $selected_sensors)) {
+      $selected_sensors[] = $sensor;
+    }
   }
+  logger_set_variable('selected_sensors', $selected_sensors);
 }
 
 /**
- * Removes an user from the chart.
+ * Removes a sensor from the line chart.
  *
- * @param $uid  The id of the user to be removed.
+ * @param $meter The id of the sensor to be removed.
  */
-function logger_remove_user($uid) {
+function logger_remove_sensor_series($meter) {
 
-  $selected_users = logger_get_variable('selected_users', array());
-  for ($i = 0; $i < count($selected_users); $i++) {
-    if ($selected_users[$i] == $uid) {
-      unset($selected_users[$i]);
+  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $remaining = array();
+
+  foreach ($selected_sensors as $sensor) {
+
+    if ($sensor->meter != $meter) {
+      $remaining[] = $sensor;
     }
   }
-  logger_set_variable('selected_users', array_values($selected_users));
+  logger_set_variable('selected_sensors', $remaining);
 }
 
 /**

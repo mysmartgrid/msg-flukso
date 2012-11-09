@@ -621,3 +621,15 @@ function logger_update_7014() {
 
   return st('Field description has been successfully added to table logger_devices.');
 }
+
+/**
+ * Remove variables '%selected_users%'.
+ */
+function logger_update_7014() {
+
+  db_delete('variable')
+    ->condition('name', '%selected_users%', 'LIKE')
+    ->execute();
+
+  return st("Variables '%selected_users%' have been removed.");
+}
