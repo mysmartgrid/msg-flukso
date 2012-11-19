@@ -625,7 +625,7 @@ function logger_update_7014() {
 /**
  * Remove variables '%selected_users%'.
  */
-function logger_update_7014() {
+function logger_update_7015() {
 
   db_delete('variable')
     ->condition('name', '%selected_users%', 'LIKE')
