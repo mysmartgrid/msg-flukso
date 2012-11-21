@@ -259,7 +259,6 @@ function hideLineSeries(uid, i, username, meter, hideText, showText) {
     style = 'hidden';
   }
 
-  //Remove the table line as soon as possible
   document.getElementById('hide-legend-row' + i).innerHTML = text;
 
   setLineVisibility(i, visible);
@@ -365,6 +364,7 @@ function updateLineLegend(chart) {
 
   var minVisibleDate = chart.xAxisRange(0)[0];
   var maxVisibleDate = chart.xAxisRange(0)[1];
+  var lineVisibility = chart.visibility();
 
   //sensors
   for (var s = 1; s < chart.numColumns(); s++) {
@@ -374,22 +374,25 @@ function updateLineLegend(chart) {
     var sum = 0;
     var total = 0;
     var last = null;
+    
+    if (lineVisibility[s - 1]) {
 
-    //sensor's values
-    for (var v = 0; v < chart.numRows(); v++) {
-      var timestamp = chart.getValue(v, 0);
+      //sensor's values
+      for (var v = 0; v < chart.numRows(); v++) {
+        var timestamp = chart.getValue(v, 0);
 
-      if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
+        if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
 
-        var value = chart.getValue(v, s);
-        value = value ? value : 0;
-        last = value;
-        max = value > max ? value : max;
-        min = value < min ? value : min;
+          var value = chart.getValue(v, s);
+          value = value ? value : 0;
+          last = value;
+          max = value > max ? value : max;
+          min = value < min ? value : min;
 
-        if (value != 0) {
-          sum += value;
-          total++;
+          if (value != 0) {
+            sum += value;
+            total++;
+          }
         }
       }
     }
@@ -572,6 +575,8 @@ function createLineChart(id, fileURL, properties, weather) {
   chart.weather = weather;
   chart.fileURL = fileURL;
   storeChart(id, chart);
+
+  updateLineLegend(chart);
 
   return chart;
 }

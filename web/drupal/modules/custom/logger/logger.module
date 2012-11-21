@@ -234,6 +234,14 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['logger/hide/sensor'] = array(
+    'title' => 'Hides a chart series',
+    'page callback' => 'logger_hide_sensor_series',
+    'page arguments' => array(3),
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
   $items['logger/file'] = array(
     'title' => 'Downloads a chart file',
     'page callback' => 'logger_download_chart_data_file',
@@ -977,7 +985,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
   $unique_id = "$context $interval" . implode(',', $types) . " $unit " . implode(',', $prices) . " $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
-    $unique_id .= " $sensor->meter $sensor->type $sensor->forecast $sensor->price";
+    $unique_id .= " $sensor->meter $sensor->type $sensor->forecast $sensor->price $sensor->visible";
   }
 
   $i = strpos($context, '_');
@@ -1452,7 +1460,7 @@ function logger_get_power_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
 
     $data['legend'][$i] = logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
@@ -1574,7 +1582,7 @@ function logger_get_forecast_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
       logger_format_power_series_data($chart, $forecast['power']);
@@ -1618,7 +1626,7 @@ function logger_get_anomaly_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
       logger_format_power_series_data($chart, $anomalies);
@@ -1638,9 +1646,10 @@ function logger_get_anomaly_chart_data($chart) {
  * @param $username The user name.
  * @param $i        The series number.
  * @param $meter    The sensor id.
+ * @param $visible  If the series is visible.
  * @return the link code.
  */
-function logger_create_remove_power_series_link($uid, $i, $username, $meter) {
+function logger_create_remove_power_series_link($uid, $i, $username, $meter, $visible) {
 
   global $user;
 
@@ -1650,10 +1659,11 @@ function logger_create_remove_power_series_link($uid, $i, $username, $meter) {
     $link = '<a href="javascript: void(0)" id="hide-legend-row' . $i . '" OnClick="javascript: ';
 
     if ($user->uid == $uid) {
-      $link .= 'hideLineSeries(' . "$uid, $i, '$username', '" . t('Hide') . "', '" . t('Show') . "'" . ');">' . t('Hide');
+      $link .= "hideLineSeries($uid, $i, '$username', '$meter', '" . t('Hide') . "', '" . t('Show') . "');\">" .
+      ($visible ? t('Hide') : t('Show'));
     }
     else {
-      $link .= 'removeLineSeries(' . "$uid, $i, '$username', '" . $meter . "', '" . LOGGER_LEGEND_TABLE_ID . "'" . ');">' . t('Remove');
+      $link .= "removeLineSeries($uid, $i, '$username', '$meter', '" . LOGGER_LEGEND_TABLE_ID . "');\">" . t('Remove');
     }
     $link .= '</a>';
   }
@@ -1784,6 +1794,7 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   $query->join('logger_meter_type', 't', 't.id = m.type');
   $query->addField('t', 'name', 'type');
   $query->addField('t', 'id', 'type_id');
+  $query->addExpression('TRUE', 'visible');
 
   if (user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');
@@ -1988,6 +1999,11 @@ function theme_logger_line_chart_area($variables) {
   $yvalue1 = $chart->yaxis[0] + 0;
   $yvalue2 = $chart->yaxis[1] + 0;
 
+  $visibility = array();
+  foreach ($chart->sensors as $sensor) {
+    $visibility[] .= $sensor->visible ? "true" : "false";
+  }
+
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
     'drawCallback' => 'updateLineChartForm',
@@ -1995,7 +2011,8 @@ function theme_logger_line_chart_area($variables) {
     'stepPlot' => $chart->step_plot ? 'true' : 'false' ,
     'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false',
-    'fillAlpha' => $chart->context == 'onsite' ? 1 : 0.15//FIXME: create a property on the chart object
+    'fillAlpha' => $chart->context == 'onsite' ? 1 : 0.15, //FIXME: create a property on the chart object
+    'visibility' => '[' . implode(', ', $visibility) . ']'
   );
   if ($chart->show_slider) {
     $chart_properties['zoomCallback'] = 'updateSliderChart';
@@ -2026,7 +2043,8 @@ function theme_logger_line_chart_area($variables) {
       'stepPlot' => $chart_properties['stepPlot'],
       'rollPeriod' => $chart_properties['rollPeriod'],
       'fillGraph' => $chart_properties['fillGraph'],
-      'fillAlpha' => $chart_properties['fillAlpha']
+      'fillAlpha' => $chart_properties['fillAlpha'],
+      'visibility' => $chart_properties['visibility'] 
     );
 
     $output .= logger_create_dygraph($chart, FALSE, $slider_properties, TRUE);
@@ -3162,6 +3180,25 @@ function logger_remove_sensor_series($meter) {
     }
   }
   logger_set_variable('selected_sensors', $remaining);
+}
+
+/**
+ * Hides a sendor series on the line chart.
+ *
+ * @param $meter The id of the sensor to be hidden.
+ */
+function logger_hide_sensor_series($meter) {
+
+  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $changed = array();
+
+  foreach ($selected_sensors as $sensor) {
+    if ($sensor->meter == $meter) {
+      $sensor->visible = !$sensor->visible;
+    }
+    $changed[] = $sensor;
+  }
+  logger_set_variable('selected_sensors', $changed);
 }
 
 /**
