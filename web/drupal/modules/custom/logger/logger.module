@@ -229,7 +229,7 @@ function logger_menu() {
   $items['logger/remove/sensor'] = array(
     'title' => 'Removes a chart series',
     'page callback' => 'logger_remove_sensor_series',
-    'page arguments' => array(3),
+    'page arguments' => array(3, 4),
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
   );
@@ -237,7 +237,7 @@ function logger_menu() {
   $items['logger/hide/sensor'] = array(
     'title' => 'Hides a chart series',
     'page callback' => 'logger_hide_sensor_series',
-    'page arguments' => array(3),
+    'page arguments' => array(3, 4),
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
   );
@@ -592,8 +592,8 @@ function logger_is_mobile_device() {
  */
 function logger_user_power_page($uid) {
 
-  logger_set_variable('selected_sensors', array());
-  logger_add_user_series($uid);
+  logger_set_variable('power_selected_sensors', array());
+  logger_add_user_series($uid, 'power');
 
   return logger_power_page('hour');
 }
@@ -608,7 +608,7 @@ function logger_power_page($interval) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
-  $sensors = logger_get_subscribed_sensors($types);
+  $sensors = logger_get_subscribed_sensors($types, 'power');
 
   return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'watt');
 }
@@ -625,7 +625,7 @@ function logger_forecast_page($interval) {
 
   $interval = logger_check_interval($interval, 'f3days');
   $types = array(PRODUCTION_SENSOR_TYPE);
-  $sensors = logger_get_sensors($types, array($user->uid), TRUE);
+  $sensors = logger_get_subscribed_sensors($types, 'forecast');
 
   return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'watt', NULL, FALSE);
 }
@@ -926,7 +926,7 @@ function logger_check_interval($interval, $default_interval) {
 /**
  * Creates an object to hold chart parameters.
  *
- * @param $context            The page where the chart is going to be placed (overview or logger).
+ * @param $context            The page where the chart is going to be placed.
  * @param $types              The array of sensor types.
  * @param $interval           The time interval.
  * @param $unit               The chart unit.
@@ -1460,7 +1460,7 @@ function logger_get_power_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
 
     $data['legend'][$i] = logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
@@ -1560,41 +1560,49 @@ function logger_get_forecast_chart_data($chart) {
 
   $is_visitor = user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
-  $total = count($chart->sensors);
-  $i = $total;
+  $data['legend'] = array();
+  $i = 0;
 
   foreach ($chart->sensors as &$sensor) {
-
-    $forecast = pvcast_get_forecast($sensor->meter, $chart->period['start'], $chart->period['end']);
-
-    #FIXME: move unit conversion to the pvcast module.
-    $factor = 1;
-    if ($chart->unit == 'eur/year') {
-      $factor = $sensor->price * 24 * 365 / 1000;
-    }
-    else if ($chart->unit == 'kWh/year') {
-      $factor = 24 * 365 / 1000;
-    }
-    foreach ($forecast['power'] as $time => $value) {
-      $forecast['power'][$time] = $value * $factor;
-    }
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
+    //FIXME
+    system("echo $sensor->meter >> /tmp/test.txt");
 
-    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Forecast"][$sensor->type] =
-      logger_format_power_series_data($chart, $forecast['power']);
+    //If this is a forecast series
+    if (strpos($sensor->meter, 'Forecast') === 0) {
 
-    foreach ($forecast['precipitation'] as $time => $rain) {
-      $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
-      $data['weather'][$i][$time] = $rain > 0 ? RAIN_WEATHER_ID : ($time > $sun['sunrise'] && $time < $sun['sunset'] ? SUN_WEATHER_ID : MOON_WEATHER_ID);
+      $meter = substr($sensor->meter, 8);
+      $forecast = pvcast_get_forecast($meter, $chart->period['start'], $chart->period['end']);
+
+      #FIXME: move unit conversion to the pvcast module.
+      $factor = 1;
+      if ($chart->unit == 'eur/year') {
+        $factor = $sensor->price * 24 * 365 / 1000;
+      }
+      else if ($chart->unit == 'kWh/year') {
+        $factor = 24 * 365 / 1000;
+      }
+      foreach ($forecast['power'] as $time => $value) {
+        $forecast['power'][$time] = $value * $factor;
+      }
+
+      $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
+        logger_format_power_series_data($chart, $forecast['power']);
+
+      foreach ($forecast['precipitation'] as $time => $rain) {
+        $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
+        $data['weather'][$i][$time] = $rain > 0 ? RAIN_WEATHER_ID : ($time > $sun['sunrise'] && $time < $sun['sunset'] ? SUN_WEATHER_ID : MOON_WEATHER_ID);
+      }
+      $data['temperature'][$i] = $forecast['temperature'];
     }
-    $data['temperature'][$i] = $forecast['temperature'];
+
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
 
     $data['legend'][$i] =
-      logger_create_legend_line($username, $sensor->function . '  (' . t('Forecast') . ')', t($sensor->type), $i,
+      logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
 
     $i++;
@@ -1626,7 +1634,7 @@ function logger_get_anomaly_chart_data($chart) {
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible);
+    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
 
     $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
       logger_format_power_series_data($chart, $anomalies);
@@ -1647,9 +1655,10 @@ function logger_get_anomaly_chart_data($chart) {
  * @param $i        The series number.
  * @param $meter    The sensor id.
  * @param $visible  If the series is visible.
+ * @param $context  The chart context.
  * @return the link code.
  */
-function logger_create_remove_power_series_link($uid, $i, $username, $meter, $visible) {
+function logger_create_remove_power_series_link($uid, $i, $username, $meter, $visible, $context) {
 
   global $user;
 
@@ -1659,11 +1668,11 @@ function logger_create_remove_power_series_link($uid, $i, $username, $meter, $vi
     $link = '<a href="javascript: void(0)" id="hide-legend-row' . $i . '" OnClick="javascript: ';
 
     if ($user->uid == $uid) {
-      $link .= "hideLineSeries($uid, $i, '$username', '$meter', '" . t('Hide') . "', '" . t('Show') . "');\">" .
+      $link .= "hideLineSeries($uid, $i, '$username', '$meter', '" . t('Hide') . "', '" . t('Show') . "', '$context');\">" .
       ($visible ? t('Hide') : t('Show'));
     }
     else {
-      $link .= "removeLineSeries($uid, $i, '$username', '$meter', '" . LOGGER_LEGEND_TABLE_ID . "');\">" . t('Remove');
+      $link .= "removeLineSeries($uid, $i, '$username', '$meter', '" . LOGGER_LEGEND_TABLE_ID . "', '$context');\">" . t('Remove');
     }
     $link .= '</a>';
   }
@@ -1852,18 +1861,30 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
 /**
  * Returns an array containing all sensors from other users, selected to be plotted on the chart.
  *
- * @param $types  The types of sensors to be returned.
+ * @param $types   The types of sensors to be returned.
+ * @param $context The chart context.
  * @return the array of user sensors.
  */
-function logger_get_subscribed_sensors($types) {
+function logger_get_subscribed_sensors($types, $context) {
 
   global $user;
-  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
 
   if (empty($selected_sensors)) {
 
     $selected_sensors = logger_get_sensors($types, array($user->uid), TRUE);
-    logger_set_variable('selected_sensors', $selected_sensors);
+
+    if ($context == 'forecast') {
+
+      foreach ($selected_sensors as $sensor) {
+        $forecast = clone $sensor;
+        $forecast->meter = 'Forecast' . $sensor->meter;
+        $forecast->function = $sensor->function . ' (' . t('Forecast') . ')';
+        $selected_sensors[] = $forecast;
+      }
+    }
+
+    logger_set_variable($context . '_selected_sensors', $selected_sensors);
   }
   return $selected_sensors;
 }
@@ -2826,7 +2847,7 @@ function logger_linechart_form_submit($form, &$form_state) {
   logger_chart_form_submit($form, $form_state);
 
   if (isset($form_state['values']['new_user']) && $form_state['values']['new_user'] > 0) {
-    logger_add_user_series($form_state['values']['new_user']);
+    logger_add_user_series($form_state['values']['new_user'], 'power'); //FIXME: read context from form field
   }
 
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
@@ -3144,15 +3165,16 @@ function logger_get_users_options() {
 /**
  * Adds an user to the chart.
  *
- * @param $uid  The id of the user to be added.
+ * @param $uid     The id of the user to be added.
+ * @param $context The chart context.
  */
-function logger_add_user_series($uid) {
+function logger_add_user_series($uid, $context) {
 
   global $user;
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($uid), TRUE);
-  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
 
   foreach ($sensors as $sensor) {
 
@@ -3160,17 +3182,18 @@ function logger_add_user_series($uid) {
       $selected_sensors[] = $sensor;
     }
   }
-  logger_set_variable('selected_sensors', $selected_sensors);
+  logger_set_variable($context . '_selected_sensors', $selected_sensors);
 }
 
 /**
  * Removes a sensor from the line chart.
  *
- * @param $meter The id of the sensor to be removed.
+ * @param $meter   The id of the sensor to be removed.
+ * @param $context The chart context.
  */
-function logger_remove_sensor_series($meter) {
+function logger_remove_sensor_series($meter, $context) {
 
-  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
   $remaining = array();
 
   foreach ($selected_sensors as $sensor) {
@@ -3179,17 +3202,18 @@ function logger_remove_sensor_series($meter) {
       $remaining[] = $sensor;
     }
   }
-  logger_set_variable('selected_sensors', $remaining);
+  logger_set_variable($context . '_selected_sensors', $remaining);
 }
 
 /**
  * Hides a sendor series on the line chart.
  *
- * @param $meter The id of the sensor to be hidden.
+ * @param $meter   The id of the sensor to be hidden.
+ * @param $context The chart context.
  */
-function logger_hide_sensor_series($meter) {
+function logger_hide_sensor_series($meter, $context) {
 
-  $selected_sensors = logger_get_variable('selected_sensors', array());
+  $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
   $changed = array();
 
   foreach ($selected_sensors as $sensor) {
@@ -3198,7 +3222,7 @@ function logger_hide_sensor_series($meter) {
     }
     $changed[] = $sensor;
   }
-  logger_set_variable('selected_sensors', $changed);
+  logger_set_variable($context . '_selected_sensors', $changed);
 }
 
 /**

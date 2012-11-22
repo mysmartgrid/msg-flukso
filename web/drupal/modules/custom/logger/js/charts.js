@@ -221,7 +221,7 @@ function findCheckBoxes(form, fieldPrefix) {
   return checkBoxes;
 }
 
-function removeLineSeries(uid, i, username, meter, tableId) {
+function removeLineSeries(uid, i, username, meter, tableId, context) {
 
   var visibilities = lineChart.visibility();
 
@@ -237,10 +237,10 @@ function removeLineSeries(uid, i, username, meter, tableId) {
 
   var form = document.getElementById('logger-linechart-form');
 
-  jQuery.get('/logger/remove/sensor/' + meter);
+  jQuery.get('/logger/remove/sensor/' + meter + '/' + context);
 }
 
-function hideLineSeries(uid, i, username, meter, hideText, showText) {
+function hideLineSeries(uid, i, username, meter, hideText, showText, context) {
 
   var visibilities = lineChart.visibility();
 
@@ -268,7 +268,7 @@ function hideLineSeries(uid, i, username, meter, hideText, showText) {
   document.getElementById('avg' + i).style.visibility = style;
   document.getElementById('last' + i).style.visibility = style;
 
-  jQuery.get('/logger/hide/sensor/' + meter);
+  jQuery.get('/logger/hide/sensor/' + meter + '/' + context);
 }
 
 function isLastVisibleLine(i, visibilities) {
@@ -575,8 +575,6 @@ function createLineChart(id, fileURL, properties, weather) {
   chart.weather = weather;
   chart.fileURL = fileURL;
   storeChart(id, chart);
-
-  updateLineLegend(chart);
 
   return chart;
 }
