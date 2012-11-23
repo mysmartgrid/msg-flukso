@@ -2024,6 +2024,9 @@ function theme_logger_line_chart_area($variables) {
   $yvalue1 = $chart->yaxis[0] + 0;
   $yvalue2 = $chart->yaxis[1] + 0;
 
+  //In order to avoid a bug in Dygraphs
+  $yvalue2 += ($yvalue2 % 10 == 0 ? 1 : 0);
+
   $visibility = array();
   foreach ($chart->sensors as $sensor) {
     $visibility[] .= $sensor->visible ? "true" : "false";
