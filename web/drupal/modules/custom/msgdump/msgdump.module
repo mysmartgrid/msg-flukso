@@ -273,7 +273,7 @@ function msgdump_remove_by_sensor($meter) {
 function msgdump_cron() {
 
   $now = REQUEST_TIME;
-  $time_limit = MONTH;
+  $time_limit = WEEK;
 
   //delete old dumps
   db_delete('msgdump')

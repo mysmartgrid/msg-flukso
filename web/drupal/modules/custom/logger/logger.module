@@ -1403,15 +1403,18 @@ function logger_get_onsite_chart_data($chart) {
       if (!$hour_interval) {
         $total = count($series['values']);
         $values = $total > 0 ? $series['values'] : array(0);
+        $sum = array_sum($values);
+        $avg = $total > 0 ? $sum / $total : '';
         $min = min($values);
         $max = max($values);
         $min_time = array_search($min, $values);
         $max_time = array_search($max, $values);
+        $unit = '';
 
-        $cells['Min'] = logger_format_legend_record($min, $min_time, $chart->interval);
-        $cells['Max'] = logger_format_legend_record($max, $max_time, $chart->interval);
-        $cells['Sum'] = array_sum($values);
-        $cells['Avg'] = $total > 0 ? $cells['Sum'] / $total : '';
+        $cells['Min'] = logger_format_legend_record($min, $min_time, $chart->interval, $unit);
+        $cells['Max'] = logger_format_legend_record($max, $max_time, $chart->interval, $unit);
+        $cells['Sum'] = $sum;
+        $cells['Avg'] = $avg;
       }
       $data['legend'][$line_id] = logger_create_legend_line($user->name, t('All'), $name, $line_id, $cells, $series['chartSeriesIds']);
     }
@@ -1766,11 +1769,12 @@ function logger_create_legend_line($username, $function, $type, $i, $values = ar
  * @param $value       The record value.
  * @param $record_time The record time.
  * @param $interval    The chart time interval name.
+ * @param $unit        The record value unit (optional).
  * @return the formatted record.
  */
-function logger_format_legend_record($value, $record_time, $interval) {
+function logger_format_legend_record($value, $record_time, $interval, $unit = '') {
 
-  $value = number_format($value, 2, '.', '');
+  $value = number_format($value, 2, '.', '') . " $unit";
 
   if ($record_time && $interval) {
     $record_time = strtok($record_time, '<');//Remove tag if it exists

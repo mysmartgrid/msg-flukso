@@ -1267,9 +1267,8 @@ function notification_cron() {
   //Run only in the first quarter of an hour
   if ($rest < 15 * MINUTE) {
     notification_send_summary_report_emails();
+    notification_eventlog_clear_old();
   }
-
-  notification_eventlog_clear_old();
 }
 
 function notification_compose_base_query($event_id) {
