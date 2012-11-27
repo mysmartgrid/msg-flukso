@@ -5,7 +5,7 @@ if [ $# -ne 2 ]; then
   exit 1
 fi
 
-cd /var/www/flukso-api/flukso/var/keys/$1
+cd /mnt/fhgfs/keys/$1
 /usr/bin/touch authorized_keys.new
 
 # Remove old keys

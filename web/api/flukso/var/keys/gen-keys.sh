@@ -5,7 +5,7 @@ if [ $# -ne 2 ]; then
   exit 1
 fi
 
-cd /var/www/flukso-api/flukso/var/keys/$1
+cd /mnt/fhgfs/keys/$1
 
 #Generate the device key
 /bin/rm $2_device*
