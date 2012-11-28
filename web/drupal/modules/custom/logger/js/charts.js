@@ -579,7 +579,7 @@ function createLineChart(id, fileURL, properties, weather) {
   return chart;
 }
 
-function createBarChart(id, series, names, colors, dataLabels, stacks, percent) {
+function createBarChart(id, series, names, colors, dataLabels, dataLabels2, stacks, percent) {
 
   var stacked = stacks.length > 0;
   var numTicks = names.length;
@@ -645,7 +645,8 @@ function createBarChart(id, series, names, colors, dataLabels, stacks, percent) 
 
   chart.plot = function() {
     var plot = jQuery.plot(jQuery('#' + id), data, options);
-    showBarDataLabels(plot, stacks, dataLabels, barWidth);
+    showBarDataLabels(plot, stacks, dataLabels, barWidth, 15);
+    showBarDataLabels(plot, stacks, dataLabels2, barWidth, -5);
   };
   chart.plot();
 
@@ -686,52 +687,63 @@ function getChart(id) {
   return null;
 }
 
-function showBarDataLabels(plot, stacks, dataLabels, barWidth) {
+function showBarDataLabels(plot, stacks, dataLabels, barWidth, yOffset) {
+
+  if (dataLabels.length == 0) {
+    return;
+  }
 
   var series = plot.getData();
   var stacked = stacks.length > 0;
   var offset = plot.pointOffset({x: 0, y: 0});
   var floor = offset.top;
-  var extraOffset = createBiArray(20, 20, 15);
+  var extraOffset = createBiArray(20, 20, yOffset);
 
   for (var d = 0; d < series.length; d++) {
 
-    jQuery.each(series[d].data,
+    if (dataLabels[d] != undefined) { 
 
-      function(i, point) {
+      jQuery.each(series[d].data,
 
-        //Coordinates
-        var x = point[0];
-        var y = point[1];
+        function(i, point) {
 
-        //Only positive values are shown
-        if (y <= 0) {
-          return;
+          //Coordinates
+          var x = point[0];
+
+          if (x >= 0) {
+            var y = point[1];
+
+            //Only positive values are shown
+            if (y <= 0) {
+              return;
+            }
+
+            //Stack index
+            var s = stacked ? stacks[d] : d;
+
+            //x-axis data point index
+            var p = Math.round(x - barWidth * s);
+
+            offset = plot.pointOffset({x: x, y: y});
+            var barHeight = floor - offset.top;
+
+            //Subtact previous bars' offsets
+            offset.top -= extraOffset[s][p];
+
+            //If the data labels are too close
+            if (barHeight < 15) {
+              offset.top += barHeight - 15;
+            }
+
+            if (stacked) {
+              extraOffset[s][p] += barHeight;
+            }
+
+            showDataLabel(plot, offset, barWidth, dataLabels[d][p]);
+          }
         }
-
-        //Stack index
-        var s = stacked ? stacks[d] : d;
-
-        //x-axis data point index
-        var p = Math.round(x - barWidth * s);
-
-        offset = plot.pointOffset({x: x, y: y});
-        var barHeight = floor - offset.top;
-
-        //Subtact previous bars' offsets
-        offset.top -= extraOffset[s][p];
-
-        //If the data labels are too close
-        if (barHeight < 15) {
-          offset.top += barHeight - 15;
-        }
-
-        if (stacked) {
-          extraOffset[s][p] += barHeight;
-        }
-
-        showDataLabel(plot, offset, barWidth, dataLabels[d][p]);
-    });
+      );
+    }
   }
 }
 
@@ -739,11 +751,13 @@ function showDataLabel(plot, offset, barWidth, value) {
 
   if (value != null) {
 
-    //Format value
-    var precision = value < 1000 ? 2 : 0;
-    value = value.toFixed(precision);
-    if (value == 0) {
-      value += '...';
+    if (typeof value == 'number') {
+      //Format value
+      var precision = value < 1000 ? 2 : 0;
+      value = value.toFixed(precision);
+      if (value == 0) {
+        value += '...';
+      }
     }
 
     var labelDivClass = getStyleBySelector('p.chart-label');
@@ -791,6 +805,20 @@ function setSeriesColor(chartId, i, color) {
 
   jQuery.get('/logger/setvariable/series_color_' + chartId + '_' + i + '/' + escape(color));
 
+  return true;
+}
+
+function syncColorPickers(i, color) {
+
+  var buttons = document.getElementsByClassName("color");
+
+  for (var b = 0; b < buttons.length; b++) {
+    if (buttons[b].className.indexOf('series_color' + i) > 0) {
+      buttons[b].style.background = '#' + color;
+      buttons[b].style.color = 'transparent';
+      buttons[b].value = color;
+    }
+  }
   return true;
 }
 

@@ -985,7 +985,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $t2 = $chart->period['end']   - ($chart->period['end']   % $lifetime);
   $unique_id = "$context $interval" . implode(',', $types) . " $unit " . implode(',', $prices) . " $chart->resolution $t1 $t2 $aggregate_sensors";
   foreach ($chart->sensors as $sensor) {
-    $unique_id .= " $sensor->meter $sensor->type $sensor->forecast $sensor->price $sensor->visible";
+    $unique_id .= " $sensor->meter $sensor->function $sensor->type $sensor->forecast $sensor->price $sensor->visible";
   }
 
   $i = strpos($context, '_');
@@ -1324,6 +1324,55 @@ function logger_get_onsite_chart_data($chart) {
 
   global $user;
 
+  $hour_interval = !(strrpos($chart->interval, 'hour') === FALSE);
+  $all_series = logger_get_onsite_chart_series($chart);
+  $data = array('stacks' => array(0, 1, 0, 1));
+
+  foreach ($all_series as $line_id => $series) {
+
+    $name = $series['name'];
+    $labels = isset($series['labels']) ? $series['labels'] : array();
+    $labels2 = isset($series['labels2']) ? $series['labels2'] : array();
+
+    if (!empty($name)) {
+      $cells = array('Min' => 0, 'Max' => 0, 'Avg' => 0);
+
+      if (!$hour_interval) {
+        $values = empty($series['values']) ? array(0) : $series['values'];
+        $min = min($values);
+        $max = max($values);
+        $min_time = array_search($min, $values);
+        $max_time = array_search($max, $values);
+        $min_complement = $line_id == 0 ? $labels2[$min_time] . '%' : '';
+        $max_complement = $line_id == 0 ? $labels2[$max_time] . '%' : '';
+
+        $cells['Min'] = logger_format_legend_record($min, $min_time, $chart->interval, $min_complement);
+        $cells['Max'] = logger_format_legend_record($max, $max_time, $chart->interval, $max_complement);
+        $cells['Sum'] = array_sum($values);
+        $cells['Avg'] = $cells['Sum'] / count($values);
+      }
+      $chart_series_ids = isset($series['chartSeriesIds']) ? $series['chartSeriesIds'] : array();
+      $color_ids = isset($series['colorIds']) ? $series['colorIds'] : array();
+      $data['legend'][$line_id] = logger_create_legend_line($user->name, t('All'), $name, $line_id, $cells, $chart_series_ids, $color_ids);
+    }
+
+    foreach ($labels2 as $time => $value) {
+      $data['labels2'][t('All')][$name][$time] = "'" . str_repeat('&nbsp;', 10) . "$value%'";
+    }
+    $data['series'][$user->uid][$user->name][t('All')][$name] = $series['values'];
+    $data['labels'][t('All')][$name] = $labels;
+  }
+  return $data;
+}
+
+/**
+ * Returns an array containing all on-site consumption chart series data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart series data.
+ */
+function logger_get_onsite_chart_series($chart) {
+
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $sensors = array(CONSUMPTION_SENSOR_TYPE => array(), PRODUCTION_SENSOR_TYPE => array());
@@ -1337,10 +1386,11 @@ function logger_get_onsite_chart_data($chart) {
   $onsite = array();
   $feedin = array();
   $supply = array();
+  $agg_consumption = array();
+  $agg_production = array();
 
   $sub_interval = logger_get_sub_interval($chart->interval);
   $sub_time_window = logger_get_default_time_window($sub_interval);
-
   $from = $chart->period['start'] - ($chart->period['start'] % MINUTE);
 
   $hour_interval = !(strrpos($chart->interval, 'hour') === FALSE);
@@ -1350,7 +1400,6 @@ function logger_get_onsite_chart_data($chart) {
   //For every measurement
   for ($time = $from; $time < $chart->period['end']; $time += MINUTE) {
 
-    //Format time
     $start = $time + $chart->offset;
     $start -= ($start % $sub_time_window) + $chart->offset;
     $start -= $extra_time;
@@ -1363,6 +1412,8 @@ function logger_get_onsite_chart_data($chart) {
       $onsite[$title] = 0;
       $feedin[$title] = 0;
       $supply[$title] = 0;
+      $agg_consumption[$title] = 0;
+      $agg_production[$title] = 0;
     }
     if (!isset($consumed[$time])) {
       $consumed[$time] = 0;
@@ -1377,51 +1428,32 @@ function logger_get_onsite_chart_data($chart) {
       $onsite[$title] += $produced[$time];
       $supply[$title] += $consumed[$time] - $produced[$time];
     }
+    $agg_consumption[$title] += $consumed[$time];
+    $agg_production[$title] += $produced[$time];
   }
 
+  $labels2 = array();
   if ($hour_interval) {
     foreach ($onsite as $title => $value) {
       $supply[$title] += $value;
       $feedin[$title] += $value;
-    }  
-  }
-
-  $all_series = array(
-    0 => array('name' => t('On-site Consumption'), 'values' => $onsite, 'labels' => $onsite, 'chartSeriesIds' => array(0, 1)),
-    1 => array('name' => '',                       'values' => $onsite, 'labels' => array()),
-    2 => array('name' => t('Power Grid Supply'),   'values' => $supply, 'labels' => $supply, 'chartSeriesIds' => array()),
-    3 => array('name' => t('Power Grid Feed-in'),  'values' => $feedin, 'labels' => $feedin, 'chartSeriesIds' => array())
-  );
-  $data['stacks'] = array(0, 1, 0, 1);
-
-  foreach ($all_series as $line_id => $series) {
-    $name = $series['name'];
-
-    if (!empty($name)) {
-      $cells = array('Min' => 0, 'Max' => 0, 'Avg' => 0);
-
-      if (!$hour_interval) {
-        $total = count($series['values']);
-        $values = $total > 0 ? $series['values'] : array(0);
-        $sum = array_sum($values);
-        $avg = $total > 0 ? $sum / $total : '';
-        $min = min($values);
-        $max = max($values);
-        $min_time = array_search($min, $values);
-        $max_time = array_search($max, $values);
-        $unit = '';
-
-        $cells['Min'] = logger_format_legend_record($min, $min_time, $chart->interval, $unit);
-        $cells['Max'] = logger_format_legend_record($max, $max_time, $chart->interval, $unit);
-        $cells['Sum'] = $sum;
-        $cells['Avg'] = $avg;
-      }
-      $data['legend'][$line_id] = logger_create_legend_line($user->name, t('All'), $name, $line_id, $cells, $series['chartSeriesIds']);
     }
-    $data['series'][$user->uid][$user->name][t('All')][$name] = $series['values'];
-    $data['labels'][t('All')][$name] = $series['labels'];
   }
-  return $data;
+  else {
+    foreach ($onsite as $time => $value) {
+      $sum = $value + $supply[$time];
+      $labels2[$time] = number_format($sum > 0 ? $value * 100 / $sum : 0, 0);
+    }
+  }
+
+  return array(
+    0 => array('name' => t('On-site Consumption'),'values' => $onsite, 'labels' => $onsite, 'labels2' => $labels2,'chartSeriesIds' => array(0, 1)),
+    1 => array('name' => '',                      'values' => $onsite),
+    2 => array('name' => t('Power Grid Supply'),  'values' => $supply, 'labels' => $supply),
+    3 => array('name' => t('Power Grid Feed-in'), 'values' => $feedin, 'labels' => $feedin),
+    4 => array('name' => t('Power Consumption'),  'values' => $agg_consumption, 'colorIds' => array(2, 0)),
+    5 => array('name' => t('Power Production'),   'values' => $agg_production,  'colorIds' => array(3, 0))
+  );
 }
 
 /**
@@ -1570,9 +1602,6 @@ function logger_get_forecast_chart_data($chart) {
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
-
-    //FIXME
-    system("echo $sensor->meter >> /tmp/test.txt");
 
     //If this is a forecast series
     if (strpos($sensor->meter, 'Forecast') === 0) {
@@ -1743,15 +1772,17 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
  * @param $i                 The legend line index.
  * @param $values            The collumn values (Min, Max, Last, Avg, Sum, Operations) (optional).
  * @param $chart_series_ids  An array of chart series ids, associated with this legend line (optional).
+ * @param $colorIds          An array of line colors represented by this legend line (optional).
  * @return the legend line.
  */
-function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array()) {
+function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
 
   $line = array(
     'User' => $username,
     'Sensor' => $function,
     'Type' => $type,
-    'seriesIds' => $chart_series_ids
+    'seriesIds' => $chart_series_ids,
+    'colorIds' => $colorIds
   );
 
   foreach ($values as $title => $value) {
@@ -1769,12 +1800,11 @@ function logger_create_legend_line($username, $function, $type, $i, $values = ar
  * @param $value       The record value.
  * @param $record_time The record time.
  * @param $interval    The chart time interval name.
- * @param $unit        The record value unit (optional).
  * @return the formatted record.
  */
-function logger_format_legend_record($value, $record_time, $interval, $unit = '') {
+function logger_format_legend_record($value, $record_time, $interval, $complement = '') {
 
-  $value = number_format($value, 2, '.', '') . " $unit";
+  $value = number_format($value, 2, '.', '') . (empty($complement) ? '' : " ($complement)");
 
   if ($record_time && $interval) {
     $record_time = strtok($record_time, '<');//Remove tag if it exists
@@ -1975,10 +2005,10 @@ function logger_theme() {
     'logger_color_picker' => array(
       'variables' => array(
         'chartId' => NULL,
-        'index' => NULL,
+        'indexes' => array(),
         'colors' => NULL,
         'seriesIds' => array() 
-      ),
+      )
     )
   );
 }
@@ -2094,6 +2124,7 @@ function theme_logger_bar_chart_area($variables) {
   $chart = $variables['chart'];
   $percentual = $chart->percentual ? 'true' : 'false';
   $data_labels = array();
+  $data_labels2 = array();
   $series = array();
   $names = array();
   $stacks = array();
@@ -2111,9 +2142,18 @@ function theme_logger_bar_chart_area($variables) {
     }
     $names = array_keys($values);
 
-    foreach ($chart->data['labels'] as $function => $typedata) {
-      foreach ($typedata as $type => $values) {
-        $data_labels[] = implode(', ', $values);
+    if (isset($chart->data['labels'])) {
+      foreach ($chart->data['labels'] as $function => $typedata) {
+        foreach ($typedata as $type => $values) {
+          $data_labels[] = implode(', ', $values);
+        }
+      }
+    }
+    if (isset($chart->data['labels2'])) {
+      foreach ($chart->data['labels2'] as $function => $typedata) {
+        foreach ($typedata as $type => $values) {
+          $data_labels2[] = implode(', ', $values);
+        }
       }
     }
   }
@@ -2133,6 +2173,7 @@ function theme_logger_bar_chart_area($variables) {
         ['" . implode("', '", $names) . "'],
         ['" . implode("', '", $chart->colors) . "'],
         [ [ " . implode('], [', $data_labels) . " ] ],
+        [ [ " . implode('], [', $data_labels2) . " ] ],
         [" . implode(", ", $stacks) . "],
         $percentual);
     </script>" .
@@ -2261,11 +2302,12 @@ function logger_create_chart_legend($chart) {
     $lines[$line_id] = array(array(
       'data' => theme('logger_color_picker', array(
         'chartId' => $chart->context,
-        'index' => $line_id,
+        'indexes' => empty($cells['colorIds'])? array($line_id) : $cells['colorIds'],
         'colors' => $chart->colors,
         'seriesIds' => empty($cells['seriesIds']) ? array($line_id) : $cells['seriesIds']
     ))));
     unset($cells['seriesIds']);
+    unset($cells['colorIds']);
 
     foreach ($cells as $title => $value) {
 
@@ -2329,6 +2371,8 @@ function logger_get_series_colors($chart_id) {
     '#B1C800', //GREEN5
     '#A8AFAF', //GRAY3
     '#1F82C0', //BLUE3
+    '#A8AFAF', //GRAY3
+    '#1F82C0'  //BLUE3
   );
 
   $palette = isset($palettes[$chart_id]) ? $palettes[$chart_id] : $palettes['power'];
@@ -2712,26 +2756,39 @@ function theme_logger_time_period($variables) {
 function theme_logger_color_picker($variables) {
 
   $chart_id = $variables['chartId'];
-  $i = $variables['index'];
   $colors = $variables['colors'];
-  $picker_id = 'series_color' . $i;
+  $pickers = '';
+  $created = array();
 
-  $on_change = '';
-  foreach ($variables['seriesIds'] as $series_id) {
-    $on_change .= (empty($on_change) ? '' : ' && ') . "setSeriesColor('$chart_id', $series_id, this.value)";
-  }
+  foreach ($variables['indexes'] as $color_index) {
 
-  return '
-    <input
+    $picker_id = 'series_color' . $color_index;
+
+    //Visible color button
+    $pickers .= '<input
       class="color {valueElement:' . "'$picker_id'" . '}
       type="button"
-      style="width: 10px; height: 10px; color: transparent;"/>
+      style="width: 10px; height: 10px; color: transparent;"/><br>';
 
-    <input
-      id="' . $picker_id . '"
-      type="hidden"
-      value="' . $colors[$i % count($colors)] . '"
-      onchange="javascript: ' . $on_change . ';"/>';
+    if (!in_array($color_index, $created)) {
+
+      //Synchronize picker colors if multiple legend lines refer to the same chart series
+      $on_change = count($variables['indexes']) > 1 ? "syncColorPickers($color_index, this.value)" : 'true';
+
+      foreach ($variables['seriesIds'] as $series_id) {
+        $on_change .= " && setSeriesColor('$chart_id', $series_id, this.value)";
+      }
+
+      //Hidden control button
+      $pickers .= '<input
+        id="' . $picker_id . '"
+        type="hidden"
+        value="' . $colors[$color_index % count($colors)] . '"
+        onchange="javascript: ' . $on_change . ';"/>';
+    }
+    $created[] = $color_index;
+  }
+  return $pickers;
 }
 
 /**
@@ -3444,13 +3501,16 @@ function logger_cron() {
 
   $rest = REQUEST_TIME % HOUR;
 
-  //Run only in the first quarter of an hour
+  //First quarter of an hour
   if ($rest >= 45 * MINUTE) {
     logger_remove_expired_support_requests();
   }
 
-  logger_bind_support_ports();
-  logger_update_support_authorized_keys();
+  //Second quarter of an hour
+  if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
+    logger_bind_support_ports();
+    logger_update_support_authorized_keys();
+  }
 
   //Runs only once a day
   logger_update_pvcast_models();
