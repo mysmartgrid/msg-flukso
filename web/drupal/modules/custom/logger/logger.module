@@ -731,26 +731,8 @@ function logger_overview_page($interval) {
  */
 function logger_relative_energy_consumption_page() {
 
-  global $user;
-
-  $meters = logger_get_variable('selected_meters', array());
-  $all_meters = array();
-
   $types = array(CONSUMPTION_SENSOR_TYPE);
-  $all_sensors = logger_get_sensors($types, array($user->uid));
-
-  $sensors = array();
-  foreach ($all_sensors as $sensor) {
-    $all_meters[] = $sensor->meter;
-    if (isset($meters[$sensor->meter]) && $meters[$sensor->meter]) {
-      $sensors[] = $sensor;
-    }
-  }
-
-  if (empty($sensors)) {
-    $sensors = $all_sensors;
-    logger_set_variable('selected_meters', $all_meters);
-  }
+  $sensors = logger_get_selected_sensors($types);
 
   $introduction = t('The following chart allows you to compare current and previous levels of ' .
     'energy consumption in six different time frames: hour, day, week, month, and year. ' .
@@ -799,11 +781,9 @@ function logger_energy_page($interval) {
  */
 function logger_onsite_page($interval) {
 
-  global $user;
-
-  $interval = logger_check_interval($interval, 'week');
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
-  $sensors = logger_get_sensors($types, array($user->uid));
+  $sensors = logger_get_selected_sensors($types);
+  $interval = logger_check_interval($interval, 'week');
   $title = t('Your on-site energy consumption');
 
   return strrpos($interval, 'hour') === FALSE ?
@@ -1897,15 +1877,15 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
  *
  * @param $types   The types of sensors to be returned.
  * @param $context The chart context.
- * @return the array of user sensors.
+ * @return the array of sensors.
  */
 function logger_get_subscribed_sensors($types, $context) {
 
   global $user;
+
   $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
 
   if (empty($selected_sensors)) {
-
     $selected_sensors = logger_get_sensors($types, array($user->uid), TRUE);
 
     if ($context == 'forecast') {
@@ -1917,10 +1897,38 @@ function logger_get_subscribed_sensors($types, $context) {
         $selected_sensors[] = $forecast;
       }
     }
-
     logger_set_variable($context . '_selected_sensors', $selected_sensors);
   }
   return $selected_sensors;
+}
+
+/**
+ * Returns an array containing all sensors selected by the user to be plotted on the chart.
+ *
+ * @param $types   The types of sensors to be returned.
+ * @return the array of sensors.
+ */
+function logger_get_selected_sensors($types) {
+
+  global $user;
+
+  $meters = logger_get_variable('selected_meters', array());
+  $all_meters = array();
+  $all_sensors = logger_get_sensors($types, array($user->uid));
+
+  $sensors = array();
+  foreach ($all_sensors as $sensor) {
+    $all_meters[] = $sensor->meter;
+    if (isset($meters[$sensor->meter]) && $meters[$sensor->meter]) {
+      $sensors[] = $sensor;
+    }
+  }
+
+  if (empty($sensors)) {
+    $sensors = $all_sensors;
+    logger_set_variable('selected_meters', $all_meters);
+  }
+  return $sensors;
 }
 
 /**
@@ -2556,7 +2564,7 @@ function logger_barchart_form($form, &$form_state, $chart) {
     '#options' => $meter_options,
     '#required' => TRUE,
     '#attributes' => array('onclick' => $submit_js), //In IE, onchange does not work
-    '#access' => $chart->context == 'relative'
+    '#access' => $chart->context != 'energy'
   );
   return $form;
 }

@@ -702,8 +702,7 @@ function showBarDataLabels(plot, stacks, dataLabels, barWidth, yOffset) {
   for (var d = 0; d < series.length; d++) {
 
     if (dataLabels[d] != undefined) { 
-
-      jQuery.each(series[d].data,
+        jQuery.each(series[d].data,
 
         function(i, point) {
 
