@@ -1333,14 +1333,14 @@ function logger_get_onsite_chart_data($chart) {
       }
       $chart_series_ids = isset($series['chartSeriesIds']) ? $series['chartSeriesIds'] : array();
       $color_ids = isset($series['colorIds']) ? $series['colorIds'] : array();
-      $data['legend'][$line_id] = logger_create_legend_line($user->name, t('All'), $name, $line_id, $cells, $chart_series_ids, $color_ids);
+      $data['legend'][$line_id] = logger_create_legend_line($user->name, NULL, $name, $line_id, $cells, $chart_series_ids, $color_ids);
     }
 
     foreach ($labels2 as $time => $value) {
-      $data['labels2'][t('All')][$name][$time] = "'" . str_repeat('&nbsp;', 10) . "$value%'";
+      $data['labels2'][0][$name][$time] = "'" . str_repeat('&nbsp;', 10) . "$value%'";
     }
-    $data['series'][$user->uid][$user->name][t('All')][$name] = $series['values'];
-    $data['labels'][t('All')][$name] = $labels;
+    $data['series'][$user->uid][$user->name][0][$name] = $series['values'];
+    $data['labels'][0][$name] = $labels;
   }
   return $data;
 }
@@ -1747,7 +1747,7 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
  * Creates a line for the energy consumption chart legend.
  *
  * @param $username          The user name.
- * @param $function          The sensor function.
+ * @param $function          The sensor function (not displayed if NULL).
  * @param $type              The sensor type.
  * @param $i                 The legend line index.
  * @param $values            The collumn values (Min, Max, Last, Avg, Sum, Operations) (optional).
@@ -1757,14 +1757,17 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
  */
 function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
 
-  $line = array(
-    'User' => $username,
-    'Sensor' => $function,
-    'Type' => $type,
-    'seriesIds' => $chart_series_ids,
-    'colorIds' => $colorIds
-  );
+  $line = array();
+  $line['User'] = $username;
 
+  if ($function != NULL) {
+    $line['Sensor'] = $function;
+  }
+
+  $line['Type'] = $type;
+  $line['seriesIds'] = $chart_series_ids;
+  $line['colorIds'] = $colorIds;
+  
   foreach ($values as $title => $value) {
     $id = strtolower("$title$i");
     $value = is_numeric($value) ? ($value == 0 ? '' : number_format($value, 2, '.', '')) : $value;
