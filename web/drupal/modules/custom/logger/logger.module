@@ -1431,8 +1431,8 @@ function logger_get_onsite_chart_series($chart) {
     1 => array('name' => '',                      'values' => $onsite),
     2 => array('name' => t('Power Grid Supply'),  'values' => $supply, 'labels' => $supply),
     3 => array('name' => t('Power Grid Feed-in'), 'values' => $feedin, 'labels' => $feedin),
-    4 => array('name' => t('Power Consumption'),  'values' => $agg_consumption, 'colorIds' => array(2, 0)),
-    5 => array('name' => t('Power Production'),   'values' => $agg_production,  'colorIds' => array(3, 0))
+    4 => array('name' => t('Energy Consumption'), 'values' => $agg_consumption, 'colorIds' => array(2, 0)),
+    5 => array('name' => t('Energy Production'),  'values' => $agg_production,  'colorIds' => array(3, 0))
   );
 }
 
@@ -2580,6 +2580,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
   $on_change_js = 'submitLineChartForm()';
   $form = logger_create_chart_form($form, $on_change_reset_js, $chart);
   $resolutions = $chart->context == 'forecast' ? array(HOUR => t('Hour')) : logger_get_resolutions_options();
+  $meter_options = logger_get_meters_options($chart->types);
 
   $form['new_user'] = array(
     '#type' => 'select',
@@ -2649,6 +2650,17 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#required' => TRUE,
     '#attributes' => array('onchange' => $on_change_js),
     '#access' => $chart->context != 'onsite'
+  );
+
+  $form['selected_meters'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Sensors'),
+    '#description' => t('Select the sensors you want to plot on the chart.'),
+    '#default_value' => logger_get_variable('selected_meters', array_keys($meter_options)),
+    '#options' => $meter_options,
+    '#required' => TRUE,
+    '#attributes' => array('onclick' => $on_change_js), //In IE, onchange does not work
+    '#access' => $chart->context == 'onsite'
   );
   return $form;
 }
@@ -2923,6 +2935,9 @@ function logger_linechart_form_submit($form, &$form_state) {
 
   if (isset($form_state['values']['new_user']) && $form_state['values']['new_user'] > 0) {
     logger_add_user_series($form_state['values']['new_user'], 'power'); //FIXME: read context from form field
+  }
+  if (isset($form_state['values']['selected_meters'])) {
+    logger_set_variable('selected_meters', $form_state['values']['selected_meters']);
   }
 
   logger_set_variable('step_plot', $form_state['values']['step_plot']);
