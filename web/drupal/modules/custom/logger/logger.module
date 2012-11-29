@@ -2796,8 +2796,7 @@ function theme_logger_color_picker($variables) {
     if (!in_array($color_index, $created)) {
 
       //Synchronize picker colors if multiple legend lines refer to the same chart series
-      $on_change = count($variables['indexes']) > 1 ? "syncColorPickers($color_index, this.value)" : 'true';
-
+      $on_change = "syncColorPickers($color_index, this.value)";
       foreach ($variables['seriesIds'] as $series_id) {
         $on_change .= " && setSeriesColor('$chart_id', $series_id, this.value)";
       }
