@@ -495,7 +495,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   }
 
   if (isset($filter['device'])) {
-    $query->condition('d.device', $filter['device'], '=');
+    $query->condition('d.device', $filter['device'] . '%', 'LIKE');
   }
 
   if (isset($filter['type_id']) && $filter['type_id'] > 0) {
