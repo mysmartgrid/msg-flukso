@@ -769,19 +769,10 @@ function notification_newsletter_form($form) {
     '#element_validate' => array('notification_email_validate'),
   );
 
-  $form['firstname'] = array(
+  $form['fullname'] = array(
     '#type' => 'textfield',
-    '#title' => t('First Name'),
-    '#description' => t('Enter your first name.'),
-    '#maxlength' => 20,
-    '#required' => 1,
-    '#size' => 20,
-  );
-
-  $form['lastname'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Last Name'),
-    '#description' => t('Enter your last name.'),
+    '#title' => t('Name'),
+    '#description' => t('Enter your full name.'),
     '#maxlength' => 20,
     '#required' => 1,
     '#size' => 20,
@@ -901,34 +892,31 @@ function notification_edition_form_submit($form, &$form_state) {
 
 function notification_newsletter_form_submit($form, &$form_state) {
 
-  $email     = $form_state['values']['email'];
-  $firstname = $form_state['values']['firstname'];
-  $lastname  = $form_state['values']['lastname'];
+  $url = 'http://listserv.mysmartgrid.de/mailman/subscribe/Newsletter';
 
-  $url = 'http://www.eor.de/fileadmin/verwaltung/mysmartgrid.php' .
-    '?email=' . urlencode($email) .
-    '&firstname=' . urlencode($firstname) .
-    '&surname=' . urlencode($lastname);
+  $headers = array('Content-Type' => 'application/x-www-form-urlencoded');
 
-  //For testing, uncomment the following line
-  //$url .= '&test=1';
+  $data = array(
+    'email' => $form_state['values']['email'],
+    'fullname' => $form_state['values']['fullname'],
+    'digest' => '0'
+  );
 
-  $request = drupal_http_request($url);
-  $response = $request->data;
+  $response = drupal_http_request($url, array(
+    'headers' => $headers,
+    'method' => 'POST',
+    'data' => http_build_query($data)
+  ));
 
-  if ($response == "RECORD_CREATED") {
+  if ($response->code == 200) {
 
     drupal_set_message(t('Almost Finished... We need to confirm your email address. ' .
       'To complete the subscription process, please click the link in the email we just sent you.'));
   }
-  elseif ($response == "RECORD_UPDATED") {
-
-    drupal_set_message(t('The e-mail address was already present in the database. The user data has been updated.'));
-  }
   else {
     drupal_set_message(t('Our apologies. The newsletter subscription is temporarily unavailable. Please, try again later.'));
 
-    notification_send_system_error_email('newsletter', $response, urlencode($url));
+    notification_send_system_error_email('newsletter', $response->code, urlencode($url));
   }
 }
 
@@ -1253,21 +1241,25 @@ function notification_cron() {
   notification_send_communication_restored_emails();
   notification_send_peak_consumption_emails();
 
-  //Run only in the third quarter of an hour
+  //First quarter of an hour
+  if ($rest >= 45) {
+    notification_eventlog_clear_old();
+  }
+
+  //Second quarter of an hour
   if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
     notification_send_corrupted_message_emails();
     notification_send_measurement_anomaly_emails();
   }
 
-  //Run only in the second quarter of an hour
+  //Third quarter of an hour
   if ($rest < 30 * MINUTE && $rest >= 15 * MINUTE) {
     notification_send_forecast_report_emails();
   }
 
-  //Run only in the first quarter of an hour
+  //Fourth quarter of an hour
   if ($rest < 15 * MINUTE) {
     notification_send_summary_report_emails();
-    notification_eventlog_clear_old();
   }
 }
 
