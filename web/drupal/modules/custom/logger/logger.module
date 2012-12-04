@@ -1397,6 +1397,8 @@ function logger_get_onsite_chart_series($chart) {
     }
     if (!isset($consumed[$time])) {
       $consumed[$time] = 0;
+    }
+    if (!isset($produced[$time])) {
       $produced[$time] = 0;
     }
 
