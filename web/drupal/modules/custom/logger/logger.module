@@ -1760,10 +1760,10 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
 function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
 
   $line = array();
-  $line['User'] = $username;
+  $line['User'] = wordwrap($username, 10, "<br>", TRUE);
 
   if ($function != NULL) {
-    $line['Sensor'] = $function;
+    $line['Sensor'] = wordwrap($function, 8, "<br>", TRUE);
   }
 
   $line['Type'] = $type;
