@@ -1889,22 +1889,49 @@ function logger_get_subscribed_sensors($types, $context) {
   global $user;
 
   $selected_sensors = logger_get_variable($context . '_selected_sensors', array());
+  $uids = array();
+  foreach ($selected_sensors as $sensor) {
+    $uids[$sensor->uid] = $sensor->uid;
+  }
+  $sensors = logger_get_sensors($types, $uids, TRUE);
 
-  if (empty($selected_sensors)) {
-    $selected_sensors = logger_get_sensors($types, array($user->uid), TRUE);
-
-    if ($context == 'forecast') {
-
-      foreach ($selected_sensors as $sensor) {
-        $forecast = clone $sensor;
-        $forecast->meter = 'Forecast' . $sensor->meter;
-        $forecast->function = $sensor->function . ' (' . t('Forecast') . ')';
-        $selected_sensors[] = $forecast;
-      }
+  if ($context == 'forecast') {
+    foreach ($sensors as $sensor) {
+      $forecast = clone $sensor;
+      $forecast->meter = 'Forecast' . $sensor->meter;
+      $forecast->function = $sensor->function . ' (' . t('Forecast') . ')';
+      $sensors[] = $forecast;
     }
+  }
+
+  $new_sensors = array();
+  $diff = array_udiff($sensors, $selected_sensors, 'logger_compare_sensors');
+  foreach ($diff as $new_sensor) {
+    if ($new_sensor->uid == $user->uid) {
+      $new_sensors[] = $new_sensor;
+    }
+  }
+
+  $selected_sensors = array_merge($selected_sensors, $new_sensors);
+  $removed_sensors = array_udiff($selected_sensors, $sensors, 'logger_compare_sensors');
+  $selected_sensors = array_udiff($selected_sensors, $removed_sensors, 'logger_compare_sensors');
+
+  if (!empty($new_sensors) || !empty($removed_sensors)) {
     logger_set_variable($context . '_selected_sensors', $selected_sensors);
   }
+
   return $selected_sensors;
+}
+
+function logger_compare_sensors($sensor1, $sensor2) {
+
+  if ($sensor1->meter === $sensor2->meter) {
+    if ($sensor1->function === $sensor2->function) {
+      return 0;
+    }
+    return ($sensor1->function > $sensor2->function) ? 1 : -1;
+  }
+  return ($sensor1->meter > $sensor2->meter) ? 1 : -1;
 }
 
 /**
