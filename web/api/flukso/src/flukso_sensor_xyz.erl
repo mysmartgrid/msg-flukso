@@ -28,7 +28,8 @@
          is_authorized/2,
          content_types_provided/2,
          to_json/2,
-         process_post/2]).
+         process_post/2,
+         delete_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
@@ -44,13 +45,14 @@ init(Config) ->
 
 
 allowed_methods(ReqData, State) ->
-    {['POST', 'GET'], ReqData, State}.
+    {['POST', 'GET', 'DELETE'], ReqData, State}.
 
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> malformed_POST(ReqData, State);
-        'GET'  -> malformed_GET(ReqData, State)
+        'POST'   -> malformed_POST(ReqData, State);
+        'GET'    -> malformed_GET(ReqData, State);
+        'DELETE' -> malformed_DELETE(ReqData, State)
     end.
 
 
@@ -100,11 +102,26 @@ malformed_GET(ReqData, _State) ->
      end, 
     ReqData, State}.
 
+malformed_DELETE(ReqData, _State) ->
+    io:fwrite("malformed_DELETE sensor\n"),
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+
+    State = #state{rrdSensor = RrdSensor, digest = Digest},
+
+    {case {ValidVersion, ValidSensor, ValidDigest} of
+        {true, true, true} -> false;
+        _ -> true
+     end,
+    ReqData, State}.
 
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> is_auth_POST(ReqData, State);
-        'GET'  -> is_auth_GET(ReqData, State)
+        'POST'   -> is_auth_POST(ReqData, State);
+        'GET'    -> is_auth_GET(ReqData, State);
+        'DELETE' -> is_auth_DELETE(ReqData, State)
     end.
 
 
@@ -142,6 +159,26 @@ is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
         _Permission -> "Access refused" 
     end,
     ReqData, State}.
+
+
+is_auth_DELETE(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
+    io:fwrite("is_auth_DELETE sensor\n"),
+
+    {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
+
+    case mysql:get_result_rows(Result) of
+
+      %Sensor is found
+      [[_Key]] ->
+        Key = _Key,
+        Auth = check_digest(Key, ReqData, ClientDigest);
+
+      %Sensor is not found %TODO: improve this function
+      _ ->
+        Auth = true 
+    end,
+
+    {Auth, ReqData, State}.
 
 
 content_types_provided(ReqData, State) -> 
@@ -406,3 +443,10 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
       {error, error}
   end.
 
+delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
+    io:fwrite("delete_resource sensor\n"),
+
+    mysql:execute(pool, sensor_delete, [RrdSensor]), 
+
+    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.

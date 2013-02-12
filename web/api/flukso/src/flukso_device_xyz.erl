@@ -129,14 +129,6 @@ process_post(ReqData, #state{device = Device} = State) ->
 
     IsDescriptionInformed = proplists:is_defined(<<"description">>, JsonData),
 
-    if
-      IsDescriptionInformed == true ->
-        Description = proplists:get_value(<<"description">>, JsonData);
-
-      true ->
-        Description = OldDescription
-    end,
-
     case mysql:get_result_rows(Result) of
 
       %Device exists
@@ -183,6 +175,14 @@ process_post(ReqData, #state{device = Device} = State) ->
             FirmwareVersion = OldFirmwareVersion
         end,
 
+        if
+          IsDescriptionInformed == true ->
+            Description = proplists:get_value(<<"description">>, JsonData);
+
+          true ->
+            Description = OldDescription
+        end,
+
         mysql:execute(pool, device_update,
           [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Description, Device]),
 
@@ -194,6 +194,14 @@ process_post(ReqData, #state{device = Device} = State) ->
         Serial = Timestamp,
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
+
+        if
+          IsDescriptionInformed == true ->
+            Description = proplists:get_value(<<"description">>, JsonData);
+
+          true ->
+            Description = "Flukso Device"
+        end,
 
         mysql:execute(pool, device_insert,
           [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description])
