@@ -26,7 +26,8 @@
          allowed_methods/2,
          malformed_request/2,
          is_authorized/2,
-         process_post/2]).
+         process_post/2,
+         delete_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
@@ -41,12 +42,13 @@ init(Config) ->
 
 
 allowed_methods(ReqData, State) ->
-    {['POST'], ReqData, State}.
+    {['POST', 'DELETE'], ReqData, State}.
 
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> malformed_POST(ReqData, State)
+        'POST'   -> malformed_POST(ReqData, State);
+        'DELETE' -> malformed_DELETE(ReqData, State)
     end.
 
 
@@ -74,9 +76,27 @@ malformed_POST(ReqData, _State) ->
     ReqData, State}.
 
 
+malformed_DELETE(ReqData, _State) ->
+    io:fwrite("malformed_DELETE device\n"),
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)
+),
+
+    State = #state{device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidDevice, ValidDigest} of
+        {true, true, true} -> false;
+        _ -> true
+     end,
+    ReqData, State}.
+
+
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> is_auth_POST(ReqData, State)
+        'POST'   -> is_auth_POST(ReqData, State);
+        'DELETE' -> is_auth_DELETE(ReqData, State)
     end.
 
 
@@ -97,6 +117,26 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
     end,   
 
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+
+
+is_auth_DELETE(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+    io:fwrite("is_auth_DELETE device\n"),
+
+    {data, Result} = mysql:execute(pool, device_key, [Device]),
+
+    case mysql:get_result_rows(Result) of
+
+      %If device is found
+      [[_Key]] ->
+        Key = _Key,
+        DigestCheck = check_digest(Key, ReqData, ClientDigest);
+
+      %If device does not exist. %TODO: return proper message
+      _ ->
+        DigestCheck = true 
+    end,
+
+    {DigestCheck, ReqData, State}.
 
 
 %
@@ -249,3 +289,12 @@ compose_support_tag(Device) ->
 
       _ -> []
     end.
+
+
+delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+    io:fwrite("delete_resource device\n"),
+
+    mysql:execute(pool, device_delete, [Device]),
+
+    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
