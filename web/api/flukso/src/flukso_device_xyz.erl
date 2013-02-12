@@ -127,10 +127,20 @@ process_post(ReqData, #state{device = Device} = State) ->
     Timestamp = unix_time(),
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
+    IsDescriptionInformed = proplists:is_defined(<<"description">>, JsonData),
+
+    if
+      IsDescriptionInformed == true ->
+        Description = proplists:get_value(<<"description">>, JsonData);
+
+      true ->
+        Description = OldDescription
+    end,
+
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets, OldFirmwareVersion]] ->
+      [[Key, Upgrade, Resets, OldFirmwareVersion, OldDescription]] ->
 
         IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
 
@@ -174,7 +184,7 @@ process_post(ReqData, #state{device = Device} = State) ->
         end,
 
         mysql:execute(pool, device_update,
-          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Device]),
+          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Description, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -186,7 +196,7 @@ process_post(ReqData, #state{device = Device} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
 
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
+          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description])
     end,
 
     Support = compose_support_tag(Device),
