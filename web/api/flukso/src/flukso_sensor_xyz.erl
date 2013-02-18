@@ -446,7 +446,10 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
 delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
     io:fwrite("delete_resource sensor\n"),
 
-    mysql:execute(pool, sensor_delete, [RrdSensor]), 
+    mysql:execute(pool, msgdump_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_agg_delete, [RrdSensor]),
+    mysql:execute(pool, token_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_delete, [RrdSensor]),
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
     {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
