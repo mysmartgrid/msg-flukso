@@ -294,7 +294,24 @@ compose_support_tag(Device) ->
 delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
     io:fwrite("delete_resource device\n"),
 
+    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+
+    Sensors = mysql:get_result_rows(_Result),
+    Deleted = [delete_device_sensor(Sensor) || [Sensor] <- Sensors],
+
+    mysql:execute(pool, event_delete, [Device]),
+    mysql:execute(pool, notification_delete, [Device]),
+    mysql:execute(pool, support_slot_release, [Device]),
     mysql:execute(pool, device_delete, [Device]),
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
     {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+
+
+delete_device_sensor(Sensor) ->
+
+  mysql:execute(pool, msgdump_delete, [Sensor]),
+  mysql:execute(pool, sensor_agg_delete, [Sensor]),
+  mysql:execute(pool, token_delete, [Sensor]),
+  mysql:execute(pool, sensor_delete, [Sensor]),
+  {ok}.
