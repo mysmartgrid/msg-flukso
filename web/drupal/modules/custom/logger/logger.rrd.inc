@@ -219,7 +219,15 @@ function logger_rrd_latest_timestamp($sensor, $appliance_id = NULL) {
   if (file_exists($file_path)) {
 
     $command = RRDTOOL . " last $file_path";
-    exec($command, $lines);
+    $lines = array();
+    $error = 0;
+    exec($command, $lines, $error);
+
+    if ($error != 0) {
+      watchdog('logger.rrd.last', "Error executing rrd command: last. Return code: %error", array('%error' => $error), WATCHDOG_ERROR);
+      return 0;
+    }
+
     return $lines[0];
   }
   else {
@@ -451,7 +459,13 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
   //save_file('/tmp/rrd.command.txt', $command);
 
   $lines = array();
-  exec($command, $lines);
+  $error = 0;
+  exec($command, $lines, $error);
+
+  if ($error != 0) {
+    watchdog('logger.rrd.export', "Error executing rrd command: export. Return code: %error", array('%error' => $error), WATCHDOG_ERROR);
+    return array();
+  }
 
   return logger_rrd_parse_exported_lines($lines);
 }
