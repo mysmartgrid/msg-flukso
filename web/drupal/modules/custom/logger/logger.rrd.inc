@@ -427,6 +427,8 @@ function logger_rrd_file($meter, $appliance_id = NULL) {
  */
 function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period, $step) {
 
+  global $user;
+
   if (!$def) {
     return array();
   }
