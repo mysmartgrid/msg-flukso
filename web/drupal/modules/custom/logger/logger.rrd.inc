@@ -455,12 +455,20 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     "$def " .
     "XPORT:$exported_cdef";
 
-  //DEBUG
-  //save_file('/tmp/rrd.command.txt', $command);
+  //Function exec() is unable to execute long commands
+  if (strlen($command) > 102400) {
+    $script_path = '/tmp/rrd.' . $user->uid . '.' . REQUEST_TIME . '.sh';
+    save_file($script_path, "#!/bin/bash\n" . $command);
+    $command = "/bin/sh $script_path";
+  }
 
   $lines = array();
   $error = 0;
   exec($command, $lines, $error);
+
+  if (isset($script_path)) {
+    unlink($script_path);
+  }
 
   if ($error != 0) {
     watchdog('logger.rrd.export', "Error executing rrd command: export. Return code: %error", array('%error' => $error), WATCHDOG_ERROR);
