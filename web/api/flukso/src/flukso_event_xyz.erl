@@ -51,6 +51,7 @@ malformed_request(ReqData, State) ->
 
 
 malformed_POST(ReqData, _State) ->
+
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
     {Event, ValidEvent} = check_event(wrq:path_info(event, ReqData)),
@@ -93,11 +94,11 @@ is_auth_POST(ReqData, #state{event = Event, device = Device, digest = ClientDige
 % Mochijson2: {struct,[{<<"device">>,   "01234567890123456789012345678901"}]}
 %
 process_post(ReqData, #state{event = Event, device = Device} = State) ->
+
     {data, Result} = mysql:execute(pool, device_props, [Device]),
-    [[Key, Upgrade, Resets, FirmwareVersion]] = mysql:get_result_rows(Result),
+    [[Key, Upgrade, Resets, FirmwareVersion, Description]] = mysql:get_result_rows(Result),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-
     Timestamp = unix_time(),
 
     mysql:execute(pool, event_insert, [Device, Event, Timestamp]),

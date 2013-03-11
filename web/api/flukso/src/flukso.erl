@@ -44,7 +44,7 @@ mysql_prepare() ->
 
     mysql:prepare(sensor_key, <<"SELECT sha FROM (logger_devices ld INNER JOIN logger_meters lm ON ld.device = lm.device) WHERE lm.meter = ?">>),
     mysql:prepare(sensor_props, <<"SELECT uid, device FROM logger_meters WHERE meter = ?">>),
-    mysql:prepare(device_sensors, <<"SELECT meter FROM logger_meters WHERE device = ?">>),
+    mysql:prepare(device_sensors, <<"SELECT meter, function FROM logger_meters WHERE device = ?">>),
     mysql:prepare(sensor_update, <<"UPDATE logger_meters SET access = ?, value = ? WHERE meter = ?">>),
     mysql:prepare(sensor_delete, <<"DELETE FROM logger_meters WHERE meter = ?">>),
     mysql:prepare(sensor_agg, <<"SELECT meter FROM logger_aggregated_meters WHERE virtual_meter = ?">>),
@@ -54,7 +54,7 @@ mysql_prepare() ->
     %TODO: mysql:prepare(sensor_config, <<"UPDATE logger_meters SET class = ?, type = ?, function = ?, voltage = ?, current = ?, phase = ?, constant = ?, enabled = ? WHERE meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version, description FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_version = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_upgrade_update, <<"UPDATE logger_devices SET upgrade = ? WHERE device = ?">>),
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),

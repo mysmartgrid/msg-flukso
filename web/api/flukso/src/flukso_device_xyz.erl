@@ -26,6 +26,8 @@
          allowed_methods/2,
          malformed_request/2,
          is_authorized/2,
+         content_types_provided/2,
+         to_json/2,
          process_post/2,
          delete_resource/2]).
 
@@ -42,17 +44,19 @@ init(Config) ->
 
 
 allowed_methods(ReqData, State) ->
-    {['POST', 'DELETE'], ReqData, State}.
+    {['POST', 'GET', 'DELETE'], ReqData, State}.
 
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST'   -> malformed_POST(ReqData, State);
+        'GET'    -> malformed_GET(ReqData, State);
         'DELETE' -> malformed_DELETE(ReqData, State)
     end.
 
 
 malformed_POST(ReqData, _State) ->
+
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
@@ -76,14 +80,11 @@ malformed_POST(ReqData, _State) ->
     ReqData, State}.
 
 
-malformed_DELETE(ReqData, _State) ->
-    io:fwrite("malformed_DELETE device\n"),
+malformed_GET(ReqData, _State) ->
 
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)
-),
-
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
     State = #state{device = Device, digest = Digest},
 
     {case {ValidVersion, ValidDevice, ValidDigest} of
@@ -93,10 +94,25 @@ malformed_DELETE(ReqData, _State) ->
     ReqData, State}.
 
 
+malformed_DELETE(ReqData, _State) ->
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+
+    State = #state{device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidDevice, ValidDigest} of
+        {true, true, true} -> false;
+        _ -> true
+    end, ReqData, State}.
+
+
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST'   -> is_auth_POST(ReqData, State);
-        'DELETE' -> is_auth_DELETE(ReqData, State)
+        'GET'    -> is_auth_GET(ReqData, State);
+        'DELETE' -> is_auth_GET(ReqData, State)
     end.
 
 
@@ -104,39 +120,61 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    case mysql:get_result_rows(Result) of
+    Key = case mysql:get_result_rows(Result) of
 
       %If device is found, use the key stored in the database
-      [[_Key]] ->
-        Key = _Key;
+      [[_Key]] -> _Key;
 
       %Otherwise, use key informed in the request
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-        Key = proplists:get_value(<<"key">>, JsonData)
+        proplists:get_value(<<"key">>, JsonData)
     end,   
 
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
-is_auth_DELETE(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
-    io:fwrite("is_auth_DELETE device\n"),
+is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    case mysql:get_result_rows(Result) of
+    {case mysql:get_result_rows(Result) of
 
-      %If device is found
-      [[_Key]] ->
-        Key = _Key,
-        DigestCheck = check_digest(Key, ReqData, ClientDigest);
+      %If device is found, use the key stored in the database
+      [[Key]] ->
+           check_digest(Key, ReqData, ClientDigest);
 
-      %If device does not exist. %TODO: return proper message
-      _ ->
-        DigestCheck = true 
+      %Otherwise, return false
+      _ -> false
+
+    end, ReqData, State}.
+
+
+content_types_provided(ReqData, State) ->
+    {[{"application/json", to_json}], ReqData, State}.
+
+
+to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State) ->
+
+    {data, Result} = mysql:execute(pool, device_props, [Device]),
+    [[Key, Upgrade, Resets, FirmwareVersion, Description]] = mysql:get_result_rows(Result),
+
+    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+    _Sensors = mysql:get_result_rows(_Result),
+
+    Sensors = [{struct, [
+        {<<"meter">>, Meter},
+        {<<"function">>, Function}]} || [Meter, Function] <- _Sensors],
+
+    Encoded = mochijson2:encode({struct, [
+              {<<"description">>, Description},
+              {<<"sensors">>, Sensors}]}),
+
+    {case JsonpCallback of
+        undefined -> Encoded;
+            _ -> [JsonpCallback, "(", Encoded, ");"]
     end,
-
-    {DigestCheck, ReqData, State}.
+    ReqData, State}.
 
 
 %
@@ -162,6 +200,7 @@ is_auth_DELETE(ReqData, #state{device = Device, digest = ClientDigest} = State) 
 % Mochijson2: {struct,[{<<"key">>, 12345678901234567890123456789012}]}
 %
 process_post(ReqData, #state{device = Device} = State) ->
+
     {data, Result} = mysql:execute(pool, device_props, [Device]),
 
     Timestamp = unix_time(),
@@ -292,12 +331,11 @@ compose_support_tag(Device) ->
 
 
 delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
-    io:fwrite("delete_resource device\n"),
 
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
 
     Sensors = mysql:get_result_rows(_Result),
-    Deleted = [delete_device_sensor(Sensor) || [Sensor] <- Sensors],
+    [delete_device_sensor(Meter) || [Meter, Function] <- Sensors],
 
     mysql:execute(pool, event_delete, [Device]),
     mysql:execute(pool, notification_delete, [Device]),
@@ -314,4 +352,5 @@ delete_device_sensor(Sensor) ->
   mysql:execute(pool, sensor_agg_delete, [Sensor]),
   mysql:execute(pool, token_delete, [Sensor]),
   mysql:execute(pool, sensor_delete, [Sensor]),
-  {ok}.
+
+  file:delete(string:concat(?BASE_PATH, string:concat(binary_to_list(Sensor), ".rrd"))).

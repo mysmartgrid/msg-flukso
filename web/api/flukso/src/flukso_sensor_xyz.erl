@@ -57,7 +57,6 @@ malformed_request(ReqData, State) ->
 
 
 malformed_POST(ReqData, _State) ->
-    io:fwrite("malformed_POST sensor\n"),
 
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
@@ -73,6 +72,7 @@ malformed_POST(ReqData, _State) ->
 
 
 malformed_GET(ReqData, _State) ->
+
     {_Version, ValidVersion} = check_version(
       wrq:get_req_header("X-Version", ReqData), 
       wrq:get_qs_value("version", ReqData)),
@@ -83,9 +83,19 @@ malformed_GET(ReqData, _State) ->
       wrq:get_qs_value("end", ReqData), 
       wrq:get_qs_value("resolution", ReqData)),
     {RrdFactor, ValidUnit} = check_unit(wrq:get_qs_value("unit", ReqData)),
-    {Token, ValidToken} = check_token(
-      wrq:get_req_header("X-Token", ReqData),
-      wrq:get_qs_value("token", ReqData)),
+
+    TokenHeader = wrq:get_req_header("X-Token", ReqData),
+    {Token, ValidToken} = case TokenHeader of
+      undefined -> {undefined, true};
+      _ -> check_token(TokenHeader, wrq:get_qs_value("token", ReqData))
+    end,
+
+    DigestHeader = wrq:get_req_header("X-Digest", ReqData),    
+    {Digest, ValidDigest} = case DigestHeader of
+      undefined -> {undefined, true};
+      _ -> check_digest(DigestHeader)
+    end,
+
     {JsonpCallback, ValidJsonpCallback} = check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)),
 
     State = #state{rrdSensor = RrdSensor, 
@@ -94,16 +104,16 @@ malformed_GET(ReqData, _State) ->
                    rrdResolution = RrdResolution,
                    rrdFactor = RrdFactor,
                    token = Token,
+                   digest = Digest,
                    jsonpCallback = JsonpCallback},
 
-    {case {ValidVersion, ValidSensor, ValidTime, ValidUnit, ValidToken, ValidJsonpCallback}  of
-	{true, true, true, true, true, true} -> false;
+    {case {ValidVersion, ValidSensor, ValidTime, ValidUnit, ValidToken, ValidDigest, ValidJsonpCallback} of
+	{true, true, true, true, true, true, true} -> false;
 	_ -> true
      end, 
     ReqData, State}.
 
 malformed_DELETE(ReqData, _State) ->
-    io:fwrite("malformed_DELETE sensor\n"),
 
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
@@ -126,7 +136,6 @@ is_authorized(ReqData, State) ->
 
 
 is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
-    io:fwrite("is_auth_POST sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
@@ -149,20 +158,27 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
-is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
-    io:fwrite("is_auth_GET sensor\n"),
+is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token, digest = ClientDigest} = State) ->
 
-    {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
+    {case ClientDigest of
+      undefined ->
+      {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
+        case mysql:get_result_rows(Result) of
+          [[62]] -> true;
+          _Permission -> "Access refused"
+        end;
 
-    {case mysql:get_result_rows(Result) of
-        [[62]] -> true;
-        _Permission -> "Access refused" 
+      _ ->
+        {data, Result} = mysql:execute(pool, sensor_key, [RrdSensor]),
+        case mysql:get_result_rows(Result) of
+          [[Key]] -> check_digest(Key, ReqData, ClientDigest);
+          _ -> false
+        end
     end,
     ReqData, State}.
 
 
 is_auth_DELETE(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
-    io:fwrite("is_auth_DELETE sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
@@ -182,11 +198,10 @@ is_auth_DELETE(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = Stat
 
 
 content_types_provided(ReqData, State) -> 
-        {[{"application/json", to_json}], ReqData, State}.
+    {[{"application/json", to_json}], ReqData, State}.
 
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
-
     case wrq:get_qs_value("interval", ReqData) of
         _Interval -> Path = ?BASE_PATH
     end,
@@ -255,7 +270,6 @@ query_sensor(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor) ->
 
 
 process_post(ReqData, State) ->
-    io:fwrite("process_post sensor\n"),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     Payload = {
@@ -284,7 +298,6 @@ process_post(ReqData, State) ->
 % Mochijson2: {struct,[{<<"config">>, {struct,[{<<"device">>,<<"12345678901234567890123456789012">>}, {<<"type">>,<<"electricity">>}, ... ]} }]}
 %
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
-    io:fwrite("process_config sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
 
@@ -341,7 +354,6 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
 %
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
-    io:fwrite("process_measurements sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
 
@@ -355,22 +367,17 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
         case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
           % valid
           {ok, Response} ->
-            %io:fwrite(string:concat(string:concat("rrdtool last successfull : ", integer_to_list(RrdTimestamp)), "\n"));
             RrdTimestamp = Response;
 
           % error
           {error, Reason} ->
-            %io:fwrite("rrdtool last failed\n"),
             RrdTimestamp = 1
           end,
-
-          %io:fwrite(string:concat(string:concat("process_measurements timestamps: ", integer_to_list(RrdTimestamp)), "\n")),
 
           case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) of
 
             %Measurements are valid
             {ok, RrdData} ->
-
               %debugging
               %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
               %logger(Uid, <<"rrdupdate.base">>,
@@ -435,6 +442,7 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
         %end,
 
         {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
+
       _ ->
         {error, Measurements} 
     end
@@ -444,7 +452,6 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
   end.
 
 delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
-    io:fwrite("delete_resource sensor\n"),
 
     mysql:execute(pool, msgdump_delete, [RrdSensor]),
     mysql:execute(pool, sensor_agg_delete, [RrdSensor]),

@@ -52,6 +52,7 @@ malformed_request(ReqData, State) ->
 
 
 malformed_GET(ReqData, _State) ->
+
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(firmware, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
@@ -72,7 +73,6 @@ is_authorized(ReqData, State) ->
 
 
 is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
-    io:fwrite("is_auth_GET firmware\n"),
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
@@ -88,13 +88,12 @@ content_types_provided(ReqData, State) ->
 
 
 to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
-    io:fwrite("to_json firmware\n"),
 
     {data, Result} = mysql:execute(pool, device_props, [Device]),
 
     case mysql:get_result_rows(Result) of
 
-      [[Key, Upgrade, Resets, CurrentVersion]] ->
+      [[Key, Upgrade, Resets, CurrentVersion, Description]] ->
 
         if
           Upgrade > 0 ->
