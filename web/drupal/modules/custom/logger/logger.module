@@ -995,7 +995,7 @@ function logger_download_chart_data_file($cache_id) {
   $lines = '';
 
   $cache = cache_get($cache_id, 'cache_page');
-  if ($cache->data) {
+  if (isset($cache->data)) {
     $values = array();
     $s = 1;
     $header = t('Serie');
@@ -1760,7 +1760,7 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
 function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
 
   $line = array();
-  $line['User'] = wordwrap($username, 10, "<br>", TRUE);
+  $line['User'] = wordwrap($username, 12, "<br>", TRUE);
 
   if ($function != NULL) {
     $line['Sensor'] = wordwrap($function, 8, "<br>", TRUE);

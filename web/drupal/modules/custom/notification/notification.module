@@ -527,7 +527,8 @@ function notification_registration_form($form, &$form_state) {
     'Here you can set the period of time in which you want to receive summary reports.');
 
   $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
-    'Here you can set the period of time in which you want to receive energy production forecast reports.');
+    'Here you can set the period of time in which you want to receive energy production forecast reports. ' . 
+    'The reports are sent only if the sensor has the "Forecast" option activated at the sensor edition page.');
 
   $form['min_interval'] = array(
     '#type' => 'select',
@@ -684,7 +685,7 @@ function notification_edition_form($form, &$form_state, $notification) {
     $unit_id = $child ? $child->unit_id : NULL;
 
     $form['events'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-      'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, i' . 
+      'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, ' . 
       'when the first message is received, the communication is considered reestablished.', FALSE, '', $checked, $limit_up, $unit_id);
 
     $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,

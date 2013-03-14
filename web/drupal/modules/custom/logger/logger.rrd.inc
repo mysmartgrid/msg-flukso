@@ -201,6 +201,11 @@ function logger_rrd_update($meter, $values) {
 function logger_rrd_query_sensor($sensor, $unit, $period, $step, $price = NULL) {
 
   $def = logger_rrd_sensor_def(METER, $sensor, $unit, $price);
+
+  if ($def == NULL) {
+    return array();
+  }
+
   $latest = logger_rrd_latest_timestamp($sensor);
 
   return logger_rrd_export($def, METER, $latest, TRUE, $period, $step);
@@ -336,6 +341,11 @@ function logger_rrd_query_energy($sensors, $unit, $period, $step, $prices = NULL
 function logger_rrd_query_appliance($sensor, $period, $appliance_id) {
 
   $def = logger_rrd_appliance_def(METER, $appliance_id, $sensor);
+
+  if ($def == NULL) {
+    return array();
+  }
+
   $latest = logger_rrd_latest_timestamp($sensor, $appliance_id);
 
   return logger_rrd_export($def, METER, $latest, TRUE, $period, 60);
@@ -428,7 +438,7 @@ function logger_rrd_file($meter, $appliance_id = NULL) {
 function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period, $step) {
 
   global $user;
-
+ 
   if (!$def) {
     return array();
   }
@@ -473,7 +483,7 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
   }
 
   if ($error != 0) {
-    watchdog('logger.rrd.export', "Error executing rrd command: export. Return code: %error", array('%error' => $error), WATCHDOG_ERROR);
+    watchdog('logger.rrd.export', "Error executing rrd. Return code: %error . Command: %command", array('%error' => $error, '%command' => $command), WATCHDOG_ERROR);
     return array();
   }
 
