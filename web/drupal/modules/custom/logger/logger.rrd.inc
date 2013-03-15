@@ -279,14 +279,18 @@ function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
     }
   }
 
-  $operators = str_repeat(",+", $i - 2);
+  if ($i > 1) {
+    $operators = str_repeat(",+", $i - 2);
+    $series_id = METER . '0';
 
-  $series_id = METER . '0';
+    //Sum all measurements of a particular time
+    $def .= "CDEF:$series_id=$variables$operators ";
 
-  //Sum all measurements of a particular time
-  $def .= "CDEF:$series_id=$variables$operators ";
+    return logger_rrd_export($def, $series_id, REQUEST_TIME, FALSE, $period, $step);
 
-  return logger_rrd_export($def, $series_id, REQUEST_TIME, FALSE, $period, $step);
+  } else {
+    return array();
+  }
 }
 
 /**

@@ -1763,7 +1763,7 @@ function logger_create_legend_line($username, $function, $type, $i, $values = ar
   $line['User'] = wordwrap($username, 12, "<br>", TRUE);
 
   if ($function != NULL) {
-    $line['Sensor'] = wordwrap($function, 8, "<br>", TRUE);
+    $line['Sensor'] = wordwrap($function, 10, "<br>", TRUE);
   }
 
   $line['Type'] = $type;
