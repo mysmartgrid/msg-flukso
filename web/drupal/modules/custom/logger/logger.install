@@ -642,7 +642,7 @@ function logger_update_7015() {
 /**
  * Add field description to table logger_meters.
  */
-function logger_update_7015() {
+function logger_update_7016() {
 
   db_add_field('logger_meters', 'description', array(
     'type' => 'varchar',
