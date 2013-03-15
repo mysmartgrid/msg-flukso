@@ -196,6 +196,11 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 'main',
       ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => FALSE
+      ),
       'value' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -632,4 +637,18 @@ function logger_update_7015() {
     ->execute();
 
   return st("Variables '%selected_users%' have been removed.");
+}
+
+/**
+ * Add field description to table logger_meters.
+ */
+function logger_update_7015() {
+
+  db_add_field('logger_meters', 'description', array(
+    'type' => 'varchar',
+    'length' => 60,
+    'not null' => FALSE
+  ));
+
+  return st('Field description has been successfully added to table logger_meters.');
 }
