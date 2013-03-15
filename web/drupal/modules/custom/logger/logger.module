@@ -3420,10 +3420,16 @@ function logger_get_appliances($cache_id) {
 
   drupal_add_http_header('Content-Type', 'application/json;');
 
-  $cache = cache_get($cache_id, 'cache_page');
+  if (user_has_role('Expert')) {
 
-  if ($cache->data && isset($cache->data['appliances'])) {
-    $detected = $cache->data['appliances'];
+    $cache = cache_get($cache_id, 'cache_page');
+
+    if ($cache->data && isset($cache->data['appliances'])) {
+      $detected = $cache->data['appliances'];
+
+    } else {
+      $detected = array();
+    }
 
   } else {
     $detected = array();
@@ -4111,7 +4117,7 @@ function logger_forward_api_request($auth, $object, $id, $body, $signed_body = N
 
     if (isset($response->error)) {
 
-      watchdog('logger.forward', "Error forwarding to %url. %error", array('%url' => $url, '%error' => $response->error), WATCHDOG_ERROR);
+      //watchdog('logger.forward', "Error forwarding to %url. %error", array('%url' => $url, '%error' => $response->error), WATCHDOG_ERROR);
 
       return xmlrpc_error(-32601, t('Server error.') . ' ' . $response->error);
     }
