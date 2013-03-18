@@ -335,7 +335,7 @@ delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State)
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
 
     Sensors = mysql:get_result_rows(_Result),
-    [delete_device_sensor(Meter) || [Meter, Function] <- Sensors],
+    [delete_device_sensor(Meter) || [Meter, Function, Description] <- Sensors],
 
     mysql:execute(pool, event_delete, [Device]),
     mysql:execute(pool, notification_delete, [Device]),
