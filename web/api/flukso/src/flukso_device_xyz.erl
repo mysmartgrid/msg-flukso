@@ -155,19 +155,19 @@ content_types_provided(ReqData, State) ->
 
 
 to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State) ->
-
     {data, Result} = mysql:execute(pool, device_props, [Device]),
-    [[Key, Upgrade, Resets, FirmwareVersion, Description]] = mysql:get_result_rows(Result),
+    [[Key, Upgrade, Resets, FirmwareVersion, DeviceDescription]] = mysql:get_result_rows(Result),
 
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
     _Sensors = mysql:get_result_rows(_Result),
 
     Sensors = [{struct, [
         {<<"meter">>, Meter},
-        {<<"function">>, Function}]} || [Meter, Function] <- _Sensors],
+        {<<"function">>, Function},
+        {<<"description">>, SensorDescription}]} || [Meter, Function, SensorDescription] <- _Sensors],
 
     Encoded = mochijson2:encode({struct, [
-              {<<"description">>, Description},
+              {<<"description">>, DeviceDescription},
               {<<"sensors">>, Sensors}]}),
 
     {case JsonpCallback of

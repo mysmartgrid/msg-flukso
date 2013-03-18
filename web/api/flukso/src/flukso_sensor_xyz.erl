@@ -306,17 +306,17 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       %Sensor is found
       [[_Uid, Device]] ->
 
-        Args = [%proplists:get_value(<<"class">>,    Params),
-                %proplists:get_value(<<"type">>,     Params),
-                proplists:get_value(<<"function">>, Params),
-                %proplists:get_value(<<"voltage">>,  Params),
-                %proplists:get_value(<<"current">>,  Params),
-                %proplists:get_value(<<"phase">>,    Params),
-                %proplists:get_value(<<"constant">>, Params),
-                %proplists:get_value(<<"enable">>,   Params),
+        Args = [%proplists:get_value(<<"class">>,      Params),
+                %proplists:get_value(<<"type">>,       Params),
+                proplists:get_value(<<"function">>,    Params),
+                proplists:get_value(<<"description">>, Params),
+                %proplists:get_value(<<"voltage">>,    Params),
+                %proplists:get_value(<<"current">>,    Params),
+                %proplists:get_value(<<"phase">>,      Params),
+                %proplists:get_value(<<"constant">>,   Params),
+                %proplists:get_value(<<"enable">>,     Params),
                 Sensor],
 
-        %TODO: create fields in table logger_meters
         {updated, _Result} = mysql:execute(pool, sensor_config, Args),
         RrdResponse = "ok";
 
@@ -324,6 +324,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       _ ->
         Timestamp = unix_time(),
         Function = proplists:get_value(<<"function">>, Params),
+        Description = proplists:get_value(<<"description">>, Params),
         Device = proplists:get_value(<<"device">>, Params),
 
         case rrd_create(?BASE_PATH, Sensor) of
@@ -335,7 +336,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
             RrdResponse = "ok",
 
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, 0, 0, 0, 0, "watt", Device]),
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, Description, 0, 0, 0, 0, "watt", Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->

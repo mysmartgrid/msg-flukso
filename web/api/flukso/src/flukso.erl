@@ -27,31 +27,29 @@
 
 ensure_started(App) ->
     case application:start(App) of
-	ok ->
-	    ok;
-	{error, {already_started, App}} ->
-	    ok
+        ok ->
+            ok;
+        {error, {already_started, App}} ->
+            ok
     end.
 
 
 mysql_prepare() ->
     mysql:prepare(watchdog, <<"INSERT INTO watchdog (uid, type, message, variables, severity, location, hostname, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(timezone, <<"SELECT timezone FROM users WHERE uid = ?">>),
-
     mysql:prepare(permissions, <<"SELECT permissions FROM logger_tokens WHERE meter = ? AND token = ?">>),
     mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),
     mysql:prepare(token_delete, <<"DELETE FROM logger_tokens WHERE meter = ?">>),
-
     mysql:prepare(sensor_key, <<"SELECT sha FROM (logger_devices ld INNER JOIN logger_meters lm ON ld.device = lm.device) WHERE lm.meter = ?">>),
     mysql:prepare(sensor_props, <<"SELECT uid, device FROM logger_meters WHERE meter = ?">>),
-    mysql:prepare(device_sensors, <<"SELECT meter, function FROM logger_meters WHERE device = ?">>),
+    mysql:prepare(device_sensors, <<"SELECT meter, function, description FROM logger_meters WHERE device = ?">>),
     mysql:prepare(sensor_update, <<"UPDATE logger_meters SET access = ?, value = ? WHERE meter = ?">>),
     mysql:prepare(sensor_delete, <<"DELETE FROM logger_meters WHERE meter = ?">>),
     mysql:prepare(sensor_agg, <<"SELECT meter FROM logger_aggregated_meters WHERE virtual_meter = ?">>),
     mysql:prepare(sensor_agg_delete, <<"DELETE FROM logger_aggregated_meters WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, function, phase, constant, value, factor, unit, price, latitude, longitude) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(sensor_config, <<"UPDATE logger_meters SET function = ? WHERE meter = ?">>),
-    %TODO: mysql:prepare(sensor_config, <<"UPDATE logger_meters SET class = ?, type = ?, function = ?, voltage = ?, current = ?, phase = ?, constant = ?, enabled = ? WHERE meter = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, function, description, phase, constant, value, factor, unit, price, latitude, longitude) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_config, <<"UPDATE logger_meters SET function = ?, description = ? WHERE meter = ?">>),
+    %TODO: mysql:prepare(sensor_config, <<"UPDATE logger_meters SET class = ?, type = ?, function = ?, , description = ?, voltage = ?, current = ?, phase = ?, constant = ?, enabled = ? WHERE meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version, description FROM logger_devices WHERE device = ?">>),
