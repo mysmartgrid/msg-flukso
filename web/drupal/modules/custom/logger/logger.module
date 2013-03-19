@@ -1471,7 +1471,9 @@ function logger_get_power_chart_data($chart) {
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
 
     foreach (logger_get_appliance_ids() as $app) {
-      $data['appliances'][$i][$app] = logger_rrd_query_appliance($sensor, $chart->period, $app);
+      if ($chart->resolution == MINUTE) {
+        $data['appliances'][$i][$app] = logger_rrd_query_appliance($sensor, $chart->period, $app);
+      }
     }
 
     //Hide usernames for Visitors
