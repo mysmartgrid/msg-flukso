@@ -995,7 +995,7 @@ function logger_download_chart_data_file($cache_id) {
   $lines = '';
 
   $cache = cache_get($cache_id, 'cache_page');
-  if (isset($cache->data)) {
+  if (isset($cache->data) && isset($cache->data['series'])) {
     $values = array();
     $s = 1;
     $header = t('Serie');
