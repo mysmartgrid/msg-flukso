@@ -340,11 +340,12 @@ function logger_rrd_query_energy($sensors, $unit, $period, $step, $prices = NULL
  * @param $sensor       The sensor.
  * @param $period       An array containing a period of time to be queried.
  * @param $appliance_id The appliance id.
+ * @param $step         The amount of time aggregated in a single point.
  * @return the array associating timestamps with detection flags: either 0 (not detected) or 1 (detected).
  */
-function logger_rrd_query_appliance($sensor, $period, $appliance_id) {
+function logger_rrd_query_appliance($sensor, $period, $appliance_id, $step) {
 
-  $def = logger_rrd_appliance_def(METER, $appliance_id, $sensor);
+  $def = logger_rrd_appliance_def(METER, $appliance_id, $sensor, $step);
 
   if ($def == NULL) {
     return array();
@@ -352,7 +353,7 @@ function logger_rrd_query_appliance($sensor, $period, $appliance_id) {
 
   $latest = logger_rrd_latest_timestamp($sensor, $appliance_id);
 
-  return logger_rrd_export($def, METER, $latest, TRUE, $period, 60);
+  return logger_rrd_export($def, METER, $latest, TRUE, $period, $step);
 }
 
 /**
@@ -379,8 +380,7 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
   $file_path = logger_rrd_file($sensor->meter);
   if (file_exists($file_path)) {
 
-    return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
-      "CDEF:$series_id=" . "data$series_id," . $factor . ",* ";
+    return "DEF:data$series_id=$file_path:meter:AVERAGE CDEF:$series_id=data$series_id,$factor.,* ";
   }
   else {
     return NULL;
@@ -393,9 +393,10 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
  * @param $series_id    The series id.
  * @param $appliance_id The appliance id.
  * @param $sensor       The sensor.
+ * @param $step         The amount of time aggregated in a single point.
  * @return the DEF tag.
  */
-function logger_rrd_appliance_def($series_id, $appliance_id, $sensor) {
+function logger_rrd_appliance_def($series_id, $appliance_id, $sensor, $step) {
 
   global $user;
 
@@ -406,8 +407,8 @@ function logger_rrd_appliance_def($series_id, $appliance_id, $sensor) {
   $file_path = logger_rrd_file($sensor->meter, $appliance_id);
   if (file_exists($file_path)) {
 
-    return "DEF:data$series_id=" . "$file_path:meter:AVERAGE " .
-      "CDEF:$series_id=" . "data$series_id";
+    $function = $step == MINUTE ? 'AVERAGE' : $step < HOUR ? 'MIN' : 'MAX';
+    return "DEF:data$series_id=$file_path:meter:$function CDEF:$series_id=data$series_id";
   }
   else {
     return NULL;
