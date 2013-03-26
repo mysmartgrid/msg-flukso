@@ -380,7 +380,7 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
   $file_path = logger_rrd_file($sensor->meter);
   if (file_exists($file_path)) {
 
-    return "DEF:data$series_id=$file_path:meter:AVERAGE CDEF:$series_id=data$series_id,$factor.,* ";
+    return "DEF:data$series_id=$file_path:meter:AVERAGE CDEF:$series_id=data$series_id,$factor,* ";
   }
   else {
     return NULL;
