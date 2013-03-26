@@ -407,7 +407,15 @@ function logger_rrd_appliance_def($series_id, $appliance_id, $sensor, $step) {
   $file_path = logger_rrd_file($sensor->meter, $appliance_id);
   if (file_exists($file_path)) {
 
-    $function = $step == MINUTE ? 'AVERAGE' : $step < HOUR ? 'MIN' : 'MAX';
+    if ($step == MINUTE) {
+      $function = 'AVERAGE';
+    }
+    else if ($step == 15 * MINUTE) {
+      $function = 'MIN';
+    }
+    else {
+      $function = 'MAX';
+    }
     return "DEF:data$series_id=$file_path:meter:$function CDEF:$series_id=data$series_id";
   }
   else {
