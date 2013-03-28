@@ -460,8 +460,13 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
   $end = $period['end'];
 
   //time period MUST be within the RRA and both $start and $end must be multiples of $step
-  $start = $start - ($start % $step);
-  $end = $end - ($end % $step);
+  if ($step >= DAY) {
+    $offset = get_timezone_offset();
+    $start += $offset;
+    $end += $offset;
+  }
+  $start -= $start % $step;
+  $end -= $end % $step;
 
   $storage_period = logger_rrd_get_storage_period($step);
 
