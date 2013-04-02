@@ -1121,6 +1121,12 @@ function logger_format_series_period($interval, $period, $offset = 0) {
 
   $start = $period['start'];
   $end = $period['end'] - 1; //from 00:00:00 until 23:59:59 on user timezone
+
+  //daylight savings
+  $start += date('I', $start) == "0" ? HOUR : 0;
+  $end += date('I', $end) == "0" ? HOUR : 0;
+
+  $period['start'] = $start;
   $period['end'] = $end;
 
   switch ($interval) {
@@ -1155,14 +1161,21 @@ function logger_format_series_period($interval, $period, $offset = 0) {
 /**
  * Formats a period of time array for exhibition.
  * 
- * @param $interval  The time interval name.
- * @param $period    The pair of timestamps (start, end) that define the period.
+ * @param $interval      The time interval name.
+ * @param $period        The pair of timestamps (start, end) that define the period.
+ * @param $dst_adjusted  Whether daylight saving offset has been removed from dates.
  * @return the period of time as a string.
  */
-function logger_format_period($interval, $period) {
+function logger_format_period($interval, $period, $dst_adjusted = FALSE) {
 
   $start = $period['start'];
   $end   = $period['end'];
+
+  if (!$dst_adjusted) {
+    //daylight savings
+    $start += date('I', $start) == "0" ? HOUR : 0;
+    $end += date('I', $end) == "0" ? HOUR : 0;
+  }
 
   switch ($interval) {
     case 'hour':

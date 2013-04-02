@@ -226,10 +226,20 @@ function rzip($source, $destination) {
  * @param $file_path The file path.
  * @param $content   The file content.
  */
-function save_file($file_path, $content) {
-  $fh = fopen($file_path, 'w');
+function save_file($file_path, $contenti, $mode = 'w') {
+  $fh = fopen($file_path, $mode);
   fwrite($fh, $content);
   fclose($fh);
+}
+
+/**
+ * Appends a string to a file.
+ *
+ * @param $file_path The file path.
+ * @param $content   The file content.
+ */
+function append_file($file_path, $content) {
+  save_file($file_path, $contenti, 'a');
 }
 
 /**
