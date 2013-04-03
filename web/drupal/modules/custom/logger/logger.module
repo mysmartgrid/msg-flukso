@@ -1140,7 +1140,7 @@ function logger_format_series_period($interval, $period, $offset = 0) {
       break;
     case 'day':
       $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
-      $complement = logger_format_period('dayquarter', $period);
+      $complement = logger_format_period('dayquarter', $period, TRUE);
       break;
     case 'week':
       $formatted_time = t(date("l", $start));
@@ -1148,7 +1148,7 @@ function logger_format_series_period($interval, $period, $offset = 0) {
       break;
     case 'month':
       $formatted_time = t('Week') . ' ' . date("W", $start);
-      $complement = logger_format_period('week', $period);
+      $complement = logger_format_period('week', $period, TRUE);
       break;
     case 'year':
       $formatted_time = t(date("M", $start));
