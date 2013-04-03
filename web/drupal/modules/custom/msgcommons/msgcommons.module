@@ -226,7 +226,7 @@ function rzip($source, $destination) {
  * @param $file_path The file path.
  * @param $content   The file content.
  */
-function save_file($file_path, $contenti, $mode = 'w') {
+function save_file($file_path, $content, $mode = 'w') {
   $fh = fopen($file_path, $mode);
   fwrite($fh, $content);
   fclose($fh);
@@ -239,7 +239,7 @@ function save_file($file_path, $contenti, $mode = 'w') {
  * @param $content   The file content.
  */
 function append_file($file_path, $content) {
-  save_file($file_path, $contenti, 'a');
+  save_file($file_path, $content, 'a');
 }
 
 /**
