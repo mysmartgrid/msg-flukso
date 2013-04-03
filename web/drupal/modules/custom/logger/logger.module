@@ -642,7 +642,7 @@ function logger_anomaly_page($interval) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(PRODUCTION_SENSOR_TYPE);
-  $sensors = logger_get_sensors($types, array($user->uid));
+  $sensors = logger_get_subscribed_sensors($types, 'anomaly');
 
   return logger_line_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types, 'watt');
 }
@@ -991,11 +991,15 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
  */
 function logger_download_chart_data_file($cache_id) {
 
+  //TODO: simplify this function
   $header = '';
   $lines = '';
 
   $cache = cache_get($cache_id, 'cache_page');
   if (isset($cache->data) && isset($cache->data['series'])) {
+
+    $timestamps = array();
+    $series = array();
     $values = array();
     $s = 1;
     $header = t('Serie');
@@ -1004,14 +1008,20 @@ function logger_download_chart_data_file($cache_id) {
       foreach ($userdata as $username => $sensors) {
         foreach ($sensors as $sensor => $typedata) {
           foreach ($typedata as $type => $measurements) {
-            $header .= ',S' . $s++;
-
-            foreach ($measurements as $timestamp => $value) {
-              //TODO: simplify
-              $values[$timestamp] = (isset($values[$timestamp]) ? $values[$timestamp] : '') . ',' . $value;
-            }
+            $timestamps = array_merge($timestamps, array_keys($measurements));
+            $series[] = $measurements;
           }
         }
+      }
+    }
+    $timestamps = array_unique($timestamps);
+
+    foreach ($series as $measurements) {
+      $header .= ',S' . $s++;
+
+      foreach ($timestamps as $timestamp) {
+        $value = isset($measurements[$timestamp]) ? $measurements[$timestamp] : '';
+        $values[$timestamp] = (isset($values[$timestamp]) ? $values[$timestamp] : '') . ',' . $value;
       }
     }
     ksort($values); //Sorted CSV increases the performance of JS libraries
@@ -1651,24 +1661,32 @@ function logger_get_anomaly_chart_data($chart) {
 
   $is_visitor = user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
-  $total = count($chart->sensors);
-  $i = $total;
+  $data['legend'] = array();
+  $i = 0;
 
   foreach ($chart->sensors as &$sensor) {
-
-    $anomalies = logger_detect_production_anomalies($sensor, $chart->unit, $chart->period, $chart->resolution);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
 
+    //If this is a forecast series
+    if (strpos($sensor->meter, 'Anomalies') === 0) {
+
+      $meter = substr($sensor->meter, 9);
+      $clone = clone $sensor;//FIXME: remove this line later
+      $clone->meter = $meter;
+      $anomalies = logger_detect_production_anomalies($clone, $chart->unit, $chart->period, $chart->resolution);
+
+      $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
+        logger_format_power_series_data($chart, $anomalies);
+    }
+
     $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
 
-    $data['series'][$sensor->uid][$sensor->username]["$sensor->meter Anomalies"][$sensor->type] =
-      logger_format_power_series_data($chart, $anomalies);
-
     $data['legend'][$i] =
-      logger_create_legend_line($username, $sensor->function . '  (' . t('Anomalies') . ')', t($sensor->type), $i,
+      logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
         array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
+
     $i++;
   }
   return $data;
@@ -1908,12 +1926,13 @@ function logger_get_subscribed_sensors($types, $context) {
   }
   $sensors = logger_get_sensors($types, $uids, TRUE);
 
-  if ($context == 'forecast') {
+  if ($context == 'forecast' || $context == 'anomaly') {
     foreach ($sensors as $sensor) {
-      $forecast = clone $sensor;
-      $forecast->meter = 'Forecast' . $sensor->meter;
-      $forecast->function = $sensor->function . ' (' . t('Forecast') . ')';
-      $sensors[] = $forecast;
+      $extra = clone $sensor;
+      $extra_type = $context == 'forecast' ? 'Forecast' : 'Anomalies';
+      $extra->meter = $extra_type . $sensor->meter;
+      $extra->function = $sensor->function . ' (' . t($extra_type) . ')';
+      $sensors[] = $extra;
     }
   }
 
