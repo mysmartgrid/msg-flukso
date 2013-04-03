@@ -1980,7 +1980,7 @@ function notification_query_production_anomalies($notifiable) {
 
   require_once LOGGER_PATH . "/logger.anomaly.inc"; 
 
-  $period = array('start' => ($notifiable['base_time'] - HOUR), 'end' => time());
+  $period = array('start' => ($notifiable['base_time'] - 5 * MINUTE), 'end' => time());
   $anomalies = logger_detect_production_anomalies((object) $notifiable, 'watt', $period, MINUTE, 100);
 
   $list = '';
