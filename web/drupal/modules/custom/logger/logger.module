@@ -2324,8 +2324,11 @@ function logger_create_interval_menu($context) {
         l(t('Hour'),    "$context/hour"),
         l(t('Day'),     "$context/24hours"),
         l(t('3 Days'),  "$context/72hours"),
-        l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"));
+        l(t('Week'),    "$context/week"));
+
+      if (user_has_role('Techniker')) {
+        $items[] = l(t('Month'),   "$context/month");
+      }
       break;
 
     case 'energy':
