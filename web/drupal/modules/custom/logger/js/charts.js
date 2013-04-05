@@ -80,7 +80,17 @@ function getStyleBySelector(selector) {
     rules = isIE ? sheets[s].imports : rules;
 
     for (r = 0; r < rules.length; r++){
-      var imported = isIE ? rules[r].rules : rules[r].styleSheet.cssRules;
+
+      var imported;
+      if (rules[r].rules != undefined) {
+        imported = rules[r].rules;
+
+      } else if (rules[r].styleSheet != undefined) {
+        imported = rules[r].styleSheet.cssRules;
+
+      } else {
+        window.location = '/webbrowser';
+      }
 
       style = findStyle(imported, selector);
       if (style != null) {
