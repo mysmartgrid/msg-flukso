@@ -30,7 +30,7 @@ body {}
 }
 
 /* Fraunhofer-Logo Lines ___________________________________________________ */
-#page { background: url(../images/bg-lines.gif) no-repeat center 620px; }
+/* #page { background: url(../images/bg-lines.gif) no-repeat center 620px; } */
 
 #doc, #header .wrapper, #footer .wrapper {
 	margin: 0 auto;
@@ -42,7 +42,7 @@ body {}
 	overflow: hidden;
 }
 #doc {
-	background: url(../images/bg-doc-silver.png) left top no-repeat;
+	background: url(../images/bg-doc-silver.jpg) left top no-repeat;
 }
 #dinfo {
 	display: none;

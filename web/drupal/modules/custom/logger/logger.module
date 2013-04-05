@@ -54,30 +54,52 @@ function logger_init() {
 
   check_browser_support();
 
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_DEFAULT, 'weight' => 100);
+
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
-    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js');
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js', $options);
   }
 
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/strftime-min.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph.js');
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/strftime-min.js', $options);
 
-  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/charts.js');
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/charts.js', $options);
 
   drupal_add_library('system', 'ui.datepicker');
   drupal_add_css(LOGGER_REL_PATH . '/style/ui.datepicker.css');
 
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.js');
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.js', $options);
 
   drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/theme/default/style.css');
   drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/style.css');
-  drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/maps.js');
-  drupal_add_js(LOGGER_REL_PATH . '/js/logger.js');
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/maps.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/logger.js', $options);
 }
 
 function logger_permission() {
@@ -2401,7 +2423,7 @@ function logger_create_chart_legend($chart) {
       $header[$title] = array('data' => t($title));
     }
   }
-  $options = array('type' => 'inline', 'scope' => 'header');
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
 
   drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", $options);
   drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
@@ -2796,7 +2818,8 @@ function theme_logger_geo_location($variables) {
   $latitude = strtok($coordinates, ',');
   $longitude = strtok(',');
 
-  drupal_add_js("jQuery(document).ready(function(){createMap($latitude, $longitude);});", array('type' => 'inline', 'scope' => 'header'));
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 202);
+  drupal_add_js("jQuery(document).ready(function(){createMap($latitude, $longitude);});", $options);
 
   $latitude_field = logger_create_custom_field($element, '_latitude', $latitude, 11, 11);
   $longitude_field = logger_create_custom_field($element, '_longitude', $longitude, 11, 11);
@@ -2900,7 +2923,8 @@ function logger_create_time_fields($element, $suffix) {
       monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
     }";
 
-  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', array('type' => 'inline', 'scope' => 'header'));
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 203);
+  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', $options);
 
   return logger_create_custom_field($element, $suffix . 'date', '', 10, 10) .
     logger_create_custom_field($element, $suffix . 'time', '', 5, 5);

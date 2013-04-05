@@ -58,7 +58,7 @@ define('NOTIFICATION_TIMESTAMP_FORMAT', 'd-m-Y H:i');
 
 
 function notification_init() {
-  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js');
+  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_DEFAULT, 'weight' => 100));
 }
 
 function notification_permission() {
@@ -325,8 +325,8 @@ function notification_list_page() {
 
   $table_id = 'notification-list-table';
   $handler = "function() { resizeLegend('$table_id'); }";
-  drupal_add_js("$(window).resize( $handler );", array('type' => 'inline', 'scope' => JS_DEFAULT));
-  drupal_add_js("$(document).ready(  $handler );", array('type' => 'inline', 'scope' => JS_DEFAULT));
+  drupal_add_js("$(window).resize( $handler );", array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 201));
+  drupal_add_js("$(document).ready(  $handler );", array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 202));
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
@@ -1709,12 +1709,15 @@ function notification_create_forecast_chart($notifiable) {
 
     date_default_timezone_set($notifiable['timezone']); 
 
+    $csv = "Time,Value\n";
     $values = array();
     $days = array();
     foreach ($forecast as $timestamp => $value) {
+      $time = date('d.m.Y G:i', $timestamp);
+      $csv .= "$time,$value\n";
       $values[] = $value;
       $hour = date('G', $timestamp);
-      $hours[] = $hour % 12 == 0 ? date('d.m.Y G:i', $timestamp) : NULL;
+      $hours[] = $hour % 12 == 0 ? $time : NULL;
     }
 
     $dataset = new pData;
@@ -1735,7 +1738,10 @@ function notification_create_forecast_chart($notifiable) {
     $chart->drawTitle(60, 22, t('Device') . ': ' . $notifiable['serial'] . ' ' . t('Sensor') . ': ' . $notifiable['function'], 50, 50, 50, 585);
     $chart->Render($file_path);
 
-    $content = file_get_contents("$base_url/$file_path");
+    $content = array(
+      'data' => $csv,
+      'image' => file_get_contents("$base_url/$file_path")
+    );
   }
   return $content;
 }
@@ -1879,8 +1885,15 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
         'cid' => 'chart',
         'file_name' => 'chart.jpg',
         'content_type' => 'image/jpeg',
-        'content' => $notifiable['chart'],
-        'size' => strlen($notifiable['chart'])
+        'content' => $notifiable['chart']['image'],
+        'size' => strlen($notifiable['chart']['image'])
+      );
+      $attachments[2] = array(
+        'cid' => 'data',
+        'file_name' => 'chart-data-file.txt',
+        'content_type' => 'text/html',
+        'content' => $notifiable['chart']['data'],
+        'size' => strlen($notifiable['chart']['data'])
       );
       unset($notifiable['chart']);
     }
