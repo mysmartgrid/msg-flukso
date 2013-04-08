@@ -3,8 +3,8 @@
  <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Flot Examples</title>
-    <link href="layout.css" rel="stylesheet" type="text/css"></link>
-    <!--[if IE]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
+    <link href="layout.css" rel="stylesheet" type="text/css">
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
     <script language="javascript" type="text/javascript" src="../jquery.js"></script>
     <script language="javascript" type="text/javascript" src="../jquery.flot.js"></script>
  </head>
@@ -48,8 +48,8 @@ $(function () {
         $.plot($("#placeholder"), [d], {
             xaxis: {
                 mode: "time",
-                min: (new Date("1990/01/01")).getTime(),
-                max: (new Date("2000/01/01")).getTime()
+                min: (new Date(1990, 1, 1)).getTime(),
+                max: (new Date(2000, 1, 1)).getTime()
             }
         });
     });
@@ -59,8 +59,8 @@ $(function () {
             xaxis: {
                 mode: "time",
                 minTickSize: [1, "month"],
-                min: (new Date("1999/01/01")).getTime(),
-                max: (new Date("2000/01/01")).getTime()
+                min: (new Date(1999, 1, 1)).getTime(),
+                max: (new Date(2000, 1, 1)).getTime()
             }
         });
     });

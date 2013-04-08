@@ -188,23 +188,6 @@ function msgweb_preprocess_region(&$vars) {
 }
 
 /**
- * Perform alterations before a page is rendered.
- */
-function msgweb_page_alter($page) {
-
-  //Add META tags to the header
-  $meta = array(
-    '#type' => 'html_tag',
-    '#tag' => 'meta',
-    '#attributes' => array(
-      'http-equiv' => 'X-UA-Compatible',
-      'content' => 'IE=EmulateIE7'
-    )
-  );
-  drupal_add_html_head($meta, 'meta_ie7_emulation');
-}
-
-/**
  * Alter the HTML head tag.
  */
 function msgweb_html_head_alter(&$head_elements) {
