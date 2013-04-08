@@ -3335,9 +3335,10 @@ function logger_get_users_options() {
   foreach ($fluksonians as $fluksonian) {
 
     //Hide user names for Visitors
-    $username = $fluksonian->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($fluksonian->uid, 3, '0', STR_PAD_LEFT) : $fluksonian->name;
+    $username = $is_visitor ? t('User') . ' ' . str_pad($fluksonian->uid, 3, '0', STR_PAD_LEFT) : $fluksonian->name;
     $options[$fluksonian->uid] = $username;
   }
+  unset($options[$user->uid]);
   return $options;
 }
 
