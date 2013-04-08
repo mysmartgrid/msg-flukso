@@ -24,8 +24,8 @@ var barChart;
 
 function formatDate(d) {
   return '' +
-    (d.getDate()  < 10 ? '0' : '') + d.getDate() + '/' +
-    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '/' +
+    (d.getDate()  < 10 ? '0' : '') + d.getDate() + '-' +
+    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '-' +
     d.getFullYear();
 }
 
@@ -37,7 +37,7 @@ function formatTime(d) {
 
 function parseDate(datestr, timestr) {
 
-  var dateParts = datestr.split('/');
+  var dateParts = datestr.split('-');
   var timeParts = timestr.split(':');
 
   return new Date(

@@ -58,7 +58,8 @@ define('NOTIFICATION_TIMESTAMP_FORMAT', 'd-m-Y H:i');
 
 
 function notification_init() {
-  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_DEFAULT, 'weight' => 100));
+
+  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js', array('type' => 'file', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 100));
 }
 
 function notification_permission() {
@@ -224,7 +225,7 @@ function notification_edition_page($device, $event_id, $limit_up, $unit_id) {
   $query->addField('e', 'name', 'event_name');
 
   $notification = $query
-    ->fields('n', array('id', 'device', 'event_id', 'limit_up', 'unit_id', 'emails', 'min_interval'))
+    ->fields('n', array('id', 'device', 'event_id', 'limit_up', 'unit_id', 'emails', 'min_interval', 'base_time'))
     ->fields('d', array('serial'))
     ->condition('n.device', $device)
     ->condition('n.event_id', $event_id)
@@ -326,7 +327,7 @@ function notification_list_page() {
   $table_id = 'notification-list-table';
   $handler = "function() { resizeLegend('$table_id'); }";
   drupal_add_js("$(window).resize( $handler );", array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 201));
-  drupal_add_js("$(document).ready(  $handler );", array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 202));
+  drupal_add_js("$(document).ready( $handler );", array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 202));
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
@@ -537,6 +538,16 @@ function notification_registration_form($form, &$form_state) {
     '#default_value' => 0,
     '#required' => TRUE,
     '#options' => notification_get_frequency_options(),
+  );
+
+  $form['start'] = array(
+    '#type' => 'textfield',
+    '#theme' => 'logger_time',
+    '#title' => t('Start Time'),
+    '#description' => t('Please, inform the time beyond which the notifications will be sent.'),
+    '#default_value' => time(),
+    '#required' => TRUE,
+    '#text-align' => 'center'
   );
 
   $form['submit'] = array(
@@ -751,6 +762,16 @@ function notification_edition_form($form, &$form_state, $notification) {
     '#default_value' => $notification->min_interval,
   );
 
+  $form['start'] = array(
+    '#type' => 'textfield',
+    '#theme' => 'logger_time',
+    '#title' => t('Start Time'),
+    '#description' => t('Please, inform the time beyond which the notifications will be sent.'),
+    '#default_value' => $notification->base_time,
+    '#required' => TRUE,
+    '#text-align' => 'center'
+  );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
@@ -863,6 +884,10 @@ function notification_registration_form_validate($form, &$form_state) {
   if (!user_access('save event notifications')) {
     form_set_error('', t('Operation not allowed.'));
   }
+
+  if (DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $_REQUEST['startdate'] . ' ' . $_REQUEST['starttime']) == FALSE) {
+    form_set_error('startdate', t('Invalid start time.'));
+  }
 }
 
 function notification_edition_form_validate($form, &$form_state) {
@@ -941,16 +966,17 @@ function notification_register_event($values, $event_id, $parent_id = NULL) {
 
     $emails = $values['emails'];
     $min_interval = $values['min_interval'];
+    $base_time = DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp();
 
     $notification = notification_get($device, $event_id, $limit_up, $unit_id);
 
     if ($notification) {
-      $values = array('emails' => $emails, 'min_interval' => $min_interval, 'parent_id' => $parent_id);
+      $values = array('emails' => $emails, 'min_interval' => $min_interval, 'parent_id' => $parent_id, 'base_time' => $base_time);
       notification_update($device, $event_id, $limit_up, $unit_id, $values);
       return $notification->id;
     }
     else {
-      notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id);
+      notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id, $base_time);
 
       if ($event_id == ANY_DEVICE_ISSUE_EVENT_ID) {
         $notification = notification_get($device, $event_id, $limit_up, $unit_id);
@@ -995,15 +1021,15 @@ function notification_edit_event($values) {
     }
   }
 
-  $emails = $values['emails'];
   $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
   $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
-  $min_interval = $values['min_interval'];
+
   $values = array(
     'limit_up' => $limit_up,
     'unit_id' => $unit_id,
-    'emails' => $emails,
-    'min_interval' => $min_interval
+    'emails' => $values['emails'],
+    'min_interval' => $values['min_interval'],
+    'base_time' => DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp()
   );
 
   $notification = notification_get($device, $event_id, $limit_up, $unit_id);
@@ -1131,8 +1157,9 @@ function notification_delete_children($parent_id) {
  * @param $limit_up      The event's threshold.
  * @param $unit_id       The unit id.
  * @param $parent_id     The parent notification id.
+ * @param $base_time     The time when the notifications start to be sent.
  */
-function notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id) {
+function notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id, $base_time) {
 
   db_insert('notification')
     ->fields(array(
@@ -1140,7 +1167,7 @@ function notification_insert($device, $event_id, $emails, $min_interval, $limit_
       'event_id' => $event_id,
       'emails' => $emails,
       'min_interval' => $min_interval,
-      'base_time' => REQUEST_TIME,
+      'base_time' => $base_time,
       'limit_up' => $limit_up,
       'unit_id' => $unit_id,
       'last_sent' => 0,

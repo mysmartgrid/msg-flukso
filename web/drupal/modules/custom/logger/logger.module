@@ -80,9 +80,6 @@ function logger_init() {
   $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/charts.js', $options);
 
-  drupal_add_library('system', 'ui.datepicker');
-  drupal_add_css(LOGGER_REL_PATH . '/style/ui.datepicker.css');
-
   $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.js', $options);
 
@@ -1217,10 +1214,10 @@ function logger_format_period($interval, $period, $dst_adjusted = FALSE) {
       return logger_format_long_period($start, $end, 'H:i');
 
     case 'day':
-      return date('d/m', $start);
+      return date('d-m', $start);
 
     case 'week':
-      return logger_format_long_period($start, $end, 'd/m');
+      return logger_format_long_period($start, $end, 'd-m');
 
     case 'month':
       return t(date('F', $start));
@@ -2093,6 +2090,9 @@ function logger_theme() {
     'logger_value_range' => array(
       'render element' => 'element',
     ),
+    'logger_time' => array(
+      'render element' => 'element',
+    ),
     'logger_time_period' => array(
       'render element' => 'element',
     ),
@@ -2845,6 +2845,18 @@ function theme_logger_value_range($variables) {
 }
 
 /**
+ * Builds the group of fields for informing a time.
+ *
+ * @param $variables  The theme variables, containing the field element.
+ * @return the field HTML code.
+ */
+function theme_logger_time($variables) {
+
+  $element = $variables['element'];
+  return logger_create_time_fields($element);
+}
+
+/**
  * Builds the group of fields for informing a time period.
  *
  * @param $variables  The theme variables, containing the field element.
@@ -2906,15 +2918,18 @@ function theme_logger_color_picker($variables) {
  * Creates two fields to represent a timestamp: one for date and another for time.
  *
  * @param $element  The Drupal form field element.
- * @param $suffix   A suffix for the field id and name.
+ * @param $suffix   A suffix for the field id and name (optional).
  * @return the fields HTML code.
  */
-function logger_create_time_fields($element, $suffix) {
+function logger_create_time_fields($element, $suffix = '') {
+
+  drupal_add_library('system', 'ui.datepicker');
+  drupal_add_css(LOGGER_REL_PATH . '/style/ui.datepicker.css');
 
   $picker_properties = "{
       yearRange: '-1:+0',
       showAnim: 'fadeIn',
-      dateFormat: 'dd/mm/yy',
+      dateFormat: 'dd-mm-yy',
       currentText: '" . t('Today') . "',
       nextText: '" . t('Next Month') . "',
       prevText: '" . t('Previous Month') . "',
@@ -2923,10 +2938,18 @@ function logger_create_time_fields($element, $suffix) {
     }";
 
   $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 203);
-  drupal_add_js('jQuery(document).ready(function(){jQuery("#edit-xvalue' . $suffix . 'date").datepicker(' . $picker_properties . ');});', $options);
+  $field_id = '#edit-' . str_replace('_', '-', $element['#name']) . $suffix . 'date';
+  drupal_add_js('jQuery(document).ready(function(){jQuery("' . $field_id . '").datepicker(' . $picker_properties . ');});', $options);
 
-  return logger_create_custom_field($element, $suffix . 'date', '', 10, 10) .
-    logger_create_custom_field($element, $suffix . 'time', '', 5, 5);
+  $time = '';
+  $date = '';
+  if (isset($element['#default_value']) && $element['#default_value'] > 0) {
+    $date = date('d-m-Y', $element['#default_value']);
+    $time = date('H:i', $element['#default_value']);
+  }
+
+  return logger_create_custom_field($element, $suffix . 'date', $date, 10, 10) .
+    logger_create_custom_field($element, $suffix . 'time', $time, 5, 5);
 }
 
 /**
@@ -3157,11 +3180,11 @@ function logger_get_xvalue($index) {
 
   $formatted = $_REQUEST['xvalue' . $index . 'date'] . ' ' . $_REQUEST['xvalue' . $index . 'time'];
 
-  //Parses a datetime string formatted as dd/mm/yyyy hh:mm to a Unix timestamp.
+  //Parses a datetime string formatted as dd-mm-yyyy hh:mm to a Unix timestamp.
   $str = "$formatted:00 GMT+00:00";
-  $d = strtok($str, '/');
-  $m = strtok('/');
-  $r = strtok('/');
+  $d = strtok($str, '-');
+  $m = strtok('-');
+  $r = strtok('-');
   $timestamp = strtotime("$m/$d/$r");
   $timestamp -= get_timezone_offset();
 
