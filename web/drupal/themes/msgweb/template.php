@@ -21,18 +21,6 @@ function msgweb_breadcrumb($variables) {
 }
 
 /**
- * Override or insert variables into the maintenance page template.
- */
-function msgweb_preprocess_maintenance_page(&$vars) {
-  // While markup for normal pages is split into page.tpl.php and html.tpl.php,
-  // the markup for the maintenance page is all in the single
-  // maintenance-page.tpl.php template. So, to have what's done in
-  // msgweb_preprocess_html() also happen on the maintenance page, it has to be
-  // called here.
-  msgweb_preprocess_html($vars);
-}
-
-/**
  * Override or insert variables into the html template.
  */
 function msgweb_preprocess_html(&$vars) {
@@ -82,6 +70,8 @@ function msgweb_process_html(&$vars) {
  * Override or insert variables into the page template.
  */
 function msgweb_preprocess_page(&$vars) {
+
+  global $base_url;
 
   // Move secondary tabs into a separate variable.
   $vars['tabs2'] = array(
@@ -144,6 +134,10 @@ function msgweb_preprocess_page(&$vars) {
 
   $vars['noscript'] = t('This page requires JavaScript to be enabled, in order to work properly. ' .
     'Please, enable this option in your browser.');
+
+  $static_url = msgweb_get_static_url($base_url);
+  $vars['theme_url'] = $static_url . '/' . path_to_theme();
+  $vars['logo'] = $vars['theme_url'] . '/logo.png';
 }
 
 /**
@@ -192,4 +186,28 @@ function msgweb_preprocess_region(&$vars) {
  */
 function msgweb_html_head_alter(&$head_elements) {
   unset($head_elements['system_meta_generator']);
+}
+
+/**
+ * Process theme variables.
+ */
+function msgweb_process(&$vars) {
+
+  global $base_url;
+
+  $static_url = msgweb_get_static_url($base_url);
+  $vars['head']        = str_replace($base_url, $static_url, $vars['head']);
+  $vars['page_top']    = str_replace($base_url, $static_url, $vars['page_top']);
+  $vars['styles']      = str_replace($base_url, $static_url, $vars['styles']);
+  $vars['scripts']     = str_replace($base_url, $static_url, $vars['scripts']);
+  $vars['page_bottom'] = str_replace($base_url, $static_url, $vars['page_bottom']);
+}
+
+/**
+ * Returns the static domain for images, js, css, etc.
+ */
+function msgweb_get_static_url($base_url) {
+
+  //TODO: a certificate is needed for domain: static.mysmartgrid.de
+  return ''; //str_replace('www', 'static', $base_url);
 }

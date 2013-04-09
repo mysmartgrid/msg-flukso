@@ -14,7 +14,7 @@
   </div>
 
   <div id="doc">
-    <img src="/<?php print path_to_theme(); ?>/images/doc-bg.jpg" id="doc-bg" alt="" width="997" height="400" />
+    <img src="<?php print $theme_url; ?>/images/doc-bg.jpg" id="doc-bg" alt="" width="997" height="400" />
 
     <div id="main" role="main">
       <div id="breadcrumb"><?php print $breadcrumb; ?></div>
