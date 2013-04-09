@@ -1465,7 +1465,7 @@ function logger_get_onsite_chart_series($chart) {
   }
   else {
     foreach ($onsite as $time => $value) {
-      $sum = $value + $supply[$time];
+      $sum = $value + $feedin[$time];
       $labels2[$time] = number_format($sum > 0 ? $value * 100 / $sum : 0, 0);
     }
   }
