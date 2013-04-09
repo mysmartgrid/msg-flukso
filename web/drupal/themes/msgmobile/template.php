@@ -56,6 +56,9 @@ function msgmobile_process_html(&$vars) {
  * Override or insert variables into the page template.
  */
 function msgmobile_preprocess_page(&$vars) {
+
+  global $base_url;
+
   // Move secondary tabs into a separate variable.
   $vars['tabs2'] = array(
     '#theme' => 'menu_local_tasks',
