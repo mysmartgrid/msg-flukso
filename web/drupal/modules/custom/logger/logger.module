@@ -547,11 +547,11 @@ function logger_mobile_page() {
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
       ($forecast_access ?
       logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') .
-      logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/power/balance') : '') .
+      logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/balance') : '') .
       logger_create_mobile_page_icon('event.png',       t('Events'),            '/notification/list') .
       logger_create_mobile_page_icon('addnode.png',     t('Add Node'),          '/node/add') .
-      logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby') .
-      logger_create_mobile_page_icon('dump.png',        t('Dump values'),       '/dump/116/setup') .
+      logger_create_mobile_page_icon('chumby.png',      t('Chumby Image'),      '/chumby1') .
+      logger_create_mobile_page_icon('dump.png',        t('Dump values'),       '/dump/setup') .
       logger_create_mobile_page_icon('myaccount.png',   t('My Account'),        "/users/$user->name") .
       logger_create_mobile_page_icon('device.png',      t('Devices'),           '/device/mylist') .
       logger_create_mobile_page_icon('sensor.png',      t('Sensors'),           '/sensor/mylist');
