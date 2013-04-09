@@ -1917,7 +1917,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       );
       $attachments[2] = array(
         'cid' => 'data',
-        'file_name' => 'chart-data-file.txt',
+        'file_name' => 'chart-data-file.csv',
         'content_type' => 'text/html',
         'content' => $notifiable['chart']['data'],
         'size' => strlen($notifiable['chart']['data'])

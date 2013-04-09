@@ -65,7 +65,7 @@ function download_chart_data_file($file_name, $header, $lines) {
 
   drupal_add_http_header('Pragma', 'public');
   drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
-  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name.txt");
+  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name");
   drupal_add_http_header('Cache-Control', 'public');
 
   print $header . PHP_EOL . $lines;

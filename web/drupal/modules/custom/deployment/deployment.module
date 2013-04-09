@@ -378,7 +378,7 @@ function deployment_download_chart_file() {
     $header .= ',S' . $summary->state_id;
     $lines .= ',' . $summary->total;
   }
-  download_chart_data_file('chart-data-file', $header, $lines);
+  download_chart_data_file('chart-data-file.csv', $header, $lines);
 }
 
 /**
@@ -396,7 +396,7 @@ function deployment_download_list_file() {
   $lines = preg_replace("/<\/a>/", '', $lines);
   $lines = preg_replace("/<a.*?>/", '', $lines);
 
-  download_chart_data_file('deployment-list', $header, $lines);
+  download_chart_data_file('deployment-list.csv', $header, $lines);
 }
 
 /**

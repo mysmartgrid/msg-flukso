@@ -1050,7 +1050,7 @@ function logger_download_chart_data_file($cache_id) {
       $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
-  download_chart_data_file('chart-data-file', $header, $lines);
+  download_chart_data_file('chart-data-file.csv', $header, $lines);
 }
 
 /**
@@ -2275,7 +2275,7 @@ function theme_logger_bar_chart_area($variables) {
  
   return " $menu
     <div id='$id' class='chart'></div>
-    <br>i" . t('Unit') . ': ' . t($chart->unit) . '<br><br>' .
+    <br>" . t('Unit') . ': ' . t($chart->unit) . '<br><br>' .
     logger_create_chart_legend($chart);
 }
 
