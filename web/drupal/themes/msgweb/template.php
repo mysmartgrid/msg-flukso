@@ -196,11 +196,26 @@ function msgweb_process(&$vars) {
   global $base_url;
 
   $static_url = msgweb_get_static_url($base_url);
-  $vars['head']        = str_replace($base_url, $static_url, $vars['head']);
-  $vars['page_top']    = str_replace($base_url, $static_url, $vars['page_top']);
-  $vars['styles']      = str_replace($base_url, $static_url, $vars['styles']);
-  $vars['scripts']     = str_replace($base_url, $static_url, $vars['scripts']);
-  $vars['page_bottom'] = str_replace($base_url, $static_url, $vars['page_bottom']);
+
+  if (isset($vars['head'])) {
+    $vars['head'] = str_replace($base_url, $static_url, $vars['head']);
+  }
+
+  if (isset($vars['page_top'])) {
+    $vars['page_top'] = str_replace($base_url, $static_url, $vars['page_top']);
+  }
+
+  if (isset($vars['styles'])) {
+    $vars['styles'] = str_replace($base_url, $static_url, $vars['styles']);
+  }
+
+  if (isset($vars['scripts'])) {
+    $vars['scripts'] = str_replace($base_url, $static_url, $vars['scripts']);
+  }
+
+  if (isset($vars['page_bottom'])) {
+    $vars['page_bottom'] = str_replace($base_url, $static_url, $vars['page_bottom']);
+  }
 }
 
 /**
