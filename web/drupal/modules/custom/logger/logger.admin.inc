@@ -816,7 +816,7 @@ function logger_device_clone($device_id) {
     ))
     ->execute();
 
-    system('/bin/ln -s ' . LOGGER_PATH . "/data/base/$sensor->meter.rrd " . LOGGER_PATH . "/data/base/$new_meter.rrd");
+    exec('/bin/ln -s ' . LOGGER_PATH . "/data/base/$sensor->meter.rrd " . LOGGER_PATH . "/data/base/$new_meter.rrd");
   }
 
   return t("Device %device has been successfuly cloned. The cloned device id is: %new_device_id.", array(

@@ -238,7 +238,7 @@ function msgdump_register($file, $meter) {
 
   save_file(MSGDUMP_DB_PATH . "/$file.flukso4rrc", $config);
 
-  system(MSGDUMP_BIN_PATH . '/flukso_create_db -c ' . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
+  exec(MSGDUMP_BIN_PATH . '/flukso_create_db -c ' . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
 }
 
 /**
@@ -305,7 +305,7 @@ function msgdump_cron() {
     //Update each dump once a day
     foreach ($dumps as $dump) {
  
-        system(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc');
+        exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc');
 
         db_update('msgdump')
           ->fields(array(

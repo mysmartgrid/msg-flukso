@@ -4031,7 +4031,7 @@ function logger_send_remote_support_email($device, $serial, $description) {
  * @param $device The device id.
  */
 function logger_create_support_key($host, $device) {
-  system(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device");
+  exec(LOGGER_DEVICE_CERT_PATH . "/gen-keys.sh $host $device");
 }
 
 /**
@@ -4057,7 +4057,7 @@ function logger_update_support_authorized_keys() {
   $accounts = $query->execute();
 
   foreach ($accounts as $account) {
-    system(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->port");
+    exec(LOGGER_DEVICE_CERT_PATH . "/gen-authorized-keys.sh $account->host $account->port");
   }
 }
 

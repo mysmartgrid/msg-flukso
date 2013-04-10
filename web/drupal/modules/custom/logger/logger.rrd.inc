@@ -93,7 +93,8 @@ function logger_rrd_create($meter, $step, $ds_type, $archives) {
       "$ds " .
       logger_rrd_rras($step, $archives);
 
-    system($command, $return);
+    $output = array();
+    exec($command, $output, $return);
   }
   return $return == 0;
 }
@@ -183,7 +184,8 @@ function logger_rrd_update($meter, $values) {
     $command .= " $timestamp:$value";
   }
 
-  system($command, $return);
+  $output = array();
+  exec($command, $output, $return);
 
   return $return == 0;
 }
