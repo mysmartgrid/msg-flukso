@@ -88,8 +88,11 @@ function getStyleBySelector(selector) {
       } else if (rules[r].styleSheet != undefined) {
         imported = rules[r].styleSheet.cssRules;
 
-      } else {
+      } else if (document.cookie != undefined && document.cookie.indexOf('mysmartgrid_cookiecontrol') >= 0) {
         window.location = '/webbrowser';
+
+      } else {
+        return null;
       }
 
       style = findStyle(imported, selector);
