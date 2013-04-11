@@ -1215,7 +1215,7 @@ function logger_format_period($interval, $period, $dst_adjusted = FALSE) {
       return logger_format_long_period($start, $end, 'H:i');
 
     case 'day':
-      return date('d-m', $start);
+      return '<nobr>' . date('d-m', $start) . '</nobr>';
 
     case 'week':
       return logger_format_long_period($start, $end, 'd-m');
@@ -1238,8 +1238,8 @@ function logger_format_period($interval, $period, $dst_adjusted = FALSE) {
  */
 function logger_format_long_period($start, $end, $format) {
 
-  return t('from:') . '&nbsp;&nbsp;' . date($format, $start) . '<br>' .
-         t('to:') . '&nbsp;&nbsp;' . date($format, $end);
+  return t('from:') . '&nbsp;&nbsp;<nobr>' . date($format, $start) . '</nobr><br>' .
+         t('to:') . '&nbsp;&nbsp;<nobr>' . date($format, $end) . '</nobr>';
 }
 
 /**
