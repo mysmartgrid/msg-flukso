@@ -57,11 +57,6 @@ define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
 define('NOTIFICATION_TIMESTAMP_FORMAT', 'd-m-Y H:i');
 
 
-function notification_init() {
-
-  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification-min.js', array('type' => 'file', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 100));
-}
-
 function notification_permission() {
   return array(
     'list event notifications' => array(
@@ -472,6 +467,8 @@ function notification_newsletter_page() {
 function notification_registration_form($form, &$form_state) {
 
   global $user;
+
+  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification-min.js', array('type' => 'file', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 100));
 
   $form['device'] = array(
     '#type' => 'select',
