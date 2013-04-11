@@ -372,7 +372,7 @@ function deployment_download_chart_file() {
       $lines .= $time ? "\r\n" : '';
       $time = $summary->time;
 
-      $lines .= date('d-M-Y H:i', $time + $offset);
+      $lines .= date('Y-m-d H:i', $time + $offset);
       $header = t('Time');
     }
     $header .= ',S' . $summary->state_id;

@@ -54,7 +54,7 @@ function logger_init() {
 
   check_browser_support();
 
-  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_DEFAULT, 'weight' => 100);
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 100);
 
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
@@ -78,9 +78,6 @@ function logger_init() {
   drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
-
-  $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.min.js', $options);
 
   $options['weight']++;
@@ -91,6 +88,10 @@ function logger_init() {
 
   $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers-min.js', $options);
+
+  $options['group'] = JS_DEFAULT;
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
 
   $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/maps-min.js', $options);
