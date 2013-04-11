@@ -59,44 +59,44 @@ function logger_init() {
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
     $options['weight']++;
-    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas.js', $options);
+    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas-min.js', $options);
   }
 
   $options['weight']++;
   drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/strftime-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/charts.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.min.js', $options);
 
   drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/theme/default/style.css');
   drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/style.css');
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/maps.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/maps-min.js', $options);
 
   $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/logger.js', $options);
+  drupal_add_js(LOGGER_REL_PATH . '/js/logger-min.js', $options);
 }
 
 function logger_permission() {
@@ -2422,10 +2422,12 @@ function logger_create_chart_legend($chart) {
       $header[$title] = array('data' => t($title));
     }
   }
-  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", $options);
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  if (logger_is_mobile_device()) {
+    $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
+    drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", $options);
+    drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  }
 
   return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
