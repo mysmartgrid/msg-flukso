@@ -974,7 +974,11 @@ function logger_download_chart_data_file($cache_id) {
   $lines = '';
 
   $cache = cache_get($cache_id, 'cache_page');
-  if (isset($cache->data) && isset($cache->data['series'])) {
+
+  if ($cache === FALSE) {
+    watchdog('logger.cache', "Error getting cache %cid", array('%cid' => $cache_id), WATCHDOG_ERROR);
+  }
+  else if (isset($cache->data) && isset($cache->data['series'])) {
 
     $timestamps = array();
     $series = array();
