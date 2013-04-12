@@ -63,9 +63,17 @@ function logger_detect_production_anomalies($sensor, $unit, $period, $resolution
       isset($standard_anomalies[$timestamp])) {
 
       //Mark a segment as anomalous
-      $anomalies[$timestamp - $resolution] = $measurements[$timestamp - $resolution];
+      $ts = $timestamp - $resolution;
+      if (isset($measurements[$ts])) {
+        $anomalies[$ts] = $measurements[$ts];
+      }
+
       $anomalies[$timestamp] = $value;
-      $anomalies[$timestamp + $resolution] = $measurements[$timestamp + $resolution];
+
+      $ts = $timestamp + $resolution;
+      if (isset($measurements[$ts])) {
+        $anomalies[$ts] = $measurements[$ts];
+      }
     }
     if ($max > 0 && count($anomalies) >= $max) {
       break;
