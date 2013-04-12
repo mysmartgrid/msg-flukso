@@ -270,7 +270,7 @@ function deployment_list_page() {
   $data = deployment_get_devices($filter, $header, $page_limit);
   foreach ($data as &$device) {
 
-    $name = wordwrap($device['name'], 12, "<br>", TRUE);
+    $name = mb_wordwrap($device['name'], 12, "<br>", TRUE);
     $device['name'] = l($name, 'user/' . $device['uid'], array('html' => TRUE));
     $device['uid'] = $device['uid'] > 0 ? $device['uid'] : '';
 

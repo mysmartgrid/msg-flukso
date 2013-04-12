@@ -59,6 +59,37 @@ function tokenize_string($str, $sep = " \n\r") {
 }
 
 /**
+ * Wraps a string to a given number of characters, respecting multi-byte characters.
+ *
+ * @param $str   The input string.
+ * @param $width The number of characters at which the string will be wrapped.
+ * @param $break The line is broken using the optional break parameter.
+ * @param $cut   If the cut is set to TRUE, the string is always wrapped at or before the specified width.
+ *               So if you have a word that is larger than the given width, it is broken apart.
+ * @return the given string wrapped at the specified length. 
+ */
+function mb_wordwrap($str, $width = 75, $break = "\n", $cut = FALSE, $charset = null) {
+
+  if ($charset === NULL){
+    $charset = mb_internal_encoding();
+  }
+
+  $pieces = explode($break, $str);
+  $result = array();
+
+  foreach ($pieces as $piece) {
+    $current = $piece;
+
+    while ($cut && mb_strlen($current) > $width) {
+      $result[] = mb_substr($current, 0, $width, $charset);
+      $current = mb_substr($current, $width, 2048, $charset);
+    }
+    $result[] = $current;
+  }
+  return implode($break, $result);
+}
+
+/**
  * Downloads a chart data file.
  */
 function download_chart_data_file($file_name, $header, $lines) {
