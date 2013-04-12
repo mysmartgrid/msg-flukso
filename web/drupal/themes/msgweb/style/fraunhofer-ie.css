@@ -42,7 +42,7 @@ body {}
 	overflow: hidden;
 }
 #doc {
-	background: url(../images/bg-doc-silver.jpg) left top no-repeat;
+	background: url(../images/bg-doc-silver.png) left top no-repeat;
 }
 #dinfo {
 	display: none;
