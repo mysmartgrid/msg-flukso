@@ -53,51 +53,6 @@ define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 function logger_init() {
 
   check_browser_support();
-
-  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 100);
-
-  //If IE
-  if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
-    $options['weight']++;
-    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas-min.js', $options);
-  }
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/strftime-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.min.js', $options);
-
-  drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/theme/default/style.css');
-  drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/style.css');
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers-min.js', $options);
-
-  $options['group'] = JS_DEFAULT;
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/maps-min.js', $options);
-
-  $options['weight']++;
-  drupal_add_js(LOGGER_REL_PATH . '/js/logger-min.js', $options);
 }
 
 function logger_permission() {
@@ -539,6 +494,9 @@ function logger_mobile_page() {
 
   global $user;
 
+  drupal_add_http_header('Vary', 'User-Agent');
+  drupal_add_http_header('Cache-Control', 'private');
+
   if ($user->uid) {
     $forecast_access = logger_forecast_access('view forecast charts');
 
@@ -585,13 +543,13 @@ function logger_mobile_page() {
  * @return the icon.
  */
 function logger_create_mobile_page_icon($image, $label, $target) {
-  return '
-    <div class="menu-icon">
-      <a href="' . $target . '">
-        <img src="/sites/all/themes/msgmobile/images/icons/' . $image . '"/>
-        <span>' . $label . '</span>
-      </a>
-    </div> ';
+  return
+    '<div class="menu-icon">' .
+      '<a href="' . $target . '">' .
+        '<img src="/sites/all/themes/msgmobile/images/icons/' . $image . '"/>' .
+        '<span>' . $label . '</span>' .
+      '</a>' .
+    '</div>';
 }
 
 /**
@@ -1047,7 +1005,7 @@ function logger_download_chart_data_file($cache_id) {
     ksort($values); //Sorted CSV increases the performance of JS libraries
 
     foreach ($values as $timestamp => $values_list) {
-      $lines .= str_replace(array('&nbsp;', '<br>'), ' ', $timestamp); //Removes HTML tags
+      $lines .= str_replace(array('&nbsp;', '<br>', '<nobr>', '</nobr>'), ' ', $timestamp); //Removes HTML tags
       $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
   }
@@ -2260,23 +2218,30 @@ function theme_logger_bar_chart_area($variables) {
     $stacks = $chart->data['stacks'];    
   }
 
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.min.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.stack.min.js', $options);
+
+  $options['group'] = JS_DEFAULT;
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
+
   $id = 'barChart';
   $menu = logger_create_interval_menu($chart->context);
 
-  drupal_add_js("jQuery(document).ready( function() { 
-    createBarChart('$id',
-      [ [ " . implode('], [', $series) . " ] ],
-      ['" . implode("', '", $names) . "'],
-      ['" . implode("', '", $chart->colors) . "'],
-      [ [ " . implode('], [', $data_labels) . " ] ],
-      [ [ " . implode('], [', $data_labels2) . " ] ],
-      [" . implode(", ", $stacks) . "],
-      $percentual);
-    } );", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
+  drupal_add_js("jQuery(document).ready( function() { " .
+    "createBarChart('$id', " .
+      "[ [ " . implode('], [', $series) . " ] ], " .
+      "['" . implode("', '", $names) . "'], " .
+      "['" . implode("', '", $chart->colors) . "'], " .
+      "[ [ " . implode('], [', $data_labels) . " ] ], " .
+      "[ [ " . implode('], [', $data_labels2) . " ] ], " .
+      "[" . implode(", ", $stacks) . "], $percentual); " .
+    "} );", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
  
-  return " $menu
-    <div id='$id' class='chart'></div>
-    <br>" . t('Unit') . ': ' . t($chart->unit) . '<br><br>' .
+  return " $menu <div id='$id' class='chart'></div><br>" . t('Unit') . ': ' . t($chart->unit) . '<br><br>' .
     logger_create_chart_legend($chart);
 }
 
@@ -2320,9 +2285,33 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   $cssClass = $slider ? 'slider' : 'chart';
   $id = $slider ? 'sliderChart' : 'lineChart';
 
-  drupal_add_js('jQuery(document).ready( function() {
-      createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $properties) . '}, [' . implode(', ', $weather) . ']);
-    } );', array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+
+  //If IE
+  if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/excanvas-min.js', $options);
+  }
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/strftime-min.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/rgbcolor-min.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-canvas-min.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/dygraph/dygraph-min.js', $options);
+
+  $options['group'] = JS_DEFAULT;
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
+
+  drupal_add_js('jQuery(document).ready( function() { ' .
+      'createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $properties) . '}, [' . implode(', ', $weather) . ']); ' .
+    '} );', array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
 
   return '<div id="' . $id . '" class="' . $cssClass . '"></div><br>' . $labels_output;
 }
@@ -2882,6 +2871,8 @@ function theme_logger_time_period($variables) {
  */
 function theme_logger_color_picker($variables) {
 
+  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150));
+
   $chart_id = $variables['chartId'];
   $colors = $variables['colors'];
   $pickers = '';
@@ -2892,10 +2883,10 @@ function theme_logger_color_picker($variables) {
     $picker_id = 'series_color' . $color_index;
 
     //Visible color button
-    $pickers .= '<input
-      class="color {valueElement:' . "'$picker_id'" . '}
-      type="button"
-      style="width: 10px; height: 10px; color: transparent;"/><br>';
+    $pickers .= '<input ' .
+      'class="color {valueElement:' . "'$picker_id'" . '} ' .
+      'type="button" ' .
+      'style="width: 10px; height: 10px; color: transparent;"/><br>';
 
     if (!in_array($color_index, $created)) {
 
@@ -2929,16 +2920,16 @@ function logger_create_time_fields($element, $suffix = '') {
   drupal_add_library('system', 'ui.datepicker');
   drupal_add_css(LOGGER_REL_PATH . '/style/ui.datepicker.css');
 
-  $picker_properties = "{
-      yearRange: '-1:+0',
-      showAnim: 'fadeIn',
-      dateFormat: 'dd-mm-yy',
-      currentText: '" . t('Today') . "',
-      nextText: '" . t('Next Month') . "',
-      prevText: '" . t('Previous Month') . "',
-      dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "],
-      monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" . t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "']
-    }";
+  $picker_properties = '{ ' .
+    "yearRange: '-1:+0', " .
+    "showAnim: 'fadeIn', " .
+    "dateFormat: 'dd-mm-yy', " .
+    "currentText: '" . t('Today') . "', " .
+    "nextText: '" . t('Next Month') . "', " .
+    "prevText: '" . t('Previous Month') . "', " .
+    "dayNamesMin: [" . t("'Su','Mo','Tu','We','Th','Fr','Sa'") . "], " .
+    "monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" .
+    t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "'] }";
 
   $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 203);
   $field_id = '#edit-' . str_replace('_', '-', $element['#name']) . $suffix . 'date';

@@ -356,6 +356,18 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
   }
   else {
+    drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/theme/default/style.css');
+    drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/style.css');
+
+    $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+    drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers-min.js', $options);
+
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/maps-min.js', $options);
+
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/logger-min.js', $options);
+
     $form['prev_forecast'] = array(
       '#type' => 'hidden',
       '#default_value' => array($sensor->forecast),
