@@ -1737,23 +1737,24 @@ function logger_get_overview_chart_data($chart) {
  */
 function logger_format_power_series_data($chart, $measurements) {//FIXME: rename this function
 
-  $diff = $chart->offset / HOUR;
-  $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
-
-  //Complete data points
-  $start = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
-  $end   = $chart->period['end']   - $chart->period['end']   % $chart->resolution;
-
-  for ($timestamp = $start; $timestamp <= $end; $timestamp += $chart->resolution) {
-    $measurements[$timestamp] = isset($measurements[$timestamp]) ? $measurements[$timestamp] : NULL;
-  }
-
-  //Not all timestamps are multiples of $chart->resolution
   $formatted = array();
-  foreach ($measurements as $timestamp => $value) {
 
-    $key = date('Y-m-d H:i:s', $timestamp) . " $tz";
-    $formatted[$key] = isset($value) ? number_format($value, 3, '.', '') : '';
+  for ($timestamp = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
+    $timestamp <= $chart->period['end'];
+    $timestamp += $chart->resolution) {
+
+    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : ($timestamp % DAY > 0 ? 'Y-m-d H:i' : 'Y-m-d');
+    $key =  date($format, $timestamp);
+
+    if (isset($measurements[$timestamp])) {
+      $value = $measurements[$timestamp];
+      $decimals = (int) strstr("$value", '.');
+      $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : 1;
+      $formatted[$key] = number_format($value, $decimals, '.', '');
+    }
+    else {
+      $formatted[$key] = '';
+    }
   }
   return $formatted;
 }
