@@ -5,6 +5,33 @@
  * Install, update and uninstall functions for the msgcommon module.
  */
 
-function msgcommons_install() { }
+function msgcommons_install() {
 
-function msgcommons_uninstall() { }
+  $dir = drupal_get_path('module', 'msgcommons');
+  mkdir("$dir/tmp", 0777, TRUE);
+}
+
+function msgcommons_uninstall() {
+
+  $dir = drupal_get_path('module', 'msgcommons');
+  rmdir("$dir/tmp");
+}
+
+function msgcommons_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Makes a directory for storing forecasts.
+ */
+function msgcommons_update_7001() {
+
+  $dir = drupal_get_path('module', 'msgcommons');
+  mkdir("$dir/tmp", 0777, TRUE);
+
+  return st('Directory successfully created.');
+}
+

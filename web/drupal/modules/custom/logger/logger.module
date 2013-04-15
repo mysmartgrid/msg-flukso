@@ -950,14 +950,16 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $module = $i == FALSE ? 'logger' : substr($context, 0, $i);
 
   $chart->id = $module . '_chart_data_' . md5($unique_id);
-  $cache = cache_get($chart->id, 'cache_page');
+  $cache = safe_cache_get($chart->id);
   $chart->data = $cache ? $cache->data : FALSE;
   $chart->file_url = "$module/file/" . $chart->id;
 
   if (!$chart->data && !empty($types)) {
+
     $get_data = 'logger_get_' . $chart->context . '_chart_data';
     $chart->data = $get_data($chart);
-    cache_set($chart->id, $chart->data, 'cache_page', REQUEST_TIME + $lifetime);
+
+    safe_cache_set($chart->id, $chart->data, $lifetime);
   }
   return $chart;
 }
@@ -972,13 +974,9 @@ function logger_download_chart_data_file($cache_id) {
   //TODO: simplify this function
   $header = '';
   $lines = '';
+  $cache = safe_cache_get($cache_id);
 
-  $cache = cache_get($cache_id, 'cache_page');
-
-  if ($cache === FALSE) {
-    watchdog('logger.cache', "Error getting cache %cid", array('%cid' => $cache_id), WATCHDOG_ERROR);
-  }
-  else if (isset($cache->data) && isset($cache->data['series'])) {
+  if (isset($cache->data) && isset($cache->data['series'])) {
 
     $timestamps = array();
     $series = array();
@@ -1009,9 +1007,9 @@ function logger_download_chart_data_file($cache_id) {
     ksort($values); //Sorted CSV increases the performance of JS libraries
 
     foreach ($values as $timestamp => $values_list) {
-      $lines .= str_replace(array('&nbsp;', '<br>', '<nobr>', '</nobr>'), ' ', $timestamp); //Removes HTML tags
-      $lines .= $values_list . "\r\n"; //These characters work both in Linux and Windows
+      $lines .= $timestamp . $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
+    $lines .= str_replace(array('&nbsp;', '<br>', '<nobr>', '</nobr>'), ' ', $lines); //Removes HTML tags
   }
   download_chart_data_file('chart-data-file.csv', $header, $lines);
 }
@@ -3314,7 +3312,7 @@ function logger_get_period($interval, $resolution, $start = 0, $end = 0, $fill_s
 
   if ($fill_slider) {
     //Expand window to fill slider
-    $window *= 7;
+    $window *= 5;
   }
 
   //RRD requires the time window to be covered by RRD

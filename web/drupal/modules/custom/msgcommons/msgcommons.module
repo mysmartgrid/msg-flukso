@@ -38,6 +38,48 @@ define('WATT_UNIT_ID',   3);
 define('WEEK_UNIT_ID',   6);
 define('DAY_UNIT_ID',    5);
 
+define(MSGCOMMONS_PATH, drupal_get_path('module', 'msgcommons'));
+
+
+/**
+ * Stores data in the persistent cache.
+ * If it fails, store it in a temporary file.
+ *
+ * @param $cid       The cache id of the data to store.
+ * @param $data      The data to store in the cache.
+ * @param $lifetime  When the data expires and can be removed from the cache.
+ */
+function safe_cache_set($cid, $data, $lifetime) {
+
+    cache_set($cid, $data, 'cache_page', REQUEST_TIME + $lifetime);
+    $cache = cache_get($cid, 'cache_page');
+
+    if (!$cache) {
+      watchdog('logger.cache', "Object %cid too big for caching.", array('%cid' => $cid), WATCHDOG_NOTICE);
+      file_put_contents(MSGCOMMONS_PATH . "/tmp/$cid", serialize($data));
+    }
+}
+
+/**
+ * Returns data from the persistent cache. If not found, looks for a temporary file and returns its content.
+ * 
+ * @param $cid  The cache id of the data to retrieve.
+ * @return the cached object.
+ */
+function safe_cache_get($cid) {
+
+  $cache = cache_get($cid, 'cache_page');
+  if (!$cache) {
+
+    $file = MSGCOMMONS_PATH . "/tmp/$cid";
+    if (file_exists($file)) {
+
+      $cache = new stdClass();
+      $cache->data = unserialize(file_get_contents($file));
+    }
+  }
+  return $cache;
+}
 
 /**
  * Converts a string containing a list of tokens into an array.
@@ -539,4 +581,14 @@ function standard_deviation($values, $mean = NULL) {
     $devs[] = pow($value - $mean, 2);
   }
   return sqrt(mean($devs));
+}
+
+function msgcommons_cron() {
+
+  $rest = REQUEST_TIME % HOUR;
+
+  //First quarter of an hour
+  if ($rest >= 45 * MINUTE) {
+    rmoldfiles(MSGCOMMONS_PATH . '/tmp', HOUR);
+  }
 }

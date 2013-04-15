@@ -352,11 +352,13 @@ function logger_install() {
     ))
     ->execute();
 
-  $file_path = drupal_get_path('module', 'logger') . '/data/base';
-  mkdir($file_path, 0777, TRUE);
+  $dir = drupal_get_path('module', 'logger');
 
-  $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
-  drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
+  $path = "$dir/data/base";
+  mkdir($path, 0777, TRUE);
+
+  $path = "$dir/rrdtool";
+  drupal_set_message(check_plain(st('Please, create symbolic link:') . " $path."));
 
   variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
 }
