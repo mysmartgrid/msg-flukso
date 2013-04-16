@@ -38,7 +38,7 @@ define('WATT_UNIT_ID',   3);
 define('WEEK_UNIT_ID',   6);
 define('DAY_UNIT_ID',    5);
 
-define(MSGCOMMONS_PATH, drupal_get_path('module', 'msgcommons'));
+define('MSGCOMMONS_PATH', drupal_get_path('module', 'msgcommons'));
 
 
 /**
