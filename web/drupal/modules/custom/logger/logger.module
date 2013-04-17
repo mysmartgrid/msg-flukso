@@ -976,37 +976,37 @@ function logger_download_chart_data_file($cache_id) {
   $cache = safe_cache_get($cache_id);
   if (isset($cache->data) && isset($cache->data['series'])) {
 
-    $timestamps = array();
     $series = array();
     $values = array();
     $s = 1;
     $header = t('Serie');
+    $lines = '';
 
     foreach ($cache->data['series'] as $uid => $userdata) {
       foreach ($userdata as $username => $sensors) {
         foreach ($sensors as $sensor => $typedata) {
           foreach ($typedata as $type => $measurements) {
             foreach ($measurements as $timestamp => $value) {
-              $timestamps[$timestamp] = $timestamp;
+              $values[$timestamp] = '';
             }
             $series[] = $measurements;
           }
         }
       }
     }
-    ksort($timestamps);//Sorted CSV increases the performance of JS libraries and avoid warnings
+    ksort($values);//Sorted CSV increases the performance of JS libraries and avoid warnings
 
-    $header = '';
     foreach ($series as $measurements) {
       $header .= ',S' . $s++;
 
-      foreach ($timestamps as $timestamp) {
-        $value = isset($measurements[$timestamp]) ? $measurements[$timestamp] : '';
-        $values[$timestamp] = (isset($values[$timestamp]) ? $values[$timestamp] : '') . ',' . $value;
+      foreach ($values as $timestamp => &$list) {
+        $list .= ',';
+        if (isset($measurements[$timestamp])) {
+          $list .= $measurements[$timestamp];
+        }
       }
     }
 
-    $lines = '';
     foreach ($values as $timestamp => $values_list) {
       $lines .= $timestamp . $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
