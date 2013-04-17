@@ -972,10 +972,8 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
 function logger_download_chart_data_file($cache_id) {
 
   //TODO: simplify this function
-  $header = '';
-  $lines = '';
-  $cache = safe_cache_get($cache_id);
 
+  $cache = safe_cache_get($cache_id);
   if (isset($cache->data) && isset($cache->data['series'])) {
 
     $timestamps = array();
@@ -988,14 +986,17 @@ function logger_download_chart_data_file($cache_id) {
       foreach ($userdata as $username => $sensors) {
         foreach ($sensors as $sensor => $typedata) {
           foreach ($typedata as $type => $measurements) {
-            $timestamps = array_merge($timestamps, array_keys($measurements));
+            foreach ($measurements as $timestamp => $value) {
+              $timestamps[$timestamp] = $timestamp;
+            }
             $series[] = $measurements;
           }
         }
       }
     }
-    $timestamps = array_unique($timestamps);
+    ksort($timestamps);//Sorted CSV increases the performance of JS libraries and avoid warnings
 
+    $header = '';
     foreach ($series as $measurements) {
       $header .= ',S' . $s++;
 
@@ -1004,12 +1005,12 @@ function logger_download_chart_data_file($cache_id) {
         $values[$timestamp] = (isset($values[$timestamp]) ? $values[$timestamp] : '') . ',' . $value;
       }
     }
-    ksort($values); //Sorted CSV increases the performance of JS libraries
 
+    $lines = '';
     foreach ($values as $timestamp => $values_list) {
       $lines .= $timestamp . $values_list . "\r\n"; //These characters work both in Linux and Windows
     }
-    $lines .= str_replace(array('&nbsp;', '<br>', '<nobr>', '</nobr>'), ' ', $lines); //Removes HTML tags
+    $lines = str_replace(array('&nbsp;', '<br>', '<nobr>', '</nobr>'), ' ', $lines); //Removes HTML tags
   }
   download_chart_data_file('chart-data-file.csv', $header, $lines);
 }
@@ -1741,7 +1742,7 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
     $timestamp <= $chart->period['end'];
     $timestamp += $chart->resolution) {
 
-    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : ($timestamp % DAY > 0 ? 'Y-m-d H:i' : 'Y-m-d');
+    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : 'Y-m-d H:i';
     $key =  date($format, $timestamp);
 
     if (isset($measurements[$timestamp])) {
