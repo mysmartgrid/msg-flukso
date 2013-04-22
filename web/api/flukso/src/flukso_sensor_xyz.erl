@@ -64,9 +64,38 @@ malformed_POST(ReqData, _State) ->
 
     State = #state{rrdSensor = RrdSensor, digest = Digest},
 
-    {case {ValidVersion, ValidSensor, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
+    ErrorCode = case {ValidVersion, ValidSensor, ValidDigest} of
+      {true, true, true} ->
+        try
+          {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+          Payload = {
+            proplists:get_value(<<"measurements">>, JsonData),
+            proplists:get_value(<<"config">>, JsonData)},
+
+            case Payload of
+              {undefined, undefined} -> 400;
+              {undefined, Config} -> 0;
+              {Measurements, undefined} ->
+                %Valid timestamp: from -7 days to +10 minutes
+                ServerTimestamp = unix_time(),
+                FromTime = ServerTimestamp - 604800,
+                ToTime = ServerTimestamp + 600,
+                InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+                case length(InvalidTimestamps) of
+                  0 -> 0;
+                  _ -> 470
+                end;
+              _ -> 400
+            end
+        catch
+          _:_ -> 400
+        end;
+      _ -> 400
+    end,
+
+    {case ErrorCode of
+        0 -> false;
+        _ -> {halt, ErrorCode}
      end,
     ReqData, State}.
 
@@ -426,27 +455,16 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
 parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
 
   try
-    %Valid timestamp: from -7 days to +10 minutes
-    FromTime = ServerTimestamp - 604800,
-    ToTime = ServerTimestamp + 600,
-    InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
+    {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
 
-    case length(InvalidTimestamps) of
-      0 ->
-        Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
-        {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
+    %debuging
+    %if
+    %  length(MultipleSend) == 0 ->
+    %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
+    %end,
 
-        %debuging
-        %if
-        %  length(MultipleSend) == 0 ->
-        %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
-        %end,
-
-        {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
-
-      _ ->
-        {error, Measurements} 
-    end
+    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
   catch
     _:_ ->
       {error, error}
