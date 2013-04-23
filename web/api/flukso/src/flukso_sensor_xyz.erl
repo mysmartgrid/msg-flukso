@@ -73,28 +73,28 @@ malformed_POST(ReqData, _State) ->
             proplists:get_value(<<"config">>, JsonData)},
 
             case Payload of
-              {undefined, undefined} -> 400;
-              {undefined, Config} -> 0;
+              {undefined, undefined} -> ?HTTP_BAD_ARGUMENT;
+              {undefined, Config} -> ?HTTP_OK;
               {Measurements, undefined} ->
-                %Valid timestamp: from -7 days to +10 minutes
+                %Valid measurement timestamp: from -7 days to +5 minutes
                 ServerTimestamp = unix_time(),
-                FromTime = ServerTimestamp - 604800,
-                ToTime = ServerTimestamp + 600,
+                FromTime = ServerTimestamp - ?WEEK,
+                ToTime = ServerTimestamp + 5 * ?MINUTE,
                 InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
                 case length(InvalidTimestamps) of
-                  0 -> 0;
-                  _ -> 470
+                  0 -> ?HTTP_OK;
+                  _ -> ?HTTP_INVALID_TIMESTAMP 
                 end;
-              _ -> 400
+              _ -> ?HTTP_BAD_ARGUMENT
             end
         catch
-          _:_ -> 400
+          _:_ -> ?HTTP_BAD_ARGUMENT
         end;
-      _ -> 400
+      _ -> ?HTTP_BAD_ARGUMENT
     end,
 
     {case ErrorCode of
-        0 -> false;
+        ?HTTP_OK -> false;
         _ -> {halt, ErrorCode}
      end,
     ReqData, State}.
@@ -464,7 +464,7 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
     %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
     %end,
 
-    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
+    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]}
   catch
     _:_ ->
       {error, error}

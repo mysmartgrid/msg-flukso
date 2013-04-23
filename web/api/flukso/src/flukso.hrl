@@ -34,15 +34,19 @@
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
 -define(PEAK_CONSUMPTION_EVENT_ID,       4).
 
--define(MESSAGE_RECEIVED_EVENT_ID,            100).
--define(HEARTBEAT_RECEIVED_EVENT_ID,          101).
--define(MEASUREMENT_RECEIVED_EVENT_ID,        102).
--define(BROWNOUT_EVENT_ID,                    104).
--define(FIRMWARE_UPGRADED_EVENT_ID,           105).
--define(FAILED_FIRMWARE_UPGRADE_EVENT_ID,     106).
+-define(MESSAGE_RECEIVED_EVENT_ID,        100).
+-define(HEARTBEAT_RECEIVED_EVENT_ID,      101).
+-define(MEASUREMENT_RECEIVED_EVENT_ID,    102).
+-define(BROWNOUT_EVENT_ID,                104).
+-define(FIRMWARE_UPGRADED_EVENT_ID,       105).
+-define(FAILED_FIRMWARE_UPGRADE_EVENT_ID, 106).
 
--define(CORRUPTED_MEASUREMENT_EVENT_ID,       201).
--define(INVALID_TIMESTAMP_EVENT_ID,           202).
+-define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
+-define(INVALID_TIMESTAMP_EVENT_ID,       202).
+
+-define(HTTP_OK,                200).
+-define(HTTP_BAD_ARGUMENT,      400).
+-define(HTTP_INVALID_TIMESTAMP, 470).
 
 -record(state,
         {rrdSensor,
