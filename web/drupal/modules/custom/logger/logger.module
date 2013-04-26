@@ -1729,7 +1729,7 @@ function logger_get_overview_chart_data($chart) {
 
 /**
  * Formats power consumption chart data series.
- * 
+ *
  * @param $measurements  The array of timestamp / value that form the data series.
  * @param $chart         The chart object with the format parameters.
  * @return the formatted data series.
@@ -1742,20 +1742,45 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
     $timestamp <= $chart->period['end'];
     $timestamp += $chart->resolution) {
 
-    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : 'Y-m-d H:i';
-    $key =  date($format, $timestamp);
+    $key =  logger_format_power_data_key($timestamp);
+    $formatted[$key] = isset($measurements[$timestamp]) ? logger_format_power_data_value($measurements, $timestamp) : '';
 
-    if (isset($measurements[$timestamp])) {
-      $value = $measurements[$timestamp];
-      $decimals = (int) strstr("$value", '.');
-      $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : 1;
-      $formatted[$key] = number_format($value, $decimals, '.', '');
-    }
-    else {
-      $formatted[$key] = '';
+    //Artificial points used for connecting related series lines
+    $intermediate_time = $timestamp + (int) $chart->resolution / 2;
+    if (isset($measurements[$intermediate_time])) {
+
+      $key = logger_format_power_data_key($intermediate_time);
+      $formatted[$key] = logger_format_power_data_value($measurements, $intermediate_time);
     }
   }
   return $formatted;
+}
+
+/**
+ * Formats a power consumption chart timestamp.
+ *
+ * @param $timestamp The timestamp to be formatted.
+ * @return the formatted timestamp.
+ */
+function logger_format_power_data_key($timestamp) {
+
+    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : 'Y-m-d H:i';
+    return date($format, $timestamp);
+}
+
+/**
+ * Formats a power consumption chart value.
+ *
+ * @param $measurements The array of measurements ($timestamp => $value).
+ * @param $timestamp    The index of the value to be formatted.
+ * @return the formatted value.
+ */
+function logger_format_power_data_value($measurements, $timestamp) {
+
+  $value = $measurements[$timestamp];
+  $decimals = (int) strstr("$value", '.');
+  $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : 1;
+  return number_format($value, $decimals, '.', '');
 }
 
 /**
