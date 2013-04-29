@@ -2248,7 +2248,7 @@ function theme_logger_bar_chart_area($variables) {
     $stacks = $chart->data['stacks'];    
   }
 
-  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
   drupal_add_js(LOGGER_REL_PATH . '/js/flot/jquery.flot.min.js', $options);
 
   $options['weight']++;
@@ -2269,7 +2269,7 @@ function theme_logger_bar_chart_area($variables) {
       "[ [ " . implode('], [', $data_labels) . " ] ], " .
       "[ [ " . implode('], [', $data_labels2) . " ] ], " .
       "[" . implode(", ", $stacks) . "], $percentual); " .
-    "} );", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
+    "} );", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200, 'defer' => TRUE));
  
   return " $menu <div id='$id' class='chart'></div><br>" . t('Unit') . ': ' . t($chart->unit) . '<br><br>' .
     logger_create_chart_legend($chart);
@@ -2315,7 +2315,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   $cssClass = $slider ? 'slider' : 'chart';
   $id = $slider ? 'sliderChart' : 'lineChart';
 
-  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+  $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
 
   //If IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && strpos(strtoupper($_SERVER['HTTP_USER_AGENT']), 'MSIE')) {
@@ -2341,7 +2341,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
 
   drupal_add_js('jQuery(document).ready( function() { ' .
       'createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $properties) . '}, [' . implode(', ', $weather) . ']); ' .
-    '} );', array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
+    '} );', array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200, 'defer' => TRUE));
 
   return '<div id="' . $id . '" class="' . $cssClass . '"></div><br>' . $labels_output;
 }
@@ -2839,7 +2839,7 @@ function theme_logger_geo_location($variables) {
   $latitude = strtok($coordinates, ',');
   $longitude = strtok(',');
 
-  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 202);
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 202, 'defer' => TRUE);
   drupal_add_js("jQuery(document).ready(function(){createMap($latitude, $longitude);});", $options);
 
   $latitude_field = logger_create_custom_field($element, '_latitude', $latitude, 11, 11);
@@ -2901,7 +2901,7 @@ function theme_logger_time_period($variables) {
  */
 function theme_logger_color_picker($variables) {
 
-  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150));
+  drupal_add_js(LOGGER_REL_PATH . '/js/jscolor/jscolor-min.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE));
 
   $chart_id = $variables['chartId'];
   $colors = $variables['colors'];
@@ -2961,7 +2961,7 @@ function logger_create_time_fields($element, $suffix = '') {
     "monthNames: ['" . t('January') . "', '" . t('February') . "', '" . t('March') . "', '" . t('April') . "', '" . t('May') . "', '" . t('June') . "', '" .
     t('July') . "', '" . t('August') . "', '" . t('September') . "', '" . t('October') . "', '" . t('November') . "', '" . t('December') . "'] }";
 
-  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 203);
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 203, 'defer' => TRUE);
   $field_id = '#edit-' . str_replace('_', '-', $element['#name']) . $suffix . 'date';
   drupal_add_js('jQuery(document).ready(function(){jQuery("' . $field_id . '").datepicker(' . $picker_properties . ');});', $options);
 
