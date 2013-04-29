@@ -973,14 +973,15 @@ function logger_download_chart_data_file($cache_id) {
 
   //TODO: simplify this function
 
+  $header = t('Serie');
+  $lines = '';
   $cache = safe_cache_get($cache_id);
+
   if (isset($cache->data) && isset($cache->data['series'])) {
 
     $series = array();
     $values = array();
     $s = 1;
-    $header = t('Serie');
-    $lines = '';
 
     foreach ($cache->data['series'] as $uid => $userdata) {
       foreach ($userdata as $username => $sensors) {
