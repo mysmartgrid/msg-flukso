@@ -211,7 +211,6 @@ function msgweb_process(&$vars) {
 
   if (isset($vars['scripts'])) {
     $vars['scripts'] = str_replace($base_url, $static_url, $vars['scripts']);
-    $vars['scripts'] = str_replace("<script type=\"text/javascript\"", "<script type=\"text/javascript\" defer=\"defer\"", $vars['scripts']);
   }
 
   if (isset($vars['page_bottom'])) {
