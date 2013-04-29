@@ -213,3 +213,9 @@ function msgmobile_get_static_url($base_url) {
   return ''; //str_replace('www', 'static', $base_url);
 }
 
+function msgmobile_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
+}

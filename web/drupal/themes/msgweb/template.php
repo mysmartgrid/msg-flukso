@@ -211,6 +211,7 @@ function msgweb_process(&$vars) {
 
   if (isset($vars['scripts'])) {
     $vars['scripts'] = str_replace($base_url, $static_url, $vars['scripts']);
+    $vars['scripts'] = str_replace("<script type=\"text/javascript\"", "<script type=\"text/javascript\" defer=\"defer\"", $vars['scripts']);
   }
 
   if (isset($vars['page_bottom'])) {
@@ -225,4 +226,11 @@ function msgweb_get_static_url($base_url) {
 
   //TODO: a certificate is needed for domain: static.mysmartgrid.de
   return ''; //str_replace('www', 'static', $base_url);
+}
+
+function msgweb_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
 }

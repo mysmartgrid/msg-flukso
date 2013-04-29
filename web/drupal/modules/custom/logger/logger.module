@@ -451,6 +451,13 @@ function user_menu_alter(&$items) {
   $items['user/%user/edit']['access callback'] = 'logger_user_edit_access';
 }
 
+function logger_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
+}
+
 /**
  * This function overrides user_edit_access to block user profile edition by visitors (such as the user "guest").
  * 

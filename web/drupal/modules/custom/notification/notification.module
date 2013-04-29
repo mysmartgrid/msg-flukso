@@ -86,6 +86,13 @@ function notification_permission() {
   );
 }
 
+function notification_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
+}
+
 function notification_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
