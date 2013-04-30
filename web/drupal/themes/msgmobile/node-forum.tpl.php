@@ -1,5 +1,4 @@
 <?php
-
 /**
  * The node rendering logic for mySmartgrid.
  *
@@ -39,22 +38,18 @@
  */
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
-
   <div class="node-headline clear-block">
     <span class="timestamp"><?php print $mysmartgrid_node_timestamp; ?></span>
     <span class="node-author"> – <?php print $mysmartgrid_node_author; ?></span>
     <br><br>
   </div>
-
   <div class="content clear-block">
     <?php print $picture; ?>
     <?php print $content; ?>
   </div>
-
   <?php if (!stripos(request_uri(), 'reply')): ?>
     <div class="meta">
         <div class="more"><?php print $mysmartgrid_node_links; ?></div>
     </div>
   <?php endif; ?>
-
-</div> <!-- node -->
+</div>

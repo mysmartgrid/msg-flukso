@@ -59,15 +59,12 @@
 ?>
 <div class="<?php print $classes; ?> clearfix"<?php print $attributes; ?>>
   <?php print $picture ?>
-
   <?php if ($new): ?>
     <span class="new"><?php print $new ?></span>
   <?php endif; ?>
-
   <div class="comment-submitted">
     <?php print $submitted; ?>
   </div>
-
   <div class="comment-content"<?php print $content_attributes; ?>>
     <?php
       // We hide the comments and links now so that we can render them later.
@@ -81,7 +78,6 @@
     </div>
     <?php endif; ?>
   </div>
-
   <div class="comment-links">
   <?php print render($content['links']) ?>
   </div>

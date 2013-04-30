@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Theme setting callbacks for the msgweb theme.
