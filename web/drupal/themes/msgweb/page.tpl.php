@@ -9,7 +9,7 @@
   <div id="doc">
     <img src="<?php print $theme_url; ?>/images/doc-bg.jpg" id="doc-bg" width="997" height="400"/>
     <div id="main" role="main">
-      <!--<div id="breadcrumb"><?php print $breadcrumb; ?></div>-->
+      <div id="breadcrumb"><?php print $breadcrumb; ?></div>
       <div role="section">
         <div class="headings">
           <?php if ($title != "") { ?><h2 class="content-title"><?php print $title; ?></h2><?php } else { ?>
