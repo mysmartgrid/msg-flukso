@@ -806,7 +806,7 @@ function logger_device_clone($device_id) {
         'device' => $new_device_id,
         'meter' => $new_meter,
         'uid' => 0,
-        'function' => empty($sensor->function) ? NULL : "Cloned $sensor->function",
+        'function' => empty($sensor->function) ? NULL : substr("C $sensor->function", 0, 16),
         'created' => $sensor->created,
         'access' => $sensor->access,
         'price' => $sensor->price,
