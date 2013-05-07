@@ -292,6 +292,9 @@ function msgdump_cron() {
     //Assumes that cron runs 4 times an hour
     $chunk = ceil($total / 4);
 
+    //DEBUG
+    watchdog('msgdump.cron', "Processing %chunk MSG Dumps.", array('%chunk' => $chunk));
+
     //Get a chunk of dumps
     $dumps = db_select('msgdump', 'd')
       ->fields('d', array('file'))
@@ -304,8 +307,10 @@ function msgdump_cron() {
 
     //Update each dump once a day
     foreach ($dumps as $dump) {
- 
-        exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc');
+
+        $code = 0;
+        $output = array();
+        exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc', $output, $code);
 
         db_update('msgdump')
           ->fields(array(
@@ -314,8 +319,10 @@ function msgdump_cron() {
           ->condition('file', $dump->file)
           ->execute();
 
-        //DEBUG
-        //watchdog('cron', '[msgdump_cron] ' . $dump->file . ': ' . $res);
+        if ($code != 0) {
+          watchdog('msgdump.cron', "MSG Dump to file %file has failed. return code: %code, output: %output",
+             array('%file' => $dump->file, '%code' => $code, '%output' => implode(' ', $output)), WATCHDOG_CRITICAL);
+        }
     }
   }
 }
