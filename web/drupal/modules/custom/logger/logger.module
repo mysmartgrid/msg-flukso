@@ -3333,25 +3333,13 @@ function logger_get_sub_interval($interval) {
  */
 function logger_get_period($interval, $resolution, $start = 0, $end = 0, $fill_slider = TRUE) {
 
-  module_load_include('inc', 'logger', 'logger.rrd');
-  $storage_period = logger_rrd_get_storage_period($resolution);
-
   //If period not informed, consider default time window
   $window = $start > 0 && $end > 0 ? $end - $start : logger_get_default_time_window($interval);
-
-  $now = REQUEST_TIME;
-  if ($end < ($now - $storage_period)) {
-    $end = $now;
-  }
 
   if ($fill_slider) {
     //Expand window to fill slider
     $window *= 5;
   }
-
-  //RRD requires the time window to be covered by RRD
-  $max_window = $storage_period - ($now - $end);
-  $window = min($window, $max_window);
 
   return array('start' => ($end - $window), 'end' => $end);
 }

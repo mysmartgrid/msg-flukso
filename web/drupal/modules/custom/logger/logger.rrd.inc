@@ -42,7 +42,7 @@ function logger_rrd_base_create($meter) {
 }
 
 /**
- * Returns an array of measurement storage periods, indexed by time resolution.
+ * Returns an array of default measurement storage periods, indexed by time resolution.
  *
  * @return the array of storage periods.
  */
@@ -58,14 +58,60 @@ function logger_rrd_get_storage_periods() {
 }
 
 /**
- * Returns the storage period of measurements in the informed time resolution.
+ * Returns the measurements storage period of a sensor in the informed time resolution.
  *
+ * @param $meter The sensor id.
  * @param $step  The time resolution.
  * @return the storage period.
  */
-function logger_rrd_get_storage_period($step) {
-  $periods = logger_rrd_get_storage_periods();
-  return $periods[$step];
+function logger_rrd_get_storage_period($meter, $step) {
+
+  $cid = "storage_period_$meter"; 
+  $cache = cache_get($cid, 'cache_page');
+
+  if ($cache) {
+    $period = $cache->data;
+  }
+  else {
+    $objects = db_select('logger_meter_storage_period', 's')
+      ->fields('s', array('resolution', 'period'))
+      ->condition('s.meter', $meter)
+      ->execute();
+
+    $period = array();
+    foreach ($objects as $object) {
+      $period[$object->resolution] = $object->period;
+    }
+    cache_set($cid, $period, 'cache_page', REQUEST_TIME + DAY);
+  }
+  return $period[$step];
+}
+
+/**
+ * Adjusts the period of time of a query to the RRA limitations.
+ * 
+ * @param $meter   The sensor id.
+ * @param $step    The time resolution.
+ * @param $period  The period of time to be adjusted, as an array (start => start timestamp, end => end timestamp).
+ * @return the adjusted timestamp.
+ */
+function logger_rrd_adjust_period($meter, $step, $period) {
+
+  $storage_period = logger_rrd_get_storage_period($meter, $step);
+  $start = $period['start'];
+  $end = $period['end'];
+
+  $now = REQUEST_TIME;
+  if ($end < ($now - $storage_period)) {
+    $end = $now;
+  }
+  $window = $end - $start;
+
+  //RRD requires the time window to be covered by the RRA
+  $max_window = $storage_period - ($now - $end);
+  $window = min($window, $max_window);
+
+  return array('start' => ($end - $window), 'end' => $end);
 }
 
 /**
@@ -203,12 +249,12 @@ function logger_rrd_update($meter, $values) {
 function logger_rrd_query_sensor($sensor, $unit, $period, $step, $price = NULL) {
 
   $def = logger_rrd_sensor_def(METER, $sensor, $unit, $price);
-
   if ($def == NULL) {
     return array();
   }
 
   $latest = logger_rrd_latest_timestamp($sensor);
+  $period = logger_rrd_adjust_period($sensor->meter, $step, $period);
 
   return logger_rrd_export($def, METER, $latest, TRUE, $period, $step);
 }
@@ -469,12 +515,6 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
   }
   $start -= $start % $step;
   $end -= $end % $step;
-
-  $storage_period = logger_rrd_get_storage_period($step);
-
-  if ((REQUEST_TIME - $end) > $storage_period) {
-    return array();
-  }
 
   $maxrows = 1 + ($end - $start) / $step;
   $maxrows = $maxrows < 10 ? 10 : $maxrows; //RRDTool exports at least 8 rows

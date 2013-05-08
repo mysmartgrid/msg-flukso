@@ -898,6 +898,10 @@ function logger_sensor_remove($meter, $next_url = NULL) {
     )
     ->execute();
 
+  db_delete('logger_meter_storage_period')
+    ->condition('meter', $meter)
+    ->execute();
+
   db_delete('logger_meters')
     ->condition('meter', $meter)
     ->execute();
@@ -939,6 +943,24 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
         'permissions' => $permissions
       ))
       ->execute();
+  }
+
+  if (!$error) {
+
+    foreach (logger_rrd_get_storage_periods() as $resolution => $period) {
+
+      $error = db_insert('logger_meter_storage_period')
+        ->fields(array(
+          'meter' => $meter,
+          'resolution' => $resolution,
+          'period' => $period
+        ))
+        ->execute();
+
+      if ($error) {
+        break;        
+      }
+    }
   }
   return !$error;
 }
