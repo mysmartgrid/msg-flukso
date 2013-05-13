@@ -330,7 +330,7 @@ function notification_install() {
   db_insert('unit')
     ->fields(array(
       'id' => 4,
-      'name' => 'Killowatt',
+      'name' => 'Kilowatt',
       'symbol' => 'kW',
       'factor' => 0.001,
     ))
