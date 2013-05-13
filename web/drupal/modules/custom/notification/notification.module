@@ -869,15 +869,15 @@ function notification_limit_up_validate($field, $form_state) {
       ->execute()
       ->fetchField();
 
-    $converted_limit = $limit_up * $factor;
+    $converted_limit = $limit_up / $factor;
 
     if (($event_id == NO_COMMUNICATION_EVENT_ID || $event_id == COMMUNICATION_RESTORED_EVENT_ID) && $converted_limit < 30 * MINUTE) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
     }
-    elseif ($event_id == PEAK_CONSUMPTION_EVENT_ID && $converted_limit <= 0) {
+    elseif ($event_id == PEAK_CONSUMPTION_EVENT_ID && $converted_limit < 1) {
 
-      form_error($field, t('Peak consumption can not be lesser than 0 watt / min.'));
+      form_error($field, t('Peak consumption can not be lesser than 1 watt / min.'));
     }
     elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
 
