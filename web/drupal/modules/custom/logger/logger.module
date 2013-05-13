@@ -3641,9 +3641,10 @@ function logger_forecast_access($permission) {
  *
  * @param $interval The time interval.
  * @param $device   The device's hash code.
+ * @param $unit     The measurement unit.
  * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
  */
-function logger_query_device_measurements($interval, $device) {
+function logger_query_device_measurements($interval, $device, $unit = 'watt') {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -3656,7 +3657,7 @@ function logger_query_device_measurements($interval, $device) {
   $measurements = array();
   foreach ($sensors as $sensor) {
 
-    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($sensor, 'watt', $period, $resolution);
+    $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($sensor, $unit, $period, $resolution);
   }
   return $measurements;
 }

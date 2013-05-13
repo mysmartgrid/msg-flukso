@@ -1510,6 +1510,7 @@ function notification_send_peak_consumption_emails() {
 
   $query = notification_compose_base_query(PEAK_CONSUMPTION_EVENT_ID);
   $query->addField('n', 'base_time', 'since_time');
+  $query->addField('un', 'factor', 'unit_factor');
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->condition('m.type', CONSUMPTION_SENSOR_TYPE, '=');
@@ -2000,13 +2001,15 @@ function notification_query_peak_consumption_violations($notifiable) {
   $list = NULL;
   $measurements = logger_query_device_measurements('hour', $notifiable['device']);
 
+  $limit_up = $notifiable['limit_up'] / $notifiable['unit_factor'];
+
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {
       $sublist = NULL;
 
       foreach ($values as $timestamp => $value) {
 
-        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time']) {
+        if ($value > $limit_up && $timestamp > $notifiable['since_time']) {
 
           date_default_timezone_set($notifiable['timezone']);
 
