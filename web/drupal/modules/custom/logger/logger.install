@@ -738,3 +738,27 @@ function logger_update_7020() {
   }
   return st('Table logger_meter_storage_period successfully created.');
 }
+
+/**
+ * Update logger_meter_storage_period for user stadt-kl.
+ */
+function logger_update_7022() {
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m', array('meter'))
+    ->condition('m.uid', 1146)
+    ->condition('m.function', '', '<>')
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    db_update('logger_meter_storage_period')
+      ->fields(array(
+        'period' => 4 * WEEK
+      ))
+      ->condition('meter', $sensor->meter)
+      ->condition('resolution', MINUTE)
+      ->execute();
+  }
+  return st('Table logger_meter_storage_period has been successfully updated.');
+}
