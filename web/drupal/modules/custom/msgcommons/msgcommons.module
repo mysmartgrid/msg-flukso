@@ -55,8 +55,11 @@ function safe_cache_set($cid, $data, $lifetime) {
     $cache = cache_get($cid, 'cache_page');
 
     if (!$cache) {
-      watchdog('logger.cache', "Object %cid too big for caching.", array('%cid' => $cid), WATCHDOG_NOTICE);
-      file_put_contents(MSGCOMMONS_PATH . "/tmp/$cid", serialize($data));
+      watchdog('msg.cache', "Object %cid too big for caching.", array('%cid' => $cid), WATCHDOG_NOTICE);
+      $saved = file_put_contents(MSGCOMMONS_PATH . "/tmp/$cid", serialize($data));
+      if ($saved === FALSE) {
+        watchdog('msg.cache', "Object %cid could not be saved to a cache file.", array('%cid' => $cid), WATCHDOG_ERROR);
+      }
     }
 }
 
