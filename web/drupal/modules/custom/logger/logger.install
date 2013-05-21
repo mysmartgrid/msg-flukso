@@ -732,7 +732,7 @@ function logger_update_7020() {
       ->fields(array(
         'meter' => $sensor->meter,
         'resolution' => WEEK,
-        'period' => YEAR
+        'period' => 10 * YEAR
       ))
       ->execute();
   }

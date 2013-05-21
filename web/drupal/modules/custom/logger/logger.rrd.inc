@@ -98,20 +98,26 @@ function logger_rrd_get_storage_period($meter, $step) {
 function logger_rrd_adjust_period($meter, $step, $period) {
 
   $storage_period = logger_rrd_get_storage_period($meter, $step);
-  $start = $period['start'];
-  $end = $period['end'];
+  $min_time = REQUEST_TIME - $storage_period;
 
-  $now = REQUEST_TIME;
-  if ($end < ($now - $storage_period)) {
-    $end = $now;
+  if ($period['end'] < $min_time) {
+    $period['end'] = REQUEST_TIME;
   }
-  $window = $end - $start;
+
+  if ($period['start'] >= $period['end']) {
+    $period['start'] = $min_time;
+  }
+
+  $window = $period['end'] - $period['start'];
+  $max_window = $storage_period - (REQUEST_TIME - $period['end']);
 
   //RRD requires the time window to be covered by the RRA
-  $max_window = $storage_period - ($now - $end);
-  $window = min($window, $max_window);
+  if ($window > $max_window) {
+    $window = $max_window;
+  }
+  $period['start'] = $period['end'] - $window;
 
-  return array('start' => ($end - $window), 'end' => $end);
+  return $period;
 }
 
 /**
@@ -504,28 +510,25 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     return array();
   }
 
-  $start = $period['start'];
-  $end = $period['end'];
-
   //time period MUST be within the RRA and both $start and $end must be multiples of $step
   if ($step >= DAY) {
     $offset = get_timezone_offset();
-    $start += $offset;
-    $end += $offset;
+    $period['start'] += $offset;
+    $period['end'] += $offset;
   }
-  $start -= $start % $step;
-  $end -= $end % $step;
+  $period['start'] -= $period['start'] % $step;
+  $period['end'] -= $period['end'] % $step;
 
-  $maxrows = 1 + ($end - $start) / $step;
+  $maxrows = 1 + ($period['end'] - $period['start']) / $step;
   $maxrows = $maxrows < 10 ? 10 : $maxrows; //RRDTool exports at least 8 rows
 
   $command = RRDTOOL . ' xport ' .
-    "--start $start " .
-    "--end $end " .
-    "--step $step " .
-    "--maxrows $maxrows " .
-    "$def " .
-    "XPORT:$exported_cdef";
+    " --start " . $period['start'] .
+    " --end " . $period['end'] .
+    " --step $step" .
+    " --maxrows $maxrows" .
+    " $def" .
+    " XPORT:$exported_cdef";
 
   //Function exec() is unable to execute long commands
   if (strlen($command) > 102400) {
