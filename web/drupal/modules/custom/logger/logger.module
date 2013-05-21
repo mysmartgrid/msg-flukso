@@ -1787,7 +1787,7 @@ function logger_format_power_data_value($measurements, $timestamp) {
 
   $value = $measurements[$timestamp];
   $decimals = (int) strstr("$value", '.');
-  $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : 1;
+  $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
   return number_format($value, $decimals, '.', '');
 }
 
