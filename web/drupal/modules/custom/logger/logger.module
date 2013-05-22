@@ -1750,30 +1750,15 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
     $timestamp <= $chart->period['end'];
     $timestamp += $chart->resolution) {
 
-    $key =  logger_format_power_data_key($timestamp);
-    $formatted[$key] = isset($measurements[$timestamp]) ? logger_format_power_data_value($measurements, $timestamp) : '';
+    $formatted[$timestamp] = isset($measurements[$timestamp]) ? logger_format_power_data_value($measurements, $timestamp) : NULL;
 
     //Artificial points used for connecting related series lines
     $intermediate_time = $timestamp + (int) $chart->resolution / 2;
     if (isset($measurements[$intermediate_time])) {
-
-      $key = logger_format_power_data_key($intermediate_time);
-      $formatted[$key] = logger_format_power_data_value($measurements, $intermediate_time);
+      $formatted[$timestamp] = logger_format_power_data_value($measurements, $intermediate_time);
     }
   }
   return $formatted;
-}
-
-/**
- * Formats a power consumption chart timestamp.
- *
- * @param $timestamp The timestamp to be formatted.
- * @return the formatted timestamp.
- */
-function logger_format_power_data_key($timestamp) {
-
-    $format = $timestamp % MINUTE > 0 ? 'Y-m-d H:i:s' : 'Y-m-d H:i';
-    return date($format, $timestamp);
 }
 
 /**
@@ -1785,10 +1770,9 @@ function logger_format_power_data_key($timestamp) {
  */
 function logger_format_power_data_value($measurements, $timestamp) {
 
-  $value = $measurements[$timestamp];
-  $decimals = (int) strstr("$value", '.');
+  $decimals = (int) strstr($measurements[$timestamp], '.');
   $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
-  return number_format($value, $decimals, '.', '');
+  return number_format($measurements[$timestamp], $decimals, '.', '');
 }
 
 /**
@@ -2163,7 +2147,11 @@ function theme_logger_line_chart_area($variables) {
     'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false',
     'fillAlpha' => $chart->context == 'onsite' ? 1 : 0.15, //FIXME: create a property on the chart object
-    'visibility' => '[' . implode(', ', $visibility) . ']'
+    'visibility' => '[' . implode(', ', $visibility) . ']',
+    'xAxisLabelFormatter' => 'Dygraph.dateAxisFormatter',
+    'xValueFormatter' => 'Dygraph.dateString_',
+    'xValueParser' => 'function(x) { return 1000 * parseInt(x); }',
+    'xTicker' => 'Dygraph.dateTicker'
   );
   if ($chart->show_slider) {
     $chart_properties['zoomCallback'] = 'updateSliderChart';
@@ -2195,7 +2183,11 @@ function theme_logger_line_chart_area($variables) {
       'rollPeriod' => $chart_properties['rollPeriod'],
       'fillGraph' => $chart_properties['fillGraph'],
       'fillAlpha' => $chart_properties['fillAlpha'],
-      'visibility' => $chart_properties['visibility'] 
+      'visibility' => $chart_properties['visibility'],
+      'xAxisLabelFormatter' => $chart_properties['xAxisLabelFormatter'],
+      'xValueFormatter' => $chart_properties['xValueFormatter'],
+      'xValueParser' => $chart_properties['xValueParser'],
+      'xTicker' => $chart_properties['xTicker']
     );
 
     $output .= logger_create_dygraph($chart, FALSE, $slider_properties, TRUE);
