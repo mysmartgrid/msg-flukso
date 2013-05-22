@@ -943,7 +943,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   }
   $chart->yaxis = $yaxis;
   $chart->xaxis = $xaxis;
-  $chart->period = logger_get_period($interval, $chart->resolution, $xaxis[0], $xaxis[1], $show_slider);
+  $chart->period = logger_get_period($interval, $xaxis[0], $xaxis[1], $show_slider);
 
   $lifetime = MINUTE;
   $t1 = $chart->period['start'] - ($chart->period['start'] % $lifetime);
@@ -1755,7 +1755,7 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
     //Artificial points used for connecting related series lines
     $intermediate_time = $timestamp + (int) $chart->resolution / 2;
     if (isset($measurements[$intermediate_time])) {
-      $formatted[$timestamp] = logger_format_power_data_value($measurements, $intermediate_time);
+      $formatted[$intermediate_time] = logger_format_power_data_value($measurements, $intermediate_time);
     }
   }
   return $formatted;
@@ -3317,13 +3317,12 @@ function logger_get_sub_interval($interval) {
  * the slider chart.
  *
  * @param $interval     The time interval menu option.
- * @param $resolution   The time resolution.
  * @param $start        The initial timestamp, if known.
  * @param $end          The final timestamp, if known.
  * @param $fill_slider  Whether to expand the period to fill chart slider.
  * @return the period of time as an array.
  */
-function logger_get_period($interval, $resolution, $start = 0, $end = 0, $fill_slider = TRUE) {
+function logger_get_period($interval, $start = 0, $end = 0, $fill_slider = TRUE) {
 
   //If period not informed, consider default time window
   $window = $start > 0 && $end > 0 ? $end - $start : logger_get_default_time_window($interval);
@@ -3332,7 +3331,6 @@ function logger_get_period($interval, $resolution, $start = 0, $end = 0, $fill_s
     //Expand window to fill slider
     $window *= 5;
   }
-
   return array('start' => ($end - $window), 'end' => $end);
 }
 
@@ -3644,7 +3642,7 @@ function logger_query_device_measurements($interval, $device, $unit = 'watt') {
   $sensors = db_query($sql, array(':device' => $device));
 
   $resolution = logger_get_resolution($interval);
-  $period = logger_get_period($interval, $resolution);
+  $period = logger_get_period($interval);
 
   $measurements = array();
   foreach ($sensors as $sensor) {
@@ -4085,7 +4083,7 @@ function logger_update_pvcast_models() {
 
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
-    $period = logger_get_period('day', HOUR, $now - 4 * WEEK, $now, FALSE);
+    $period = logger_get_period('day', $now - 4 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor($sensor, 'watt', $period, HOUR);
