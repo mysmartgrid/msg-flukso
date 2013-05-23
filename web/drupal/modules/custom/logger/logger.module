@@ -2279,19 +2279,25 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   $properties = $pairs;
 
   $weather = array();
-  if (isset($chart->data['weather'])) {
-    foreach ($chart->data['weather'] as $i => $values) {
-      $pairs = array();
-      foreach ($values as $time => $icon) {
-        $degrees = $chart->data['temperature'][$i][$time];
-        $pairs[] = "[$time, $icon, $degrees]";
+  if ($slider) {
+    $id = 'slider';
+    $cssClass = 'slider';
+  }
+  else {
+    $id = 'lineChart';
+    $cssClass = 'chart';
+
+    if (isset($chart->data['weather'])) {
+      foreach ($chart->data['weather'] as $i => $values) {
+        $pairs = array();
+        foreach ($values as $time => $icon) {
+          $degrees = $chart->data['temperature'][$i][$time];
+          $pairs[] = "[$time, $icon, $degrees]";
+        }
+        $weather[] = "[ $i, [" . implode (', ', $pairs) . "] ]";
       }
-      $weather[] = "[ $i, [" . implode (', ', $pairs) . "] ]";
     }
   }
-
-  $cssClass = $slider ? 'slider' : 'chart';
-  $id = $slider ? 'sliderChart' : 'lineChart';
 
   $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
 
