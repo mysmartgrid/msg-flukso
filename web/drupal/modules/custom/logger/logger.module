@@ -1744,35 +1744,14 @@ function logger_get_overview_chart_data($chart) {
  */
 function logger_format_power_series_data($chart, $measurements) {//FIXME: rename this function
 
-  $formatted = array();
+  $formatted = array($chart->period['start'] => NULL, $chart->period['end'] => NULL);
+  foreach ($measurements as $timestamp => $value) {
 
-  for ($timestamp = $chart->period['start'] - $chart->period['start'] % $chart->resolution;
-    $timestamp <= $chart->period['end'];
-    $timestamp += $chart->resolution) {
-
-    $formatted[$timestamp] = isset($measurements[$timestamp]) ? logger_format_power_data_value($measurements, $timestamp) : NULL;
-
-    //Artificial points used for connecting related series lines
-    $intermediate_time = $timestamp + (int) $chart->resolution / 2;
-    if (isset($measurements[$intermediate_time])) {
-      $formatted[$intermediate_time] = logger_format_power_data_value($measurements, $intermediate_time);
-    }
+    $decimals = (int) strstr($measurements[$timestamp], '.');
+    $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
+    $formatted[$timestamp] = (int) number_format($value, $decimals, '.', '');
   }
   return $formatted;
-}
-
-/**
- * Formats a power consumption chart value.
- *
- * @param $measurements The array of measurements ($timestamp => $value).
- * @param $timestamp    The index of the value to be formatted.
- * @return the formatted value.
- */
-function logger_format_power_data_value($measurements, $timestamp) {
-
-  $decimals = (int) strstr($measurements[$timestamp], '.');
-  $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
-  return number_format($measurements[$timestamp], $decimals, '.', '');
 }
 
 /**
