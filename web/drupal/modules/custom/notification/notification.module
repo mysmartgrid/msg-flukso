@@ -865,11 +865,11 @@ function notification_limit_up_validate($field, $form_state) {
 
     $factor = db_select('unit', 'u')
       ->fields('u', array('factor'))
-      ->condition('u.id', $unit_id, '=')
+      ->condition('u.id', $unit_id)
       ->execute()
       ->fetchField();
 
-    $converted_limit = $limit_up / $factor;
+    $converted_limit = $limit_up * $factor;
 
     if (($event_id == NO_COMMUNICATION_EVENT_ID || $event_id == COMMUNICATION_RESTORED_EVENT_ID) && $converted_limit < 30 * MINUTE) {
 
@@ -2001,7 +2001,7 @@ function notification_query_peak_consumption_violations($notifiable) {
   $list = NULL;
   $measurements = logger_query_device_measurements('hour', $notifiable['device']);
 
-  $limit_up = $notifiable['limit_up'] / $notifiable['unit_factor'];
+  $limit_up = $notifiable['limit_up'] * $notifiable['unit_factor'];
 
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {

@@ -332,7 +332,7 @@ function notification_install() {
       'id' => 4,
       'name' => 'Kilowatt',
       'symbol' => 'kW',
-      'factor' => 0.001,
+      'factor' => 1000,
     ))
     ->execute();
 
@@ -728,4 +728,19 @@ function notification_update_7010() {
   db_add_unique_key('notification', 'uk_device_event_limit_unit', array('device', 'event_id', 'limit_up', 'unit_id'));
 
   return st("Fields id and parent_id have been successfully added to table notification.");
+}
+
+/**
+ * Update unit conversion factors.
+ */
+function notification_update_7011() {
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 1000
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  return st("Unit conversion factors have been updated.");
 }
