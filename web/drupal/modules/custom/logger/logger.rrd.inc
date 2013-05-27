@@ -66,7 +66,9 @@ function logger_rrd_get_storage_periods() {
  */
 function logger_rrd_get_storage_period($meter, $step) {
 
-  $cid = "storage_period_$meter"; 
+  //FIXME: simplify this function
+
+  $cid = "storage_period_$meter";
   $cache = cache_get($cid, 'cache_page');
 
   if ($cache) {
@@ -78,9 +80,14 @@ function logger_rrd_get_storage_period($meter, $step) {
       ->condition('s.meter', $meter)
       ->execute();
 
-    $period = array();
-    foreach ($objects as $object) {
-      $period[$object->resolution] = $object->period;
+    if (empty($objects)) {
+      $period = logger_rrd_get_storage_periods();
+    }
+    else {
+      $period = array();
+      foreach ($objects as $object) {
+        $period[$object->resolution] = $object->period;
+      }
     }
     cache_set($cid, $period, 'cache_page', REQUEST_TIME + DAY);
   }
