@@ -2280,7 +2280,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
 
   $weather = array();
   if ($slider) {
-    $id = 'slider';
+    $id = 'sliderChart';
     $cssClass = 'slider';
   }
   else {
