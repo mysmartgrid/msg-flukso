@@ -111,7 +111,7 @@ function notification_device_access($permission, $device) {
 
   $uid = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
-    ->condition('d.device', "$device", '=')
+    ->condition('d.device', "$device")
     ->execute()
     ->fetchField();
 
@@ -356,13 +356,13 @@ function notification_eventlog_page($device) {
 
   $serial = db_select('logger_devices', 'd')
     ->fields('d', array('serial'))
-    ->condition('d.device', $device, '=')
+    ->condition('d.device', $device)
     ->execute()
     ->fetchField();
 
   $query = db_select('event_log', 'l')
     ->fields('l', array('time'))
-    ->condition('l.device', $device, '=')
+    ->condition('l.device', $device)
     ->orderBy('l.time', 'DESC');
   $query->join('event', 'e', 'e.id = l.event_id');
   $query->addField('e', 'name');
@@ -421,7 +421,7 @@ function notification_eventlog_clear_old() {
   foreach ($logs as $log) {
 
     db_delete('event_log')
-      ->condition('device', $log->device, '=')
+      ->condition('device', $log->device)
       ->condition('time', $log->last_time - 3 * DAY, '<')
       ->execute();
   }
@@ -445,27 +445,20 @@ function notification_newsletter_page() {
     t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
     '</p></div>';
 
-  $output .= '<div><p><br>' .
-    t('Latest publications:');
+  $output .= '<div><p><br>' . t('Latest publications:');
 
-  $sql = '
-    SELECT
-      n.nid
-    FROM
-      {node} n,
-      {users} u,
-      {users_roles} ur
-    WHERE
-      n.type = :type AND
-      n.title LIKE :title AND
-      n.uid = u.uid AND
-      u.uid = ur.uid AND
-      ur.rid = :uid
-    ORDER BY
-      n.created DESC';
+  $query = db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('n.type', 'blogpost')
+    ->condition('n.title', "Newsletter %/%", 'LIKE')
+    ->orderBy('n.created', 'DESC')
+    ->range(0, 3);
 
-  $results = db_query_range($sql, 0, 3,
-    array(':type' => "blogpost", ':title' => "Newsletter %/%", ':uid' => 8)); //Posted by a Blogger
+  $query->join('users', 'u', 'u.uid = n.uid');
+  $query->join('users_roles', 'ur', 'ur.uid = u.uid');
+  $query->condition('ur.rid', 8); //Posted by a Blogger
+
+  $results = $query->execute();
 
   foreach ($results as $result) {
 
@@ -886,13 +879,9 @@ function notification_limit_up_validate($field, $form_state) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
     }
-    elseif ($event_id == PEAK_CONSUMPTION_EVENT_ID && $converted_limit < 1) {
+    elseif (($event_id == LOW_CONSUMPTION_EVENT_ID || $event_id == PEAK_CONSUMPTION_EVENT_ID) && ($converted_limit < 1 || $converted_limit > 999999999)) {
 
-      form_error($field, t('Peak consumption can not be lesser than 1 watt / min.'));
-    }
-    elseif ($event_id == LOW_CONSUMPTION_EVENT_ID && $converted_limit < 1) {
-
-      form_error($field, t('Low consumption can not be lesser than 1 watt / min.'));
+      form_error($field, t('Consumption limit can not be lesser than 1 watt / min or greater than 999.999.999 watt / min.'));
     }
     elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
 
@@ -1080,7 +1069,7 @@ function notification_get_event_name($event_id) {
 
   $name = db_select('event', 'e')
     ->fields('e', array('name'))
-    ->condition('e.id', $event_id, '=')
+    ->condition('e.id', $event_id)
     ->execute()
     ->fetchField();
 
@@ -1095,20 +1084,13 @@ function notification_get_event_name($event_id) {
  */
 function notification_get_units_options($event_id) {
 
-  $sql = "
-    SELECT
-      un.id,
-      un.name
-    FROM
-      {unit} un,
-      {event_unit} eu
-    WHERE
-      eu.event_id = :event_id AND
-      eu.unit_id = un.id
-    ORDER BY
-      un.id";
+  $query = db_select('unit', 'un')
+    ->fields('un', array('id', 'name'))
+    ->orderBy('un.id');
+  $query->join('event_unit', 'eu', 'eu.unit_id = un.id');
+  $query->condition('eu.event_id', $event_id);
 
-  $result = db_query($sql, array(':event_id' => $event_id));
+  $result = $query->execute();
 
   $units = array();
   foreach ($result as $row) {
@@ -1247,8 +1229,8 @@ function notification_theme() {
 
   return array(
     'notification_event_limit_up' => array(
-      'render element' => 'element',
-    ),
+      'render element' => 'element'
+    )
   );
 }
 
@@ -1272,7 +1254,8 @@ function theme_notification_event_limit_up($variables) {
 
   $default_value = isset($element['#default_value']) ? $element['#default_value'] : '';
 
-  $field1 = '<input type="text" name="limit_up' . $event_id . '" size="10" id="edit-limit-up' . $event_id . '"' .
+  $field1 = '<input type="text" name="limit_up' . $event_id . '" ' .
+    'size="' . $element['#size'] . '" maxlength="' . $element['#maxlength'] . '" id="edit-limit-up' . $event_id . '"' .
     'value="' . $default_value . '" style="text-align: right;" ' . $attributes . ' />';
 
   $options = '';
@@ -1294,29 +1277,30 @@ function notification_cron() {
 
   notification_send_no_communication_emails();
   notification_send_communication_restored_emails();
-  notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
-  notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
 
   //First quarter of an hour
   if ($rest >= 45) {
     notification_eventlog_clear_old();
+    notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
   }
 
   //Second quarter of an hour
   if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
     notification_send_corrupted_message_emails();
     notification_send_measurement_anomaly_emails();
+    notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
   }
 
   //Third quarter of an hour
   if ($rest < 30 * MINUTE && $rest >= 15 * MINUTE) {
     notification_send_forecast_report_emails();
+    notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
   }
 
   //Fourth quarter of an hour
-  //FIXME: DEBUG
   if ($rest < 15 * MINUTE) {
     notification_send_summary_report_emails();
+    notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
   }
 }
 
@@ -1362,7 +1346,7 @@ function notification_send_no_communication_emails() {
     $log_query = db_select('event_log', 'l');
     $log_query->addExpression('MAX(l.time)', 'max_time');
     $log_query->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
-      ->condition('l.device', $notifiable['device'], '=')
+      ->condition('l.device', $notifiable['device'])
       ->havingCondition('max_time', REQUEST_TIME - $notifiable['limit_up'] * $notifiable['factor'], '<');
 
     $max_time = $log_query->execute()->fetchField();
@@ -1403,13 +1387,13 @@ function notification_send_communication_restored_emails() {
     $msg_query = db_select('event_log', 'l')
       ->fields('l', array('time'))
       ->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
-      ->condition('l.device', $notifiable['device'], '=')
+      ->condition('l.device', $notifiable['device'])
       ->condition('l.time', $notifiable['base_time'] + $notifiable['limit_up'] * $notifiable['factor'], '>');
 
     $recent_msg_query = db_select('event_log', 'p')
       ->where('p.time < l.time')
       ->condition('p.time', $notifiable['base_time'], '>')
-      ->condition('p.device', $notifiable['device'], '=')
+      ->condition('p.device', $notifiable['device'])
       ->condition('p.event_id', MESSAGE_RECEIVED_EVENT_ID, '>');
     $recent_msg_query->addExpression('1');
 
@@ -1440,7 +1424,7 @@ function notification_send_communication_restored_emails() {
 
   $query = db_select('notification', 'n')
     ->fields('n', array('device', 'limit_up', 'unit_id'))
-    ->condition('n.event_id', COMMUNICATION_RESTORED_EVENT_ID, '=')
+    ->condition('n.event_id', COMMUNICATION_RESTORED_EVENT_ID)
     ->groupBy('n.device')
     ->groupBy('n.limit_up')
     ->groupBy('n.unit_id');
@@ -1533,8 +1517,8 @@ function notification_send_limit_consumption_emails($event_id) {
   $query->addField('un', 'factor', 'unit_factor');
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->condition('m.type', CONSUMPTION_SENSOR_TYPE, '=');
-  $query->condition('m.virtual', 0, '=');
+  $query->condition('m.type', CONSUMPTION_SENSOR_TYPE);
+  $query->condition('m.virtual', 0);
 
   $result = $query->execute();
   
@@ -1617,10 +1601,10 @@ function notification_send_summary_report_emails() {
 
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function', 'price'))
-      ->condition('m.device', $notifiable['device'], '=')
+      ->condition('m.device', $notifiable['device'])
       ->isNotNull('m.function')
       ->condition('m.type', $types, 'IN')
-      ->condition('m.virtual', 0, '=');
+      ->condition('m.virtual', 0);
     $sensors_query->addField('m', 'type', 'type_id');
 
     $sensors = $sensors_query->execute();
@@ -1706,8 +1690,8 @@ function notification_send_forecast_report_emails() {
   $query = notification_compose_base_query(FORECAST_REPORT_EVENT_ID);
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->condition('m.forecast', 1, '=');
-  $query->condition('m.virtual', 0, '=');
+  $query->condition('m.forecast', 1);
+  $query->condition('m.virtual', 0);
   $query->addField('m', 'meter');
   $query->addField('m', 'function');
 
