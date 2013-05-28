@@ -208,6 +208,13 @@ function notification_install() {
 
   db_insert('event')
     ->fields(array(
+      'id' => 5,
+      'name' => 'Low Consumption',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
       'id' => 9,
       'name' => 'Any Device Issue'
     ))
@@ -402,6 +409,20 @@ function notification_install() {
   db_insert('event_unit')
     ->fields(array(
       'event_id' => 4,
+      'unit_id' => 4,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 3,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
       'unit_id' => 4,
     ))
     ->execute();
@@ -743,4 +764,33 @@ function notification_update_7011() {
     ->execute();
 
   return st("Unit conversion factors have been updated.");
+}
+
+/**
+ * Create event 'Low Consumption'.
+ */
+function notification_update_7012() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Low Consumption'
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 3,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 4,
+    ))
+    ->execute();
+
+  return st("The event 'Low Consumption' has been created.");
 }

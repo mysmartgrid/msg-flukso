@@ -29,7 +29,9 @@
 define('NO_COMMUNICATION_EVENT_ID',        1);
 define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
+define('LOW_CONSUMPTION_EVENT_ID',         5);
 define('ANY_DEVICE_ISSUE_EVENT_ID',        9);
+
 
 //Report events
 define('SUMMARY_REPORT_EVENT_ID',          10);
@@ -535,6 +537,9 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
 
+  $form['events'] += notification_create_event_fields(LOW_CONSUMPTION_EVENT_ID, 100, WATT_UNIT_ID,
+    'Here you can set the minimum electricity consumption. Below this limit, the device is considered faulty.');
+
   $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
@@ -750,6 +755,12 @@ function notification_edition_form($form, &$form_state, $notification) {
         'Beyond this limit, the device is considered faulty.');
       break;
 
+    case LOW_CONSUMPTION_EVENT_ID:
+      $form['limit_up']['#title'] = t('Minimum Consumption');
+      $form['limit_up']['#description'] = t('Here you can set the minimum electricity consumption. ' .
+        'Below this limit, the device is considered faulty.');
+      break;
+
     case SUMMARY_REPORT_EVENT_ID:
       $form['limit_up']['#title'] = t('Frequency');
       $form['limit_up']['#description'] = t('Here you can set the period of time in which you want to receive summary reports.');
@@ -879,6 +890,10 @@ function notification_limit_up_validate($field, $form_state) {
 
       form_error($field, t('Peak consumption can not be lesser than 1 watt / min.'));
     }
+    elseif ($event_id == LOW_CONSUMPTION_EVENT_ID && $converted_limit < 1) {
+
+      form_error($field, t('Low consumption can not be lesser than 1 watt / min.'));
+    }
     elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
 
       form_error($field, t('The minimum period for the summary report is 1 day.'));
@@ -915,6 +930,7 @@ function notification_registration_form_submit($form, &$form_state) {
   notification_register_event($_REQUEST, MEASUREMENT_ANOMALY_EVENT_ID, $id);
 
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
+  notification_register_event($_REQUEST, LOW_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
   notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
 
@@ -1278,7 +1294,8 @@ function notification_cron() {
 
   notification_send_no_communication_emails();
   notification_send_communication_restored_emails();
-  notification_send_peak_consumption_emails();
+  notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
+  notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
 
   //First quarter of an hour
   if ($rest >= 45) {
@@ -1297,6 +1314,7 @@ function notification_cron() {
   }
 
   //Fourth quarter of an hour
+  //FIXME: DEBUG
   if ($rest < 15 * MINUTE) {
     notification_send_summary_report_emails();
   }
@@ -1504,24 +1522,27 @@ function notification_send_corrupted_message_emails() {
 }
 
 /**
- * Sends e-mails notifying users of the occurrence of Peak Consumption events.
+ * Sends e-mails notifying users of the occurrence of Peak/Low Consumption events.
+ *
+ * @param $event_id The event id.
  */
-function notification_send_peak_consumption_emails() {
+function notification_send_limit_consumption_emails($event_id) {
 
-  $query = notification_compose_base_query(PEAK_CONSUMPTION_EVENT_ID);
+  $query = notification_compose_base_query($event_id);
   $query->addField('n', 'base_time', 'since_time');
   $query->addField('un', 'factor', 'unit_factor');
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->condition('m.type', CONSUMPTION_SENSOR_TYPE, '=');
   $query->condition('m.virtual', 0, '=');
-  
-  $result = $query->execute();
 
+  $result = $query->execute();
+  
+  $maximum = $event_id == PEAK_CONSUMPTION_EVENT_ID;
   $notifiables = array();
   while ($notifiable = $result->fetchAssoc()) {
 
-    $violations = notification_query_peak_consumption_violations($notifiable);
+    $violations = notification_query_limit_consumption_violations($notifiable, $maximum);
     if ($violations) {
 
       $notifiable['violations'] = $violations['list'];
@@ -1530,12 +1551,14 @@ function notification_send_peak_consumption_emails() {
     }
   }
 
+  $above = $maximum ? 'above' : 'below';
+
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_email(
-    "Your Flukso device (serial number: %serial) has registered peaks of " .
-    "power consumption above the limit of %limit_up %unit_name.<br><br>" .
+    "Your Flukso device (serial number: %serial) has registered " .
+    "power consumption $above the limit of %limit_up %unit_name.<br><br>" .
 
-    "The following list shows the measurements above the limit.<br><br>" .
+    "The following list shows the measurements $above the limit.<br><br>" .
     "!violations <br><br>");
 
   notification_send_emails($message, $notifiables);
@@ -1991,12 +2014,13 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
 }
 
 /**
- * Returns a list of measurements that violate the Peak Consumption limit.
+ * Returns a list of measurements that violate a consumption limit.
  *
- * @param $notifiable  The user notifiable of the Peak Consumption Event.
+ * @param $notifiable  The notifiable event to test.
+ * @param $maximum     Whether the limit is a maximum value. When FALSE, the limit is assumed to be a minimum value.
  * @return an array containing the latest timestamp and the HTML list of measurements.
  */
-function notification_query_peak_consumption_violations($notifiable) {
+function notification_query_limit_consumption_violations($notifiable, $maximum) {
 
   $list = NULL;
   $measurements = logger_query_device_measurements('hour', $notifiable['device']);
@@ -2009,7 +2033,9 @@ function notification_query_peak_consumption_violations($notifiable) {
 
       foreach ($values as $timestamp => $value) {
 
-        if ($value > $limit_up && $timestamp > $notifiable['since_time']) {
+        $violate = $maximum ? ($value > $limit_up) : ($value < $limit_up);
+
+        if ($violate && $timestamp > $notifiable['since_time']) {
 
           date_default_timezone_set($notifiable['timezone']);
 
