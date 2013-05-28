@@ -1129,14 +1129,6 @@ function logger_format_series_period($interval, $period, $offset = 0) {
   $period['end'] = $end;
 
   switch ($interval) {
-    case 'hour':
-    case '72hours':
-    case '24hours':
-      $diff = $offset / HOUR;
-      $tz = 'GMT' . ($diff < 0 ? '-' : '+') . (abs($diff) > 9 ? '' : '0') . abs($diff) . '00';
-      $formatted_time = date('Y-m-d H:i:s', $end + 1) . " $tz";
-      $complement = '';
-      break;
     case 'day':
       $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
       $complement = logger_format_period('dayquarter', $period, TRUE);
@@ -1153,6 +1145,8 @@ function logger_format_series_period($interval, $period, $offset = 0) {
       $formatted_time = t(date("M", $start));
       $complement = date("Y", $start);
       break;
+    default :
+      return $end + 1;
   }
   return $formatted_time . (empty($complement) ? '' : "<br>$complement");
 }
@@ -1341,12 +1335,11 @@ function logger_get_onsite_chart_data($chart) {
         $cells['Sum'] = array_sum($values);
         $cells['Avg'] = $cells['Sum'] / count($values);
       }
-      $chart_series_ids = isset($series['chartSeriesIds']) ? $series['chartSeriesIds'] : array();
-      $color_ids = isset($series['colorIds']) ? $series['colorIds'] : array();
-      $data['legend'][$line_id] = logger_create_legend_line($user->name, NULL, $name, $line_id, $cells, $chart_series_ids, $color_ids);
+      $data['legend'][$line_id] = logger_create_legend_line($user->name, NULL, $name, $line_id, $cells, $series['chartSeriesIds'], $series['colorIds']);
     }
     $data['series'][$user->uid][$user->name][0][$name] = $series['values'];
     $data['labels'][0][$name] = $series['labels'];
+    //Format percentages
     foreach ($series['labels2'] as $time => $value) {
       $data['labels2'][0][$name][$time] = "'$value%'";
     }
@@ -1443,12 +1436,12 @@ function logger_get_onsite_chart_series($chart) {
   }
 
   return array(
-    0 => array('name' => t('On-site Consumption'),'values' => $onsite,          'labels' => $onsite, 'labels2' => $supply_perc, 'chartSeriesIds' => array(0, 1)),
-    1 => array('name' => '',                      'values' => $onsite,          'labels' => array(), 'labels2' => $feedin_perc),
-    2 => array('name' => t('Power Grid Supply'),  'values' => $supply,          'labels' => $supply, 'labels2' => array()),
-    3 => array('name' => t('Power Grid Feed-in'), 'values' => $feedin,          'labels' => $feedin, 'labels2' => array()),
-    4 => array('name' => t('Energy Consumption'), 'values' => $agg_consumption, 'labels' => array(), 'labels2' => array(), 'colorIds' => array(2, 0)),
-    5 => array('name' => t('Energy Production'),  'values' => $agg_production,  'labels' => array(), 'labels2' => array(), 'colorIds' => array(3, 0))
+    0 => array('name' => t('On-site Consumption'), 'values' => $onsite,          'labels' => $onsite, 'labels2' => $supply_perc, 'chartSeriesIds' => array(0, 1), 'colorIds' => array()),
+    1 => array('name' => '',                       'values' => $onsite,          'labels' => array(), 'labels2' => $feedin_perc, 'chartSeriesIds' => array(),     'colorIds' => array()),
+    2 => array('name' => t('Power Grid Supply'),   'values' => $supply,          'labels' => $supply, 'labels2' => array(),      'chartSeriesIds' => array(),     'colorIds' => array()),
+    3 => array('name' => t('Power Grid Feed-in'),  'values' => $feedin,          'labels' => $feedin, 'labels2' => array(),      'chartSeriesIds' => array(),     'colorIds' => array()),
+    4 => array('name' => t('Energy Consumption'),  'values' => $agg_consumption, 'labels' => array(), 'labels2' => array(),      'chartSeriesIds' => array(),     'colorIds' => array(2, 0)),
+    5 => array('name' => t('Energy Production'),   'values' => $agg_production,  'labels' => array(), 'labels2' => array(),      'chartSeriesIds' => array(),     'colorIds' => array(3, 0))
   );
 }
 
