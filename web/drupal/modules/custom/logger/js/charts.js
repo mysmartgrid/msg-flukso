@@ -18,9 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-var lineChart;
-var sliderChart;
-var barChart;
+var chartData = null;
+var lineChart = null;
+var sliderCharti = null;
+var barChart = null;
 
 function formatDate(d) {
   return '' +
@@ -572,6 +573,22 @@ function getWeather(seriesIndex, time) {
   return null;
 }
 
+function downloadChartData(fileURL) {
+
+  //TODO: cache downloaded data
+
+  if (chartData == null) {
+    jQuery.ajax({
+      url: '/' + fileURL,
+      async: false,
+      success: function(data) {
+        chartData = data;
+      }
+    });
+  }
+  return chartData;
+}
+
 function createLineChart(id, fileURL, properties, weather) {
 
   var div = document.getElementById(id);
@@ -584,7 +601,8 @@ function createLineChart(id, fileURL, properties, weather) {
   properties.axisLabelFontSize = clazz.fontSize.replace("px","");
   properties.yAxisLabelWidth = properties.axisLabelFontSize * 4;
 
-  var chart = new Dygraph(div, '/' + fileURL, properties);
+  var chart = new Dygraph(div, downloadChartData(fileURL), properties);
+
   chart.weather = weather;
   chart.fileURL = fileURL;
   storeChart(id, chart);
@@ -678,11 +696,13 @@ function storeChart(id, chart) {
   } else if (id == 'sliderChart') {
     sliderChart = chart;
     barChart = null;
+    chartData = null;
 
   } else if (id == 'barChart') {
     barChart = chart;
     lineChart = null;
     sliderChart = null;
+    chartData = null;
   }
 }
 
