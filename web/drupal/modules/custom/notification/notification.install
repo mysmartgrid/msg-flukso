@@ -450,6 +450,13 @@ function notification_install() {
 
   db_insert('event_unit')
     ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 7,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
       'event_id' => 11,
       'unit_id' => 5,
     ))
@@ -793,4 +800,19 @@ function notification_update_7012() {
     ->execute();
 
   return st("The event 'Low Consumption' has been created.");
+}
+
+/**
+ * Summary report now works with the unit 'month'.
+ */
+function notification_update_7013() {
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 7,
+    ))
+    ->execute();
+
+  return st("Unit 'month' has been added to event 'summary report'.");
 }

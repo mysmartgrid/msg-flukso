@@ -883,9 +883,9 @@ function notification_limit_up_validate($field, $form_state) {
 
       form_error($field, t('Consumption limit can not be lesser than 1 watt / min or greater than 999.999.999 watt / min.'));
     }
-    elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
+    elseif ($event_id == SUMMARY_REPORT_EVENT_ID && ($converted_limit < DAY || $converted_limit > 6 * MONTH)) {
 
-      form_error($field, t('The minimum period for the summary report is 1 day.'));
+      form_error($field, t('The period for the summary report must be between 1 day and 6 months.'));
     }
     elseif ($event_id == FORECAST_REPORT_EVENT_ID && ($converted_limit > 3 * DAY || $converted_limit < DAY)) {
 
