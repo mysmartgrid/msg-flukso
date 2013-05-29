@@ -204,7 +204,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->meter = NULL;
     $sensor->type = CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
-    $sensor->forecast = 0;
+    $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
     $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
     $sensor->virtual = TRUE;
@@ -383,7 +383,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#options' => array(
         '1' => t('Activate'),
       ),
-      '#default_value' => array($sensor->forecast)
+      '#default_value' => array($sensor->forecast),
+      '#suffix' => '</div>'
     );
 
     $form['coordinates'] = array(
@@ -392,8 +393,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#title' => t('Location'),
       '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
       '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
-      '#text-align' => 'center',
-      '#suffix' => '</div>'
+      '#text-align' => 'center'
     );
   }
 
@@ -489,11 +489,6 @@ function logger_sensor_form_validate($form, &$form_state) {
     if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
 
       form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
-    }
-
-    if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
-
-      form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
     }
   }
 

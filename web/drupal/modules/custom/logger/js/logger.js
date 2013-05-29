@@ -33,7 +33,7 @@ function showSensorForecastFields() {
     } else {
       forecastDiv.style.display = 'none';
       var forecastField = document.getElementById('edit-forecast-1');
-      forecastField.checked = false;
+      forecastField.checked = true;
     }
   }
 }
