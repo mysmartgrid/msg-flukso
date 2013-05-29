@@ -1558,15 +1558,17 @@ function notification_send_summary_report_emails() {
   $query = notification_compose_base_query(SUMMARY_REPORT_EVENT_ID);
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
-  $offset = "IF(un.id = :week_unit_id, 4 * :day, 0)";
-  $since_time = "n.base_time - ((n.base_time - $offset) % un.factor)";
-  $until_time = "$since_time + n.limit_up * un.factor";
+  $offset = "IF (un.id = :week_unit_id, 4 * :day, 0)";
+  $since = "n.base_time - ((n.base_time - $offset) % un.factor)";
+  $since_time = "IF (un.id = :month_unit_id, n.base_time - (n.base_time % :day), $since)";
+  $until_time = "IF (un.id = :month_unit_id, UNIX_TIMESTAMP(FROM_UNIXTIME(n.base_time) + INTERVAL n.limit_up MONTH), $since + n.limit_up * un.factor)";
 
   $args = array(
     ':now' => REQUEST_TIME,
     ':delay' => 12 * HOUR,
     ':day' => DAY,
-    ':week_unit_id' => WEEK_UNIT_ID
+    ':week_unit_id' => WEEK_UNIT_ID,
+    ':month_unit_id' => MONTH_UNIT_ID
   );
 
   $query->addExpression($since_time, 'since_time', $args);
@@ -1597,7 +1599,7 @@ function notification_send_summary_report_emails() {
     date_default_timezone_set($notifiable['timezone']);
 
     $period = array('start' => $notifiable['since_time'], 'end' => $notifiable['until_time']);
-    $resolution = $notifiable['unit_id'] == WEEK_UNIT_ID ? DAY : MINUTE;
+    $resolution = $notifiable['unit_id'] == DAY_UNIT_ID ? MINUTE : DAY;
 
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function', 'price'))
