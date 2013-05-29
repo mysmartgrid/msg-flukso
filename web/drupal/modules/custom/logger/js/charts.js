@@ -52,15 +52,6 @@ function parseDate(datestr, timestr) {
   );
 }
 
-function formatCVSTimeStamp(d) {
-  return '' +
-    d.getFullYear() + '-' +
-    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '-' +
-    (d.getDate()  < 10 ? '0' : '') + d.getDate() + ' ' +
-    (d.getHours()   < 10 ? '0' : '') + d.getHours() + ':' +
-    (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
-}
-
 /**
  * Look through stylesheets in reverse order that they appear in the document.
  */
@@ -468,7 +459,7 @@ function addLineAnnotation(event, point) {
 
   var annotation = {
     series: point.name,
-    x: formatCVSTimeStamp(date),
+    x: timestamp,
     shortText: yval,
     text: text,
     width: width,
