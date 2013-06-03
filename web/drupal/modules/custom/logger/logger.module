@@ -45,7 +45,7 @@ define('LOGGER_PATH', DRUPAL_ROOT . '/' . LOGGER_REL_PATH);
 define('LOGGER_DEFAULT_LATITUDE', 49.444710);
 define('LOGGER_DEFAULT_LONGITUDE', 7.769031);
 
-define('LOGGER_LEGEND_TABLE_ID', 'logger-legend-table');
+define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
@@ -53,6 +53,8 @@ define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 function logger_init() {
 
   check_browser_support();
+
+  drupal_add_js(LOGGER_REL_PATH . '/js/logger-min.js', array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 100, 'defer' => TRUE));
 }
 
 function logger_permission() {
@@ -1701,7 +1703,7 @@ function logger_create_remove_power_series_link($uid, $i, $username, $meter, $vi
       ($visible ? t('Hide') : t('Show'));
     }
     else {
-      $link .= "removeLineSeries($uid, $i, '$username', '$meter', '" . LOGGER_LEGEND_TABLE_ID . "', '$context');\">" . t('Remove');
+      $link .= "removeLineSeries($uid, $i, '$username', '$meter', '" . LOGGER_TABLE_ID . "', '$context');\">" . t('Remove');
     }
     $link .= '</a>';
   }
@@ -2423,12 +2425,14 @@ function logger_create_chart_legend($chart) {
   }
 
   if (logger_is_mobile_device()) {
+
     $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
-    drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); resizeCharts(); } );", $options);
-    drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+
+    drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); resizeCharts(); } );", $options);
+    drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
   }
 
-  return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable'),
+  return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
     '<p align="right">' . l(t('Save Data'), $chart->file_url) . '</p>';
 }

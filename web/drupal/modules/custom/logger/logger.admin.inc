@@ -75,18 +75,19 @@ function logger_userdevices_page() {
     $rows[] = $row;
   }
  
-  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
-  $options = array('type' => 'inline', 'scope' => 'header');
+  if (logger_is_mobile_device()) {
+    drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
+    drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
+  }
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
 
   $form = drupal_get_form('logger_deviceactivation_form');
   return drupal_render($form) . '<br><br><br>' . 
 
     theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
       'empty' => t('No devices available.'), 'sticky' => FALSE, 'colgroups' => array(),
-      'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
+      'attributes' => array('id' => LOGGER_TABLE_ID, 'class' => 'resizable')));
 }
 
 /**
@@ -109,11 +110,15 @@ function logger_usersensors_page() {
     ->condition('d.uid', $user->uid)
     ->execute();
 
+  $is_mobile = logger_is_mobile_device();
+
   foreach ($devices as $device) {
 
-    $table_id = LOGGER_LEGEND_TABLE_ID . "$device->serial";
-    drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . $table_id . "'); } );", $options);
-    drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . $table_id . "'); } );", $options);
+    if ($is_mobile) {
+      $table_id = LOGGER_TABLE_ID . "$device->serial";
+      drupal_add_js("jQuery(window).resize( function() { resizeTable('" . $table_id . "'); } );", $options);
+      drupal_add_js("jQuery(document).ready( function() { resizeTable('" . $table_id . "'); } );", $options);
+    }
 
     $output .= '<br><br>' . t('Device') . ": $device->serial <br><br>";
 

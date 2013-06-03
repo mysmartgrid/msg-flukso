@@ -332,12 +332,13 @@ function notification_list_page() {
 
   if (logger_is_mobile_device()) {
 
-    $handler = "function() { resizeLegend('$table_id'); }";
-    $options = array('type' => 'footer', 'scope' => JS_DEFAULT, 'weight' => 201, 'defer' => TRUE);
-    drupal_add_js("$(window).resize( $handler );", $options);
+    $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
+
+    $handler = "function() { resizeTable('$table_id'); }";
+    drupal_add_js("jQuery(window).resize( $handler );", $options);
 
     $options['weight']++;
-    drupal_add_js("$(document).ready( $handler );", $options);
+    drupal_add_js("jQuery(document).ready( $handler );", $options);
   }
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
