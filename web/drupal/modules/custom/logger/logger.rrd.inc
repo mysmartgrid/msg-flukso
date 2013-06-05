@@ -517,14 +517,15 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     return array();
   }
 
-  //time period MUST be within the RRA and both $start and $end must be multiples of $step
+  //time period MUST be within the RRA
   if ($step >= DAY) {
+    //RRD aggregations operate in UTC time
     $offset = get_timezone_offset();
     $period['start'] += $offset;
     $period['end'] += $offset;
   }
   $period['start'] -= $period['start'] % $step;
-  $period['end'] -= $period['end'] % $step;
+  $period['end'] -= $period['end'] % $step + 1; //Until the last second
 
   $maxrows = 1 + ($period['end'] - $period['start']) / $step;
   $maxrows = $maxrows < 10 ? 10 : $maxrows; //RRDTool exports at least 8 rows
