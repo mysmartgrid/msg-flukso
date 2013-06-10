@@ -192,9 +192,9 @@ function logger_schema() {
       ),
       'function' => array(
         'type' => 'varchar',
-        'length' => '16',
-        'not null' => TRUE,
-        'default' => 'main',
+        'length' => '32',
+        'not null' => FALSE,
+        'default' => NULL,
       ),
       'description' => array(
         'type' => 'varchar',
@@ -761,4 +761,19 @@ function logger_update_7022() {
       ->execute();
   }
   return st('Table logger_meter_storage_period has been successfully updated.');
+}
+
+/**
+ * Resize field function of table logger_meters.
+ */
+function logger_update_7023() {
+
+  db_change_field('logger_meters', 'function', 'function',
+    array(
+      'type' => 'varchar',
+      'length' => '32',
+      'not null' => FALSE,
+      'default' => NULL
+  ));
+  return st('Field logger_meters.function has been created.');
 }
