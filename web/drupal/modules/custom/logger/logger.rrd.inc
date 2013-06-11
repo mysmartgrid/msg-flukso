@@ -80,15 +80,14 @@ function logger_rrd_get_storage_period($meter, $step) {
       ->condition('s.meter', $meter)
       ->execute();
 
-    if (empty($objects)) {
+    $period = array();
+    foreach ($objects as $object) {
+      $period[$object->resolution] = $object->period;
+    }
+    if (empty($period)) {
       $period = logger_rrd_get_storage_periods();
     }
-    else {
-      $period = array();
-      foreach ($objects as $object) {
-        $period[$object->resolution] = $object->period;
-      }
-    }
+
     cache_set($cid, $period, 'cache_page', REQUEST_TIME + DAY);
   }
   return $period[$step];
