@@ -3328,26 +3328,21 @@ function logger_get_users_options() {
 
   global $user;
 
+  $options = array(0 => '');
   $is_visitor = user_has_role('Visitor');
 
   $query = db_select('users', 'u')
     ->fields('u', array('uid', 'name'))
     ->groupBy('u.uid');
 
+  $query->join('logger_users', 'lu', 'lu.uid = u.uid');
+  $query->condition('lu.private', 0);
+
   $query->join('logger_meters', 'm', 'm.uid = u.uid');
   $query->isNotNull('m.function')
     ->condition('m.uid', 0, '>');
 
-  if ($is_visitor) {
-    $query->orderBy('u.uid');
-  }
-  else {
-    $query->orderBy('u.name');
-  }
-
   $fluksonians = $query->execute();
-
-  $options = array(0 => '');
   foreach ($fluksonians as $fluksonian) {
 
     //Hide user names for Visitors
@@ -3355,6 +3350,8 @@ function logger_get_users_options() {
     $options[$fluksonian->uid] = $username;
   }
   unset($options[$user->uid]);
+  sort($options);
+
   return $options;
 }
 
