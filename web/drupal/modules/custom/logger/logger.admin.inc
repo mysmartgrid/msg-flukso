@@ -148,7 +148,7 @@ function logger_usersensors_page() {
         $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
       }
       else {
-        $row[] = $sensor->function;
+        $row[] = mb_wordwrap($sensor->function, 16, "<br>", TRUE);
         $row[] = t($sensor->type);
         $row[] = t('Active');
         $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
