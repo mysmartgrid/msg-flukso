@@ -474,6 +474,7 @@ delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = 
 
     mysql:execute(pool, msgdump_delete, [RrdSensor]),
     mysql:execute(pool, sensor_agg_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_storage_delete, [RrdSensor]),
     mysql:execute(pool, token_delete, [RrdSensor]),
     mysql:execute(pool, sensor_delete, [RrdSensor]),
 

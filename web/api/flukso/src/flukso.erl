@@ -47,6 +47,7 @@ mysql_prepare() ->
     mysql:prepare(sensor_delete, <<"DELETE FROM logger_meters WHERE meter = ?">>),
     mysql:prepare(sensor_agg, <<"SELECT meter FROM logger_aggregated_meters WHERE virtual_meter = ?">>),
     mysql:prepare(sensor_agg_delete, <<"DELETE FROM logger_aggregated_meters WHERE meter = ?">>),
+    mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
     mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, function, description, phase, constant, value, factor, unit, price, latitude, longitude) SELECT ?, uid, device, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
     mysql:prepare(sensor_config, <<"UPDATE logger_meters SET function = ?, description = ? WHERE meter = ?">>),
     %TODO: mysql:prepare(sensor_config, <<"UPDATE logger_meters SET class = ?, type = ?, function = ?, , description = ?, voltage = ?, current = ?, phase = ?, constant = ?, enabled = ? WHERE meter = ?">>),
