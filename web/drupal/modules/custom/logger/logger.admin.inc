@@ -114,8 +114,8 @@ function logger_usersensors_page() {
 
   foreach ($devices as $device) {
 
+    $table_id = LOGGER_TABLE_ID . "$device->serial";
     if ($is_mobile) {
-      $table_id = LOGGER_TABLE_ID . "$device->serial";
       drupal_add_js("jQuery(window).resize( function() { resizeTable('" . $table_id . "'); } );", $options);
       drupal_add_js("jQuery(document).ready( function() { resizeTable('" . $table_id . "'); } );", $options);
     }
