@@ -3340,7 +3340,8 @@ function logger_get_users_options() {
 
   $query->join('logger_meters', 'm', 'm.uid = u.uid');
   $query->isNotNull('m.function')
-    ->condition('m.uid', 0, '>');
+    ->condition('m.uid', 0, '>')
+    ->orderBy('u.name');
 
   $fluksonians = $query->execute();
   foreach ($fluksonians as $fluksonian) {
@@ -3350,7 +3351,7 @@ function logger_get_users_options() {
     $options[$fluksonian->uid] = $username;
   }
   unset($options[$user->uid]);
-  sort($options);
+  //TODO: sort() produces different results in different machines
 
   return $options;
 }
