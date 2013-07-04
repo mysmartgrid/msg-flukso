@@ -334,8 +334,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#type' => 'textfield',
     '#title' => t('Function'),
     '#description' => t("Enter the sensor's function name."),
-    '#maxlength' => 16,
-    '#size' => 16,
+    '#maxlength' => 32,
+    '#size' => 32,
     '#required' => TRUE,
     '#default_value' => $sensor->function
   );
