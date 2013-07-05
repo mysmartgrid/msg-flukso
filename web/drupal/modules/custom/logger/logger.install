@@ -6,6 +6,7 @@
  */
 
 function logger_schema() {
+
   $schema['logger_devices'] = array(
     'description' => "Contains the Fluksometer device ID's.",
     'fields' => array(
@@ -202,11 +203,12 @@ function logger_schema() {
         'not null' => FALSE
       ),
       'value' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
+        'type' => 'float',
+        'size' => 'big',
+        'precision' => 24,
+        'scale' => 20,
         'not null' => TRUE,
         'default' => 0,
-        'disp-width' => '10',
       ),
       'factor' => array(
         'type' => 'int',
@@ -215,11 +217,10 @@ function logger_schema() {
         'default' => 1,
         'disp-width' => '10',
       ),
-      'unit' => array(
-        'type' => 'varchar',
-        'length' => '16',
+      'unit_id' => array(
+        'type' => 'int',
         'not null' => TRUE,
-        'default' => 'watt',
+        'unasigned' => TRUE,
       ),
       'forecast' => array(
         'type' => 'int',
@@ -775,5 +776,72 @@ function logger_update_7023() {
       'not null' => FALSE,
       'default' => NULL
   ));
-  return st('Field logger_meters.function has been created.');
+  return st('Field logger_meters.function has been changed.');
+}
+
+/**
+ * Change type of field value of table logger_meters.
+ */
+function logger_update_7025() {
+
+  db_change_field('logger_meters', 'value', 'value',
+    array(
+      'type' => 'float',
+      'size' => 'big',
+      'precision' => 24,
+      'scale' => 20,
+      'not null' => TRUE,
+      'default' => 0
+  ));
+  return st('Field logger_meters.value has been changed.');
+}
+
+/**
+ * Replace field 'unit' by field 'unit_id' in table logger_meters.
+ */
+function logger_update_7026() {
+
+  db_add_field('logger_meters', 'unit_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 10 
+    ))
+    ->condition('unit', 'watt')
+    ->execute();
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 10
+    ))
+    ->condition('unit', 'eur')
+    ->execute();
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 11 
+    ))
+    ->condition('unit', 'kwh')
+    ->execute();
+
+  db_drop_field('logger_meters', 'unit');
+
+  return st('Field logger_meters.unit_id has been created.');
+}
+
+/**
+ * Remove logger module variables.
+ */
+function logger_update_7027() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_%', 'LIKE')
+    ->execute();
+
+  return st('Logger module variables have been removed.');
 }

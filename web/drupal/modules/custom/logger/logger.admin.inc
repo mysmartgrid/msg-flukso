@@ -929,7 +929,7 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
       'function' => $function,
       'type' => $type,
       'virtual' => $virtual,
-      'unit' => 'watt',
+      'unit' => 'Wh',
       'forecast' => $forecast,
       'latitude' => $latitude,
       'longitude' => $longitude,

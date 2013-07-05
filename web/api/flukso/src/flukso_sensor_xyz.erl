@@ -111,7 +111,19 @@ malformed_GET(ReqData, _State) ->
       wrq:get_qs_value("start", ReqData), 
       wrq:get_qs_value("end", ReqData), 
       wrq:get_qs_value("resolution", ReqData)),
-    {RrdFactor, ValidUnit} = check_unit(wrq:get_qs_value("unit", ReqData)),
+
+    {UnitId, RrdFactor, ValidUnit} = case check_unit(wrq:get_qs_value("unit", ReqData)) of
+      {UnitString, true} ->
+        {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+        case mysql:get_result_rows(_Result) of
+          [[_UnitId, _RrdFactor]] ->
+            {_UnitId, _RrdFactor, true};
+          _ ->
+            {0, 0, false}
+        end;
+      _ ->
+        {0, 0, false}
+    end,
 
     TokenHeader = wrq:get_req_header("X-Token", ReqData),
     {Token, ValidToken} = case TokenHeader of
@@ -132,6 +144,7 @@ malformed_GET(ReqData, _State) ->
                    rrdEnd = RrdEnd,
                    rrdResolution = RrdResolution,
                    rrdFactor = RrdFactor,
+                   unitId = UnitId,
                    token = Token,
                    digest = Digest,
                    jsonpCallback = JsonpCallback},
@@ -333,12 +346,13 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[_Uid, Device]] ->
+      [[_Uid, Device, UnitId]] ->
 
         Args = [%proplists:get_value(<<"class">>,      Params),
                 %proplists:get_value(<<"type">>,       Params),
                 proplists:get_value(<<"function">>,    Params),
                 proplists:get_value(<<"description">>, Params),
+                UnitId,
                 %proplists:get_value(<<"voltage">>,    Params),
                 %proplists:get_value(<<"current">>,    Params),
                 %proplists:get_value(<<"phase">>,      Params),
@@ -356,16 +370,19 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
         Description = proplists:get_value(<<"description">>, Params),
         Device = proplists:get_value(<<"device">>, Params),
 
+        %FIXME:
+        UnitString = proplists:get_value(<<"unit">>, Params),
+        {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+        [[UnitId, Factor]] = mysql:get_result_rows(_Result),
+
         case rrd_create(?BASE_PATH, Sensor) of
           {ok, _RrdResponse} ->
-
+            RrdResponse = "ok",
             B = term_to_binary({node(), now()}),
             L = binary_to_list(erlang:md5(B)),
             Token = lists:flatten(list_to_hex(L)),
 
-            RrdResponse = "ok",
-
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, Description, 0, 0, 0, 0, "watt", Device]),
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, Description, 0, 0, 0, 0, UnitId, Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->
@@ -390,7 +407,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[Uid, Device]] ->
+      [[Uid, Device, UnitId]] ->
 
         ServerTimestamp = unix_time(),
 
@@ -404,15 +421,16 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
             RrdTimestamp = 1
           end,
 
-          case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) of
+          case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId) of
 
             %Measurements are valid
             {ok, RrdData} ->
-              %debugging
-              %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
-              %logger(Uid, <<"rrdupdate.base">>,
-              %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
-              %  ?INFO, ReqData),
+
+              %debugging%FIXME: comment out debug code
+              UnsortedList = [[integer_to_list(T), ":", float_to_list(float(C)), " "] || [T, C] <- Measurements],
+              logger(Uid, <<"rrdupdate.base">>,
+                string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+                ?INFO, ReqData),
 
               case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
@@ -452,7 +470,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
+parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId) ->
 
   try
     Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
@@ -464,7 +482,15 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
     %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
     %end,
 
-    {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]}
+    {ok, [[integer_to_list(Time), ":", 
+
+      case is_float(Counter) of
+        true -> float_to_list(float(Counter));
+        _ -> integer_to_list(Counter)
+      end,
+ 
+     " "] || [Time, Counter] <- Filtered]}
+
   catch
     _:_ ->
       {error, error}

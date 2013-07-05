@@ -597,7 +597,7 @@ function logger_power_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'power');
 
-  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'watt');
+  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'W');
 }
 
 /**
@@ -614,7 +614,7 @@ function logger_forecast_page($interval) {
   $types = array(PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'forecast');
 
-  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'watt', NULL, FALSE);
+  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'W', NULL, FALSE);
 }
 
 /**
@@ -631,7 +631,7 @@ function logger_anomaly_page($interval) {
   $types = array(PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'anomaly');
 
-  return logger_line_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types, 'watt');
+  return logger_line_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types, 'W');
 }
 
 /**
@@ -648,7 +648,7 @@ function logger_balance_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
-  return logger_line_chart_page($interval, 'balance', t('Your power balance'), $sensors, $types, 'watt');
+  return logger_line_chart_page($interval, 'balance', t('Your power balance'), $sensors, $types, 'W');
 }
 
 /**
@@ -708,7 +708,7 @@ function logger_overview_page($interval) {
   $types = array(CONSUMPTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types);
 
-  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $types, 'watt', $introduction);
+  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $types, 'W', $introduction);
 }
 
 /**
@@ -1602,7 +1602,7 @@ function logger_get_forecast_chart_data($chart) {
 
       #FIXME: move unit conversion to the pvcast module.
       $factor = 1;
-      if ($chart->unit == 'eur/year') {
+      if ($chart->unit == '€/year') {
         $factor = $sensor->price * 24 * 365 / 1000;
       }
       else if ($chart->unit == 'kWh/year') {
@@ -1766,7 +1766,7 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
 function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
 
   $line = array();
-  $line['User'] = mb_wordwrap($username, 10, "<br>", TRUE);
+  $line['User'] = mb_wordwrap($username, 12, "<br>", TRUE);
 
   if ($function != NULL) {
     $line['Sensor'] = mb_wordwrap($function, 16, "<br>", TRUE);
@@ -1822,8 +1822,11 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'unit', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('uid', 'meter', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
     ->isNotNull('m.function');
+
+  $query->join('unit', 'un', 'm.unit_id = un.id');
+  $query->addField('un', 'name', 'unit');
 
   $query->join('logger_meter_type', 't', 't.id = m.type');
   $query->addField('t', 'name', 'type');
@@ -2554,7 +2557,7 @@ function logger_mail_alter(&$message) {
 
 function logger_create_chart_form($form, $submit_js, $chart) {
 
-  $show_price = user_has_role('Expert') && strpos(" $chart->unit", 'eur') > 0;
+  $show_price = user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
   $unit_type = logger_get_unit_type($chart->unit);
@@ -2562,7 +2565,7 @@ function logger_create_chart_form($form, $submit_js, $chart) {
 
   //FIXME: the units array should be informed by a caller function
   if ($chart->context == 'balance') {
-    unset($units['eur/year']);
+    unset($units['€/year']);
   }
 
   $form[$unit_type . '_unit'] = array(
@@ -3138,7 +3141,7 @@ function logger_get_meters_options($types, $virtual = FALSE) {
  * @return the array of units.
  */
 function logger_get_energy_units_options() {
-  return array('kWh' => t('kWh'), 'eur' => t('eur'));
+  return array('kWh' => t('kWh'), '€' => t('Euro'));
 }
 
 /**
@@ -3147,7 +3150,7 @@ function logger_get_energy_units_options() {
  * @return the array of units.
  */
 function logger_get_power_units_options() {
-  return array('watt' => t('watt'), 'kWh/year' => t('kWh/year'), 'eur/year' => t('euro/year'));
+  return array('W' => t('Watt'), 'kWh/year' => t('kWh/year'), '€/year' => t('Euro/year'));
 }
 
 /**
@@ -3157,6 +3160,7 @@ function logger_get_power_units_options() {
  * @return either energy or power.
  */
 function logger_get_unit_type($unit) {
+
   $energy_units = logger_get_energy_units_options();
   return isset($energy_units[$unit]) ? 'energy' : 'power';
 }
@@ -3616,7 +3620,7 @@ function logger_forecast_access($permission) {
  * @param $unit     The measurement unit.
  * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
  */
-function logger_query_device_measurements($interval, $device, $unit = 'watt') {
+function logger_query_device_measurements($interval, $device, $unit = 'W') {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
@@ -4068,7 +4072,7 @@ function logger_update_pvcast_models() {
     $period = logger_get_period('day', $now - 4 * WEEK, $now, FALSE);
 
     foreach ($sensors as $sensor) {
-      $measurements = logger_rrd_query_sensor($sensor, 'watt', $period, HOUR);
+      $measurements = logger_rrd_query_sensor($sensor, 'W', $period, HOUR);
       if (!empty($measurements)) {
         pvcast_update_model($sensor->meter, $measurements);
       }

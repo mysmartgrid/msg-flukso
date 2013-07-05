@@ -164,7 +164,8 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
     Sensors = [{struct, [
         {<<"meter">>, Meter},
         {<<"function">>, Function},
-        {<<"description">>, SensorDescription}]} || [Meter, Function, SensorDescription] <- _Sensors],
+        {<<"description">>, SensorDescription},
+        {<<"unit">>, Unit}]} || [Meter, Function, SensorDescription, Unit] <- _Sensors],
 
     Encoded = mochijson2:encode({struct, [
               {<<"description">>, DeviceDescription},
@@ -335,7 +336,7 @@ delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State)
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
 
     Sensors = mysql:get_result_rows(_Result),
-    [delete_device_sensor(Meter) || [Meter, Function, Description] <- Sensors],
+    [delete_device_sensor(Meter) || [Meter, Function, Description, Unit] <- Sensors],
 
     mysql:execute(pool, event_delete, [Device]),
     mysql:execute(pool, notification_delete, [Device]),

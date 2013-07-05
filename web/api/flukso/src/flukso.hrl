@@ -54,6 +54,7 @@
          rrdEnd,
          rrdResolution,
          rrdFactor,
+         unitId,
          token,
          device,
          event,
@@ -157,16 +158,17 @@ check_time(undefined, Start, End, Resolution) ->
 check_time(_, _, _, _) ->
     {false, false, false, false}.
 
-check_unit(Unit) ->
-    Units = [{"watt", 3600},
-             {"kwhperyear", 31536},
-             {"eurperyear", 5676},
-             {"audperyear", 5991}],
 
-    case lists:keyfind(Unit, 1, Units) of
-        false -> {false, false};
-        {_Unit, RrdFactor} -> {RrdFactor, true}
-    end.
+check_unit(Unit) ->
+    UnitString = string:to_lower(Unit),
+    {UnitString,
+      case UnitString of
+        "watt" -> true;
+        "kwhperyear" -> true;
+        "kwh" -> true;
+        "wh" -> true;
+        _ -> false  
+      end}.
 
 
 check_jsonp_callback(undefined) ->
@@ -285,7 +287,7 @@ rrd_update(Path, RrdSensor, RrdData) ->
 
 rrd_create(Path, RrdSensor) ->
   %FIXME: use erlrrd:create
-  file:copy("/var/www/flukso-api/flukso/var/data/base/template.rrd", ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
+  file:copy("/var/www/flukso-api/flukso/var/data/base/derive.template.rrd", ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
 
 rrd_last(RRDFile) ->
   erlrrd:last(RRDFile).

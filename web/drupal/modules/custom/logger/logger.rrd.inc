@@ -255,7 +255,7 @@ function logger_rrd_update($meter, $values) {
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
- * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'.
+ * @param $price        The price of kWh, when the unit id either 'Euro' or 'Euro/year'.
  * @return the array of sensor's measurements.
  */
 function logger_rrd_query_sensor($sensor, $unit, $period, $step, $price = NULL) {
@@ -307,7 +307,7 @@ function logger_rrd_latest_timestamp($sensor, $appliance_id = NULL) {
  * @param $unit         The power unit.
  * @param $period       An array containing a period of time to be queried.
  * @param $step         The amount of time aggregated in a single point.
- * @param $price        The price of kWh, when the unit id either 'eur' or 'eur/year'. 
+ * @param $price        The price of kWh, when the unit id either 'Euro' or 'Euro/year'. 
  * @return the array of sensor's measurements.
  */
 function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
@@ -360,7 +360,7 @@ function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
  * @param $unit       The energy unit.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
- * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
+ * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'Euro' or 'Euro/year'.
  * @return the summed energy consumption.
  */
 function logger_rrd_query_total_energy($sensors, $unit, $period, $step, $prices = NULL) {
@@ -376,7 +376,7 @@ function logger_rrd_query_total_energy($sensors, $unit, $period, $step, $prices 
  * @param $unit       The energy unit.
  * @param $period     An array containing a period of time to be queried.
  * @param $step       The amount of time aggregated in a single point.
- * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'eur' or 'eur/year'.
+ * @param $prices     The prices of kWh, indexed by sensor type, when the unit id either 'Euro' or 'Euro/year'.
  * @return the array of energy consumption, indexed by timestamp.
  */
 function logger_rrd_query_energy($sensors, $unit, $period, $step, $prices = NULL) {
@@ -422,7 +422,7 @@ function logger_rrd_query_appliance($sensor, $period, $appliance_id, $step) {
  * @param $series_id   The series id.
  * @param $sensor      The sensor.
  * @param $unit        The unit.
- * @param $price       The price of kWh, when the unit id either 'eur' or 'eur/year'.
+ * @param $price       The price of kWh, when the unit id either 'Euro' or 'Euro/year'.
  * @return the DEF tag.
  */
 function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
@@ -594,26 +594,21 @@ function logger_rrd_parse_exported_lines($lines) {
  * Returns the unit conversion factor.
  * 
  * @param $unit  the unit.
- * @param $price the price (if the unit is Euro).
+ * @param $price the price (if the unit is Monetary).
  * @return the unit conversion factor.
  */
 function logger_rrd_get_unit_factor($unit, $price = NULL) {
 
-  $factors['eur'] = 0.00018; // € 0.18 / kWh
-  $factors['Wh']  = 1;
-  $factors['kWh'] = 0.001;
+  $result = db_select('unit', 'u')
+      ->fields('u', array('factor'))
+      ->condition('u.symbol', $unit)
+      ->execute();
 
-  $factors['watt']     = 3600; // 1Wh/s = 3600 W
-  $factors['kWh/year'] = 31536; //($factors['watt'] / 1000) * 24 * 365;
-  $factors['eur/year'] = $factors['kWh/year'] * $factors['eur'] * 1000; // € 0.18 / kWh
+  $factor = count($result) == 1 ? $result->fetchField() : 1;
 
-  if ($unit == 'eur' && $price) {
-    return $price * $factors['kWh'];
+  //TODO: use unit id instead
+  if (strpos($unit, '€') != FALSE && $price) {
+    $factor *= $price; 
   }
-  elseif ($unit == 'eur/year' && $price) {
-    return $price * $factors['kWh/year'];
-  }
-  else {
-    return $factors[$unit];
-  }
+  return $factor;
 }

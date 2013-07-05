@@ -26,35 +26,6 @@ function notification_schema() {
     ),
   );
 
-  $schema['unit'] = array(
-    'description' => 'Stores units',
-    'fields' => array(
-      'id' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'unasigned' => TRUE,
-      ),
-      'name' => array(
-        'type' => 'varchar',
-        'length' => '16',
-        'not null' => TRUE,
-      ),
-      'symbol' => array(
-        'type' => 'varchar',
-        'length' => '10',
-        'not null' => TRUE,
-      ),
-      'factor' => array(
-        'type' => 'float',
-        'size' => 'normal',
-        'not null' => TRUE,
-      ),
-    ),
-    'primary key' => array(
-      'id',
-    ),
-  );
-
   $schema['event_unit'] = array(
     'description' => 'Stores units associated with Flukso events',
     'fields' => array(
@@ -294,79 +265,6 @@ function notification_install() {
     ->fields(array(
       'id' => 999,
       'name' => 'System Error',
-    ))
-    ->execute();
-
-  //unit
-  db_insert('unit')
-    ->fields(array(
-      'id' => 0,
-      'name' => 'none',
-      'symbol' => 'none',
-      'factor' => 1,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 1,
-      'name' => 'minute',
-      'symbol' => 'min',
-      'factor' => 60,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 2,
-      'name' => 'hour',
-      'symbol' => 'h',
-      'factor' => 3600,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 3,
-      'name' => 'Watt',
-      'symbol' => 'W',
-      'factor' => 1,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 4,
-      'name' => 'Kilowatt',
-      'symbol' => 'kW',
-      'factor' => 1000,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 5,
-      'name' => 'day',
-      'symbol' => 'day',
-      'factor' => DAY,
-    ))
-    ->execute();
-
-  db_insert('unit')
-    ->fields(array(
-      'id' => 6,
-      'name' => 'week',
-      'symbol' => 'week',
-      'factor' => WEEK,
-    ))
-    ->execute();
-  
-  db_insert('unit')
-    ->fields(array(
-      'id' => 7,
-      'name' => 'month',
-      'symbol' => 'month',
-      'factor' => MONTH,
     ))
     ->execute();
 
@@ -756,21 +654,6 @@ function notification_update_7010() {
   db_add_unique_key('notification', 'uk_device_event_limit_unit', array('device', 'event_id', 'limit_up', 'unit_id'));
 
   return st("Fields id and parent_id have been successfully added to table notification.");
-}
-
-/**
- * Update unit conversion factors.
- */
-function notification_update_7011() {
-
-  db_update('unit')
-    ->fields(array(
-      'factor' => 1000
-    ))
-    ->condition('id', 4)
-    ->execute();
-
-  return st("Unit conversion factors have been updated.");
 }
 
 /**

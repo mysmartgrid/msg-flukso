@@ -2028,7 +2028,7 @@ function notification_query_limit_consumption_violations($notifiable, $maximum) 
 
           $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
           $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
-            number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
+            number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
         }
       }
       $list .= $sublist;
@@ -2048,7 +2048,7 @@ function notification_query_production_anomalies($notifiable) {
   require_once LOGGER_PATH . "/logger.anomaly.inc"; 
 
   $period = array('start' => ($notifiable['base_time'] - 5 * MINUTE), 'end' => time());
-  $anomalies = logger_detect_production_anomalies((object) $notifiable, 'watt', $period, MINUTE, 100);
+  $anomalies = logger_detect_production_anomalies((object) $notifiable, 'W', $period, MINUTE, 100);
 
   $list = '';
   foreach ($anomalies as $timestamp => $value) {
@@ -2057,7 +2057,7 @@ function notification_query_production_anomalies($notifiable) {
 
     $list = $list ? $list : t('Sensor') . ': ' . $notifiable['function'] . '<br> ';
     $list .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
-      number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
+      number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
   }
   return $list;
 }
