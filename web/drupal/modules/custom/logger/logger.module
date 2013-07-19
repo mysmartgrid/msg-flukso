@@ -49,6 +49,8 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
+define('LIBKLIO_DEVICE_TYPE_ID', 4);
+
 
 function logger_init() {
 
@@ -1833,6 +1835,9 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   $query->addField('t', 'id', 'type_id');
   $query->addExpression('TRUE', 'visible');
 
+  $query->join('logger_devices', 'd', 'd.device = m.device');
+  $query->addField('d', 'type_id', 'device_type_id');
+
   if (user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');
   }
@@ -1986,9 +1991,13 @@ function logger_get_aggregated_sensors($virtual_meter) {
 
   if ($virtual_meter) {
 
-    $query = db_select('logger_aggregated_meters', 'm')
-    ->fields('m', array('meter'))
-    ->condition('m.virtual_meter', $virtual_meter, '=');
+    $query = db_select('logger_aggregated_meters', 'a')
+    ->fields('a', array('meter'))
+    ->condition('a.virtual_meter', $virtual_meter, '=');
+
+    $query->join('logger_meters', 'm', 'm.meter = a.meter');
+    $query->join('logger_devices', 'd', 'd.device = m.device');
+    $query->addField('d', 'type_id', 'device_type_id');
 
     return db_query_objects($query);
   }

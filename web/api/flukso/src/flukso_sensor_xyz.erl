@@ -411,55 +411,56 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
 
         ServerTimestamp = unix_time(),
 
-        case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
+        RrdTimestamp = case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
           % valid
-          {ok, Response} ->
-            RrdTimestamp = Response;
+          {ok, Response} -> Response;
 
           % error
-          {error, Reason} ->
-            RrdTimestamp = 1
-          end,
+          {error, Reason} -> 1
+        end,
 
-          case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId) of
+        {data, _Result} = mysql:execute(pool, device_type, [Device]),
+        [[DeviceTypeId]] = mysql:get_result_rows(_Result),
 
-            %Measurements are valid
-            {ok, RrdData} ->
+        case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) of
 
-              %debugging%FIXME: comment out debug code
-              UnsortedList = [[integer_to_list(T), ":", float_to_list(float(C)), " "] || [T, C] <- Measurements],
-              logger(Uid, <<"rrdupdate.base">>,
-                string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
-                ?INFO, ReqData),
+          %Measurements are valid
+          {ok, RrdData} ->
 
-              case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
+            %debugging
+            %UnsortedList = [[integer_to_list(T), ":", float_to_list(float(C)), " "] || [T, C] <- Measurements],
+            %logger(Uid, <<"rrdupdate.base">>,
+            %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+            %  ?INFO, ReqData),
 
-                %RRD files were successfully updated
-                {ok, _RrdResponse} ->
-                  RrdResponse = "ok",
-                    [LastTimestamp, LastValue] = lists:last(Measurements),
+            case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
-                    %debugging
-                    %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
+              %RRD files were successfully updated
+              {ok, _RrdResponse} ->
+                RrdResponse = "ok",
+                [LastTimestamp, LastValue] = lists:last(Measurements),
 
-                    mysql:execute(pool, sensor_update, [ServerTimestamp, LastValue, RrdSensor]),
-                    mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, ServerTimestamp]);
+                %debugging
+                %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
+
+                mysql:execute(pool, sensor_update, [ServerTimestamp, LastValue, RrdSensor]),
+                mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, ServerTimestamp]);
     
-                  %RRD files were not successfully updated
-                  {error, RrdResponse} ->
-                    logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
-              end;
+              %RRD files were not successfully updated
+              {error, RrdResponse} ->
+                logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
+            end;
 
-            %Invalid Timestamp
-            {error, RrdData} ->
-              mysql:execute(pool, event_insert, [Device, ?INVALID_TIMESTAMP_EVENT_ID, ServerTimestamp]),
-              RrdResponse = "Invalid Timestamp";
+          %Invalid Timestamp
+          {error, time} ->
+            mysql:execute(pool, event_insert, [Device, ?INVALID_TIMESTAMP_EVENT_ID, ServerTimestamp]),
+            RrdResponse = "Invalid Timestamp";
 
-            %Invalid Measurements
-            _ ->
-              mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, ServerTimestamp]),
-              RrdResponse = "Invalid Measurements"
-          end;
+          %Invalid Measurements
+          _ ->
+            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, ServerTimestamp]),
+            RrdResponse = "Invalid Measurements"
+        end;
 
       %Unknown sensor
       _ ->
@@ -470,26 +471,28 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId) ->
+parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) ->
+
+  %TODO: use field storage_unit_id
+  [[Factor]] = case DeviceTypeId of
+    ?LIBKLIO_DEVICE_TYPE_ID ->
+      {data, Result} = mysql:execute(pool, unit_factor, [UnitId]),
+      mysql:get_result_rows(Result);
+    _ ->
+      [[1]]
+  end, 
 
   try
     Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
     {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
 
-    %debuging
-    %if
-    %  length(MultipleSend) == 0 ->
-    %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
-    %end,
+    if
+      length(Filtered) > 0 ->
+        {ok, [[integer_to_list(Time), ":", integer_to_list(trunc(float(Counter) / Factor)), " "] || [Time, Counter] <- Filtered]};
 
-    {ok, [[integer_to_list(Time), ":", 
-
-      case is_float(Counter) of
-        true -> float_to_list(float(Counter));
-        _ -> integer_to_list(Counter)
-      end,
- 
-     " "] || [Time, Counter] <- Filtered]}
+      true ->
+        {error, time}
+    end
 
   catch
     _:_ ->

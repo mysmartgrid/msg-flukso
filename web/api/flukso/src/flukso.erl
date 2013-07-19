@@ -40,6 +40,7 @@ mysql_prepare() ->
     mysql:prepare(permissions, <<"SELECT permissions FROM logger_tokens WHERE meter = ? AND token = ?">>),
 
     mysql:prepare(unit_props, <<"SELECT id, factor FROM unit WHERE string_id = LOWER(?)">>),
+    mysql:prepare(unit_factor, <<"SELECT factor FROM unit WHERE id = ?">>),
 
     mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),
     mysql:prepare(token_delete, <<"DELETE FROM logger_tokens WHERE meter = ?">>),
@@ -57,9 +58,10 @@ mysql_prepare() ->
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version, description FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_type, <<"SELECT type_id FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_version = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_upgrade_update, <<"UPDATE logger_devices SET upgrade = ? WHERE device = ?">>),
-    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
 
     mysql:prepare(notification_delete, <<"DELETE FROM notification WHERE device = ?">>),

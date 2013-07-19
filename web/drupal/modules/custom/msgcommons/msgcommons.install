@@ -77,7 +77,7 @@ function msgcommons_install() {
       'id' => 3,
       'name' => 'Watt',
       'symbol' => 'W',
-      'factor' => 3600,
+      'factor' => 3.6,
       'string_id' => 'watt'
     ))
     ->execute();
@@ -87,7 +87,7 @@ function msgcommons_install() {
       'id' => 4,
       'name' => 'Kilowatt',
       'symbol' => 'kW',
-      'factor' => 3600 * 1000,
+      'factor' => 3600,
       'string_id' => 'kw'
     ))
     ->execute();
@@ -127,7 +127,7 @@ function msgcommons_install() {
       'id' => 8,
       'name' => 'Euro',
       'symbol' => '€',
-      'factor' => 0.00018, // € 0.18 / kWh
+      'factor' => 0.00000018, // € 0.18 / kWh
       'string_id' => 'euro'
     ))
     ->execute();
@@ -137,7 +137,7 @@ function msgcommons_install() {
       'id' => 9,
       'name' => 'Watt-second',
       'symbol' => 'Ws',
-      'factor' => 1000,
+      'factor' => 1,
       'string_id' => 'ws'
     ))
     ->execute();
@@ -147,7 +147,7 @@ function msgcommons_install() {
       'id' => 10,
       'name' => 'Watt-hour',
       'symbol' => 'Wh',
-      'factor' => 1,
+      'factor' => 1000,
       'string_id' => 'wh'
     ))
     ->execute();
@@ -157,7 +157,7 @@ function msgcommons_install() {
       'id' => 11,
       'name' => 'Kilowatt-hour',
       'symbol' => 'kWh',
-      'factor' => 0.001,
+      'factor' => 0.000001,
       'string_id' => 'kwh'
     ))
     ->execute();
@@ -167,7 +167,7 @@ function msgcommons_install() {
       'id' => 12,
       'name' => 'Kilowatt / year',
       'symbol' => 'kWh/year',
-      'factor' => (3600 / 1000) * 24 * 365,
+      'factor' => (3.6 / 1000) * 24 * 365,
       'string_id' => 'kwhperyear'
     ))
     ->execute();
@@ -177,7 +177,7 @@ function msgcommons_install() {
       'id' => 13,
       'name' => 'Euro / year',
       'symbol' => '€/year',
-      'factor' => (3600 / 1000) * 24 * 365 * 0.00018,
+      'factor' => (3.6 / 1000) * 24 * 365 * 0.18, //€ 0.18 / kWh
       'string_id' => 'europeryear'
     ))
     ->execute();
@@ -425,4 +425,68 @@ function msgcommons_update_7005() {
   ));
 
   return st('Field unit.string_id has been updated.');
+}
+
+/**
+ * Updates unit factors.
+ */
+function msgcommons_update_7007() {
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 3.6
+    ))
+    ->condition('id', 3)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 3600
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 0.00000018
+    ))
+    ->condition('id', 8)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 1
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 1000
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 0.000001
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000) * 24 * 365
+    ))
+    ->condition('id', 12)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000) * 24 * 365 * 0.18 //€ 0.18 / kWh
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  return st('Unit factors have been updated.');
 }

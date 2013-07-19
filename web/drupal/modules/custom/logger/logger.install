@@ -7,6 +7,23 @@
 
 function logger_schema() {
 
+  $schema['logger_device_type'] = array(
+    'description' => 'Stores the device types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
   $schema['logger_devices'] = array(
     'description' => "Contains the Fluksometer device ID's.",
     'fields' => array(
@@ -127,6 +144,11 @@ function logger_schema() {
         'type' => 'varchar',
         'length' => 60,
         'not null' => FALSE
+      ),
+      'type_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
       ),
     ),
     'primary key' => array('device'),
@@ -845,3 +867,143 @@ function logger_update_7027() {
 
   return st('Logger module variables have been removed.');
 }
+
+/**
+ * Creates table logger_device_type.
+ */
+function logger_update_7028() {
+
+  db_create_table('logger_device_type', drupal_get_schema_unprocessed('logger', 'logger_device_type'));
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 0,
+      'name' => 'Unknown'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Flukso 1.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Flukso 2.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'VZLogger'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'LibKlio Store'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Cloned Device'
+    ))
+    ->execute();
+
+  return st('Table logger_device_type has been created.');
+}
+
+/**
+ * Adds field type_id to table logger_devices.
+ */
+function logger_update_7029() {
+
+  db_add_field('logger_devices', 'type_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 1
+    ))
+    ->condition('serial', 100000000, '<')
+    ->condition('serial', 90000000, '>')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 2
+    ))
+    ->condition('serial', 100000000, '>')
+    ->condition('serial', 6000000000, '<')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('serial', 6000000000, '>')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('device', 'dvdvdv%', 'LIKE')
+    ->execute();
+
+  return st('Field type_id has been added to table logger_devices.');
+}
+
+/**
+ * Fix device types of libklio stores.
+ */
+function logger_update_7030() {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 4
+    ))
+    ->condition('description', 'libklio%', 'LIKE')
+    ->execute();
+
+  return st('The device types of libklio stores have been fixed.');
+}
+
+/**
+ * Fix types of cloned devices.
+ */
+function logger_update_7031() {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('device', 'dvdvdv%', 'LIKE')
+    ->execute();
+
+  return st('The types of cloned devices have been fixed.');
+}
+
+/**
+ * Remove logger module variables.
+ */
+function logger_update_7032() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_%', 'LIKE')
+    ->execute();
+
+  return st('Logger module variables have been removed.');
+}
+

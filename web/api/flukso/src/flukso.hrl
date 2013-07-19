@@ -30,6 +30,12 @@
 -define(MONTH, 2419200).
 -define(YEAR, 31536000).
 
+-define(UNKNOWN_DEVICE_TYPE_ID,  0).
+-define(FLUKSO1_DEVICE_TYPE_ID,  1).
+-define(FLUKSO2_DEVICE_TYPE_ID,  2).
+-define(VZLOGGER_DEVICE_TYPE_ID, 3).
+-define(LIBKLIO_DEVICE_TYPE_ID,  4).
+
 -define(NO_COMMUNICATION_EVENT_ID,       1).
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
 -define(PEAK_CONSUMPTION_EVENT_ID,       4).
@@ -80,12 +86,12 @@ check_version(_, _) ->
 
 
 check_event(Event) ->
-    case Event of
-        BROWNOUT_EVENT_ID -> {Event, true};
-        FIRMWARE_UPGRADED_EVENT_ID -> {Event, true};
-        FAILED_FIRMWARE_UPGRADE_EVENT_ID -> {Event, true};
-        _ -> {false, false}
-    end.
+    {Event, case Event of
+        BROWNOUT_EVENT_ID -> true;
+        FIRMWARE_UPGRADED_EVENT_ID -> true;
+        FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
+        _ -> false
+    end}.
 
 check_event(undefined, undefined) ->
     {false, false};
@@ -105,6 +111,14 @@ check_device(Device) ->
 
 check_key(Key) ->
     check_hex(Key, 32).
+
+check_device_type(Type) ->
+    {Type, case Type of
+        <<"flukso2">> -> true;
+        <<"vzlogger">> -> true;
+        <<"libklio">> -> true;
+        _ -> false
+    end}.
 
 check_token(undefined, undefined) ->
     {false, false};
@@ -214,6 +228,13 @@ digest_response(Key, Properties, ReqData, State, Embody) ->
 
 
 %% helper functions
+
+get_optional_value(Property, JsonData, DefaultValue) ->
+  case proplists:is_defined(Property, JsonData) of
+    true -> proplists:get_value(Property, JsonData);
+    _ -> DefaultValue
+  end.
+
 unix_time() ->
     {Megaseconds, Seconds, _Microseconds} = erlang:now(),
     Megaseconds*1000000 + Seconds.

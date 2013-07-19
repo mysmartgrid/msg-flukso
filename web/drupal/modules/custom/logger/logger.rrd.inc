@@ -435,7 +435,7 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
 
   $price = isset($price) ? $price : $sensor->price;
 
-  $factor = logger_rrd_get_unit_factor($unit, $price);
+  $factor = logger_rrd_get_unit_factor($unit, $price, $sensor->device_type_id);
 
   $file_path = logger_rrd_file($sensor->meter);
   if (file_exists($file_path)) {
@@ -597,7 +597,7 @@ function logger_rrd_parse_exported_lines($lines) {
  * @param $price the price (if the unit is Monetary).
  * @return the unit conversion factor.
  */
-function logger_rrd_get_unit_factor($unit, $price = NULL) {
+function logger_rrd_get_unit_factor($unit, $price = NULL, $device_type_id = 0) {//FIXME: argument
 
   $result = db_select('unit', 'u')
       ->fields('u', array('factor'))
@@ -610,5 +610,5 @@ function logger_rrd_get_unit_factor($unit, $price = NULL) {
   if (strpos($unit, '€') != FALSE && $price) {
     $factor *= $price; 
   }
-  return $factor;
+  return $factor * ($device_type_id == LIBKLIO_DEVICE_TYPE_ID ? 1 : 1000);
 }

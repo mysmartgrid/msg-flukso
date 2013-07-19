@@ -71,10 +71,19 @@ malformed_POST(ReqData, _State) ->
         ValidKey = true
     end,
 
+    IsTypeDefined = proplists:is_defined(<<"type">>, JsonData),
+    if
+      %When defined, type is validated
+      IsTypeDefined == true ->
+        {Type, ValidType} = check_device_type(proplists:get_value(<<"type">>, JsonData));
+      true ->
+        ValidType = true
+    end,
+
     State = #state{device = Device, digest = Digest},
 
-    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey} of
-        {true, true, true, true} -> false;
+    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey, ValidType} of
+        {true, true, true, true, true} -> false;
         _ -> true
      end,
     ReqData, State}.
@@ -207,8 +216,6 @@ process_post(ReqData, #state{device = Device} = State) ->
     Timestamp = unix_time(),
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
-    IsDescriptionInformed = proplists:is_defined(<<"description">>, JsonData),
-
     case mysql:get_result_rows(Result) of
 
       %Device exists
@@ -233,35 +240,29 @@ process_post(ReqData, #state{device = Device} = State) ->
           %Heartbeat Message
           true ->
             NewKey = Key, %Key is not changed
-            Version = proplists:get_value(<<"version">>, JsonData),
-            Reset = proplists:get_value(<<"reset">>, JsonData),
-            Uptime = proplists:get_value(<<"uptime">>, JsonData),
-            Memtotal = proplists:get_value(<<"memtotal">>, JsonData),
-            Memcached = proplists:get_value(<<"memcached">>, JsonData),
-            Membuffers = proplists:get_value(<<"membuffers">>, JsonData),
-            Memfree = proplists:get_value(<<"memfree">>, JsonData),
+            Version = get_optional_value(<<"version">>, JsonData, 0),
+            Reset = get_optional_value(<<"reset">>, JsonData, 0),
+            Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
+            Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
+            Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
+            Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
+            Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
             NewResets = Resets + Reset
         end,
 
         IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
 
-        if
+        FirmwareVersion = if
           IsFirmwareInformed == true ->
             {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            FirmwareVersion = proplists:get_value(<<"version">>, Firmware);
+            proplists:get_value(<<"version">>, Firmware);
             %TODO: process <<"build">> and <<"tag">>
 
           true ->
-            FirmwareVersion = OldFirmwareVersion
+            OldFirmwareVersion
         end,
 
-        if
-          IsDescriptionInformed == true ->
-            Description = proplists:get_value(<<"description">>, JsonData);
-
-          true ->
-            Description = OldDescription
-        end,
+        Description = get_optional_value(<<"description">>, JsonData, OldDescription),
 
         mysql:execute(pool, device_update,
           [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Description, Device]),
@@ -274,17 +275,21 @@ process_post(ReqData, #state{device = Device} = State) ->
         Serial = Timestamp,
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
+        Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
-        if
-          IsDescriptionInformed == true ->
-            Description = proplists:get_value(<<"description">>, JsonData);
-
+        TypeId = case proplists:is_defined(<<"type">>, JsonData) of
           true ->
-            Description = "Flukso Device"
+            case proplists:get_value(<<"type">>, JsonData) of
+              <<"flukso2">> -> ?FLUKSO2_DEVICE_TYPE_ID;
+              <<"vzlogger">> -> ?VZLOGGER_DEVICE_TYPE_ID;
+              <<"libklio">> -> ?LIBKLIO_DEVICE_TYPE_ID;
+              _ -> ?UNKNOWN_DEVICE_TYPE_ID
+            end;
+          _ -> ?FLUKSO2_DEVICE_TYPE_ID 
         end,
 
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description])
+          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),
