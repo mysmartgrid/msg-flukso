@@ -1007,3 +1007,13 @@ function logger_update_7042() {
 
   return st('Logger module variables have been removed.');
 }
+
+/**
+ * Redefine variable logger_msg_service_url.
+ */
+function logger_update_7043() {
+
+  variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
+
+  return st('Variable logger_msg_service_url has been redefined.');
+}
