@@ -3633,14 +3633,20 @@ function logger_query_device_measurements($interval, $device, $unit = 'W') {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $sql = "SELECT meter, function, price FROM {logger_meters} WHERE device = :device";
-  $sensors = db_query($sql, array(':device' => $device));
+  //TODO. create a function for this query
+  $query = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'function', 'price'))
+    ->condition('m.device', $device);
+  $query->join('logger_devices', 'd', 'd.device = m.device');
+  $query->addField('d', 'type_id', 'device_type_id');
+
+  $result = $query->execute();
 
   $resolution = logger_get_resolution($interval);
   $period = logger_get_period($interval);
 
   $measurements = array();
-  foreach ($sensors as $sensor) {
+  foreach ($result as $sensor) {
 
     $measurements[$sensor->meter][$sensor->function] = logger_rrd_query_sensor($sensor, $unit, $period, $resolution);
   }
