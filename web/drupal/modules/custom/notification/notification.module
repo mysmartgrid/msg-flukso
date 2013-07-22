@@ -1321,6 +1321,7 @@ function notification_compose_base_query($event_id) {
   $query->join('users', 'u', 'u.uid = d.uid'); 
 
   $query->addField('d', 'serial');
+  $query->addField('d', 'type_id', 'device_type_id');
   $query->addField('u', 'timezone');
   $query->addField('un', 'factor');
   $query->addField('un', 'name', 'unit_name');
