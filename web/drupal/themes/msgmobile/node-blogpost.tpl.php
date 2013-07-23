@@ -1,5 +1,4 @@
 <?php
-
 /**
  * The node rendering logic for mySmartGrid.
  *
@@ -40,7 +39,6 @@
  */
 ?>
 <div id="node-<?php print $node->nid; ?>" class="<?php echo $mysmartgrid_node_class; ?>">
-
   <div class="node-headline clear-block">
   <?php if ($page == 0): ?>
     <h3><a href="<?php print $node_url; ?>" rel="bookmark" title="<?php print $mysmartgrid_perma_title; ?>"><?php print $title; ?></a></h3>
@@ -54,9 +52,7 @@
       <span class="node-author">'</span>
     <?php endif; ?>
   </div>
-
   <div class="content clear-block">
-    
     <?php print $picture; ?>
     <?php print $content; ?>
   </div>
@@ -69,4 +65,4 @@
       <?php endif; ?>
     </div>
   <?php endif; ?>
-</div> <!-- node -->
+</div>

@@ -29,7 +29,9 @@
 define('NO_COMMUNICATION_EVENT_ID',        1);
 define('COMMUNICATION_RESTORED_EVENT_ID',  3);
 define('PEAK_CONSUMPTION_EVENT_ID',        4);
+define('LOW_CONSUMPTION_EVENT_ID',         5);
 define('ANY_DEVICE_ISSUE_EVENT_ID',        9);
+
 
 //Report events
 define('SUMMARY_REPORT_EVENT_ID',          10);
@@ -56,10 +58,6 @@ define('NOTIFICATION_PATH', DRUPAL_ROOT . '/' . NOTIFICATION_REL_PATH);
 
 define('NOTIFICATION_TIMESTAMP_FORMAT', 'd-m-Y H:i');
 
-
-function notification_init() {
-  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification.js');
-}
 
 function notification_permission() {
   return array(
@@ -90,6 +88,13 @@ function notification_permission() {
   );
 }
 
+function notification_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
+}
+
 function notification_settings_access($permission, $account) {
   return ($account->uid == $GLOBALS['user']->uid && user_access($permission));
 }
@@ -106,7 +111,7 @@ function notification_device_access($permission, $device) {
 
   $uid = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
-    ->condition('d.device', "$device", '=')
+    ->condition('d.device', "$device")
     ->execute()
     ->fetchField();
 
@@ -224,7 +229,7 @@ function notification_edition_page($device, $event_id, $limit_up, $unit_id) {
   $query->addField('e', 'name', 'event_name');
 
   $notification = $query
-    ->fields('n', array('id', 'device', 'event_id', 'limit_up', 'unit_id', 'emails', 'min_interval'))
+    ->fields('n', array('id', 'device', 'event_id', 'limit_up', 'unit_id', 'emails', 'min_interval', 'base_time'))
     ->fields('d', array('serial'))
     ->condition('n.device', $device)
     ->condition('n.event_id', $event_id)
@@ -324,9 +329,17 @@ function notification_list_page() {
   }
 
   $table_id = 'notification-list-table';
-  $handler = "function() { resizeLegend('$table_id'); }";
-  drupal_add_js("$(window).resize( $handler );", array('type' => 'inline', 'scope' => JS_DEFAULT));
-  drupal_add_js("$(document).ready(  $handler );", array('type' => 'inline', 'scope' => JS_DEFAULT));
+
+  if (logger_is_mobile_device()) {
+
+    $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
+
+    $handler = "function() { resizeTable('$table_id'); }";
+    drupal_add_js("jQuery(window).resize( $handler );", $options);
+
+    $options['weight']++;
+    drupal_add_js("jQuery(document).ready( $handler );", $options);
+  }
 
   $caption = '<p>' . l(t('Register Notification'), 'notification/register') . '<br><br></p>';
 
@@ -344,13 +357,13 @@ function notification_eventlog_page($device) {
 
   $serial = db_select('logger_devices', 'd')
     ->fields('d', array('serial'))
-    ->condition('d.device', $device, '=')
+    ->condition('d.device', $device)
     ->execute()
     ->fetchField();
 
   $query = db_select('event_log', 'l')
     ->fields('l', array('time'))
-    ->condition('l.device', $device, '=')
+    ->condition('l.device', $device)
     ->orderBy('l.time', 'DESC');
   $query->join('event', 'e', 'e.id = l.event_id');
   $query->addField('e', 'name');
@@ -409,7 +422,7 @@ function notification_eventlog_clear_old() {
   foreach ($logs as $log) {
 
     db_delete('event_log')
-      ->condition('device', $log->device, '=')
+      ->condition('device', $log->device)
       ->condition('time', $log->last_time - 3 * DAY, '<')
       ->execute();
   }
@@ -433,27 +446,20 @@ function notification_newsletter_page() {
     t('Of course, we do not share this information with anyone at any given time. If you want to unsubscribe, please click the appropriate link found at the end of each newsletter.') .
     '</p></div>';
 
-  $output .= '<div><p><br>' .
-    t('Latest publications:');
+  $output .= '<div><p><br>' . t('Latest publications:');
 
-  $sql = '
-    SELECT
-      n.nid
-    FROM
-      {node} n,
-      {users} u,
-      {users_roles} ur
-    WHERE
-      n.type = :type AND
-      n.title LIKE :title AND
-      n.uid = u.uid AND
-      u.uid = ur.uid AND
-      ur.rid = :uid
-    ORDER BY
-      n.created DESC';
+  $query = db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('n.type', 'blogpost')
+    ->condition('n.title', "Newsletter %/%", 'LIKE')
+    ->orderBy('n.created', 'DESC')
+    ->range(0, 3);
 
-  $results = db_query_range($sql, 0, 3,
-    array(':type' => "blogpost", ':title' => "Newsletter %/%", ':uid' => 8)); //Posted by a Blogger
+  $query->join('users', 'u', 'u.uid = n.uid');
+  $query->join('users_roles', 'ur', 'ur.uid = u.uid');
+  $query->condition('ur.rid', 8); //Posted by a Blogger
+
+  $results = $query->execute();
 
   foreach ($results as $result) {
 
@@ -493,6 +499,8 @@ function notification_registration_form($form, &$form_state) {
     '#suffix' => '</table>',
   );
 
+  drupal_add_js(NOTIFICATION_REL_PATH . '/js/notification-min.js', array('type' => 'file', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200));
+
   $show_details_link = '<br><a id="showDetails" href="javascript: showDeviceIssueEvents(true);">' . t('Show details') . '</a>';
   $hide_details_link = '<a id="hideDetails" style="display: none" href="javascript: showDeviceIssueEvents(false);">' . t('Hide details') . '</a>';
  
@@ -523,11 +531,15 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(PEAK_CONSUMPTION_EVENT_ID, 5000, WATT_UNIT_ID,
     'Here you can set the maximum electricity consumption. Beyond this limit, the device is considered faulty.');
 
+  $form['events'] += notification_create_event_fields(LOW_CONSUMPTION_EVENT_ID, 100, WATT_UNIT_ID,
+    'Here you can set the minimum electricity consumption. Below this limit, the device is considered faulty.');
+
   $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
   $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
-    'Here you can set the period of time in which you want to receive energy production forecast reports.');
+    'Here you can set the period of time in which you want to receive energy production forecast reports. ' . 
+    'The reports are sent only if the sensor has the "Forecast" option activated at the sensor edition page.');
 
   $form['min_interval'] = array(
     '#type' => 'select',
@@ -536,6 +548,16 @@ function notification_registration_form($form, &$form_state) {
     '#default_value' => 0,
     '#required' => TRUE,
     '#options' => notification_get_frequency_options(),
+  );
+
+  $form['start'] = array(
+    '#type' => 'textfield',
+    '#theme' => 'logger_time',
+    '#title' => t('Start Time'),
+    '#description' => t('Please, inform the time beyond which the notifications will be sent.'),
+    '#default_value' => time(),
+    '#required' => TRUE,
+    '#text-align' => 'center'
   );
 
   $form['submit'] = array(
@@ -684,7 +706,7 @@ function notification_edition_form($form, &$form_state, $notification) {
     $unit_id = $child ? $child->unit_id : NULL;
 
     $form['events'] += notification_create_event_fields(COMMUNICATION_RESTORED_EVENT_ID, 2, HOUR_UNIT_ID,
-      'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, i' . 
+      'Here you can set the maximum period of time acceptable for a device to be offline. Beyond this limit, ' . 
       'when the first message is received, the communication is considered reestablished.', FALSE, '', $checked, $limit_up, $unit_id);
 
     $form['events'] += notification_create_event_fields(CORRUPTED_MESSAGE_EVENT_ID, NULL, NULL,
@@ -727,6 +749,12 @@ function notification_edition_form($form, &$form_state, $notification) {
         'Beyond this limit, the device is considered faulty.');
       break;
 
+    case LOW_CONSUMPTION_EVENT_ID:
+      $form['limit_up']['#title'] = t('Minimum Consumption');
+      $form['limit_up']['#description'] = t('Here you can set the minimum electricity consumption. ' .
+        'Below this limit, the device is considered faulty.');
+      break;
+
     case SUMMARY_REPORT_EVENT_ID:
       $form['limit_up']['#title'] = t('Frequency');
       $form['limit_up']['#description'] = t('Here you can set the period of time in which you want to receive summary reports.');
@@ -748,6 +776,16 @@ function notification_edition_form($form, &$form_state, $notification) {
     '#required' => TRUE,
     '#options' => notification_get_frequency_options(),
     '#default_value' => $notification->min_interval,
+  );
+
+  $form['start'] = array(
+    '#type' => 'textfield',
+    '#theme' => 'logger_time',
+    '#title' => t('Start Time'),
+    '#description' => t('Please, inform the time beyond which the notifications will be sent.'),
+    '#default_value' => $notification->base_time,
+    '#required' => TRUE,
+    '#text-align' => 'center'
   );
 
   $form['submit'] = array(
@@ -832,7 +870,7 @@ function notification_limit_up_validate($field, $form_state) {
 
     $factor = db_select('unit', 'u')
       ->fields('u', array('factor'))
-      ->condition('u.id', $unit_id, '=')
+      ->condition('u.id', $unit_id)
       ->execute()
       ->fetchField();
 
@@ -842,13 +880,13 @@ function notification_limit_up_validate($field, $form_state) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
     }
-    elseif ($event_id == PEAK_CONSUMPTION_EVENT_ID && $converted_limit <= 0) {
+    elseif (($event_id == LOW_CONSUMPTION_EVENT_ID || $event_id == PEAK_CONSUMPTION_EVENT_ID) && ($converted_limit < 1 || $converted_limit > 999999999)) {
 
-      form_error($field, t('Peak consumption can not be lesser than 0 watt / min.'));
+      form_error($field, t('Consumption limit can not be lesser than 1 watt / min or greater than 999.999.999 watt / min.'));
     }
-    elseif ($event_id == SUMMARY_REPORT_EVENT_ID && $converted_limit < DAY) {
+    elseif ($event_id == SUMMARY_REPORT_EVENT_ID && ($converted_limit < DAY || $converted_limit > 6 * MONTH)) {
 
-      form_error($field, t('The minimum period for the summary report is 1 day.'));
+      form_error($field, t('The period for the summary report must be between 1 day and 6 months.'));
     }
     elseif ($event_id == FORECAST_REPORT_EVENT_ID && ($converted_limit > 3 * DAY || $converted_limit < DAY)) {
 
@@ -861,6 +899,10 @@ function notification_registration_form_validate($form, &$form_state) {
 
   if (!user_access('save event notifications')) {
     form_set_error('', t('Operation not allowed.'));
+  }
+
+  if (DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $_REQUEST['startdate'] . ' ' . $_REQUEST['starttime']) == FALSE) {
+    form_set_error('startdate', t('Invalid start time.'));
   }
 }
 
@@ -878,6 +920,7 @@ function notification_registration_form_submit($form, &$form_state) {
   notification_register_event($_REQUEST, MEASUREMENT_ANOMALY_EVENT_ID, $id);
 
   notification_register_event($_REQUEST, PEAK_CONSUMPTION_EVENT_ID);
+  notification_register_event($_REQUEST, LOW_CONSUMPTION_EVENT_ID);
   notification_register_event($_REQUEST, SUMMARY_REPORT_EVENT_ID);
   notification_register_event($_REQUEST, FORECAST_REPORT_EVENT_ID);
 
@@ -940,16 +983,17 @@ function notification_register_event($values, $event_id, $parent_id = NULL) {
 
     $emails = $values['emails'];
     $min_interval = $values['min_interval'];
+    $base_time = DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp();
 
     $notification = notification_get($device, $event_id, $limit_up, $unit_id);
 
     if ($notification) {
-      $values = array('emails' => $emails, 'min_interval' => $min_interval, 'parent_id' => $parent_id);
+      $values = array('emails' => $emails, 'min_interval' => $min_interval, 'parent_id' => $parent_id, 'base_time' => $base_time);
       notification_update($device, $event_id, $limit_up, $unit_id, $values);
       return $notification->id;
     }
     else {
-      notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id);
+      notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id, $base_time);
 
       if ($event_id == ANY_DEVICE_ISSUE_EVENT_ID) {
         $notification = notification_get($device, $event_id, $limit_up, $unit_id);
@@ -994,15 +1038,15 @@ function notification_edit_event($values) {
     }
   }
 
-  $emails = $values['emails'];
   $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
   $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
-  $min_interval = $values['min_interval'];
+
   $values = array(
     'limit_up' => $limit_up,
     'unit_id' => $unit_id,
-    'emails' => $emails,
-    'min_interval' => $min_interval
+    'emails' => $values['emails'],
+    'min_interval' => $values['min_interval'],
+    'base_time' => DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp()
   );
 
   $notification = notification_get($device, $event_id, $limit_up, $unit_id);
@@ -1026,7 +1070,7 @@ function notification_get_event_name($event_id) {
 
   $name = db_select('event', 'e')
     ->fields('e', array('name'))
-    ->condition('e.id', $event_id, '=')
+    ->condition('e.id', $event_id)
     ->execute()
     ->fetchField();
 
@@ -1041,20 +1085,13 @@ function notification_get_event_name($event_id) {
  */
 function notification_get_units_options($event_id) {
 
-  $sql = "
-    SELECT
-      un.id,
-      un.name
-    FROM
-      {unit} un,
-      {event_unit} eu
-    WHERE
-      eu.event_id = :event_id AND
-      eu.unit_id = un.id
-    ORDER BY
-      un.id";
+  $query = db_select('unit', 'un')
+    ->fields('un', array('id', 'name'))
+    ->orderBy('un.id');
+  $query->join('event_unit', 'eu', 'eu.unit_id = un.id');
+  $query->condition('eu.event_id', $event_id);
 
-  $result = db_query($sql, array(':event_id' => $event_id));
+  $result = $query->execute();
 
   $units = array();
   foreach ($result as $row) {
@@ -1130,8 +1167,9 @@ function notification_delete_children($parent_id) {
  * @param $limit_up      The event's threshold.
  * @param $unit_id       The unit id.
  * @param $parent_id     The parent notification id.
+ * @param $base_time     The time when the notifications start to be sent.
  */
-function notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id) {
+function notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id, $base_time) {
 
   db_insert('notification')
     ->fields(array(
@@ -1139,7 +1177,7 @@ function notification_insert($device, $event_id, $emails, $min_interval, $limit_
       'event_id' => $event_id,
       'emails' => $emails,
       'min_interval' => $min_interval,
-      'base_time' => REQUEST_TIME,
+      'base_time' => $base_time,
       'limit_up' => $limit_up,
       'unit_id' => $unit_id,
       'last_sent' => 0,
@@ -1192,8 +1230,8 @@ function notification_theme() {
 
   return array(
     'notification_event_limit_up' => array(
-      'render element' => 'element',
-    ),
+      'render element' => 'element'
+    )
   );
 }
 
@@ -1217,7 +1255,8 @@ function theme_notification_event_limit_up($variables) {
 
   $default_value = isset($element['#default_value']) ? $element['#default_value'] : '';
 
-  $field1 = '<input type="text" name="limit_up' . $event_id . '" size="10" id="edit-limit-up' . $event_id . '"' .
+  $field1 = '<input type="text" name="limit_up' . $event_id . '" ' .
+    'size="' . $element['#size'] . '" maxlength="' . $element['#maxlength'] . '" id="edit-limit-up' . $event_id . '"' .
     'value="' . $default_value . '" style="text-align: right;" ' . $attributes . ' />';
 
   $options = '';
@@ -1239,27 +1278,30 @@ function notification_cron() {
 
   notification_send_no_communication_emails();
   notification_send_communication_restored_emails();
-  notification_send_peak_consumption_emails();
 
   //First quarter of an hour
   if ($rest >= 45) {
     notification_eventlog_clear_old();
+    notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
   }
 
   //Second quarter of an hour
   if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
     notification_send_corrupted_message_emails();
     notification_send_measurement_anomaly_emails();
+    notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
   }
 
   //Third quarter of an hour
   if ($rest < 30 * MINUTE && $rest >= 15 * MINUTE) {
     notification_send_forecast_report_emails();
+    notification_send_limit_consumption_emails(PEAK_CONSUMPTION_EVENT_ID);
   }
 
   //Fourth quarter of an hour
   if ($rest < 15 * MINUTE) {
     notification_send_summary_report_emails();
+    notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
   }
 }
 
@@ -1279,6 +1321,7 @@ function notification_compose_base_query($event_id) {
   $query->join('users', 'u', 'u.uid = d.uid'); 
 
   $query->addField('d', 'serial');
+  $query->addField('d', 'type_id', 'device_type_id');
   $query->addField('u', 'timezone');
   $query->addField('un', 'factor');
   $query->addField('un', 'name', 'unit_name');
@@ -1305,7 +1348,7 @@ function notification_send_no_communication_emails() {
     $log_query = db_select('event_log', 'l');
     $log_query->addExpression('MAX(l.time)', 'max_time');
     $log_query->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
-      ->condition('l.device', $notifiable['device'], '=')
+      ->condition('l.device', $notifiable['device'])
       ->havingCondition('max_time', REQUEST_TIME - $notifiable['limit_up'] * $notifiable['factor'], '<');
 
     $max_time = $log_query->execute()->fetchField();
@@ -1346,13 +1389,13 @@ function notification_send_communication_restored_emails() {
     $msg_query = db_select('event_log', 'l')
       ->fields('l', array('time'))
       ->condition('l.event_id', MESSAGE_RECEIVED_EVENT_ID, '>')
-      ->condition('l.device', $notifiable['device'], '=')
+      ->condition('l.device', $notifiable['device'])
       ->condition('l.time', $notifiable['base_time'] + $notifiable['limit_up'] * $notifiable['factor'], '>');
 
     $recent_msg_query = db_select('event_log', 'p')
       ->where('p.time < l.time')
       ->condition('p.time', $notifiable['base_time'], '>')
-      ->condition('p.device', $notifiable['device'], '=')
+      ->condition('p.device', $notifiable['device'])
       ->condition('p.event_id', MESSAGE_RECEIVED_EVENT_ID, '>');
     $recent_msg_query->addExpression('1');
 
@@ -1383,7 +1426,7 @@ function notification_send_communication_restored_emails() {
 
   $query = db_select('notification', 'n')
     ->fields('n', array('device', 'limit_up', 'unit_id'))
-    ->condition('n.event_id', COMMUNICATION_RESTORED_EVENT_ID, '=')
+    ->condition('n.event_id', COMMUNICATION_RESTORED_EVENT_ID)
     ->groupBy('n.device')
     ->groupBy('n.limit_up')
     ->groupBy('n.unit_id');
@@ -1465,23 +1508,27 @@ function notification_send_corrupted_message_emails() {
 }
 
 /**
- * Sends e-mails notifying users of the occurrence of Peak Consumption events.
+ * Sends e-mails notifying users of the occurrence of Peak/Low Consumption events.
+ *
+ * @param $event_id The event id.
  */
-function notification_send_peak_consumption_emails() {
+function notification_send_limit_consumption_emails($event_id) {
 
-  $query = notification_compose_base_query(PEAK_CONSUMPTION_EVENT_ID);
+  $query = notification_compose_base_query($event_id);
   $query->addField('n', 'base_time', 'since_time');
+  $query->addField('un', 'factor', 'unit_factor');
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->condition('m.type', CONSUMPTION_SENSOR_TYPE, '=');
-  $query->condition('m.virtual', 0, '=');
-  
-  $result = $query->execute();
+  $query->condition('m.type', CONSUMPTION_SENSOR_TYPE);
+  $query->condition('m.virtual', 0);
 
+  $result = $query->execute();
+  
+  $maximum = $event_id == PEAK_CONSUMPTION_EVENT_ID;
   $notifiables = array();
   while ($notifiable = $result->fetchAssoc()) {
 
-    $violations = notification_query_peak_consumption_violations($notifiable);
+    $violations = notification_query_limit_consumption_violations($notifiable, $maximum);
     if ($violations) {
 
       $notifiable['violations'] = $violations['list'];
@@ -1490,12 +1537,14 @@ function notification_send_peak_consumption_emails() {
     }
   }
 
+  $above = $maximum ? 'above' : 'below';
+
   //ATTENTION: Any change in the following message requires its translations to be redefined.
   $message = notification_compose_email(
-    "Your Flukso device (serial number: %serial) has registered peaks of " .
-    "power consumption above the limit of %limit_up %unit_name.<br><br>" .
+    "Your Flukso device (serial number: %serial) has registered " .
+    "power consumption $above the limit of %limit_up %unit_name.<br><br>" .
 
-    "The following list shows the measurements above the limit.<br><br>" .
+    "The following list shows the measurements $above the limit.<br><br>" .
     "!violations <br><br>");
 
   notification_send_emails($message, $notifiables);
@@ -1511,15 +1560,17 @@ function notification_send_summary_report_emails() {
   $query = notification_compose_base_query(SUMMARY_REPORT_EVENT_ID);
 
   $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
-  $offset = "IF(un.id = :week_unit_id, 4 * :day, 0)";
-  $since_time = "n.base_time - ((n.base_time - $offset) % un.factor)";
-  $until_time = "$since_time + n.limit_up * un.factor";
+  $offset = "IF (un.id = :week_unit_id, 4 * :day, 0)";
+  $since = "n.base_time - ((n.base_time - $offset) % un.factor)";
+  $since_time = "IF (un.id = :month_unit_id, n.base_time - (n.base_time % :day), $since)";
+  $until_time = "IF (un.id = :month_unit_id, UNIX_TIMESTAMP(FROM_UNIXTIME(n.base_time) + INTERVAL n.limit_up MONTH), $since + n.limit_up * un.factor)";
 
   $args = array(
     ':now' => REQUEST_TIME,
     ':delay' => 12 * HOUR,
     ':day' => DAY,
-    ':week_unit_id' => WEEK_UNIT_ID
+    ':week_unit_id' => WEEK_UNIT_ID,
+    ':month_unit_id' => MONTH_UNIT_ID
   );
 
   $query->addExpression($since_time, 'since_time', $args);
@@ -1550,14 +1601,16 @@ function notification_send_summary_report_emails() {
     date_default_timezone_set($notifiable['timezone']);
 
     $period = array('start' => $notifiable['since_time'], 'end' => $notifiable['until_time']);
-    $resolution = $notifiable['unit_id'] == WEEK_UNIT_ID ? DAY : MINUTE;
+    $resolution = $notifiable['unit_id'] == DAY_UNIT_ID ? MINUTE : DAY;
 
+    //TODO: use logger_get_sensors instead
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function', 'price'))
-      ->condition('m.device', $notifiable['device'], '=')
+      ->condition('m.device', $notifiable['device'])
       ->isNotNull('m.function')
       ->condition('m.type', $types, 'IN')
-      ->condition('m.virtual', 0, '=');
+      ->condition('m.virtual', 0);
+    $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
 
     $sensors = $sensors_query->execute();
@@ -1643,8 +1696,8 @@ function notification_send_forecast_report_emails() {
   $query = notification_compose_base_query(FORECAST_REPORT_EVENT_ID);
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->condition('m.forecast', 1, '=');
-  $query->condition('m.virtual', 0, '=');
+  $query->condition('m.forecast', 1);
+  $query->condition('m.virtual', 0);
   $query->addField('m', 'meter');
   $query->addField('m', 'function');
 
@@ -1708,12 +1761,15 @@ function notification_create_forecast_chart($notifiable) {
 
     date_default_timezone_set($notifiable['timezone']); 
 
+    $csv = "Time,Value\n";
     $values = array();
     $days = array();
     foreach ($forecast as $timestamp => $value) {
+      $time = date('d.m.Y G:i', $timestamp);
+      $csv .= "$time,$value\n";
       $values[] = $value;
       $hour = date('G', $timestamp);
-      $hours[] = $hour % 12 == 0 ? date('d.m.Y G:i', $timestamp) : NULL;
+      $hours[] = $hour % 12 == 0 ? $time : NULL;
     }
 
     $dataset = new pData;
@@ -1734,7 +1790,10 @@ function notification_create_forecast_chart($notifiable) {
     $chart->drawTitle(60, 22, t('Device') . ': ' . $notifiable['serial'] . ' ' . t('Sensor') . ': ' . $notifiable['function'], 50, 50, 50, 585);
     $chart->Render($file_path);
 
-    $content = file_get_contents("$base_url/$file_path");
+    $content = array(
+      'data' => $csv,
+      'image' => file_get_contents("$base_url/$file_path")
+    );
   }
   return $content;
 }
@@ -1878,8 +1937,15 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
         'cid' => 'chart',
         'file_name' => 'chart.jpg',
         'content_type' => 'image/jpeg',
-        'content' => $notifiable['chart'],
-        'size' => strlen($notifiable['chart'])
+        'content' => $notifiable['chart']['image'],
+        'size' => strlen($notifiable['chart']['image'])
+      );
+      $attachments[2] = array(
+        'cid' => 'data',
+        'file_name' => 'chart-data-file.csv',
+        'content_type' => 'text/html',
+        'content' => $notifiable['chart']['data'],
+        'size' => strlen($notifiable['chart']['data'])
       );
       unset($notifiable['chart']);
     }
@@ -1938,15 +2004,18 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
 }
 
 /**
- * Returns a list of measurements that violate the Peak Consumption limit.
+ * Returns a list of measurements that violate a consumption limit.
  *
- * @param $notifiable  The user notifiable of the Peak Consumption Event.
+ * @param $notifiable  The notifiable event to test.
+ * @param $maximum     Whether the limit is a maximum value. When FALSE, the limit is assumed to be a minimum value.
  * @return an array containing the latest timestamp and the HTML list of measurements.
  */
-function notification_query_peak_consumption_violations($notifiable) {
+function notification_query_limit_consumption_violations($notifiable, $maximum) {
 
   $list = NULL;
   $measurements = logger_query_device_measurements('hour', $notifiable['device']);
+
+  $limit_up = $notifiable['limit_up'] * $notifiable['unit_factor'];
 
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {
@@ -1954,13 +2023,15 @@ function notification_query_peak_consumption_violations($notifiable) {
 
       foreach ($values as $timestamp => $value) {
 
-        if ($value > $notifiable['limit_up'] && $timestamp > $notifiable['since_time']) {
+        $violate = $maximum ? ($value > $limit_up) : ($value < $limit_up);
+
+        if ($violate && $timestamp > $notifiable['since_time']) {
 
           date_default_timezone_set($notifiable['timezone']);
 
           $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
           $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
-            number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
+            number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
         }
       }
       $list .= $sublist;
@@ -1979,8 +2050,8 @@ function notification_query_production_anomalies($notifiable) {
 
   require_once LOGGER_PATH . "/logger.anomaly.inc"; 
 
-  $period = array('start' => $notifiable['base_time'], 'end' => time());
-  $anomalies = logger_detect_production_anomalies((object) $notifiable, 'watt', $period, MINUTE);
+  $period = array('start' => ($notifiable['base_time'] - 5 * MINUTE), 'end' => time());
+  $anomalies = logger_detect_production_anomalies((object) $notifiable, 'W', $period, MINUTE, 100);
 
   $list = '';
   foreach ($anomalies as $timestamp => $value) {
@@ -1989,7 +2060,7 @@ function notification_query_production_anomalies($notifiable) {
 
     $list = $list ? $list : t('Sensor') . ': ' . $notifiable['function'] . '<br> ';
     $list .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
-      number_format($value, 2, '.', '') . ' ' . t('watt') . '<br> ';
+      number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
   }
   return $list;
 }

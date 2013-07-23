@@ -39,11 +39,12 @@ define('FLAT_LINE_ANOMALY_MIN_VALUES', 15);
  * @param $unit       The measurement unit.
  * @param $period     The time period.
  * @param $resolution The measurement resolution.
+ * @param $max        Maximum number of anomalies to be returned (optional).
  * @return the array of anomalous values, indexed by timestamp.
  */
-function logger_detect_production_anomalies($sensor, $unit, $period, $resolution) {
+function logger_detect_production_anomalies($sensor, $unit, $period, $resolution, $max = 0) {
 
-  module_load_include('inc', 'logger', 'logger.rrd');  
+  module_load_include('inc', 'logger', 'logger.rrd');
 
   $measurements = logger_rrd_query_sensor($sensor, $unit, $period, $resolution);
 
@@ -62,9 +63,20 @@ function logger_detect_production_anomalies($sensor, $unit, $period, $resolution
       isset($standard_anomalies[$timestamp])) {
 
       //Mark a segment as anomalous
-      $anomalies[$timestamp - $resolution] = $measurements[$timestamp - $resolution];
+      $ts = $timestamp - $resolution;
+      if (isset($measurements[$ts])) {
+        $anomalies[$ts] = $measurements[$ts];
+      }
+
       $anomalies[$timestamp] = $value;
-      $anomalies[$timestamp + $resolution] = $measurements[$timestamp + $resolution];
+
+      $ts = $timestamp + $resolution;
+      if (isset($measurements[$ts])) {
+        $anomalies[$ts] = $measurements[$ts];
+      }
+    }
+    if ($max > 0 && count($anomalies) >= $max) {
+      break;
     }
   }
   return $anomalies;

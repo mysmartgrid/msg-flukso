@@ -30,7 +30,7 @@ body {}
 }
 
 /* Fraunhofer-Logo Lines ___________________________________________________ */
-#page { background: url(../images/bg-lines.gif) no-repeat center 620px; }
+/* #page { background: url(../images/bg-lines.gif) no-repeat center 620px; } */
 
 #doc, #header .wrapper, #footer .wrapper {
 	margin: 0 auto;
@@ -471,8 +471,8 @@ div.vignette ul.fisheye li.fisheyeXXXS {
 #logo {
 	left: 2em;
 	position: absolute;
-	top: 50px;
-	width: 190px; /* fixed width as logo is an image that will not resize */
+	top: 45px;
+	/* width: 190px;*/ /* fixed width as logo is an image that will not resize */
 	z-index: 1000;
 }
 #header #logo a {

@@ -26,7 +26,10 @@
          allowed_methods/2,
          malformed_request/2,
          is_authorized/2,
-         process_post/2]).
+         content_types_provided/2,
+         to_json/2,
+         process_post/2,
+         delete_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
@@ -41,16 +44,19 @@ init(Config) ->
 
 
 allowed_methods(ReqData, State) ->
-    {['POST'], ReqData, State}.
+    {['POST', 'GET', 'DELETE'], ReqData, State}.
 
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> malformed_POST(ReqData, State)
+        'POST'   -> malformed_POST(ReqData, State);
+        'GET'    -> malformed_GET(ReqData, State);
+        'DELETE' -> malformed_DELETE(ReqData, State)
     end.
 
 
 malformed_POST(ReqData, _State) ->
+
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
@@ -65,18 +71,57 @@ malformed_POST(ReqData, _State) ->
         ValidKey = true
     end,
 
+    IsTypeDefined = proplists:is_defined(<<"type">>, JsonData),
+    if
+      %When defined, type is validated
+      IsTypeDefined == true ->
+        {Type, ValidType} = check_device_type(proplists:get_value(<<"type">>, JsonData));
+      true ->
+        ValidType = true
+    end,
+
     State = #state{device = Device, digest = Digest},
 
-    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey} of
-        {true, true, true, true} -> false;
+    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey, ValidType} of
+        {true, true, true, true, true} -> false;
         _ -> true
      end,
     ReqData, State}.
 
 
+malformed_GET(ReqData, _State) ->
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    State = #state{device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidDevice, ValidDigest} of
+        {true, true, true} -> false;
+        _ -> true
+     end,
+    ReqData, State}.
+
+
+malformed_DELETE(ReqData, _State) ->
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+
+    State = #state{device = Device, digest = Digest},
+
+    {case {ValidVersion, ValidDevice, ValidDigest} of
+        {true, true, true} -> false;
+        _ -> true
+    end, ReqData, State}.
+
+
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> is_auth_POST(ReqData, State)
+        'POST'   -> is_auth_POST(ReqData, State);
+        'GET'    -> is_auth_GET(ReqData, State);
+        'DELETE' -> is_auth_GET(ReqData, State)
     end.
 
 
@@ -84,19 +129,62 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    case mysql:get_result_rows(Result) of
+    Key = case mysql:get_result_rows(Result) of
 
       %If device is found, use the key stored in the database
-      [[_Key]] ->
-        Key = _Key;
+      [[_Key]] -> _Key;
 
       %Otherwise, use key informed in the request
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-        Key = proplists:get_value(<<"key">>, JsonData)
+        proplists:get_value(<<"key">>, JsonData)
     end,   
 
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+
+
+is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+
+    {data, Result} = mysql:execute(pool, device_key, [Device]),
+
+    {case mysql:get_result_rows(Result) of
+
+      %If device is found, use the key stored in the database
+      [[Key]] ->
+           check_digest(Key, ReqData, ClientDigest);
+
+      %Otherwise, return false
+      _ -> false
+
+    end, ReqData, State}.
+
+
+content_types_provided(ReqData, State) ->
+    {[{"application/json", to_json}], ReqData, State}.
+
+
+to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State) ->
+    {data, Result} = mysql:execute(pool, device_props, [Device]),
+    [[Key, Upgrade, Resets, FirmwareVersion, DeviceDescription]] = mysql:get_result_rows(Result),
+
+    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+    _Sensors = mysql:get_result_rows(_Result),
+
+    Sensors = [{struct, [
+        {<<"meter">>, Meter},
+        {<<"function">>, Function},
+        {<<"description">>, SensorDescription},
+        {<<"unit">>, Unit}]} || [Meter, Function, SensorDescription, Unit] <- _Sensors],
+
+    Encoded = mochijson2:encode({struct, [
+              {<<"description">>, DeviceDescription},
+              {<<"sensors">>, Sensors}]}),
+
+    {case JsonpCallback of
+        undefined -> Encoded;
+            _ -> [JsonpCallback, "(", Encoded, ");"]
+    end,
+    ReqData, State}.
 
 
 %
@@ -122,6 +210,7 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 % Mochijson2: {struct,[{<<"key">>, 12345678901234567890123456789012}]}
 %
 process_post(ReqData, #state{device = Device} = State) ->
+
     {data, Result} = mysql:execute(pool, device_props, [Device]),
 
     Timestamp = unix_time(),
@@ -130,7 +219,7 @@ process_post(ReqData, #state{device = Device} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets, OldFirmwareVersion]] ->
+      [[Key, Upgrade, Resets, OldFirmwareVersion, OldDescription]] ->
 
         IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
 
@@ -151,30 +240,32 @@ process_post(ReqData, #state{device = Device} = State) ->
           %Heartbeat Message
           true ->
             NewKey = Key, %Key is not changed
-            Version = proplists:get_value(<<"version">>, JsonData),
-            Reset = proplists:get_value(<<"reset">>, JsonData),
-            Uptime = proplists:get_value(<<"uptime">>, JsonData),
-            Memtotal = proplists:get_value(<<"memtotal">>, JsonData),
-            Memcached = proplists:get_value(<<"memcached">>, JsonData),
-            Membuffers = proplists:get_value(<<"membuffers">>, JsonData),
-            Memfree = proplists:get_value(<<"memfree">>, JsonData),
+            Version = get_optional_value(<<"version">>, JsonData, 0),
+            Reset = get_optional_value(<<"reset">>, JsonData, 0),
+            Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
+            Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
+            Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
+            Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
+            Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
             NewResets = Resets + Reset
         end,
 
         IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
 
-        if
+        FirmwareVersion = if
           IsFirmwareInformed == true ->
             {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            FirmwareVersion = proplists:get_value(<<"version">>, Firmware);
+            proplists:get_value(<<"version">>, Firmware);
             %TODO: process <<"build">> and <<"tag">>
 
           true ->
-            FirmwareVersion = OldFirmwareVersion
+            OldFirmwareVersion
         end,
 
+        Description = get_optional_value(<<"description">>, JsonData, OldDescription),
+
         mysql:execute(pool, device_update,
-          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Device]),
+          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Description, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -184,9 +275,21 @@ process_post(ReqData, #state{device = Device} = State) ->
         Serial = Timestamp,
         Upgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
+        Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
+
+        TypeId = case proplists:is_defined(<<"type">>, JsonData) of
+          true ->
+            case proplists:get_value(<<"type">>, JsonData) of
+              <<"flukso2">> -> ?FLUKSO2_DEVICE_TYPE_ID;
+              <<"vzlogger">> -> ?VZLOGGER_DEVICE_TYPE_ID;
+              <<"libklio">> -> ?LIBKLIO_DEVICE_TYPE_ID;
+              _ -> ?UNKNOWN_DEVICE_TYPE_ID
+            end;
+          _ -> ?FLUKSO2_DEVICE_TYPE_ID 
+        end,
 
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE"])
+          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),
@@ -231,3 +334,29 @@ compose_support_tag(Device) ->
 
       _ -> []
     end.
+
+
+delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
+
+    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+
+    Sensors = mysql:get_result_rows(_Result),
+    [delete_device_sensor(Meter) || [Meter, Function, Description, Unit] <- Sensors],
+
+    mysql:execute(pool, event_delete, [Device]),
+    mysql:execute(pool, notification_delete, [Device]),
+    mysql:execute(pool, support_slot_release, [Device]),
+    mysql:execute(pool, device_delete, [Device]),
+
+    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+
+
+delete_device_sensor(Sensor) ->
+
+  mysql:execute(pool, msgdump_delete, [Sensor]),
+  mysql:execute(pool, sensor_agg_delete, [Sensor]),
+  mysql:execute(pool, token_delete, [Sensor]),
+  mysql:execute(pool, sensor_delete, [Sensor]),
+
+  file:delete(string:concat(?BASE_PATH, string:concat(binary_to_list(Sensor), ".rrd"))).

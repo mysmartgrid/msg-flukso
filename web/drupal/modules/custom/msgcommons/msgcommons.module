@@ -37,7 +37,158 @@ define('HOUR_UNIT_ID',   2);
 define('WATT_UNIT_ID',   3);
 define('WEEK_UNIT_ID',   6);
 define('DAY_UNIT_ID',    5);
+define('MONTH_UNIT_ID',  7);
 
+define('MSGCOMMONS_PATH', drupal_get_path('module', 'msgcommons'));
+
+
+function msgcommons_menu() {
+
+  $items['validate/recaptcha'] = array(
+    'title' => 'Captchavalidation',
+    'description' => 'Validate a registration form recaptcha',
+    'page callback' => 'msgcommons_validate_recaptcha',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function msgcommons_validate_recaptcha() {
+
+  _recaptcha_load_library();
+
+  //was there a reCAPTCHA response?
+  if (recaptcha_captcha_validation(NULL, "reCAPTCHA")) {
+    msgcommons_call_salesforce();
+  }
+  else {
+    //set the error code so that we can display it
+    return drupal_set_message(t('Error: Captcha validation failed.'));
+  }
+}
+
+/**
+ * Forwards the POST request to Salesforce.
+ */
+function msgcommons_call_salesforce() {
+
+  $url = 'https://www.salesforce.com/servlet/servlet.WebToLead';
+  $headers = array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8');
+  $postdata = msgcommons_copy_salesforce_post_data();
+
+  $response = drupal_http_request($url, array(
+    'headers' => $headers,
+    'method' => 'POST',
+    'data'   => $postdata,
+  ));
+
+  if ($response->code == 200) {
+    print $response->data;
+  }
+  else {
+    return drupal_set_message(t('Our apologies. ter.'));
+  }
+}
+
+/**
+ * Compose the body for a salesforce POST request, from the current request attributes.
+ */
+function msgcommons_copy_salesforce_post_data() {
+
+  $postdata = '';
+  $attributes = $_POST;
+
+  //DEBUG
+  //$attributes = msgcommons_dummy_data();
+
+  foreach ($attributes as $key => $value) {
+    if ($postdata != '') {
+      $postdata .= '&';
+    }
+    $postdata.= "$key=$value";
+  }
+  return $postdata;
+}
+
+/**
+ * Compose the body for a salesforce POST test request. 
+ */
+function msgcommons_dummy_data() {
+
+  global $base_url;
+
+  return array(
+    'oid' => '00D2000000060mn',
+    'retURL' => "$base_url/vielen-dank",
+    //'debug' => 1,
+    //'debugEmail' => 'kai.krueger@itwm.fraunhofer.de',
+    '00N20000003bgx2' => 'Nein', // Emos Programm
+    '00N20000003Jyzz' => 'Nein', // PV Ueberwachung
+    'salutation' =>      'Herr', // Anrede
+    'first_name' =>      'Max3',
+    'last_name' => 'Musterman',
+    'street' => 'Musterring 1',
+    'zip' => '76768',
+    'city' => 'Berg',
+    'company' => 'mySmartGrid',
+    'email' => 'krueger@itwm.fhg.de',
+    'phone' => '0631 31600',
+    '00N20000003JxDf' => 'Haus', // Art der Wohnung
+    '00N20000003bgwi' => '', //'Eigentümer', // Eigentumsverhältnis
+    '00N20000003bgxC' => '', //'4 Personen', // Personen im Haushalt
+    '00N20000003JxDk' => '', // Wärmepumpe
+    '00N20000003JxDp' => '', // Photovoltaikanlage
+    '00N20000003bgz8' => '', // PV-Peakleistung
+    '00N20000003bgxM' => '', // Warmwasser-Bereitung
+    'description' => '',
+    'submit' => 'senden',
+  );
+}
+
+/**
+ * Stores data in the persistent cache.
+ * If it fails, store it in a temporary file.
+ *
+ * @param $cid       The cache id of the data to store.
+ * @param $data      The data to store in the cache.
+ * @param $lifetime  When the data expires and can be removed from the cache.
+ */
+function safe_cache_set($cid, $data, $lifetime) {
+
+  cache_set($cid, $data, 'cache_page', REQUEST_TIME + $lifetime);
+  $cache = cache_get($cid, 'cache_page');
+
+  if (!$cache) {
+    watchdog('msg.cache', "Object %cid too big for caching.", array('%cid' => $cid), WATCHDOG_NOTICE);
+    $saved = file_put_contents(MSGCOMMONS_PATH . "/tmp/$cid", serialize($data));
+    if ($saved === FALSE) {
+      watchdog('msg.cache', "Object %cid could not be saved to a cache file.", array('%cid' => $cid), WATCHDOG_ERROR);
+    }
+  }
+}
+
+/**
+ * Returns data from the persistent cache. If not found, looks for a temporary file and returns its content.
+ * 
+ * @param $cid  The cache id of the data to retrieve.
+ * @return the cached object.
+ */
+function safe_cache_get($cid) {
+
+  $cache = cache_get($cid, 'cache_page');
+  if (!$cache) {
+
+    $file = MSGCOMMONS_PATH . "/tmp/$cid";
+    if (file_exists($file)) {
+
+      $cache = new stdClass();
+      $cache->data = unserialize(file_get_contents($file));
+    }
+  }
+  return $cache;
+}
 
 /**
  * Converts a string containing a list of tokens into an array.
@@ -59,13 +210,44 @@ function tokenize_string($str, $sep = " \n\r") {
 }
 
 /**
+ * Wraps a string to a given number of characters, respecting multi-byte characters.
+ *
+ * @param $str   The input string.
+ * @param $width The number of characters at which the string will be wrapped.
+ * @param $break The line is broken using the optional break parameter.
+ * @param $cut   If the cut is set to TRUE, the string is always wrapped at or before the specified width.
+ *               So if you have a word that is larger than the given width, it is broken apart.
+ * @return the given string wrapped at the specified length. 
+ */
+function mb_wordwrap($str, $width = 75, $break = "\n", $cut = FALSE, $charset = null) {
+
+  if ($charset === NULL){
+    $charset = mb_internal_encoding();
+  }
+
+  $pieces = explode($break, $str);
+  $result = array();
+
+  foreach ($pieces as $piece) {
+    $current = $piece;
+
+    while ($cut && mb_strlen($current) > $width) {
+      $result[] = mb_substr($current, 0, $width, $charset);
+      $current = mb_substr($current, $width, 2048, $charset);
+    }
+    $result[] = $current;
+  }
+  return implode($break, $result);
+}
+
+/**
  * Downloads a chart data file.
  */
 function download_chart_data_file($file_name, $header, $lines) {
 
   drupal_add_http_header('Pragma', 'public');
   drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
-  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name.txt");
+  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name");
   drupal_add_http_header('Cache-Control', 'public');
 
   print $header . PHP_EOL . $lines;
@@ -226,10 +408,20 @@ function rzip($source, $destination) {
  * @param $file_path The file path.
  * @param $content   The file content.
  */
-function save_file($file_path, $content) {
-  $fh = fopen($file_path, 'w');
+function save_file($file_path, $content, $mode = 'w') {
+  $fh = fopen($file_path, $mode);
   fwrite($fh, $content);
   fclose($fh);
+}
+
+/**
+ * Appends a string to a file.
+ *
+ * @param $file_path The file path.
+ * @param $content   The file content.
+ */
+function append_file($file_path, $content) {
+  save_file($file_path, $content, 'a');
 }
 
 /**
@@ -385,7 +577,7 @@ function check_browser_support() {
     $supported = FALSE;
     $supported_browsers = array(
       array('name' => 'Firefox',  'version' => 3),
-      array('name' => 'MSIE',     'version' => 7),
+      array('name' => 'MSIE',     'version' => 8),
       array('name' => 'Chrome',   'version' => 1),
       array('name' => 'Chromium', 'version' => 1),
       array('name' => 'Safari',   'version' => 4),
@@ -406,7 +598,7 @@ function check_browser_support() {
   if (!$supported) {
     drupal_set_message(t('Warning: you are using an outdated browser. ' . 
       'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' . 
-      'Internet Explorer 7, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11, Android 2.3.4, Android 4.1 (or a later version).'),
+      'Internet Explorer 8, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11, Android 2.3.4, Android 4.1 (or a later version).'),
       'error', FALSE);
   }
 }
@@ -498,4 +690,14 @@ function standard_deviation($values, $mean = NULL) {
     $devs[] = pow($value - $mean, 2);
   }
   return sqrt(mean($devs));
+}
+
+function msgcommons_cron() {
+
+  $rest = REQUEST_TIME % HOUR;
+
+  //First quarter of an hour
+  if ($rest >= 45 * MINUTE) {
+    rmoldfiles(MSGCOMMONS_PATH . '/tmp', HOUR);
+  }
 }

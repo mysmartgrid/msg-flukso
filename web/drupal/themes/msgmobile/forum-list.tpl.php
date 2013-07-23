@@ -1,6 +1,5 @@
 <?php
 // $Id: forum-list.tpl.php,v 1.4 2007/08/30 18:58:12 goba Exp $
-
 /**
  * @file forum-list.tpl.php
  * Default theme implementation to display a list of forums and containers.
@@ -70,12 +69,10 @@
   <?php endforeach; ?>
   </tbody>
 </table>
-
 <script type="text/javascript">
   var id = 'forum-<?php print $forum_id; ?>';
-  window.onresize = function() { resizeLegend(id, 3, 4); };
-  document.onready = function() { resizeLegend(id, 3, 4); };
-  
+  window.onresize = function() { resizeTable(id, 3, 4); };
+  document.onready = function() { resizeTable(id, 3, 4); };
   var table = document.getElementById(id);
   for(var r = 0; r < table.rows.length; r++) {
     table.rows[r].cells[4].style.display = 'none';

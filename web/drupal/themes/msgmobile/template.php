@@ -56,6 +56,9 @@ function msgmobile_process_html(&$vars) {
  * Override or insert variables into the page template.
  */
 function msgmobile_preprocess_page(&$vars) {
+
+  global $base_url;
+
   // Move secondary tabs into a separate variable.
   $vars['tabs2'] = array(
     '#theme' => 'menu_local_tasks',
@@ -117,6 +120,10 @@ function msgmobile_preprocess_page(&$vars) {
 
   $vars['noscript'] = t('This page requires JavaScript to be enabled, in order to work properly. ' .
     'Please, enable this option in your browser.');
+
+  $static_url = msgmobile_get_static_url($base_url);
+  $vars['theme_url'] = $static_url . '/' . path_to_theme();
+  $vars['logo'] = $vars['theme_url'] . '/logo.png';
 }
 
 /**
@@ -161,25 +168,54 @@ function msgmobile_preprocess_region(&$vars) {
 }
 
 /**
- * Perform alterations before a page is rendered.
- */
-function msgmobile_page_alter($page) {
-
-  //Add META tags to the header
-  $meta = array(
-    '#type' => 'html_tag',
-    '#tag' => 'meta',
-    '#attributes' => array(
-      'http-equiv' => 'X-UA-Compatible',
-      'content' => 'IE=EmulateIE7'
-    )
-  );
-  drupal_add_html_head($meta, 'meta_ie7_emulation');
-}
-
-/**
  * Alter the HTML head tag.
  */
 function msgmobile_html_head_alter(&$head_elements) {
   unset($head_elements['system_meta_generator']);
+}
+
+/**
+ * Process theme variables.
+ */
+function msgmobile_process(&$vars) {
+
+  global $base_url;
+
+  $static_url = msgmobile_get_static_url($base_url);
+
+  if (isset($vars['head'])) {
+    $vars['head'] = str_replace($base_url, $static_url, $vars['head']);
+  }
+
+  if (isset($vars['page_top'])) {
+    $vars['page_top'] = str_replace($base_url, $static_url, $vars['page_top']);
+  }
+
+  if (isset($vars['styles'])) {
+    $vars['styles'] = str_replace($base_url, $static_url, $vars['styles']);
+  }
+
+  if (isset($vars['scripts'])) {
+    $vars['scripts'] = str_replace($base_url, $static_url, $vars['scripts']);
+  }
+
+  if (isset($vars['page_bottom'])) {
+    $vars['page_bottom'] = str_replace($base_url, $static_url, $vars['page_bottom']);
+  }
+}
+
+/**
+ * Returns the static domain for images, js, css, etc.
+ */
+function msgmobile_get_static_url($base_url) {
+
+  //TODO: a certificate is needed for domain: static.mysmartgrid.de
+  return ''; //str_replace('www', 'static', $base_url);
+}
+
+function msgmobile_js_alter(&$scripts) {
+
+  foreach ($scripts as $key => $value) {
+    $scripts[$key]['defer'] = TRUE;
+  }
 }

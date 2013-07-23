@@ -75,18 +75,19 @@ function logger_userdevices_page() {
     $rows[] = $row;
   }
  
-  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
-  $options = array('type' => 'inline', 'scope' => 'header');
+  if (logger_is_mobile_device()) {
+    drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
+    drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
+  }
 
-  drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
-  drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . LOGGER_LEGEND_TABLE_ID . "'); } );", $options);
+  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
 
   $form = drupal_get_form('logger_deviceactivation_form');
   return drupal_render($form) . '<br><br><br>' . 
 
     theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
       'empty' => t('No devices available.'), 'sticky' => FALSE, 'colgroups' => array(),
-      'attributes' => array('id' => LOGGER_LEGEND_TABLE_ID, 'class' => 'resizable')));
+      'attributes' => array('id' => LOGGER_TABLE_ID, 'class' => 'resizable')));
 }
 
 /**
@@ -109,11 +110,15 @@ function logger_usersensors_page() {
     ->condition('d.uid', $user->uid)
     ->execute();
 
+  $is_mobile = logger_is_mobile_device();
+
   foreach ($devices as $device) {
 
-    $table_id = LOGGER_LEGEND_TABLE_ID . "$device->serial";
-    drupal_add_js("jQuery(window).resize( function() { resizeLegend('" . $table_id . "'); } );", $options);
-    drupal_add_js("jQuery(document).ready( function() { resizeLegend('" . $table_id . "'); } );", $options);
+    $table_id = LOGGER_TABLE_ID . "$device->serial";
+    if ($is_mobile) {
+      drupal_add_js("jQuery(window).resize( function() { resizeTable('" . $table_id . "'); } );", $options);
+      drupal_add_js("jQuery(document).ready( function() { resizeTable('" . $table_id . "'); } );", $options);
+    }
 
     $output .= '<br><br>' . t('Device') . ": $device->serial <br><br>";
 
@@ -143,7 +148,7 @@ function logger_usersensors_page() {
         $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
       }
       else {
-        $row[] = $sensor->function;
+        $row[] = mb_wordwrap($sensor->function, 16, "<br>", TRUE);
         $row[] = t($sensor->type);
         $row[] = t('Active');
         $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
@@ -204,7 +209,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->meter = NULL;
     $sensor->type = CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
-    $sensor->forecast = 0;
+    $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
     $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
     $sensor->virtual = TRUE;
@@ -329,8 +334,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#type' => 'textfield',
     '#title' => t('Function'),
     '#description' => t("Enter the sensor's function name."),
-    '#maxlength' => 16,
-    '#size' => 16,
+    '#maxlength' => 32,
+    '#size' => 32,
     '#required' => TRUE,
     '#default_value' => $sensor->function
   );
@@ -356,6 +361,18 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
   }
   else {
+    drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/theme/default/style.css');
+    drupal_add_css(LOGGER_REL_PATH . '/js/openlayers/style.css');
+
+    $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150);
+    drupal_add_js(LOGGER_REL_PATH . '/js/openlayers/OpenLayers-min.js', $options);
+
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/maps-min.js', $options);
+
+    $options['weight']++;
+    drupal_add_js(LOGGER_REL_PATH . '/js/logger-min.js', $options);
+
     $form['prev_forecast'] = array(
       '#type' => 'hidden',
       '#default_value' => array($sensor->forecast),
@@ -365,11 +382,14 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     $form['forecast'] = array(
       '#type' => 'checkboxes',
       '#title' => t('Forecast'),
-      '#description' => t('Check this option if you want to see measurement forecast for this sensor. The first forecast data will be available within one day.'),
+      '#description' => t('Check this option if you want to see measurement forecast for this sensor. ' . 
+        'The forecast data will be available only if this sensor has been sending measurements for at least 4 weeks. ' . 
+        'If so, the first forecast data will be available 24 hours after this change.'),
       '#options' => array(
         '1' => t('Activate'),
       ),
-      '#default_value' => array($sensor->forecast)
+      '#default_value' => array($sensor->forecast),
+      '#suffix' => '</div>'
     );
 
     $form['coordinates'] = array(
@@ -378,8 +398,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#title' => t('Location'),
       '#description' => t('Please, click on the map to indicate the exact location of the sensor. Use the icons on the top to control zoom and move the map.'),
       '#default_value' => $sensor->latitude . ',' . $sensor->longitude,
-      '#text-align' => 'center',
-      '#suffix' => '</div>'
+      '#text-align' => 'center'
     );
   }
 
@@ -475,11 +494,6 @@ function logger_sensor_form_validate($form, &$form_state) {
     if ($forecast && !($latitude > 47.25 && $latitude < 55.09 && $longitude > 5.8 && $longitude < 15.069)) {
 
       form_set_error('coordinates', t('The forecast service is available only for sensors located in Germany.'));
-    }
-
-    if ($forecast && $type != PRODUCTION_SENSOR_TYPE) {
-
-      form_set_error('forecast', t('The forecast service is available only for power production sensors.'));
     }
   }
 
@@ -792,7 +806,7 @@ function logger_device_clone($device_id) {
         'device' => $new_device_id,
         'meter' => $new_meter,
         'uid' => 0,
-        'function' => empty($sensor->function) ? NULL : "Cloned $sensor->function",
+        'function' => empty($sensor->function) ? NULL : substr("C $sensor->function", 0, 16),
         'created' => $sensor->created,
         'access' => $sensor->access,
         'price' => $sensor->price,
@@ -802,7 +816,9 @@ function logger_device_clone($device_id) {
       ))
       ->execute();
 
-    pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
+    if ($sensor->forecast == 1) {
+      pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
+    }
 
     $new_token = md5(uniqid(rand(), TRUE));
 
@@ -814,7 +830,7 @@ function logger_device_clone($device_id) {
     ))
     ->execute();
 
-    system('/bin/ln -s ' . LOGGER_PATH . "/data/base/$sensor->meter.rrd " . LOGGER_PATH . "/data/base/$new_meter.rrd");
+    exec('/bin/ln -s ' . LOGGER_PATH . "/data/base/$sensor->meter.rrd " . LOGGER_PATH . "/data/base/$new_meter.rrd");
   }
 
   return t("Device %device has been successfuly cloned. The cloned device id is: %new_device_id.", array(
@@ -884,6 +900,10 @@ function logger_sensor_remove($meter, $next_url = NULL) {
     )
     ->execute();
 
+  db_delete('logger_meter_storage_period')
+    ->condition('meter', $meter)
+    ->execute();
+
   db_delete('logger_meters')
     ->condition('meter', $meter)
     ->execute();
@@ -909,7 +929,7 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
       'function' => $function,
       'type' => $type,
       'virtual' => $virtual,
-      'unit' => 'watt',
+      'unit' => 'Wh',
       'forecast' => $forecast,
       'latitude' => $latitude,
       'longitude' => $longitude,
@@ -925,6 +945,24 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
         'permissions' => $permissions
       ))
       ->execute();
+  }
+
+  if (!$error) {
+
+    foreach (logger_rrd_get_storage_periods() as $resolution => $period) {
+
+      $error = db_insert('logger_meter_storage_period')
+        ->fields(array(
+          'meter' => $meter,
+          'resolution' => $resolution,
+          'period' => $period
+        ))
+        ->execute();
+
+      if ($error) {
+        break;        
+      }
+    }
   }
   return !$error;
 }

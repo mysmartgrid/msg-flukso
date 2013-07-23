@@ -3,8 +3,8 @@
  <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Flot Examples</title>
-    <link href="layout.css" rel="stylesheet" type="text/css"></link>
-    <!--[if IE]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
+    <link href="layout.css" rel="stylesheet" type="text/css">
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
     <script language="javascript" type="text/javascript" src="../jquery.js"></script>
     <script language="javascript" type="text/javascript" src="../jquery.flot.js"></script>
  </head>
@@ -14,16 +14,12 @@
     <div id="placeholder" style="width:600px;height:300px"></div>
 
     <p>There are plenty of options you can set to control the precise
-    looks of your plot. You can control the axes, the legend, the
-    default graph type, the look of grid, etc.</p>
+    looks of your plot. You can control the ticks on the axes, the
+    legend, the graph type, etc. The idea is that Flot goes to great
+    lengths to provide sensible defaults so that you don't have to
+    customize much for a good result.</p>
 
-    <p>The idea is that Flot goes to great lengths to provide <b>sensible
-    defaults</b> which you can then customize as needed for your
-    particular application. If you've found a use case where the
-    defaults can be improved, please don't hesitate to give your
-    feedback.</p>
-
-<script id="source" language="javascript" type="text/javascript">
+<script type="text/javascript">
 $(function () {
     var d1 = [];
     for (var i = 0; i < Math.PI * 2; i += 0.25)

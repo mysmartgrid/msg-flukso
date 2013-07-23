@@ -18,14 +18,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-var lineChart;
-var sliderChart;
-var barChart;
+var chartData = null;
+var lineChart = null;
+var sliderCharti = null;
+var barChart = null;
 
 function formatDate(d) {
   return '' +
-    (d.getDate()  < 10 ? '0' : '') + d.getDate() + '/' +
-    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '/' +
+    (d.getDate()  < 10 ? '0' : '') + d.getDate() + '-' +
+    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '-' +
     d.getFullYear();
 }
 
@@ -37,7 +38,7 @@ function formatTime(d) {
 
 function parseDate(datestr, timestr) {
 
-  var dateParts = datestr.split('/');
+  var dateParts = datestr.split('-');
   var timeParts = timestr.split(':');
 
   return new Date(
@@ -49,15 +50,6 @@ function parseDate(datestr, timestr) {
     0,
     0
   );
-}
-
-function formatCVSTimeStamp(d) {
-  return '' +
-    d.getFullYear() + '-' +
-    (d.getMonth() <  9 ? '0' : '') + (d.getMonth() + 1) + '-' +
-    (d.getDate()  < 10 ? '0' : '') + d.getDate() + ' ' +
-    (d.getHours()   < 10 ? '0' : '') + d.getHours() + ':' +
-    (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 }
 
 /**
@@ -80,7 +72,20 @@ function getStyleBySelector(selector) {
     rules = isIE ? sheets[s].imports : rules;
 
     for (r = 0; r < rules.length; r++){
-      var imported = isIE ? rules[r].rules : rules[r].styleSheet.cssRules;
+
+      var imported;
+      if (rules[r].rules != undefined) {
+        imported = rules[r].rules;
+
+      } else if (rules[r].styleSheet != undefined) {
+        imported = rules[r].styleSheet.cssRules;
+
+      } else if (document.cookie != undefined && document.cookie.indexOf('mysmartgrid_cookiecontrol') >= 0) {
+        window.location = '/webbrowser';
+
+      } else {
+        return null;
+      }
 
       style = findStyle(imported, selector);
       if (style != null) {
@@ -111,11 +116,6 @@ function percentToPx(value, max) {
   } else {
     return value.replace("px","");
   }
-}
-
-function isMobile() {
-  //If client is a mobile device
-  return document.body.clientWidth < 600;
 }
 
 function hideZero(value) {
@@ -454,7 +454,7 @@ function addLineAnnotation(event, point) {
 
   var annotation = {
     series: point.name,
-    x: formatCVSTimeStamp(date),
+    x: timestamp,
     shortText: yval,
     text: text,
     width: width,
@@ -559,6 +559,22 @@ function getWeather(seriesIndex, time) {
   return null;
 }
 
+function downloadChartData(fileURL) {
+
+  //TODO: cache downloaded data
+
+  if (chartData == null) {
+    jQuery.ajax({
+      url: '/' + fileURL,
+      async: false,
+      success: function(data) {
+        chartData = data;
+      }
+    });
+  }
+  return chartData;
+}
+
 function createLineChart(id, fileURL, properties, weather) {
 
   var div = document.getElementById(id);
@@ -571,7 +587,8 @@ function createLineChart(id, fileURL, properties, weather) {
   properties.axisLabelFontSize = clazz.fontSize.replace("px","");
   properties.yAxisLabelWidth = properties.axisLabelFontSize * 4;
 
-  var chart = new Dygraph(div, '/' + fileURL, properties);
+  var chart = new Dygraph(div, downloadChartData(fileURL), properties);
+
   chart.weather = weather;
   chart.fileURL = fileURL;
   storeChart(id, chart);
@@ -665,11 +682,13 @@ function storeChart(id, chart) {
   } else if (id == 'sliderChart') {
     sliderChart = chart;
     barChart = null;
+    chartData = null;
 
   } else if (id == 'barChart') {
     barChart = chart;
     lineChart = null;
     sliderChart = null;
+    chartData = null;
   }
 }
 
@@ -867,26 +886,5 @@ function resizeLineChart(id) {
 function resizeBarChart() {
   if (barChart) {
     barChart.plot();
-  }
-}
-
-function resizeLegend(id, col1, col2) {
-
-  if (isMobile()) {
-
-    var table = document.getElementById(id);
-    if (table) {
-      var isLarge = document.body.clientWidth > 400;
-      var display = isLarge ? 'table-cell' : 'none';
-      col1 = col1 ? col1 : 3;
-      col2 = col2 ? col2 : table.rows[0].cells.length - 1;
-
-      for(var r = 0; r < table.rows.length; r++) {
-        var cells = table.rows[r].cells;
-        for(var c = col1; c < col2; c++) {
-          cells[c].style.display = display;
-        }
-      }
-    }
   }
 }

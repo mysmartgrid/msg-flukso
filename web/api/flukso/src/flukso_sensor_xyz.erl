@@ -28,7 +28,8 @@
          is_authorized/2,
          content_types_provided/2,
          to_json/2,
-         process_post/2]).
+         process_post/2,
+         delete_resource/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
@@ -44,18 +45,117 @@ init(Config) ->
 
 
 allowed_methods(ReqData, State) ->
-    {['POST', 'GET'], ReqData, State}.
+    {['POST', 'GET', 'DELETE'], ReqData, State}.
 
 
 malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> malformed_POST(ReqData, State);
-        'GET'  -> malformed_GET(ReqData, State)
+        'POST'   -> malformed_POST(ReqData, State);
+        'GET'    -> malformed_GET(ReqData, State);
+        'DELETE' -> malformed_DELETE(ReqData, State)
     end.
 
 
 malformed_POST(ReqData, _State) ->
-    io:fwrite("malformed_POST sensor\n"),
+
+    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
+    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+
+    State = #state{rrdSensor = RrdSensor, digest = Digest},
+
+    ErrorCode = case {ValidVersion, ValidSensor, ValidDigest} of
+      {true, true, true} ->
+        try
+          {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+          Payload = {
+            proplists:get_value(<<"measurements">>, JsonData),
+            proplists:get_value(<<"config">>, JsonData)},
+
+            case Payload of
+              {undefined, undefined} -> ?HTTP_BAD_ARGUMENT;
+              {undefined, Config} -> ?HTTP_OK;
+              {Measurements, undefined} ->
+                %Valid measurement timestamp: from -7 days to +5 minutes
+                ServerTimestamp = unix_time(),
+                FromTime = ServerTimestamp - ?WEEK,
+                ToTime = ServerTimestamp + 5 * ?MINUTE,
+                InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+                case length(InvalidTimestamps) of
+                  0 -> ?HTTP_OK;
+                  _ -> ?HTTP_INVALID_TIMESTAMP 
+                end;
+              _ -> ?HTTP_BAD_ARGUMENT
+            end
+        catch
+          _:_ -> ?HTTP_BAD_ARGUMENT
+        end;
+      _ -> ?HTTP_BAD_ARGUMENT
+    end,
+
+    {case ErrorCode of
+        ?HTTP_OK -> false;
+        _ -> {halt, ErrorCode}
+     end,
+    ReqData, State}.
+
+
+malformed_GET(ReqData, _State) ->
+
+    {_Version, ValidVersion} = check_version(
+      wrq:get_req_header("X-Version", ReqData), 
+      wrq:get_qs_value("version", ReqData)),
+    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
+    {RrdStart, RrdEnd, RrdResolution, ValidTime} = check_time(
+      wrq:get_qs_value("interval", ReqData), 
+      wrq:get_qs_value("start", ReqData), 
+      wrq:get_qs_value("end", ReqData), 
+      wrq:get_qs_value("resolution", ReqData)),
+
+    {UnitId, RrdFactor, ValidUnit} = case check_unit(wrq:get_qs_value("unit", ReqData)) of
+      {UnitString, true} ->
+        {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+        case mysql:get_result_rows(_Result) of
+          [[_UnitId, _RrdFactor]] ->
+            {_UnitId, _RrdFactor, true};
+          _ ->
+            {0, 0, false}
+        end;
+      _ ->
+        {0, 0, false}
+    end,
+
+    TokenHeader = wrq:get_req_header("X-Token", ReqData),
+    {Token, ValidToken} = case TokenHeader of
+      undefined -> {undefined, true};
+      _ -> check_token(TokenHeader, wrq:get_qs_value("token", ReqData))
+    end,
+
+    DigestHeader = wrq:get_req_header("X-Digest", ReqData),    
+    {Digest, ValidDigest} = case DigestHeader of
+      undefined -> {undefined, true};
+      _ -> check_digest(DigestHeader)
+    end,
+
+    {JsonpCallback, ValidJsonpCallback} = check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)),
+
+    State = #state{rrdSensor = RrdSensor, 
+                   rrdStart = RrdStart,
+                   rrdEnd = RrdEnd,
+                   rrdResolution = RrdResolution,
+                   rrdFactor = RrdFactor,
+                   unitId = UnitId,
+                   token = Token,
+                   digest = Digest,
+                   jsonpCallback = JsonpCallback},
+
+    {case {ValidVersion, ValidSensor, ValidTime, ValidUnit, ValidToken, ValidDigest, ValidJsonpCallback} of
+	{true, true, true, true, true, true, true} -> false;
+	_ -> true
+     end, 
+    ReqData, State}.
+
+malformed_DELETE(ReqData, _State) ->
 
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
@@ -69,47 +169,15 @@ malformed_POST(ReqData, _State) ->
      end,
     ReqData, State}.
 
-
-malformed_GET(ReqData, _State) ->
-    {_Version, ValidVersion} = check_version(
-      wrq:get_req_header("X-Version", ReqData), 
-      wrq:get_qs_value("version", ReqData)),
-    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
-    {RrdStart, RrdEnd, RrdResolution, ValidTime} = check_time(
-      wrq:get_qs_value("interval", ReqData), 
-      wrq:get_qs_value("start", ReqData), 
-      wrq:get_qs_value("end", ReqData), 
-      wrq:get_qs_value("resolution", ReqData)),
-    {RrdFactor, ValidUnit} = check_unit(wrq:get_qs_value("unit", ReqData)),
-    {Token, ValidToken} = check_token(
-      wrq:get_req_header("X-Token", ReqData),
-      wrq:get_qs_value("token", ReqData)),
-    {JsonpCallback, ValidJsonpCallback} = check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)),
-
-    State = #state{rrdSensor = RrdSensor, 
-                   rrdStart = RrdStart,
-                   rrdEnd = RrdEnd,
-                   rrdResolution = RrdResolution,
-                   rrdFactor = RrdFactor,
-                   token = Token,
-                   jsonpCallback = JsonpCallback},
-
-    {case {ValidVersion, ValidSensor, ValidTime, ValidUnit, ValidToken, ValidJsonpCallback}  of
-	{true, true, true, true, true, true} -> false;
-	_ -> true
-     end, 
-    ReqData, State}.
-
-
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
-        'POST' -> is_auth_POST(ReqData, State);
-        'GET'  -> is_auth_GET(ReqData, State)
+        'POST'   -> is_auth_POST(ReqData, State);
+        'GET'    -> is_auth_GET(ReqData, State);
+        'DELETE' -> is_auth_DELETE(ReqData, State)
     end.
 
 
 is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
-    io:fwrite("is_auth_POST sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
@@ -132,24 +200,50 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
     {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
 
 
-is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token} = State) ->
-    io:fwrite("is_auth_GET sensor\n"),
+is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token, digest = ClientDigest} = State) ->
 
-    {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
+    {case ClientDigest of
+      undefined ->
+      {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
+        case mysql:get_result_rows(Result) of
+          [[62]] -> true;
+          _Permission -> "Access refused"
+        end;
 
-    {case mysql:get_result_rows(Result) of
-        [[62]] -> true;
-        _Permission -> "Access refused" 
+      _ ->
+        {data, Result} = mysql:execute(pool, sensor_key, [RrdSensor]),
+        case mysql:get_result_rows(Result) of
+          [[Key]] -> check_digest(Key, ReqData, ClientDigest);
+          _ -> false
+        end
     end,
     ReqData, State}.
 
 
+is_auth_DELETE(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State) ->
+
+    {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
+
+    case mysql:get_result_rows(Result) of
+
+      %Sensor is found
+      [[_Key]] ->
+        Key = _Key,
+        Auth = check_digest(Key, ReqData, ClientDigest);
+
+      %Sensor is not found %TODO: improve this function
+      _ ->
+        Auth = true 
+    end,
+
+    {Auth, ReqData, State}.
+
+
 content_types_provided(ReqData, State) -> 
-        {[{"application/json", to_json}], ReqData, State}.
+    {[{"application/json", to_json}], ReqData, State}.
 
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
-
     case wrq:get_qs_value("interval", ReqData) of
         _Interval -> Path = ?BASE_PATH
     end,
@@ -218,7 +312,6 @@ query_sensor(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor) ->
 
 
 process_post(ReqData, State) ->
-    io:fwrite("process_post sensor\n"),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     Payload = {
@@ -247,26 +340,26 @@ process_post(ReqData, State) ->
 % Mochijson2: {struct,[{<<"config">>, {struct,[{<<"device">>,<<"12345678901234567890123456789012">>}, {<<"type">>,<<"electricity">>}, ... ]} }]}
 %
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
-    io:fwrite("process_config sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
 
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[_Uid, Device]] ->
+      [[_Uid, Device, UnitId]] ->
 
-        Args = [%proplists:get_value(<<"class">>,    Params),
-                %proplists:get_value(<<"type">>,     Params),
-                proplists:get_value(<<"function">>, Params),
-                %proplists:get_value(<<"voltage">>,  Params),
-                %proplists:get_value(<<"current">>,  Params),
-                %proplists:get_value(<<"phase">>,    Params),
-                %proplists:get_value(<<"constant">>, Params),
-                %proplists:get_value(<<"enable">>,   Params),
+        Args = [%proplists:get_value(<<"class">>,      Params),
+                %proplists:get_value(<<"type">>,       Params),
+                proplists:get_value(<<"function">>,    Params),
+                proplists:get_value(<<"description">>, Params),
+                UnitId,
+                %proplists:get_value(<<"voltage">>,    Params),
+                %proplists:get_value(<<"current">>,    Params),
+                %proplists:get_value(<<"phase">>,      Params),
+                %proplists:get_value(<<"constant">>,   Params),
+                %proplists:get_value(<<"enable">>,     Params),
                 Sensor],
 
-        %TODO: create fields in table logger_meters
         {updated, _Result} = mysql:execute(pool, sensor_config, Args),
         RrdResponse = "ok";
 
@@ -274,18 +367,22 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       _ ->
         Timestamp = unix_time(),
         Function = proplists:get_value(<<"function">>, Params),
+        Description = proplists:get_value(<<"description">>, Params),
         Device = proplists:get_value(<<"device">>, Params),
+
+        %FIXME:
+        UnitString = proplists:get_value(<<"unit">>, Params),
+        {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+        [[UnitId, Factor]] = mysql:get_result_rows(_Result),
 
         case rrd_create(?BASE_PATH, Sensor) of
           {ok, _RrdResponse} ->
-
+            RrdResponse = "ok",
             B = term_to_binary({node(), now()}),
             L = binary_to_list(erlang:md5(B)),
             Token = lists:flatten(list_to_hex(L)),
 
-            RrdResponse = "ok",
-
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, 0, 0, 0, 0, "watt", Device]),
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, Description, 0, 0, 0, 0, UnitId, Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->
@@ -304,70 +401,66 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 % Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
 %
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
-    io:fwrite("process_measurements sensor\n"),
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
 
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[Uid, Device]] ->
+      [[Uid, Device, UnitId]] ->
 
         ServerTimestamp = unix_time(),
 
-        case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
+        RrdTimestamp = case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
           % valid
-          {ok, Response} ->
-            %io:fwrite(string:concat(string:concat("rrdtool last successfull : ", integer_to_list(RrdTimestamp)), "\n"));
-            RrdTimestamp = Response;
+          {ok, Response} -> Response;
 
           % error
-          {error, Reason} ->
-            %io:fwrite("rrdtool last failed\n"),
-            RrdTimestamp = 1
-          end,
+          {error, Reason} -> 1
+        end,
 
-          %io:fwrite(string:concat(string:concat("process_measurements timestamps: ", integer_to_list(RrdTimestamp)), "\n")),
+        {data, _Result} = mysql:execute(pool, device_type, [Device]),
+        [[DeviceTypeId]] = mysql:get_result_rows(_Result),
 
-          case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) of
+        case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) of
 
-            %Measurements are valid
-            {ok, RrdData} ->
+          %Measurements are valid
+          {ok, RrdData} ->
 
-              %debugging
-              %UnsortedList = [[integer_to_list(T), ":", integer_to_list(C), " "] || [T, C] <- Measurements],
-              %logger(Uid, <<"rrdupdate.base">>,
-              %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
-              %  ?INFO, ReqData),
+            %debugging
+            %UnsortedList = [[integer_to_list(T), ":", float_to_list(float(C)), " "] || [T, C] <- Measurements],
+            %logger(Uid, <<"rrdupdate.base">>,
+            %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
+            %  ?INFO, ReqData),
 
-              case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
+            case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
 
-                %RRD files were successfully updated
-                {ok, _RrdResponse} ->
-                  RrdResponse = "ok",
-                    [LastTimestamp, LastValue] = lists:last(Measurements),
+              %RRD files were successfully updated
+              {ok, _RrdResponse} ->
+                RrdResponse = "ok",
+                [LastTimestamp, LastValue] = lists:last(Measurements),
 
-                    %debugging
-                    %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
+                %debugging
+                %io:fwrite(string:concat("RrdData=", erlrrd:c([RrdData]))),
 
-                    mysql:execute(pool, sensor_update, [ServerTimestamp, LastValue, RrdSensor]),
-                    mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, ServerTimestamp]);
+                mysql:execute(pool, sensor_update, [ServerTimestamp, LastValue, RrdSensor]),
+                mysql:execute(pool, event_insert, [Device, ?MEASUREMENT_RECEIVED_EVENT_ID, ServerTimestamp]);
     
-                  %RRD files were not successfully updated
-                  {error, RrdResponse} ->
-                    logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
-              end;
+              %RRD files were not successfully updated
+              {error, RrdResponse} ->
+                logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
+            end;
 
-            %Invalid Timestamp
-            {error, RrdData} ->
-              mysql:execute(pool, event_insert, [Device, ?INVALID_TIMESTAMP_EVENT_ID, ServerTimestamp]),
-              RrdResponse = "Invalid Timestamp";
+          %Invalid Timestamp
+          {error, time} ->
+            mysql:execute(pool, event_insert, [Device, ?INVALID_TIMESTAMP_EVENT_ID, ServerTimestamp]),
+            RrdResponse = "Invalid Timestamp";
 
-            %Invalid Measurements
-            _ ->
-              mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, ServerTimestamp]),
-              RrdResponse = "Invalid Measurements"
-          end;
+          %Invalid Measurements
+          _ ->
+            mysql:execute(pool, event_insert, [Device, ?CORRUPTED_MEASUREMENT_EVENT_ID, ServerTimestamp]),
+            RrdResponse = "Invalid Measurements"
+        end;
 
       %Unknown sensor
       _ ->
@@ -378,31 +471,41 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     {RrdResponse == "ok", wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(ServerTimestamp, RrdTimestamp, Measurements) ->
+parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) ->
+
+  %TODO: use field storage_unit_id
+  [[Factor]] = case DeviceTypeId of
+    ?LIBKLIO_DEVICE_TYPE_ID ->
+      {data, Result} = mysql:execute(pool, unit_factor, [UnitId]),
+      mysql:get_result_rows(Result);
+    _ ->
+      [[1]]
+  end, 
 
   try
-    %Valid timestamp: from -7 days to +10 minutes
-    FromTime = ServerTimestamp - 604800,
-    ToTime = ServerTimestamp + 600,
-    InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
+    {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
 
-    case length(InvalidTimestamps) of
-      0 ->
-        Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
-        {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
+    if
+      length(Filtered) > 0 ->
+        {ok, [[integer_to_list(Time), ":", integer_to_list(trunc(float(Counter) / Factor)), " "] || [Time, Counter] <- Filtered]};
 
-        %debuging
-        %if
-        %  length(MultipleSend) == 0 ->
-        %    logger(Uid, <<"rrdupdate.base">>, "Filtered duplicated values", ?WARNING, ReqData)
-        %end,
-
-        {ok, [[integer_to_list(Time), ":", integer_to_list(Counter), " "] || [Time, Counter] <- Filtered]};
-      _ ->
-        {error, Measurements} 
+      true ->
+        {error, time}
     end
+
   catch
     _:_ ->
       {error, error}
   end.
 
+delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
+
+    mysql:execute(pool, msgdump_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_agg_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_storage_delete, [RrdSensor]),
+    mysql:execute(pool, token_delete, [RrdSensor]),
+    mysql:execute(pool, sensor_delete, [RrdSensor]),
+
+    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
+    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.

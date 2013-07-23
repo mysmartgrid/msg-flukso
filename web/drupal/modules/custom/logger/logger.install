@@ -6,6 +6,24 @@
  */
 
 function logger_schema() {
+
+  $schema['logger_device_type'] = array(
+    'description' => 'Stores the device types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
   $schema['logger_devices'] = array(
     'description' => "Contains the Fluksometer device ID's.",
     'fields' => array(
@@ -127,6 +145,11 @@ function logger_schema() {
         'length' => 60,
         'not null' => FALSE
       ),
+      'type_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
     ),
     'primary key' => array('device'),
   );
@@ -192,16 +215,22 @@ function logger_schema() {
       ),
       'function' => array(
         'type' => 'varchar',
-        'length' => '16',
-        'not null' => TRUE,
-        'default' => 'main',
+        'length' => '32',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => FALSE
       ),
       'value' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
+        'type' => 'float',
+        'size' => 'big',
+        'precision' => 24,
+        'scale' => 15,
         'not null' => TRUE,
         'default' => 0,
-        'disp-width' => '10',
       ),
       'factor' => array(
         'type' => 'int',
@@ -210,11 +239,10 @@ function logger_schema() {
         'default' => 1,
         'disp-width' => '10',
       ),
-      'unit' => array(
-        'type' => 'varchar',
-        'length' => '16',
+      'unit_id' => array(
+        'type' => 'int',
         'not null' => TRUE,
-        'default' => 'watt',
+        'unasigned' => TRUE,
       ),
       'forecast' => array(
         'type' => 'int',
@@ -248,6 +276,28 @@ function logger_schema() {
       ),
     ),
     'primary key' => array('meter')
+  );
+
+  $schema['logger_meter_storage_period'] = array(
+    'description' => "Storage periods of sensor measurements.",
+    'fields' => array(
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE
+      ),
+      'resolution' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'period' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('meter', 'resolution')
   );
 
   $schema['logger_aggregated_meters'] = array(
@@ -347,11 +397,13 @@ function logger_install() {
     ))
     ->execute();
 
-  $file_path = drupal_get_path('module', 'logger') . '/data/base';
-  mkdir($file_path, 0777, TRUE);
+  $dir = drupal_get_path('module', 'logger');
 
-  $file_path = drupal_get_path('module', 'logger') . '/rrdtool';
-  drupal_set_message(check_plain(st('Please, create symbolic link:') . " $file_path."));
+  $path = "$dir/data/base";
+  mkdir($path, 0777, TRUE);
+
+  $path = "$dir/rrdtool";
+  drupal_set_message(check_plain(st('Please, create symbolic link:') . " $path."));
 
   variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
 }
@@ -632,4 +684,335 @@ function logger_update_7015() {
     ->execute();
 
   return st("Variables '%selected_users%' have been removed.");
+}
+
+/**
+ * Add field description to table logger_meters.
+ */
+function logger_update_7016() {
+
+  db_add_field('logger_meters', 'description', array(
+    'type' => 'varchar',
+    'length' => 60,
+    'not null' => FALSE
+  ));
+
+  return st('Field description has been successfully added to table logger_meters.');
+}
+
+/**
+ * Create table logger_meter_storage_period.
+ */
+function logger_update_7019() {
+
+  db_create_table('logger_meter_storage_period', drupal_get_schema_unprocessed('logger', 'logger_meter_storage_period'));
+}
+
+/**
+ * Populate table logger_meter_storage_period.
+ */
+function logger_update_7020() {
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m', array('meter'))
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    db_insert('logger_meter_storage_period')
+      ->fields(array(
+        'meter' => $sensor->meter,
+        'resolution' => MINUTE,
+        'period' => WEEK
+      ))
+      ->execute();
+
+    db_insert('logger_meter_storage_period')
+      ->fields(array(
+        'meter' => $sensor->meter,
+        'resolution' => 15 * MINUTE,
+        'period' => MONTH
+      ))
+      ->execute();
+
+    db_insert('logger_meter_storage_period')
+      ->fields(array(
+        'meter' => $sensor->meter,
+        'resolution' => HOUR,
+        'period' => 2 * MONTH
+      ))
+      ->execute();
+
+    db_insert('logger_meter_storage_period')
+      ->fields(array(
+        'meter' => $sensor->meter,
+        'resolution' => DAY,
+        'period' => 6 * MONTH
+      ))
+      ->execute();
+
+    db_insert('logger_meter_storage_period')
+      ->fields(array(
+        'meter' => $sensor->meter,
+        'resolution' => WEEK,
+        'period' => 10 * YEAR
+      ))
+      ->execute();
+  }
+  return st('Table logger_meter_storage_period successfully created.');
+}
+
+/**
+ * Update logger_meter_storage_period for user stadt-kl.
+ */
+function logger_update_7022() {
+
+  $sensors = db_select('logger_meters', 'm')
+    ->fields('m', array('meter'))
+    ->condition('m.uid', 1146)
+    ->condition('m.function', '', '<>')
+    ->execute();
+
+  foreach ($sensors as $sensor) {
+
+    db_update('logger_meter_storage_period')
+      ->fields(array(
+        'period' => 4 * WEEK
+      ))
+      ->condition('meter', $sensor->meter)
+      ->condition('resolution', MINUTE)
+      ->execute();
+  }
+  return st('Table logger_meter_storage_period has been successfully updated.');
+}
+
+/**
+ * Resize field function of table logger_meters.
+ */
+function logger_update_7023() {
+
+  db_change_field('logger_meters', 'function', 'function',
+    array(
+      'type' => 'varchar',
+      'length' => '32',
+      'not null' => FALSE,
+      'default' => NULL
+  ));
+  return st('Field logger_meters.function has been changed.');
+}
+
+/**
+ * Change type of field value of table logger_meters.
+ */
+function logger_update_7025() {
+
+  db_change_field('logger_meters', 'value', 'value',
+    array(
+      'type' => 'float',
+      'size' => 'big',
+      'precision' => 24,
+      'scale' => 15,
+      'not null' => TRUE,
+      'default' => 0
+  ));
+  return st('Field logger_meters.value has been changed.');
+}
+
+/**
+ * Replace field 'unit' by field 'unit_id' in table logger_meters.
+ */
+function logger_update_7026() {
+
+  db_add_field('logger_meters', 'unit_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 10 
+    ))
+    ->condition('unit', 'watt')
+    ->execute();
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 10
+    ))
+    ->condition('unit', 'eur')
+    ->execute();
+
+  db_update('logger_meters')
+    ->fields(array(
+      'unit_id' => 11 
+    ))
+    ->condition('unit', 'kwh')
+    ->execute();
+
+  db_drop_field('logger_meters', 'unit');
+
+  return st('Field logger_meters.unit_id has been created.');
+}
+
+/**
+ * Remove logger module variables.
+ */
+function logger_update_7027() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_%', 'LIKE')
+    ->execute();
+
+  return st('Logger module variables have been removed.');
+}
+
+/**
+ * Creates table logger_device_type.
+ */
+function logger_update_7028() {
+
+  db_create_table('logger_device_type', drupal_get_schema_unprocessed('logger', 'logger_device_type'));
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 0,
+      'name' => 'Unknown'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Flukso 1.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Flukso 2.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'VZLogger'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'LibKlio Store'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Cloned Device'
+    ))
+    ->execute();
+
+  return st('Table logger_device_type has been created.');
+}
+
+/**
+ * Adds field type_id to table logger_devices.
+ */
+function logger_update_7029() {
+
+  db_add_field('logger_devices', 'type_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 1
+    ))
+    ->condition('serial', 100000000, '<')
+    ->condition('serial', 90000000, '>')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 2
+    ))
+    ->condition('serial', 100000000, '>')
+    ->condition('serial', 6000000000, '<')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('serial', 6000000000, '>')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('device', 'dvdvdv%', 'LIKE')
+    ->execute();
+
+  return st('Field type_id has been added to table logger_devices.');
+}
+
+/**
+ * Fix device types of libklio stores.
+ */
+function logger_update_7030() {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 4
+    ))
+    ->condition('description', 'libklio%', 'LIKE')
+    ->execute();
+
+  return st('The device types of libklio stores have been fixed.');
+}
+
+/**
+ * Fix types of cloned devices.
+ */
+function logger_update_7031() {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'type_id' => 5
+    ))
+    ->condition('device', 'dvdvdv%', 'LIKE')
+    ->execute();
+
+  return st('The types of cloned devices have been fixed.');
+}
+
+/**
+ * Remove logger module variables.
+ */
+function logger_update_7032() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_%', 'LIKE')
+    ->execute();
+
+  return st('Logger module variables have been removed.');
+}
+
+/**
+ * Redefine variable logger_msg_service_url.
+ */
+function logger_update_7043() {
+
+  variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
+
+  return st('Variable logger_msg_service_url has been redefined.');
 }
