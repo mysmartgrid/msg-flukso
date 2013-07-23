@@ -367,11 +367,11 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       _ ->
         Timestamp = unix_time(),
         Function = proplists:get_value(<<"function">>, Params),
-        Description = proplists:get_value(<<"description">>, Params),
+        Description = get_optional_value(<<"description">>, Params, ""),
         Device = proplists:get_value(<<"device">>, Params),
 
         %FIXME:
-        UnitString = proplists:get_value(<<"unit">>, Params),
+        UnitString = get_optional_value(<<"unit">>, Params, "wh"),
         {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
         [[UnitId, Factor]] = mysql:get_result_rows(_Result),
 
