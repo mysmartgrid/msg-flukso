@@ -3638,7 +3638,7 @@ function logger_query_device_measurements($interval, $device, $unit = 'W') {
     ->fields('m', array('meter', 'function', 'price'))
     ->condition('m.device', $device);
   $query->join('logger_devices', 'd', 'd.device = m.device');
-  $query->addField('d', 'type_id', 'device_type_id');
+  $query->addField('d', 'type_id', 'device_type_id');  
 
   $result = $query->execute();
 

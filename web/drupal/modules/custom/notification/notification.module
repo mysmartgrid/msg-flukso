@@ -1603,12 +1603,14 @@ function notification_send_summary_report_emails() {
     $period = array('start' => $notifiable['since_time'], 'end' => $notifiable['until_time']);
     $resolution = $notifiable['unit_id'] == DAY_UNIT_ID ? MINUTE : DAY;
 
+    //TODO: use logger_get_sensors instead
     $sensors_query = db_select('logger_meters', 'm')
       ->fields('m', array('meter', 'function', 'price'))
       ->condition('m.device', $notifiable['device'])
       ->isNotNull('m.function')
       ->condition('m.type', $types, 'IN')
       ->condition('m.virtual', 0);
+    $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
 
     $sensors = $sensors_query->execute();

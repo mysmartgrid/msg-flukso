@@ -228,7 +228,7 @@ function logger_schema() {
         'type' => 'float',
         'size' => 'big',
         'precision' => 24,
-        'scale' => 15,
+        'scale' => 20,
         'not null' => TRUE,
         'default' => 0,
       ),
@@ -804,25 +804,24 @@ function logger_update_7023() {
 /**
  * Change type of field value of table logger_meters.
  */
-function logger_update_7027() {
+function logger_update_7025() {
 
   db_change_field('logger_meters', 'value', 'value',
     array(
       'type' => 'float',
       'size' => 'big',
       'precision' => 24,
-      'scale' => 15,
+      'scale' => 20,
       'not null' => TRUE,
       'default' => 0
   ));
-
   return st('Field logger_meters.value has been changed.');
 }
 
 /**
  * Replace field 'unit' by field 'unit_id' in table logger_meters.
  */
-function logger_update_7036() {
+function logger_update_7026() {
 
   db_add_field('logger_meters', 'unit_id', array(
     'type' => 'int',
@@ -860,7 +859,7 @@ function logger_update_7036() {
 /**
  * Remove logger module variables.
  */
-function logger_update_7037() {
+function logger_update_7027() {
 
   db_delete('variable')
     ->condition('name', 'logger_%', 'LIKE')
@@ -872,7 +871,7 @@ function logger_update_7037() {
 /**
  * Creates table logger_device_type.
  */
-function logger_update_7038() {
+function logger_update_7028() {
 
   db_create_table('logger_device_type', drupal_get_schema_unprocessed('logger', 'logger_device_type'));
 
@@ -924,7 +923,7 @@ function logger_update_7038() {
 /**
  * Adds field type_id to table logger_devices.
  */
-function logger_update_7039() {
+function logger_update_7029() {
 
   db_add_field('logger_devices', 'type_id', array(
     'type' => 'int',
@@ -969,7 +968,7 @@ function logger_update_7039() {
 /**
  * Fix device types of libklio stores.
  */
-function logger_update_7040() {
+function logger_update_7030() {
 
   db_update('logger_devices')
     ->fields(array(
@@ -984,7 +983,7 @@ function logger_update_7040() {
 /**
  * Fix types of cloned devices.
  */
-function logger_update_7041() {
+function logger_update_7031() {
 
   db_update('logger_devices')
     ->fields(array(
@@ -999,7 +998,7 @@ function logger_update_7041() {
 /**
  * Remove logger module variables.
  */
-function logger_update_7042() {
+function logger_update_7032() {
 
   db_delete('variable')
     ->condition('name', 'logger_%', 'LIKE')
