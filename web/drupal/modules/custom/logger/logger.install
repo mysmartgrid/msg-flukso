@@ -1016,3 +1016,17 @@ function logger_update_7043() {
 
   return st('Variable logger_msg_service_url has been redefined.');
 }
+
+/**
+ * Rename file template.rrd to derive.template.rrd
+ */
+function logger_update_7044() {
+
+  $dir = drupal_get_path('module', 'logger');
+  $path = "$dir/data/base";
+  rename("$path/template.rrd", "$path/derive.template.rrd");
+
+  return st('File template.rrd has been renamed.');
+
+}
+
