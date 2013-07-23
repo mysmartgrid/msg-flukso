@@ -35,7 +35,7 @@ function logger_userdevices_page() {
   drupal_set_title(t('My Devices'));
 
   $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'access', 'firmware_version', 'uptime'))
+    ->fields('d', array('device', 'serial', 'access', 'firmware_version', 'uptime', 'type_id'))
     ->condition('d.uid', $user->uid, '=')
     ->orderBy('d.serial');
   $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
@@ -54,8 +54,7 @@ function logger_userdevices_page() {
       l(t('History'), "event/log/list/$device->device") . '<br>' .
       l(t('Edit'), "device/edit/$device->device");
 
-    //TODO: use a version field
-    if ($device->serial > 100000000 && user_access('request device remote support', $user)) {
+    if ($device->type_id == FLUKSO2_DEVICE_TYPE_ID && user_access('request device remote support', $user)) {
 
       $support_link = $device->support_requested ?
         l(t('Suspend Support'), "device/support/suspend/$device->device") :
@@ -197,10 +196,15 @@ function logger_device_edition_page($id) {
 function logger_sensor_edition_page($meter = NULL) {
 
   if ($meter) {
-    $sensor = db_select('logger_meters', 'm')
+    //TODO: use logger_get_sensors
+    $query = db_select('logger_meters', 'm')
       ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
-      ->condition('m.meter', $meter, '=')
-      ->execute()
+      ->condition('m.meter', $meter, '=');
+
+    $query->join('logger_devices', 'd', 'd.device = m.device');
+    $query->addField('d', 'type_id', 'device_type_id');
+
+    $sensor = $query->execute()
       ->fetchObject();
   }
   else {
@@ -339,6 +343,10 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#required' => TRUE,
     '#default_value' => $sensor->function
   );
+
+  if ($sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
+    $form['function']['#attributes']['readonly'] = 'readonly';
+  }
 
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {

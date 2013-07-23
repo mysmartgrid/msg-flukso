@@ -49,8 +49,11 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
-define('LIBKLIO_DEVICE_TYPE_ID', 4);
-
+define('FLUKSO1_DEVICE_TYPE_ID',  1);
+define('FLUKSO2_DEVICE_TYPE_ID',  2);
+define('VZLOGGER_DEVICE_TYPE_ID', 3);
+define('LIBKLIO_DEVICE_TYPE_ID',  4);
+define('CLONED_DEVICE_TYPE_ID',   5);
 
 function logger_init() {
 
