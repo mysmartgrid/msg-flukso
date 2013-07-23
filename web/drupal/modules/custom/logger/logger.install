@@ -228,7 +228,7 @@ function logger_schema() {
         'type' => 'float',
         'size' => 'big',
         'precision' => 24,
-        'scale' => 20,
+        'scale' => 15,
         'not null' => TRUE,
         'default' => 0,
       ),
@@ -811,7 +811,7 @@ function logger_update_7025() {
       'type' => 'float',
       'size' => 'big',
       'precision' => 24,
-      'scale' => 20,
+      'scale' => 15,
       'not null' => TRUE,
       'default' => 0
   ));
