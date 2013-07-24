@@ -5,10 +5,27 @@
  * Install, update and uninstall functions for the msgcommon module.
  */
 
-function msgcommons_install() {
+function msgcommons_schema() {
+
+  $schema['unit_type'] = array(
+    'description' => 'Stores the unit types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
 
   $schema['unit'] = array(
-    'description' => 'Stores units',
+    'description' => 'Stores units.',
     'fields' => array(
       'id' => array(
         'type' => 'int',
@@ -35,11 +52,47 @@ function msgcommons_install() {
         'length' => '16',
         'not null' => TRUE
       ),
+      'type_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
     ),
-    'primary key' => array(
-      'id',
-    ),
+    'primary key' => array('id')
   );
+  return $schema;
+}
+
+function msgcommons_install() {
+
+  //unit types
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Energy',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Power',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Time',
+    ))
+    ->execute();
 
   //units
   db_insert('unit')
@@ -48,7 +101,8 @@ function msgcommons_install() {
       'name' => 'none',
       'symbol' => 'none',
       'factor' => 1,
-      'string_id' => 'none'
+      'string_id' => 'none',
+      'type_id' => 1
     ))
     ->execute();
 
@@ -58,7 +112,8 @@ function msgcommons_install() {
       'name' => 'Minute',
       'symbol' => 'min',
       'factor' => 60,
-      'string_id' => 'min'
+      'string_id' => 'min',
+      'type_id' => 4
     ))
     ->execute();
 
@@ -68,7 +123,8 @@ function msgcommons_install() {
       'name' => 'Hour',
       'symbol' => 'h',
       'factor' => 3600,
-      'string_id' => 'hour'
+      'string_id' => 'hour',
+      'type_id' => 4
     ))
     ->execute();
 
@@ -78,7 +134,8 @@ function msgcommons_install() {
       'name' => 'Watt',
       'symbol' => 'W',
       'factor' => 3.6,
-      'string_id' => 'watt'
+      'string_id' => 'watt',
+      'type_id' => 2
     ))
     ->execute();
 
@@ -88,7 +145,8 @@ function msgcommons_install() {
       'name' => 'Kilowatt',
       'symbol' => 'kW',
       'factor' => 3600,
-      'string_id' => 'kw'
+      'string_id' => 'kw',
+      'type_id' => 2
     ))
     ->execute();
 
@@ -98,7 +156,8 @@ function msgcommons_install() {
       'name' => 'Day',
       'symbol' => 'day',
       'factor' => DAY,
-      'string_id' => 'day'
+      'string_id' => 'day',
+      'type_id' => 4
     ))
     ->execute();
 
@@ -108,7 +167,8 @@ function msgcommons_install() {
       'name' => 'Week',
       'symbol' => 'week',
       'factor' => WEEK,
-      'string_id' => 'week'
+      'string_id' => 'week',
+      'type_id' => 4
     ))
     ->execute();
 
@@ -118,7 +178,8 @@ function msgcommons_install() {
       'name' => 'Month',
       'symbol' => 'month',
       'factor' => MONTH,
-      'string_id' => 'month'
+      'string_id' => 'month',
+      'type_id' => 4
     ))
     ->execute();
 
@@ -128,7 +189,8 @@ function msgcommons_install() {
       'name' => 'Euro',
       'symbol' => '€',
       'factor' => 0.00000018, // € 0.18 / kWh
-      'string_id' => 'euro'
+      'string_id' => 'euro',
+      'type_id' => 1
     ))
     ->execute();
 
@@ -138,7 +200,8 @@ function msgcommons_install() {
       'name' => 'Watt-second',
       'symbol' => 'Ws',
       'factor' => 1,
-      'string_id' => 'ws'
+      'string_id' => 'ws',
+      'type_id' => 1
     ))
     ->execute();
 
@@ -147,8 +210,9 @@ function msgcommons_install() {
       'id' => 10,
       'name' => 'Watt-hour',
       'symbol' => 'Wh',
-      'factor' => 1000,
-      'string_id' => 'wh'
+      'factor' => 0.001,
+      'string_id' => 'wh',
+      'type_id' => 1
     ))
     ->execute();
 
@@ -158,7 +222,8 @@ function msgcommons_install() {
       'name' => 'Kilowatt-hour',
       'symbol' => 'kWh',
       'factor' => 0.000001,
-      'string_id' => 'kwh'
+      'string_id' => 'kwh',
+      'type_id' => 1
     ))
     ->execute();
 
@@ -168,7 +233,8 @@ function msgcommons_install() {
       'name' => 'Kilowatt / year',
       'symbol' => 'kWh/year',
       'factor' => (3.6 / 1000) * 24 * 365,
-      'string_id' => 'kwhperyear'
+      'string_id' => 'kwhperyear',
+      'type_id' => 2
     ))
     ->execute();
 
@@ -178,7 +244,8 @@ function msgcommons_install() {
       'name' => 'Euro / year',
       'symbol' => '€/year',
       'factor' => (3.6 / 1000) * 24 * 365 * 0.18, //€ 0.18 / kWh
-      'string_id' => 'europeryear'
+      'string_id' => 'europeryear',
+      'type_id' => 2
     ))
     ->execute();
 
@@ -489,4 +556,190 @@ function msgcommons_update_7007() {
     ->execute();
 
   return st('Unit factors have been updated.');
+}
+
+/**
+ * Creates table unit_type.
+ */
+function msgcommons_update_7008() {
+
+  db_create_table('unit_type', drupal_get_schema_unprocessed('msgcommons', 'unit_type'));
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Energy',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Power',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Time',
+    ))
+    ->execute();
+
+  return st('Table unit_type has been created.');
+}
+
+/**
+ * Creates field unit.type_id.
+ */
+function msgcommons_update_7009() {
+
+  db_add_field('unit', 'type_id', array(
+    'type' => 'int',
+    'not null' => FALSE,
+    'unasigned' => TRUE,
+  ));
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 0)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 1)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 2)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 3)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 4)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 5)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 6)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 7)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 8)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 9)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 10)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 11)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 12)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 13)
+  ->execute();
+
+  db_change_field('unit', 'type_id', 'type_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+  ));
+
+  return st('Table unit_type has been created.');
+}
+
+/**
+ * Updates symbol of unit €/year.
+ */
+function msgcommons_update_7010() {
+
+  db_update('unit')
+    ->fields(array(
+      'symbol' => "€/year"
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  return st("Unit €/year symbol has been updated.");
+}
+
+/**
+ * Fix factor or unit watt-hour.
+ */
+function msgcommons_update_7011() {
+
+    db_update('unit')
+      ->fields(array(
+        'factor' => 0.001
+      ))
+      ->condition('id', 10)
+      ->execute();
+
+  return st("Factor of unit watt-hour has been fixed.");
 }

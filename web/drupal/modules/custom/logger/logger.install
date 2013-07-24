@@ -1024,9 +1024,22 @@ function logger_update_7044() {
 
   $dir = drupal_get_path('module', 'logger');
   $path = "$dir/data/base";
-  rename("$path/template.rrd", "$path/derive.template.rrd");
+  rename("$path/template.rrd", "$path/derive.template.rrd");  
 
   return st('File template.rrd has been renamed.');
 
 }
 
+/**
+ * Remove logger module variables.
+ */
+function logger_update_7045() {
+
+  db_delete('variable')
+    ->condition('name', 'logger_%', 'LIKE')
+    ->execute();
+
+  variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
+
+  return st('Logger module variables have been removed.');
+}

@@ -39,6 +39,11 @@ define('WEEK_UNIT_ID',   6);
 define('DAY_UNIT_ID',    5);
 define('MONTH_UNIT_ID',  7);
 
+define('ENERGY_UNIT_TYPE_ID',      1);
+define('POWER_UNIT_TYPE_ID',       2);
+define('TEMPERATURE_UNIT_TYPE_ID', 3);
+define('TIME_UNIT_TYPE_ID',        4);
+
 define('MSGCOMMONS_PATH', drupal_get_path('module', 'msgcommons'));
 
 
@@ -53,6 +58,42 @@ function msgcommons_menu() {
     'type' => MENU_CALLBACK,
   );
   return $items;
+}
+
+/**
+ * Returns an array of units of a certain type.
+ *
+ * @return the array of units.
+ */
+function msgcommons_get_units_options($type_id) {
+
+  $result = db_select('unit', 'u')
+    ->fields('u', array('symbol', 'name'))
+    ->condition('u.type_id', $type_id)
+    ->execute();
+
+  $options = array();
+  foreach ($result as $unit) {
+    $options[$unit->symbol] = $unit->name;
+  }
+  return $options;
+}
+
+/**
+ * Returns an array of units which have the type of the informed unit.
+ *
+ * @param $symbol  The symbol of the unit.
+ * @return the array of same type units.
+ */
+function msgcommons_get_same_type_units_options($symbol) {
+
+  $type_id = db_select('unit', 'u')
+    ->fields('u', array('type_id'))
+    ->condition('u.symbol', $symbol)
+    ->execute()
+    ->fetchField();
+
+  return msgcommons_get_units_options($type_id);
 }
 
 function msgcommons_validate_recaptcha() {

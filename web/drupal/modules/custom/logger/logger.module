@@ -806,8 +806,7 @@ function logger_line_chart_page($interval, $context, $title, $sensors, $types, $
   $filled = logger_get_variable('filled_graph', 1) == 1;
   $step_plot = logger_get_variable('step_plot', 0) == 1;
   $smoothing_level = logger_get_variable('smoothing_level', 1);
-  $unit_type = logger_get_unit_type($default_unit);
-  $unit = logger_get_variable($unit_type . "_unit", $default_unit);
+  $unit = logger_get_variable($chart->context . "_unit", $default_unit);
 
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
   $prices = $use_sensor_prices ? array() : array(
@@ -859,8 +858,7 @@ function logger_bar_chart_page($interval, $context, $title, $sensors, $types, $d
   }
 
   $aggregate_sensors = logger_get_variable('aggregate_sensors', 1);
-  $unit_type = logger_get_unit_type($default_unit);
-  $unit = logger_get_variable($unit_type . "_unit", $default_unit);
+  $unit = logger_get_variable($context . "_unit", $default_unit);
 
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
   $prices = $use_sensor_prices ? array() : array(
@@ -2152,7 +2150,7 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $options = array_merge(logger_get_power_units_options(), logger_get_energy_units_options());
+  $options = msgcommons_get_same_type_units_options($chart->unit);
   $unit = $options[$chart->unit];
 
   $icons = "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
@@ -2572,15 +2570,20 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $show_price = user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
-  $unit_type = logger_get_unit_type($chart->unit);
-  $units = $unit_type == 'power' ? logger_get_power_units_options() : logger_get_energy_units_options();
+  $units = msgcommons_get_same_type_units_options($chart->unit);
 
   //FIXME: the units array should be informed by a caller function
   if ($chart->context == 'balance') {
     unset($units['€/year']);
   }
 
-  $form[$unit_type . '_unit'] = array(
+  $form['context'] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $chart->context
+  );
+
+  $form[$chart->context . '_unit'] = array(
     '#type' => 'select',
     '#title' => t('Unit'),
     '#description' => t('Select the chart unit.'),
@@ -3084,11 +3087,11 @@ function logger_linechart_form_submit($form, &$form_state) {
 
 function logger_chart_form_submit($form, &$form_state) {
 
-  if (isset($form_state['values']['energy_unit'])) {
-    logger_set_variable('energy_unit', $form_state['values']['energy_unit']);
-  }
-  if (isset($form_state['values']['power_unit'])) {
-    logger_set_variable('power_unit', $form_state['values']['power_unit']);
+  $context = $form_state['values']['context'];
+  $unit_field = $context . '_unit';
+
+  if (isset($form_state['values'][$unit_field])) {
+    logger_set_variable($unit_field, $form_state['values'][$unit_field]);
   }
   if (isset($form_state['values']['use_sensor_prices'])) {
     logger_set_variable('use_sensor_prices', $form_state['values']['use_sensor_prices']);
@@ -3145,36 +3148,6 @@ function logger_get_meters_options($types, $virtual = FALSE) {
     $options[$sensor->meter] = $sensor->function;
   }
   return $options;
-}
-
-/**
- * Returns an array of energy units to be used as options of HTML select fields.
- *
- * @return the array of units.
- */
-function logger_get_energy_units_options() {
-  return array('kWh' => t('kWh'), '€' => t('Euro'));
-}
-
-/**
- * Returns an array of power units to be used as options of HTML select fields.
- *
- * @return the array of units.
- */
-function logger_get_power_units_options() {
-  return array('W' => t('Watt'), 'kWh/year' => t('kWh/year'), '€/year' => t('Euro/year'));
-}
-
-/**
- * Returns the type of an unit.
- *
- * @param $unit The unit being tested.
- * @return either energy or power.
- */
-function logger_get_unit_type($unit) {
-
-  $energy_units = logger_get_energy_units_options();
-  return isset($energy_units[$unit]) ? 'energy' : 'power';
 }
 
 /**
