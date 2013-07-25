@@ -54,6 +54,12 @@
 -define(HTTP_BAD_ARGUMENT,      400).
 -define(HTTP_INVALID_TIMESTAMP, 470).
 
+-define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
+-define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
+-define(TEMPERATURE_SENSOR_TYPE_ID,        3).
+
+-define(TEMPERATURE_UNIT_TYPE_ID,          3).
+
 -record(state,
         {rrdSensor,
          rrdStart,
@@ -181,6 +187,7 @@ check_unit(Unit) ->
         "kwhperyear" -> true;
         "kwh" -> true;
         "wh" -> true;
+        "c" -> true;
         _ -> false  
       end}.
 
@@ -306,9 +313,9 @@ rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) ->
 rrd_update(Path, RrdSensor, RrdData) ->
     erlrrd:update([Path, [RrdSensor|".rrd"], " ", RrdData]).
 
-rrd_create(Path, RrdSensor) ->
+rrd_create(Path, RrdSensor, UnitType) ->
   %FIXME: use erlrrd:create
-  file:copy("/var/www/flukso-api/flukso/var/data/base/derive.template.rrd", ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
+  file:copy([["/var/www/flukso-api/flukso/var/data/base/template."|integer_to_list(UnitType)]|".rrd"], ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
 
 rrd_last(RRDFile) ->
   erlrrd:last(RRDFile).

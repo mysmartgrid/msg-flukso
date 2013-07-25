@@ -19,7 +19,7 @@ function logger_schema() {
         'type' => 'varchar',
         'length' => '30',
         'not null' => TRUE,
-      ),
+      )
     ),
     'primary key' => array('id')
   );
@@ -386,14 +386,21 @@ function logger_install() {
   db_insert('logger_meter_type')
     ->fields(array(
       'id' => 1,
-      'name' => 'Consumption',
+      'name' => 'Energy Consumption'
     ))
     ->execute();
 
   db_insert('logger_meter_type')
     ->fields(array(
       'id' => 2,
-      'name' => 'Production',
+      'name' => 'Energy Production',
+    ))
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
     ))
     ->execute();
 
@@ -1033,7 +1040,7 @@ function logger_update_7044() {
 /**
  * Remove logger module variables.
  */
-function logger_update_7045() {
+function logger_update_7047() {
 
   db_delete('variable')
     ->condition('name', 'logger_%', 'LIKE')
@@ -1042,4 +1049,49 @@ function logger_update_7045() {
   variable_set('logger_msg_service_url', 'https://api.mysmartgrid.de:8443');
 
   return st('Logger module variables have been removed.');
+}
+
+/**
+ * Creates RRD templates links.
+ */
+function logger_update_7048() {
+
+  $dir = drupal_get_path('module', 'logger');
+  $path = "$dir/data/base";
+
+  exec("cd $path; ln -s derive.template.rrd template.1.rrd;");
+  exec("cd $path; ln -s derive.template.rrd template.2.rrd;");
+  exec("cd $path; ln -s gauge.template.rrd template.3.rrd;");
+  exec("cd $path; ln -s derive.template.rrd template.4.rrd;");
+
+  return st('RRD templates links have been created.');
+}
+
+/**
+ * Updates sensor types.
+ */
+function logger_update_7049() {
+
+  db_update('logger_meter_type')
+    ->fields(array(
+      'name' => 'Energy Consumption',
+    ))
+    ->condition('id', 1)
+    ->execute();
+
+  db_update('logger_meter_type')
+    ->fields(array(
+      'name' => 'Energy Production',
+    ))
+    ->condition('id', 2)
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
+    ))
+    ->execute();
+
+  return st('Sensor types have been updated.');
 }

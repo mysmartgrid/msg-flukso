@@ -141,7 +141,7 @@ function logger_detect_neighbor_anomalies($measurements, $sensor, $unit, $period
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $pvs = logger_get_sensors(array(PRODUCTION_SENSOR_TYPE), NULL, FALSE, FALSE, FALSE, array(
+  $pvs = logger_get_sensors(array(ENERGY_PRODUCTION_SENSOR_TYPE), NULL, FALSE, FALSE, FALSE, array(
     'latitude'  => array(
       $sensor->latitude - NEIGHBOUR_DISTANCE,
       $sensor->latitude + NEIGHBOUR_DISTANCE),

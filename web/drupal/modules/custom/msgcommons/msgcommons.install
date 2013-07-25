@@ -249,6 +249,17 @@ function msgcommons_install() {
     ))
     ->execute();
 
+  db_insert('unit')
+    ->fields(array(
+      'id' => 14,
+      'name' => 'Celsius',
+      'symbol' => '°C',
+      'factor' => 0.0001,
+      'string_id' => 'c',
+      'type_id' => 3
+    ))
+    ->execute();
+
   $dir = drupal_get_path('module', 'msgcommons');
   mkdir("$dir/tmp", 0777, TRUE);
 }
@@ -742,4 +753,23 @@ function msgcommons_update_7011() {
       ->execute();
 
   return st("Factor of unit watt-hour has been fixed.");
+}
+
+/**
+ * Creates the unit Celsius.
+ */
+function msgcommons_update_7013() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 14,
+      'name' => 'Celsius',
+      'symbol' => '°C',
+      'factor' => 0.0001,
+      'string_id' => 'c',
+      'type_id' => 3
+    ))
+    ->execute();
+
+  return st("The unit Celsius has been created.");
 }

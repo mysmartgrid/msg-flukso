@@ -1453,7 +1453,7 @@ function notification_send_measurement_anomaly_emails() {
   $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->fields('m', array('uid', 'meter', 'price', 'function', 'latitude', 'longitude'));
-  $query->condition('m.type', PRODUCTION_SENSOR_TYPE);
+  $query->condition('m.type', ENERGY_PRODUCTION_SENSOR_TYPE);
 
   $result = $query->execute();
 
@@ -1519,7 +1519,7 @@ function notification_send_limit_consumption_emails($event_id) {
   $query->addField('un', 'factor', 'unit_factor');
 
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->condition('m.type', CONSUMPTION_SENSOR_TYPE);
+  $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE);
   $query->condition('m.virtual', 0);
 
   $result = $query->execute();
@@ -1559,7 +1559,7 @@ function notification_send_summary_report_emails() {
 
   $query = notification_compose_base_query(SUMMARY_REPORT_EVENT_ID);
 
-  $types = array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE);
+  $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE);
   $offset = "IF (un.id = :week_unit_id, 4 * :day, 0)";
   $since = "n.base_time - ((n.base_time - $offset) % un.factor)";
   $since_time = "IF (un.id = :month_unit_id, n.base_time - (n.base_time % :day), $since)";
@@ -1590,12 +1590,12 @@ function notification_send_summary_report_emails() {
     $lines = array();
 
     $total_cost = array(
-      CONSUMPTION_SENSOR_TYPE => 0,
-      PRODUCTION_SENSOR_TYPE => 0
+      ENERGY_CONSUMPTION_SENSOR_TYPE => 0,
+      ENERGY_PRODUCTION_SENSOR_TYPE => 0
     );
     $total_energy = array(
-      CONSUMPTION_SENSOR_TYPE => 0,
-      PRODUCTION_SENSOR_TYPE => 0
+      ENERGY_CONSUMPTION_SENSOR_TYPE => 0,
+      ENERGY_PRODUCTION_SENSOR_TYPE => 0
     );
 
     date_default_timezone_set($notifiable['timezone']);
@@ -1634,8 +1634,8 @@ function notification_send_summary_report_emails() {
     $notifiable['until_time'] -= 1; //Display 23:59:59
 
     $notifiable['tables'] =
-      notification_compose_summary_report_table(CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
-      notification_compose_summary_report_table(PRODUCTION_SENSOR_TYPE, $lines, $total_cost, $total_energy);
+      notification_compose_summary_report_table(ENERGY_CONSUMPTION_SENSOR_TYPE, $lines, $total_cost, $total_energy) .
+      notification_compose_summary_report_table(ENERGY_PRODUCTION_SENSOR_TYPE, $lines, $total_cost, $total_energy);
 
     $notifiables[] = $notifiable;
   }
@@ -1664,7 +1664,7 @@ function notification_compose_summary_report_table($type, $lines, $total_cost, $
     return '';
   }
 
-  $title = $type == CONSUMPTION_SENSOR_TYPE ? 'Energy Consumption' : 'Energy Production';
+  $title = $type == ENERGY_CONSUMPTION_SENSOR_TYPE ? 'Energy Consumption' : 'Energy Production';
 
   return "<label class='highlight'>" . t($title) . "</label><br><br>" .
     "<table class='summary'><thead><tr>" .

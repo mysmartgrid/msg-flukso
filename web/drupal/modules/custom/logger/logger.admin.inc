@@ -54,7 +54,8 @@ function logger_userdevices_page() {
       l(t('History'), "event/log/list/$device->device") . '<br>' .
       l(t('Edit'), "device/edit/$device->device");
 
-    if ($device->type_id == FLUKSO2_DEVICE_TYPE_ID && user_access('request device remote support', $user)) {
+    //FIXME: create a field in table logger_device_type for setting whether the device supports remote support
+    if (($device->type_id == FLUKSO2_DEVICE_TYPE_ID || $device->type_id == LIBKLIO_DEVICE_TYPE_ID) && user_access('request device remote support', $user)) {
 
       $support_link = $device->support_requested ?
         l(t('Suspend Support'), "device/support/suspend/$device->device") :
@@ -204,6 +205,11 @@ function logger_sensor_edition_page($meter = NULL) {
     $query->join('logger_devices', 'd', 'd.device = m.device');
     $query->addField('d', 'type_id', 'device_type_id');
 
+    $query->join('unit', 'un', 'm.unit_id = un.id');
+    $query->addField('un', 'symbol', 'unit_symbol');
+    $query->addField('un', 'name', 'unit_name');
+    $query->addField('un', 'type_id', 'unit_type_id');
+
     $sensor = $query->execute()
       ->fetchObject();
   }
@@ -211,13 +217,16 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor = new stdClass();
     $sensor->device = NULL;
     $sensor->meter = NULL;
-    $sensor->type = CONSUMPTION_SENSOR_TYPE;
+    $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
     $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
     $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
     $sensor->virtual = TRUE;
     $sensor->price = 0.18;
+    $sensor->unit_symbol = 'Wh';
+    $sensor->unit_name = t('Watt-hour');
+    $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -313,7 +322,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#type' => 'select',
     '#title' => t('Type'),
     '#description' => t('The sensor type.'),
-    '#options' => logger_get_sensor_types_options(),
+    '#options' => logger_get_sensor_types_options(NULL, $sensor->unit_type_id),
     '#default_value' => $sensor->type,
     '#required' => TRUE,
     '#attributes' => array(
@@ -331,7 +340,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#field_prefix' => '€ ',
     '#default_value' => $sensor->price,
     '#required' => TRUE,
-    '#field_suffix' => ' / kWh'
+    '#field_suffix' => ' / kWh',
+    '#access' => $sensor->unit_type_id != TEMPERATURE_SENSOR_TYPE //FIXME: find a better way of doing this filter
   );
 
   $form['function'] = array(
@@ -344,6 +354,17 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->function
   );
 
+  $form['unit'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Unit'),
+    '#description' => t("The sensor's function name."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE,
+    '#default_value' => $sensor->unit_name . ' (' . $sensor->unit_symbol . ')',
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
   if ($sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
     $form['function']['#attributes']['readonly'] = 'readonly';
   }
@@ -351,7 +372,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {
 
-    $meters_options = logger_get_meters_options(array(CONSUMPTION_SENSOR_TYPE, PRODUCTION_SENSOR_TYPE));
+    $meters_options = logger_get_meters_options(array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE));
     $aggregated = logger_get_aggregated_sensors($sensor->meter);
 
     $selected_options = array();
@@ -476,7 +497,6 @@ function logger_sensor_form_validate($form, &$form_state) {
   $in_edition = isset($form_state['values']['meter']);
   $function = $form_state['values']['function'];
   $meter = $in_edition ? $form_state['values']['meter'] : NULL;
-  $price = $form_state['values']['price'];
 
   if (!logger_sensor_function_validate($function, $meter)) {
 
@@ -484,7 +504,7 @@ function logger_sensor_form_validate($form, &$form_state) {
       'Please inform another name which has not yet been used.', array('%function_name' => $function)));
   }
 
-  if (!($price > 0)) {
+  if (isset($form_state['values']['price']) && !($form_state['values']['price'] > 0)) {
     form_set_error('price', t('The informed price is invalid.'));
   }
 
@@ -539,18 +559,17 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
-  $price = $form_state['values']['price'];
+  $price = isset($form_state['values']['price']) ? $form_state['values']['price'] : 0;
 
   //If edition
   if (isset($form_state['values']['meter'])) {
 
     $meter = $form_state['values']['meter'];
+    $fields = array('function' => $function, 'type' => $type);
 
-    $fields = array(
-      'function' => $function,
-      'type' => $type,
-      'price' => $price
-    );
+    if ($price > 0) {
+      $fields['price'] = $price;
+    }
 
     $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
     $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
@@ -926,7 +945,7 @@ function logger_sensor_remove($meter, $next_url = NULL) {
 /**
  * Adds a new device sensor.
  */
-function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
+function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = ENERGY_CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
 
   $error = db_insert('logger_meters')
     ->fields(array(
