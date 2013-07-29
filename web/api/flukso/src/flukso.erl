@@ -39,7 +39,7 @@ mysql_prepare() ->
     mysql:prepare(timezone, <<"SELECT timezone FROM users WHERE uid = ?">>),
     mysql:prepare(permissions, <<"SELECT permissions FROM logger_tokens WHERE meter = ? AND token = ?">>),
 
-    mysql:prepare(unit_props, <<"SELECT id, factor FROM unit WHERE string_id = LOWER(?)">>),
+    mysql:prepare(unit_props, <<"SELECT id, factor, type_id FROM unit WHERE string_id = LOWER(?)">>),
     mysql:prepare(unit_factor, <<"SELECT factor FROM unit WHERE id = ?">>),
 
     mysql:prepare(token_insert, <<"INSERT INTO logger_tokens (token, meter, permissions) VALUES (?, ?, ?)">>),

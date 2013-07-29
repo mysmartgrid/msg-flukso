@@ -116,7 +116,7 @@ malformed_GET(ReqData, _State) ->
       {UnitString, true} ->
         {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
         case mysql:get_result_rows(_Result) of
-          [[_UnitId, _RrdFactor]] ->
+          [[_UnitId, _RrdFactor, _Type]] ->
             {_UnitId, _RrdFactor, true};
           _ ->
             {0, 0, false}
@@ -155,6 +155,7 @@ malformed_GET(ReqData, _State) ->
      end, 
     ReqData, State}.
 
+
 malformed_DELETE(ReqData, _State) ->
 
     {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
@@ -168,6 +169,7 @@ malformed_DELETE(ReqData, _State) ->
         _ -> true
      end,
     ReqData, State}.
+
 
 is_authorized(ReqData, State) ->
     case wrq:method(ReqData) of
@@ -301,7 +303,7 @@ query_sensor(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor) ->
     case rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
        {ok, Response} ->
            Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-           Datapoints = [[list_to_integer(X), round(list_to_float(Y) * RrdFactor)] || [X, Y] <- Filtered, string:len(Y) /= 4],
+           Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
            Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
            Final = lists:merge(Datapoints, Nans),
            {ok, Final};
@@ -367,22 +369,24 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       _ ->
         Timestamp = unix_time(),
         Function = proplists:get_value(<<"function">>, Params),
-        Description = proplists:get_value(<<"description">>, Params),
+        Description = get_optional_value(<<"description">>, Params, ""),
         Device = proplists:get_value(<<"device">>, Params),
 
         %FIXME:
-        UnitString = proplists:get_value(<<"unit">>, Params),
+        UnitString = get_optional_value(<<"unit">>, Params, "wh"),
         {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
-        [[UnitId, Factor]] = mysql:get_result_rows(_Result),
+        [[UnitId, Factor, UnitType]] = mysql:get_result_rows(_Result),
 
-        case rrd_create(?BASE_PATH, Sensor) of
+        case rrd_create(?BASE_PATH, Sensor, UnitType) of
           {ok, _RrdResponse} ->
             RrdResponse = "ok",
             B = term_to_binary({node(), now()}),
             L = binary_to_list(erlang:md5(B)),
             Token = lists:flatten(list_to_hex(L)),
 
-            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, 1, Function, Description, 0, 0, 0, 0, UnitId, Device]),
+            SensorType = case UnitType of ?TEMPERATURE_UNIT_TYPE_ID -> ?TEMPERATURE_SENSOR_TYPE_ID; _ -> ?ENERGY_CONSUMPTION_SENSOR_TYPE_ID end,
+
+            mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, SensorType, Function, Description, 0, 0, 0, 0, UnitId, Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);
 
           {error, RrdResponse} ->
@@ -427,7 +431,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
           %Measurements are valid
           {ok, RrdData} ->
 
-            %debugging
+            %debugging 
             %UnsortedList = [[integer_to_list(T), ":", float_to_list(float(C)), " "] || [T, C] <- Measurements],
             %logger(Uid, <<"rrdupdate.base">>,
             %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),

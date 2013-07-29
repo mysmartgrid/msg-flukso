@@ -221,6 +221,14 @@ process_post(ReqData, #state{device = Device} = State) ->
       %Device exists
       [[Key, Upgrade, Resets, OldFirmwareVersion, OldDescription]] ->
 
+        Version = get_optional_value(<<"version">>, JsonData, 0),
+        Reset = get_optional_value(<<"reset">>, JsonData, 0),
+        Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
+        Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
+        Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
+        Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
+        Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
+
         IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
 
         if
@@ -229,24 +237,11 @@ process_post(ReqData, #state{device = Device} = State) ->
 
             %Key can be changed, but the encryption is based on the formed key
             NewKey = proplists:get_value(<<"key">>, JsonData),
-            Version = 0,
-            Uptime = 0,
-            Memtotal = 0,
-            Memcached = 0,
-            Membuffers = 0,
-            Memfree = 0,
             NewResets = 0;
             
           %Heartbeat Message
           true ->
             NewKey = Key, %Key is not changed
-            Version = get_optional_value(<<"version">>, JsonData, 0),
-            Reset = get_optional_value(<<"reset">>, JsonData, 0),
-            Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
-            Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
-            Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
-            Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
-            Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
             NewResets = Resets + Reset
         end,
 
