@@ -347,8 +347,8 @@ function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
     $def .= "CDEF:$series_id=$variables$operators ";
 
     return logger_rrd_export($def, $series_id, REQUEST_TIME, FALSE, $period, $step);
-
-  } else {
+  }
+  else {
     return array();
   }
 }
@@ -470,7 +470,7 @@ function logger_rrd_appliance_def($series_id, $appliance_id, $sensor, $step) {
     if ($step == MINUTE) {
       $function = 'AVERAGE';
     }
-    else if ($step == 15 * MINUTE) {
+    elseif ($step == 15 * MINUTE) {
       $function = 'MIN';
     }
     else {
@@ -593,8 +593,9 @@ function logger_rrd_parse_exported_lines($lines) {
 /**
  * Returns the unit conversion factor.
  * 
- * @param $unit  the unit.
- * @param $price the price (if the unit is Monetary).
+ * @param $unit           the unit.
+ * @param $price          the price (if the unit is Monetary).
+ * @param $device_type_id the device type id (optional).
  * @return the unit conversion factor.
  */
 function logger_rrd_get_unit_factor($unit, $price = NULL, $device_type_id = 0) {//FIXME: argument

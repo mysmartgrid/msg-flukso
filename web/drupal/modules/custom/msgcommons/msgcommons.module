@@ -38,6 +38,7 @@ define('WATT_UNIT_ID',   3);
 define('WEEK_UNIT_ID',   6);
 define('DAY_UNIT_ID',    5);
 define('MONTH_UNIT_ID',  7);
+define('WH_UNIT_ID',    10);
 
 define('ENERGY_UNIT_TYPE_ID',      1);
 define('POWER_UNIT_TYPE_ID',       2);
@@ -148,7 +149,7 @@ function msgcommons_copy_salesforce_post_data() {
     if ($postdata != '') {
       $postdata .= '&';
     }
-    $postdata.= "$key=$value";
+    $postdata .= "$key=$value";
   }
   return $postdata;
 }
@@ -260,9 +261,9 @@ function tokenize_string($str, $sep = " \n\r") {
  *               So if you have a word that is larger than the given width, it is broken apart.
  * @return the given string wrapped at the specified length. 
  */
-function mb_wordwrap($str, $width = 75, $break = "\n", $cut = FALSE, $charset = null) {
+function mb_wordwrap($str, $width = 75, $break = "\n", $cut = FALSE, $charset = NULL) {
 
-  if ($charset === NULL){
+  if ($charset === NULL) {
     $charset = mb_internal_encoding();
   }
 

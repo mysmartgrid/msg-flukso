@@ -200,7 +200,7 @@ function logger_sensor_edition_page($meter = NULL) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
       ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
-      ->condition('m.meter', $meter, '=');
+      ->condition('m.meter', $meter);
 
     $query->join('logger_devices', 'd', 'd.device = m.device');
     $query->addField('d', 'type_id', 'device_type_id');
@@ -227,6 +227,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->unit_symbol = 'Wh';
     $sensor->unit_name = t('Watt-hour');
     $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
+    $sensor->device_type_id = FLUKSO2_DEVICE_TYPE_ID;
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -947,6 +948,8 @@ function logger_sensor_remove($meter, $next_url = NULL) {
  */
 function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = ENERGY_CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
 
+  module_load_include('inc', 'logger', 'logger.rrd');
+
   $error = db_insert('logger_meters')
     ->fields(array(
       'meter' => $meter,
@@ -956,7 +959,7 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
       'function' => $function,
       'type' => $type,
       'virtual' => $virtual,
-      'unit' => 'Wh',
+      'unit_id' => WH_UNIT_ID,
       'forecast' => $forecast,
       'latitude' => $latitude,
       'longitude' => $longitude,

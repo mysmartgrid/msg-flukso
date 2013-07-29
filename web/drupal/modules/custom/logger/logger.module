@@ -1668,7 +1668,7 @@ function logger_get_forecast_chart_data($chart) {
       if ($chart->unit == '€/year') {
         $factor = $sensor->price * 24 * 365 / 1000;
       }
-      else if ($chart->unit == 'kWh/year') {
+      elseif ($chart->unit == 'kWh/year') {
         $factor = 24 * 365 / 1000;
       }
       foreach ($forecast['power'] as $time => $value) {
@@ -1823,10 +1823,10 @@ function logger_format_power_series_data($chart, $measurements) {//FIXME: rename
  * @param $i                 The legend line index.
  * @param $values            The collumn values (Min, Max, Last, Avg, Sum, Operations) (optional).
  * @param $chart_series_ids  An array of chart series ids, associated with this legend line (optional).
- * @param $colorIds          An array of line colors represented by this legend line (optional).
+ * @param $color_ids          An array of line colors represented by this legend line (optional).
  * @return the legend line.
  */
-function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $colorIds = array()) {
+function logger_create_legend_line($username, $function, $type, $i, $values = array(), $chart_series_ids = array(), $color_ids = array()) {
 
   $line = array();
   $line['User'] = mb_wordwrap($username, 12, "<br>", TRUE);
@@ -1837,7 +1837,7 @@ function logger_create_legend_line($username, $function, $type, $i, $values = ar
 
   $line['Type'] = $type;
   $line['seriesIds'] = $chart_series_ids;
-  $line['colorIds'] = $colorIds;
+  $line['colorIds'] = $color_ids;
   
   foreach ($values as $title => $value) {
     $id = strtolower("$title$i");
@@ -2351,11 +2351,11 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
   $weather = array();
   if ($slider) {
     $id = 'sliderChart';
-    $cssClass = 'slider';
+    $css_class = 'slider';
   }
   else {
     $id = 'lineChart';
-    $cssClass = 'chart';
+    $css_class = 'chart';
 
     if (isset($chart->data['weather'])) {
       foreach ($chart->data['weather'] as $i => $values) {
@@ -2364,7 +2364,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
           $degrees = $chart->data['temperature'][$i][$time];
           $pairs[] = "[$time, $icon, $degrees]";
         }
-        $weather[] = "[ $i, [" . implode (', ', $pairs) . "] ]";
+        $weather[] = "[ $i, [" . implode(', ', $pairs) . "] ]";
       }
     }
   }
@@ -2397,7 +2397,7 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
       'createLineChart("' . $id . '", "' . $chart->file_url . '", {' . implode(', ', $properties) . '}, [' . implode(', ', $weather) . ']); ' .
     '} );', array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 200, 'defer' => TRUE));
 
-  return '<div id="' . $id . '" class="' . $cssClass . '"></div><br>' . $labels_output;
+  return '<div id="' . $id . '" class="' . $css_class . '"></div><br>' . $labels_output;
 }
 
 /**
@@ -3558,12 +3558,12 @@ function logger_get_appliances($cache_id) {
 
     if ($cache->data && isset($cache->data['appliances'])) {
       $detected = $cache->data['appliances'];
-
-    } else {
+    }
+    else {
       $detected = array();
     }
-
-  } else {
+  }
+  else {
     $detected = array();
   }
 
