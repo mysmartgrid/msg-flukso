@@ -819,7 +819,22 @@ form #main h3.search {
 
 
 
+/********************
+ * Undocked Content *
+ ********************/
 
+#undocked {
+        clear: both;
+        float: right;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: white;
+}
+
+#undocked a:link, #undocked a:hover, #undocked a:visited {
+        color: #555;
+}
 
 /****************
  * Main Content *

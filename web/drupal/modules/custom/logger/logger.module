@@ -263,6 +263,14 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['popup/power'] = array(
+    'description' => 'A page containing only the power chart',
+    'page callback' => 'logger_power_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
   $items['logger/getappliances'] = array(
     'title' => 'Returns list of appliances',
     'page callback' => 'logger_get_appliances',
@@ -605,15 +613,16 @@ function logger_user_power_page($uid) {
  * Builds the power consumption page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the power consumption page.
  */
-function logger_power_page($interval) {
+function logger_power_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'power');
 
-  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'W');
+  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'W', NULL, TRUE, $popup);
 }
 
 /**
@@ -820,9 +829,10 @@ function logger_onsite_page($interval) {
  * @param $default_unit The default chart unit.
  * @param $introduction A paragraph that introduces the user to the page (optional).
  * @param $show_slider  Whether or not the chart has a slider (optional).
+ * @param $popup        Whether or not this is a popup page (optional).
  * @return the line consumption page.
  */
-function logger_line_chart_page($interval, $context, $title, $sensors, $types, $default_unit, $introduction = NULL, $show_slider = TRUE) {
+function logger_line_chart_page($interval, $context, $title, $sensors, $types, $default_unit, $introduction = NULL, $show_slider = TRUE, $popup = FALSE) {
 
   $xvalue1 = logger_get_xvalue(1);
   $xvalue2 = logger_get_xvalue(2);
@@ -840,15 +850,16 @@ function logger_line_chart_page($interval, $context, $title, $sensors, $types, $
     ENERGY_PRODUCTION_SENSOR_TYPE => logger_get_variable('price2', 0.18));
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2),
-    array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider);
+    array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider, FALSE, $popup);
 
   drupal_set_title($title);
 
   $form = drupal_get_form('logger_linechart_form', $chart);
+  $rendered_form = $popup ? '' : drupal_render($form);
 
   return (empty($introduction) ? '' : $introduction . '<br><br>') .
   
-    theme('logger_line_chart_area', array('chart' => $chart)) . drupal_render($form);
+    theme('logger_line_chart_area', array('chart' => $chart)) . $rendered_form;
 }
 
 /**
@@ -936,9 +947,10 @@ function logger_check_interval($interval, $default_interval) {
  * @param $smoothing_level    The smoothing level of the chart lines.
  * @param $show_slider        Whether or not the chart has a slider.
  * @param $percentual         Whether the chart shows percentual values.
+ * @param $popup              Whether the chart is shown in a popup page.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $prices = array(), $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $show_slider = TRUE, $percentual = FALSE) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $prices = array(), $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $show_slider = TRUE, $percentual = FALSE, $popup = FALSE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -955,6 +967,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $chart->smoothing_level = $smoothing_level;
   $chart->show_slider = $show_slider;
   $chart->percentual = $percentual;
+  $chart->popup = $popup;
   $chart->prices = array(
     ENERGY_CONSUMPTION_SENSOR_TYPE => isset($prices[ENERGY_CONSUMPTION_SENSOR_TYPE]) ? $prices[ENERGY_CONSUMPTION_SENSOR_TYPE] : NULL,
     ENERGY_PRODUCTION_SENSOR_TYPE => isset($prices[ENERGY_PRODUCTION_SENSOR_TYPE]) ? $prices[ENERGY_PRODUCTION_SENSOR_TYPE] : NULL);
@@ -2215,7 +2228,7 @@ function theme_logger_line_chart_area($variables) {
 
   $icons = "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
 
-  $output = logger_create_interval_menu($chart->context) .
+  $output = logger_create_interval_menu($chart) .
     '<div style="float: right;">' . $icons . '</div>' .
     '<div>' . t($unit) . '</div>' .
     logger_create_dygraph($chart, TRUE, $chart_properties);
@@ -2307,7 +2320,7 @@ function theme_logger_bar_chart_area($variables) {
   drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
 
   $id = 'barChart';
-  $menu = logger_create_interval_menu($chart->context);
+  $menu = logger_create_interval_menu($chart);
 
   drupal_add_js("jQuery(document).ready( function() { " .
     "createBarChart('$id', " .
@@ -2403,52 +2416,53 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
 /**
  * Creates the chart intervals' horizontal menu.
  *
- * @param $context  The page where the menu is going to be placed.
+ * @param $chart  The chart object.
  * @return the list of intervals' menus.
  */
-function logger_create_interval_menu($context) {
+function logger_create_interval_menu($chart) {
 
   $items = array();
+  $path = ($chart->popup ? 'popup/' : '') . $chart->context;
 
-  switch ($context) {
+  switch ($chart->context) {
     case 'relative':
       break;
 
     case 'onsite':
       $items = array(
-        l(t('Hour'),    "$context/hour"),
-        l(t('Day'),     "$context/24hours"),
-        l(t('3 Days'),  "$context/72hours"),
-        l(t('Week'),    "$context/week"));
+        l(t('Hour'),    "$path/hour"),
+        l(t('Day'),     "$path/24hours"),
+        l(t('3 Days'),  "$path/72hours"),
+        l(t('Week'),    "$path/week"));
 
       if (user_has_role('Techniker')) {
-        $items[] = l(t('Month'),   "$context/month");
+        $items[] = l(t('Month'),   "$path/month");
       }
       break;
 
     case 'energy':
       $items = array(
-        l(t('Day'),     "$context/day"),
-        l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"),
-        l(t('Year'),    "$context/year"));
+        l(t('Day'),     "$path/day"),
+        l(t('Week'),    "$path/week"),
+        l(t('Month'),   "$path/month"),
+        l(t('Year'),    "$path/year"));
       break;
 
     case 'forecast':
       $items = array(
-        l(t('3 Days'), "$context/f3days"),
-        l(t('2 Days'), "$context/f2days"),
-        l(t('Today'),  "$context/f1day"));
+        l(t('3 Days'), "$path/f3days"),
+        l(t('2 Days'), "$path/f2days"),
+        l(t('Today'),  "$path/f1day"));
       break;
 
     default:
       $items = array(
-        l(t('Hour'),    "$context/hour"),
-        l(t('Day'),     "$context/day"),
-        l(t('3 Days'),  "$context/3days"),
-        l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"),
-        l(t('Year'),    "$context/year"));
+        l(t('Hour'),    "$path/hour"),
+        l(t('Day'),     "$path/day"),
+        l(t('3 Days'),  "$path/3days"),
+        l(t('Week'),    "$path/week"),
+        l(t('Month'),   "$path/month"),
+        l(t('Year'),    "$path/year"));
       break;
   }
   return empty($items) ? '' : theme('logger_chart_tabs', $items);
