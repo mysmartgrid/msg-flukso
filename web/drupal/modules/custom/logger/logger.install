@@ -404,6 +404,20 @@ function logger_install() {
     ))
     ->execute();
 
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
   $dir = drupal_get_path('module', 'logger');
 
   $path = "$dir/data/base";
@@ -1095,3 +1109,40 @@ function logger_update_7049() {
 
   return st('Sensor types have been updated.');
 }
+
+/**
+ * Creates new sensor types.
+ */
+function logger_update_7050() {
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  return st("New sensor types have been created.");
+}
+
+/**
+ * Creates new RRD templates links.
+ */
+function logger_update_7051() {
+
+  $dir = drupal_get_path('module', 'logger');
+  $path = "$dir/data/base";
+
+  exec("cd $path; ln -s gauge.template.rrd template.5.rrd;");
+  exec("cd $path; ln -s gauge.template.rrd template.6.rrd;");
+
+  return st('New RRD templates links have been created.');
+}
+

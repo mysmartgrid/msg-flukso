@@ -384,7 +384,12 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
             L = binary_to_list(erlang:md5(B)),
             Token = lists:flatten(list_to_hex(L)),
 
-            SensorType = case UnitType of ?TEMPERATURE_UNIT_TYPE_ID -> ?TEMPERATURE_SENSOR_TYPE_ID; _ -> ?ENERGY_CONSUMPTION_SENSOR_TYPE_ID end,
+            SensorType = case UnitType of
+              ?TEMPERATURE_UNIT_TYPE_ID -> ?TEMPERATURE_SENSOR_TYPE_ID;
+              ?PRESSURE_UNIT_TYPE_ID -> ?PRESSURE_SENSOR_TYPE_ID;
+              ?HUMIDITY_UNIT_TYPE_ID -> ?HUMIDITY_SENSOR_TYPE_ID; 
+              _ -> ?ENERGY_CONSUMPTION_SENSOR_TYPE_ID
+            end,
 
             mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, SensorType, Function, Description, 0, 0, 0, 0, UnitId, Device]),
             mysql:execute(pool, token_insert, [Token, Sensor, 62]);

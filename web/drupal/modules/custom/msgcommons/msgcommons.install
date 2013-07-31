@@ -34,7 +34,7 @@ function msgcommons_schema() {
       ),
       'name' => array(
         'type' => 'varchar',
-        'length' => '16',
+        'length' => '20',
         'not null' => TRUE,
       ),
       'symbol' => array(
@@ -91,6 +91,20 @@ function msgcommons_install() {
     ->fields(array(
       'id' => 4,
       'name' => 'Time',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
     ))
     ->execute();
 
@@ -255,8 +269,63 @@ function msgcommons_install() {
       'name' => 'Celsius',
       'symbol' => '°C',
       'factor' => 0.0001,
-      'string_id' => 'c',
+      'string_id' => 'degc',
       'type_id' => 3
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 15,
+      'name' => 'pascal',
+      'symbol' => 'Pa',
+      'factor' => 1,
+      'string_id' => 'pa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 16,
+      'name' => 'kilopascal',
+      'symbol' => 'kPa',
+      'factor' => 0.001,
+      'string_id' => 'kpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 17,
+      'name' => 'megapascal',
+      'symbol' => 'MPa',
+      'factor' => 0.000001,
+      'string_id' => 'mpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 18,
+      'name' => 'Relative Humidity',
+      'symbol' => '%r.h.',
+      'factor' => 1,
+      'string_id' => 'rh',
+      'type_id' => 6
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 19,
+      'name' => 'hectopascal',
+      'symbol' => 'hPa',
+      'factor' => 0.01,
+      'string_id' => 'hpa',
+      'type_id' => 5
     ))
     ->execute();
 
@@ -604,6 +673,20 @@ function msgcommons_update_7008() {
     ))
     ->execute();
 
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
   return st('Table unit_type has been created.');
 }
 
@@ -772,4 +855,110 @@ function msgcommons_update_7013() {
     ->execute();
 
   return st("The unit Celsius has been created.");
+}
+
+/**
+ * Creates new units.
+ */
+function msgcommons_update_7023() {
+
+  db_change_field('unit', 'name', 'name', array(
+    'type' => 'varchar',
+    'length' => '20',
+    'not null' => TRUE,
+  ));
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 15,
+      'name' => 'pascal',
+      'symbol' => 'Pa',
+      'factor' => 1,
+      'string_id' => 'pa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 16,
+      'name' => 'kilopascal',
+      'symbol' => 'kPa',
+      'factor' => 0.001,
+      'string_id' => 'kpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 17,
+      'name' => 'megapascal',
+      'symbol' => 'MPa',
+      'factor' => 0.000001,
+      'string_id' => 'mpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 18,
+      'name' => 'Relative Humidity',
+      'symbol' => '%r.h.',
+      'factor' => 1,
+      'string_id' => 'rh',
+      'type_id' => 6
+    ))
+    ->execute();
+
+  return st("New units have been created.");
+}
+
+/**
+ * Change the string id of unit °C.
+ */
+function msgcommons_update_7024() { 
+
+  db_update('unit')
+  ->fields(array(
+    'string_id' => 'degc'
+  ))
+  ->condition('string_id', 'c')
+  ->execute();
+
+  return st('String id of unit °C has been changed.');
+}
+
+/**
+ * Create unit hectopascal.
+ */
+function msgcommons_update_7025() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 19,
+      'name' => 'hectopascal',
+      'symbol' => 'hPa',
+      'factor' => 0.01,
+      'string_id' => 'hpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  return st('Create unit hectopascal.');
 }
