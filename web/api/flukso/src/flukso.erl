@@ -46,6 +46,7 @@ mysql_prepare() ->
     mysql:prepare(token_delete, <<"DELETE FROM logger_tokens WHERE meter = ?">>),
     mysql:prepare(sensor_key, <<"SELECT sha FROM (logger_devices ld INNER JOIN logger_meters lm ON ld.device = lm.device) WHERE lm.meter = ?">>),
     mysql:prepare(sensor_props, <<"SELECT uid, device, unit_id FROM logger_meters WHERE meter = ?">>),
+    mysql:prepare(sensor_device_type, <<"SELECT d.type_id FROM logger_devices d, logger_meters m WHERE d.device = m.device and m.meter = ?">>),
     mysql:prepare(device_sensors, <<"SELECT m.meter, m.function, m.description, un.string_id AS unit FROM logger_meters m, unit un WHERE m.device = ? AND m.unit_id = un.id">>),
     mysql:prepare(sensor_update, <<"UPDATE logger_meters SET access = ?, value = ? WHERE meter = ?">>),
     mysql:prepare(sensor_delete, <<"DELETE FROM logger_meters WHERE meter = ?">>),

@@ -404,6 +404,20 @@ function logger_install() {
     ))
     ->execute();
 
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
   $dir = drupal_get_path('module', 'logger');
 
   $path = "$dir/data/base";
@@ -1094,4 +1108,97 @@ function logger_update_7049() {
     ->execute();
 
   return st('Sensor types have been updated.');
+}
+
+/**
+ * Creates new sensor types.
+ */
+function logger_update_7050() {
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('logger_meter_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  return st("New sensor types have been created.");
+}
+
+/**
+ * Creates new RRD templates links.
+ */
+function logger_update_7051() {
+
+  $dir = drupal_get_path('module', 'logger');
+  $path = "$dir/data/base";
+
+  exec("cd $path; ln -s gauge.template.rrd template.5.rrd;");
+  exec("cd $path; ln -s gauge.template.rrd template.6.rrd;");
+
+  return st('New RRD templates links have been created.');
+}
+
+/**
+ * Updates test device keys.
+ */
+function logger_update_7056() {
+
+  db_update('logger_devices')
+    ->fields(array(
+      'sha' => 'd3a16238d92456bb0f6727743275dce0'
+    ))
+    ->condition('device', 'dvdvdvdvdvdvdvdvdvdvdvdvdvdvdvd1')
+    ->execute();
+
+  return st('Test device keys have been updated.');
+}
+
+/**
+ * Updates test sensor tokens.
+ */
+function logger_update_7057() {
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'token' => 'd3a16238d92456bb0f6727743275dce0'
+    ))
+    ->condition('meter', 'dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1')
+    ->execute();
+
+  return st('Test sensor token has been updated.');
+}
+
+/**
+ * Updates test sensor meter.
+ */
+function logger_update_7059() {
+
+  db_update('logger_meters')
+    ->fields(array(
+      'meter' => '5715a57b0c8ec958727ab3bb206d8b6e'
+    ))
+    ->condition('meter', 'dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1')
+    ->execute();
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'token' => '5715a57b0c8ec958727ab3bb206d8b6e'
+    ))
+    ->condition('meter', 'dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1')
+    ->execute();
+
+  $dir = drupal_get_path('module', 'logger');
+  $path = "$dir/data/base";
+
+  exec("cd $path; mv dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1.rrd 5715a57b0c8ec958727ab3bb206d8b6e.rrd;");
+
+  return st('Test sensor meter has been updated.');
 }

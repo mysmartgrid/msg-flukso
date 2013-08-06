@@ -527,7 +527,7 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
   $period['end'] -= $period['end'] % $step + 1; //Until the last second
 
   $maxrows = 1 + ($period['end'] - $period['start']) / $step;
-  $maxrows = $maxrows < 10 ? 10 : $maxrows; //RRDTool exports at least 8 rows
+  $maxrows = $maxrows < 10 ? 10 : floor($maxrows); //RRDTool exports at least 8 rows
 
   $command = RRDTOOL . ' xport ' .
     " --start " . $period['start'] .

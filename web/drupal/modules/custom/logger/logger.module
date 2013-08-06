@@ -24,13 +24,15 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
+ //error_reporting(E_ALL);
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);
 define('TEMPERATURE_SENSOR_TYPE',        3);
+define('PRESSURE_SENSOR_TYPE',           4);
+define('HUMIDITY_SENSOR_TYPE',           5);
 
 define('SUN_WEATHER_ID',  1);
 define('RAIN_WEATHER_ID', 2);
@@ -182,6 +184,26 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  $items['pressure'] = array(
+    'title' => 'Your Pressure Measurements',
+    'description' => 'Show the pressure measurements page',
+    'page callback' => 'logger_pressure_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_pressure_access',
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['humidity'] = array(
+    'title' => 'Your Humidity Measurements',
+    'description' => 'Show the humidity measurements page',
+    'page callback' => 'logger_humidity_page',
+    'page arguments' => array(1),
+    'access callback' => 'logger_humidity_access',
+    'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
   $items['power/user'] = array(
     'title' => 'Power consumption and production',
     'description' => 'Show the power consumption and production of a single user',
@@ -260,6 +282,14 @@ function logger_menu() {
     'page arguments' => array(1),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('detect anomalies'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/power'] = array(
+    'description' => 'A page containing only the power chart',
+    'page callback' => 'logger_power_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
 
@@ -441,6 +471,13 @@ function logger_menu() {
     'file' => 'logger.admin.inc'
   );
 
+  $items['jsonp/sensor'] = array(
+    'page callback' => 'logger_jsonp_sensor',
+    'page arguments' => array(2),
+    'access callback' => 'logger_jsonp_sensor_access',
+    'access arguments' => array(2),
+    'type' => MENU_CALLBACK
+  );
 
   //Other operations
 
@@ -605,22 +642,23 @@ function logger_user_power_page($uid) {
  * Builds the power consumption page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the power consumption page.
  */
-function logger_power_page($interval) {
+function logger_power_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'power');
 
-  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'W');
+  return logger_line_chart_page($interval, 'power', t('Your power consumption and production'), $sensors, $types, 'W', NULL, TRUE, $popup);
 }
 
 /**
- * Builds the power consumption page.
+ * Builds the temperature page.
  *
  * @param $interval The time interval.
- * @return the power consumption page.
+ * @return the temperature page.
  */
 function logger_temperature_page($interval) {
 
@@ -629,6 +667,36 @@ function logger_temperature_page($interval) {
   $sensors = logger_get_subscribed_sensors($types, 'temperature');
 
   return logger_line_chart_page($interval, 'temperature', t('Your temperature measurements'), $sensors, $types, '°C');
+}
+
+/**
+ * Builds the pressure page.
+ *
+ * @param $interval The time interval.
+ * @return the pressure page.
+ */
+function logger_pressure_page($interval) {
+
+  $interval = logger_check_interval($interval, 'hour');
+  $types = array(PRESSURE_SENSOR_TYPE);
+  $sensors = logger_get_subscribed_sensors($types, 'pressure');
+
+  return logger_line_chart_page($interval, 'pressure', t('Your pressure measurements'), $sensors, $types, 'hPa');
+}
+
+/**
+ * Builds the humidity page.
+ *
+ * @param $interval The time interval.
+ * @return the humidity page.
+ */
+function logger_humidity_page($interval) {
+
+  $interval = logger_check_interval($interval, 'hour');
+  $types = array(HUMIDITY_SENSOR_TYPE);
+  $sensors = logger_get_subscribed_sensors($types, 'humidity');
+
+  return logger_line_chart_page($interval, 'humidity', t('Your humidity measurements'), $sensors, $types, '%r.h.');
 }
 
 /**
@@ -820,9 +888,10 @@ function logger_onsite_page($interval) {
  * @param $default_unit The default chart unit.
  * @param $introduction A paragraph that introduces the user to the page (optional).
  * @param $show_slider  Whether or not the chart has a slider (optional).
+ * @param $popup        Whether or not this is a popup page (optional).
  * @return the line consumption page.
  */
-function logger_line_chart_page($interval, $context, $title, $sensors, $types, $default_unit, $introduction = NULL, $show_slider = TRUE) {
+function logger_line_chart_page($interval, $context, $title, $sensors, $types, $default_unit, $introduction = NULL, $show_slider = TRUE, $popup = FALSE) {
 
   $xvalue1 = logger_get_xvalue(1);
   $xvalue2 = logger_get_xvalue(2);
@@ -840,15 +909,16 @@ function logger_line_chart_page($interval, $context, $title, $sensors, $types, $
     ENERGY_PRODUCTION_SENSOR_TYPE => logger_get_variable('price2', 0.18));
 
   $chart = logger_create_chart_object($context, $types, $interval, $unit, $sensors, array($xvalue1, $xvalue2),
-    array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider);
+    array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider, FALSE, $popup);
 
   drupal_set_title($title);
 
   $form = drupal_get_form('logger_linechart_form', $chart);
+  $rendered_form = $popup ? '' : drupal_render($form);
 
   return (empty($introduction) ? '' : $introduction . '<br><br>') .
   
-    theme('logger_line_chart_area', array('chart' => $chart)) . drupal_render($form);
+    theme('logger_line_chart_area', array('chart' => $chart)) . $rendered_form;
 }
 
 /**
@@ -936,9 +1006,10 @@ function logger_check_interval($interval, $default_interval) {
  * @param $smoothing_level    The smoothing level of the chart lines.
  * @param $show_slider        Whether or not the chart has a slider.
  * @param $percentual         Whether the chart shows percentual values.
+ * @param $popup              Whether the chart is shown in a popup page.
  * @return the chart object.
  */
-function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $prices = array(), $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $show_slider = TRUE, $percentual = FALSE) {
+function logger_create_chart_object($context, $types, $interval, $unit, $sensors, $xaxis = array(0, 0), $yaxis = array(0, 0), $aggregate_sensors = FALSE, $prices = array(), $filled = FALSE, $step_plot = FALSE, $smoothing_level = 1, $show_slider = TRUE, $percentual = FALSE, $popup = FALSE) {
 
   $chart = new stdClass();
   $chart->context = $context;
@@ -955,6 +1026,7 @@ function logger_create_chart_object($context, $types, $interval, $unit, $sensors
   $chart->smoothing_level = $smoothing_level;
   $chart->show_slider = $show_slider;
   $chart->percentual = $percentual;
+  $chart->popup = $popup;
   $chart->prices = array(
     ENERGY_CONSUMPTION_SENSOR_TYPE => isset($prices[ENERGY_CONSUMPTION_SENSOR_TYPE]) ? $prices[ENERGY_CONSUMPTION_SENSOR_TYPE] : NULL,
     ENERGY_PRODUCTION_SENSOR_TYPE => isset($prices[ENERGY_PRODUCTION_SENSOR_TYPE]) ? $prices[ENERGY_PRODUCTION_SENSOR_TYPE] : NULL);
@@ -1484,41 +1556,16 @@ function logger_get_onsite_chart_series($chart) {
  */
 function logger_get_power_chart_data($chart) {
 
-  global $user;
-
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $is_visitor = user_has_role('Visitor');
-  $data = array();
+  $data = logger_get_line_chart_data($chart);
   $i = 0;
 
   foreach ($chart->sensors as &$sensor) {
 
-    $price = $chart->prices[$sensor->type_id];
-    $price = $price ? $price : $sensor->price;
-
-    //TODO: make a single call
-    if ($sensor->virtual) {
-      $aggregated = logger_get_aggregated_sensors($sensor->meter);
-      $measurements = logger_rrd_query_agg($aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
-    }
-    else {
-      $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, $price);
-    }
-
-    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
-
     foreach (logger_get_appliance_ids() as $app) {
       $data['appliances'][$i][$app] = logger_rrd_query_appliance($sensor, $chart->period, $app, $chart->resolution);
     }
-
-    //Hide usernames for Visitors
-    $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
-
-    $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
-
-    $data['legend'][$i] = logger_create_legend_line($username, $sensor->function, t($sensor->type), $i,
-      array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0, 'Operations' => $operations));
     $i++;
   }
   return $data;
@@ -1532,6 +1579,39 @@ function logger_get_power_chart_data($chart) {
  */
 function logger_get_temperature_chart_data($chart) {
 
+  return logger_get_line_chart_data($chart);
+}
+
+/**
+ * Returns an array containing all preasure chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_pressure_chart_data($chart) {
+
+  return logger_get_line_chart_data($chart);
+}
+
+/**
+ * Returns an array containing all humidity chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */
+function logger_get_humidity_chart_data($chart) {
+
+  return logger_get_line_chart_data($chart);
+}
+
+/**
+ * Returns an array containing line chart data.
+ *
+ * @param $chart  The chart object with the parameters for the data query.
+ * @return the chart data.
+ */ 
+function logger_get_line_chart_data($chart) {
+
   global $user;
 
   module_load_include('inc', 'logger', 'logger.rrd');
@@ -1544,7 +1624,7 @@ function logger_get_temperature_chart_data($chart) {
 
     $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, 0);
 
-    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
+    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_line_series_data($chart, $measurements);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
@@ -1598,7 +1678,7 @@ function logger_get_balance_chart_data($chart) {
   foreach ($measurements as $type_id => $values) {
 
     $type_name = t($type_names[$type_id]);
-    $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_power_series_data($chart, $values);
+    $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_line_series_data($chart, $values);
     $data['legend'][$i] = logger_create_legend_line($user->name, t('All'), $type_name, $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0));
     $i++;
@@ -1676,7 +1756,7 @@ function logger_get_forecast_chart_data($chart) {
       }
 
       $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
-        logger_format_power_series_data($chart, $forecast['power']);
+        logger_format_line_series_data($chart, $forecast['power']);
 
       foreach ($forecast['precipitation'] as $time => $rain) {
         $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
@@ -1727,7 +1807,7 @@ function logger_get_anomaly_chart_data($chart) {
       $anomalies = logger_detect_production_anomalies($clone, $chart->unit, $chart->period, $chart->resolution);
 
       $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
-        logger_format_power_series_data($chart, $anomalies);
+        logger_format_line_series_data($chart, $anomalies);
     }
 
     $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
@@ -1785,7 +1865,7 @@ function logger_get_overview_chart_data($chart) {
 
   $measurements = logger_rrd_query_agg($chart->sensors, $chart->unit, $chart->period, $chart->resolution);
 
-  $values = logger_format_power_series_data($chart, $measurements);
+  $values = logger_format_line_series_data($chart, $measurements);
   $type = $chart->sensors[0]->type; //For instance, just consumption
 
   $data['series'][0][t('All')][t('All')][$type] = $values;
@@ -1796,20 +1876,21 @@ function logger_get_overview_chart_data($chart) {
 }
 
 /**
- * Formats power consumption chart data series.
+ * Formats line chart data series.
  *
  * @param $measurements  The array of timestamp / value that form the data series.
  * @param $chart         The chart object with the format parameters.
  * @return the formatted data series.
  */
-function logger_format_power_series_data($chart, $measurements) {//FIXME: rename this function
+function logger_format_line_series_data($chart, $measurements) {
 
   $formatted = array($chart->period['start'] => NULL, $chart->period['end'] => NULL);
   foreach ($measurements as $timestamp => $value) {
 
-    $decimals = (int) strstr($measurements[$timestamp], '.');
-    $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
-    $formatted[$timestamp] = (int) number_format($value, $decimals, '.', '');
+    $integer = (int) strstr($measurements[$timestamp], '.', TRUE);
+    $integer *= $integer < 0 ? -1 : 1;
+    $decimals = $integer > 99 ? 1 : $decimals > 9 ? 2 : 3;
+    $formatted[$timestamp] = number_format($value, $decimals, '.', '');
   }
   return $formatted;
 }
@@ -2068,6 +2149,56 @@ function logger_get_aggregated_sensors($virtual_meter) {
 }
 
 /**
+ * Returns sensor measurements as a JavaScript object.
+ * 
+ * @param $meter    The sensor id.
+ */
+function logger_jsonp_sensor($meter) {
+
+  $data_function = isset($_REQUEST['data_function']) ? $_REQUEST['data_function'] : "getSensor$meter";
+
+  $callback_function = isset($_REQUEST['callback_function']) ? PHP_EOL . $_REQUEST['callback_function'] . "($data_function);" : '';
+
+  $url = variable_get('logger_msg_service_url') . "/sensor/$meter";
+  $glue = '?';
+  foreach ($_REQUEST as $param => $value) {
+    if (in_array($param, array('interval', 'unit', 'start', 'end', 'resolution'))) {
+      $url .= "$glue$param=$value";
+      $glue = '&';
+    }
+  }
+
+  $query = db_select('logger_devices', 'd')->fields('d', array('sha'));
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $key = $query
+    ->condition('m.meter', $meter)
+    ->execute()
+    ->fetchField();
+
+  $response = drupal_http_request($url, array(
+    'method' => 'GET',
+    'headers' => array(
+      'X-Version' => '1.0',
+      'X-Digest' => hash_hmac('sha1', "", $key)
+  )));
+
+  $comments = '';
+  $measurements = '[]';
+  if (isset($response->error)) {
+    $comments = "/* Error: " . $response->error . " */" . PHP_EOL;
+  }
+  elseif(isset($response->data) && !empty($response->data)) {
+    $measurements = $response->data;
+  }
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'text/javascript; charset=utf-8');
+  drupal_add_http_header('Cache-Control', 'public');
+
+  print $comments . "function $data_function(){return $measurements;}$callback_function";
+  exit(0);
+}
+
+/**
  * Returns an array of user devices' serial numbers indexed by their respective
  * hash codes.
  *
@@ -2210,14 +2341,11 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $options = msgcommons_get_same_type_units_options($chart->unit);
-  $unit = $options[$chart->unit];
-
   $icons = "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
 
-  $output = logger_create_interval_menu($chart->context) .
+  $output = logger_create_interval_menu($chart) .
     '<div style="float: right;">' . $icons . '</div>' .
-    '<div>' . t($unit) . '</div>' .
+    '<div>' . $chart->unit . '</div>' .
     logger_create_dygraph($chart, TRUE, $chart_properties);
 
   if ($chart->show_slider) {
@@ -2307,7 +2435,7 @@ function theme_logger_bar_chart_area($variables) {
   drupal_add_js(LOGGER_REL_PATH . '/js/charts-min.js', $options);
 
   $id = 'barChart';
-  $menu = logger_create_interval_menu($chart->context);
+  $menu = logger_create_interval_menu($chart);
 
   drupal_add_js("jQuery(document).ready( function() { " .
     "createBarChart('$id', " .
@@ -2403,52 +2531,53 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
 /**
  * Creates the chart intervals' horizontal menu.
  *
- * @param $context  The page where the menu is going to be placed.
+ * @param $chart  The chart object.
  * @return the list of intervals' menus.
  */
-function logger_create_interval_menu($context) {
+function logger_create_interval_menu($chart) {
 
   $items = array();
+  $path = ($chart->popup ? 'popup/' : '') . $chart->context;
 
-  switch ($context) {
+  switch ($chart->context) {
     case 'relative':
       break;
 
     case 'onsite':
       $items = array(
-        l(t('Hour'),    "$context/hour"),
-        l(t('Day'),     "$context/24hours"),
-        l(t('3 Days'),  "$context/72hours"),
-        l(t('Week'),    "$context/week"));
+        l(t('Hour'),    "$path/hour"),
+        l(t('Day'),     "$path/24hours"),
+        l(t('3 Days'),  "$path/72hours"),
+        l(t('Week'),    "$path/week"));
 
       if (user_has_role('Techniker')) {
-        $items[] = l(t('Month'),   "$context/month");
+        $items[] = l(t('Month'),   "$path/month");
       }
       break;
 
     case 'energy':
       $items = array(
-        l(t('Day'),     "$context/day"),
-        l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"),
-        l(t('Year'),    "$context/year"));
+        l(t('Day'),     "$path/day"),
+        l(t('Week'),    "$path/week"),
+        l(t('Month'),   "$path/month"),
+        l(t('Year'),    "$path/year"));
       break;
 
     case 'forecast':
       $items = array(
-        l(t('3 Days'), "$context/f3days"),
-        l(t('2 Days'), "$context/f2days"),
-        l(t('Today'),  "$context/f1day"));
+        l(t('3 Days'), "$path/f3days"),
+        l(t('2 Days'), "$path/f2days"),
+        l(t('Today'),  "$path/f1day"));
       break;
 
     default:
       $items = array(
-        l(t('Hour'),    "$context/hour"),
-        l(t('Day'),     "$context/day"),
-        l(t('3 Days'),  "$context/3days"),
-        l(t('Week'),    "$context/week"),
-        l(t('Month'),   "$context/month"),
-        l(t('Year'),    "$context/year"));
+        l(t('Hour'),    "$path/hour"),
+        l(t('Day'),     "$path/day"),
+        l(t('3 Days'),  "$path/3days"),
+        l(t('Week'),    "$path/week"),
+        l(t('Month'),   "$path/month"),
+        l(t('Year'),    "$path/year"));
       break;
   }
   return empty($items) ? '' : theme('logger_chart_tabs', $items);
@@ -3182,11 +3311,19 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
   }
 
   //FIXME: find a better way of filtering the sensor types
-  if ($unit_type_id == TEMPERATURE_UNIT_TYPE_ID) {
-    $query->condition('id', TEMPERATURE_SENSOR_TYPE);
-  }
-  else {
-    $query->condition('id', TEMPERATURE_SENSOR_TYPE, '<>');
+  switch ($unit_type_id) {
+
+    case TEMPERATURE_UNIT_TYPE_ID:
+      $query->condition('id', TEMPERATURE_SENSOR_TYPE);
+
+    case PRESSURE_UNIT_TYPE_ID:
+      $query->condition('id', PRESSURE_SENSOR_TYPE);
+
+    case HUMIDITY_UNIT_TYPE_ID:
+      $query->condition('id', HUMIDITY_SENSOR_TYPE);
+
+    default:
+       $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
   }
 
   $result = $query->fields('t', array('id', 'name'))
@@ -3646,6 +3783,22 @@ function logger_temperature_access($permission) {
 }
 
 /**
+ * Access callback ensuring the pressure pages are accessible only to users who have pressure sensors.
+ */
+function logger_pressure_access($permission) {
+
+  return logger_sensor_type_access($permission, PRESSURE_SENSOR_TYPE);
+}
+
+/**
+ * Access callback ensuring the humidity pages are accessible only to users who have humidity sensors.
+ */
+function logger_humidity_access($permission) {
+
+  return logger_sensor_type_access($permission, HUMIDITY_SENSOR_TYPE);
+}
+
+/**
  * Access callback ensuring the some pages are accessible only to users who have a specific type of sensor.
  */
 function logger_sensor_type_access($permission, $sensor_type) {
@@ -3681,6 +3834,27 @@ function logger_forecast_access($permission) {
     ->fetchObject();
 
   return $sensor && user_access($permission);
+}
+
+/**
+ * Access callback ensuring the validity of the tokens informed in jsonp calls. 
+ */
+function logger_jsonp_sensor_access($meter) {
+
+  if (isset($_REQUEST['token'])) {
+
+    $found = db_select('logger_tokens', 't')
+      ->fields('t', array('meter'))
+      ->condition('t.meter', $meter)
+      ->condition('t.token', $_REQUEST['token'])
+      ->execute()
+      ->fetchField();
+
+    return $found != NULL;
+  }
+  else {
+    return FALSE;
+  }
 }
 
 /**

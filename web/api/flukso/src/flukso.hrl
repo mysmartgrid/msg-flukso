@@ -57,8 +57,12 @@
 -define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
 -define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
 -define(TEMPERATURE_SENSOR_TYPE_ID,        3).
+-define(PRESSURE_SENSOR_TYPE_ID,           4).
+-define(HUMIDITY_SENSOR_TYPE_ID,           5).
 
 -define(TEMPERATURE_UNIT_TYPE_ID,          3).
+-define(PRESSURE_UNIT_TYPE_ID,             5).
+-define(HUMIDITY_UNIT_TYPE_ID,             6).
 
 -record(state,
         {rrdSensor,
@@ -187,7 +191,9 @@ check_unit(Unit) ->
         "kwhperyear" -> true;
         "kwh" -> true;
         "wh" -> true;
-        "c" -> true;
+        "degc" -> true;
+        "hpa" -> true;
+        "rh" -> true;
         _ -> false  
       end}.
 
