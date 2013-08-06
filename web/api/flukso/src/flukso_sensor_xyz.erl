@@ -117,7 +117,22 @@ malformed_GET(ReqData, _State) ->
         {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
         case mysql:get_result_rows(_Result) of
           [[_UnitId, _RrdFactor, _Type]] ->
-            {_UnitId, _RrdFactor, true};
+
+            %TODO: avoid this query
+            {_d, _R} = mysql:execute(pool, sensor_device_type, [RrdSensor]),
+            case mysql:get_result_rows(_R) of
+
+              [[DeviceTypeId]] ->
+                {_UnitId, _RrdFactor *
+                  case DeviceTypeId of
+                    ?LIBKLIO_DEVICE_TYPE_ID -> 1;
+                    _ -> 1000
+                  end,
+                true};
+
+              _ ->
+                {0, 0, false}
+            end;
           _ ->
             {0, 0, false}
         end;

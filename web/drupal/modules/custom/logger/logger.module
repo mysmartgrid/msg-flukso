@@ -24,7 +24,7 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
+ //error_reporting(E_ALL);
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
@@ -471,6 +471,13 @@ function logger_menu() {
     'file' => 'logger.admin.inc'
   );
 
+  $items['sensor/jsonp'] = array(
+    'page callback' => 'logger_sensor_jsonp',
+    'page arguments' => array(2, 3, 4),
+    'access callback' => 'logger_sensor_jsonp_access',
+    'access arguments' => array(2, 3),
+    'type' => MENU_CALLBACK
+  );
 
   //Other operations
 
@@ -2141,6 +2148,48 @@ function logger_get_aggregated_sensors($virtual_meter) {
 }
 
 /**
+ * Returns sensor measurements as a JavaScript object.
+ * 
+ * @param $meter    The sensor id.
+ * @param $token    The sensor token.
+ * @param $function The name of the JavaScript function to return the measurements array.
+ */
+function logger_sensor_jsonp($meter, $token, $function) {
+
+  $url = variable_get('logger_msg_service_url') . "/sensor/$meter";
+  $glue = '?';
+  foreach ($_REQUEST as $param => $value) {
+    if (in_array($param, array('interval', 'unit', 'start', 'end', 'resolution'))) {
+      $url .= "$glue$param=$value";
+      $glue = '&';
+    }
+  }
+
+  $query = db_select('logger_devices', 'd')->fields('d', array('sha'));
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $key = $query
+    ->condition('m.meter', $meter)
+    ->execute()
+    ->fetchField();
+
+  $response = drupal_http_request($url, array(
+    'method' => 'GET',
+    'headers' => array(
+      'X-Version' => '1.0',
+      'X-Digest' => hash_hmac('sha1', "", $key)
+  )));
+
+  $measurements = isset($response->error) || !isset($response->data) || empty($response->data) ? '[]' : $response->data;
+
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'text/javascript; charset=utf-8');
+  drupal_add_http_header('Cache-Control', 'public');
+
+  print "function $function(){return $measurements;}";
+  exit(0);
+}
+
+/**
  * Returns an array of user devices' serial numbers indexed by their respective
  * hash codes.
  *
@@ -3776,6 +3825,21 @@ function logger_forecast_access($permission) {
     ->fetchObject();
 
   return $sensor && user_access($permission);
+}
+
+/**
+ * Access callback ensuring the validity of the tokens informed in jsonp calls. 
+ */
+function logger_sensor_jsonp_access($meter, $token) {
+
+  $token = db_select('logger_tokens', 't')
+    ->fields('t', array('meter'))
+    ->condition('t.meter', $meter)
+    ->condition('t.token', $token)
+    ->execute()
+    ->fetchObject();
+
+  return $token != NULL;
 }
 
 /**
