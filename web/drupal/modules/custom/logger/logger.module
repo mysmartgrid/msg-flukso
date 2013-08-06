@@ -471,11 +471,11 @@ function logger_menu() {
     'file' => 'logger.admin.inc'
   );
 
-  $items['sensor/jsonp'] = array(
-    'page callback' => 'logger_sensor_jsonp',
-    'page arguments' => array(2, 3, 4),
-    'access callback' => 'logger_sensor_jsonp_access',
-    'access arguments' => array(2, 3),
+  $items['jsonp/sensor'] = array(
+    'page callback' => 'logger_jsonp_sensor',
+    'page arguments' => array(2),
+    'access callback' => 'logger_jsonp_sensor_access',
+    'access arguments' => array(2),
     'type' => MENU_CALLBACK
   );
 
@@ -1624,7 +1624,7 @@ function logger_get_line_chart_data($chart) {
 
     $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, 0);
 
-    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_power_series_data($chart, $measurements);
+    $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_line_series_data($chart, $measurements);
 
     //Hide usernames for Visitors
     $username = $sensor->uid != $user->uid && $is_visitor ? t('User') . ' ' . str_pad($sensor->uid, 3, '0', STR_PAD_LEFT) : $sensor->username;
@@ -1678,7 +1678,7 @@ function logger_get_balance_chart_data($chart) {
   foreach ($measurements as $type_id => $values) {
 
     $type_name = t($type_names[$type_id]);
-    $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_power_series_data($chart, $values);
+    $data['series'][$user->uid][$user->name][t('All')][$type_name] = logger_format_line_series_data($chart, $values);
     $data['legend'][$i] = logger_create_legend_line($user->name, t('All'), $type_name, $i,
       array('Min' => 0, 'Max' => 0, 'Avg' => 0, 'Last' => 0));
     $i++;
@@ -1756,7 +1756,7 @@ function logger_get_forecast_chart_data($chart) {
       }
 
       $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
-        logger_format_power_series_data($chart, $forecast['power']);
+        logger_format_line_series_data($chart, $forecast['power']);
 
       foreach ($forecast['precipitation'] as $time => $rain) {
         $sun = date_sun_info($time, $sensor->latitude, $sensor->longitude);
@@ -1807,7 +1807,7 @@ function logger_get_anomaly_chart_data($chart) {
       $anomalies = logger_detect_production_anomalies($clone, $chart->unit, $chart->period, $chart->resolution);
 
       $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] =
-        logger_format_power_series_data($chart, $anomalies);
+        logger_format_line_series_data($chart, $anomalies);
     }
 
     $operations = logger_create_remove_power_series_link($sensor->uid, $i, $username, $sensor->meter, $sensor->visible, $chart->context);
@@ -1865,7 +1865,7 @@ function logger_get_overview_chart_data($chart) {
 
   $measurements = logger_rrd_query_agg($chart->sensors, $chart->unit, $chart->period, $chart->resolution);
 
-  $values = logger_format_power_series_data($chart, $measurements);
+  $values = logger_format_line_series_data($chart, $measurements);
   $type = $chart->sensors[0]->type; //For instance, just consumption
 
   $data['series'][0][t('All')][t('All')][$type] = $values;
@@ -1876,20 +1876,21 @@ function logger_get_overview_chart_data($chart) {
 }
 
 /**
- * Formats power consumption chart data series.
+ * Formats line chart data series.
  *
  * @param $measurements  The array of timestamp / value that form the data series.
  * @param $chart         The chart object with the format parameters.
  * @return the formatted data series.
  */
-function logger_format_power_series_data($chart, $measurements) {//FIXME: rename this function
+function logger_format_line_series_data($chart, $measurements) {
 
   $formatted = array($chart->period['start'] => NULL, $chart->period['end'] => NULL);
   foreach ($measurements as $timestamp => $value) {
 
-    $decimals = (int) strstr($measurements[$timestamp], '.');
-    $decimals = $decimals > 99 ? 3 : $decimals > 9 ? 2 : $decimals > 0 ? 1 : 0;
-    $formatted[$timestamp] = (int) number_format($value, $decimals, '.', '');
+    $integer = (int) strstr($measurements[$timestamp], '.', TRUE);
+    $integer *= $integer < 0 ? -1 : 1;
+    $decimals = $integer > 99 ? 1 : $decimals > 9 ? 2 : 3;
+    $formatted[$timestamp] = number_format($value, $decimals, '.', '');
   }
   return $formatted;
 }
@@ -2151,10 +2152,12 @@ function logger_get_aggregated_sensors($virtual_meter) {
  * Returns sensor measurements as a JavaScript object.
  * 
  * @param $meter    The sensor id.
- * @param $token    The sensor token.
- * @param $function The name of the JavaScript function to return the measurements array.
  */
-function logger_sensor_jsonp($meter, $token, $function) {
+function logger_jsonp_sensor($meter) {
+
+  $data_function = isset($_REQUEST['data_function']) ? $_REQUEST['data_function'] : "getSensor$meter";
+
+  $callback_function = isset($_REQUEST['callback_function']) ? PHP_EOL . $_REQUEST['callback_function'] . "($data_function);" : '';
 
   $url = variable_get('logger_msg_service_url') . "/sensor/$meter";
   $glue = '?';
@@ -2179,13 +2182,19 @@ function logger_sensor_jsonp($meter, $token, $function) {
       'X-Digest' => hash_hmac('sha1', "", $key)
   )));
 
-  $measurements = isset($response->error) || !isset($response->data) || empty($response->data) ? '[]' : $response->data;
-
+  $comments = '';
+  $measurements = '[]';
+  if (isset($response->error)) {
+    $comments = "/* Error: " . $response->error . " */" . PHP_EOL;
+  }
+  elseif(isset($response->data) && !empty($response->data)) {
+    $measurements = $response->data;
+  }
   drupal_add_http_header('Pragma', 'public');
   drupal_add_http_header('Content-Type', 'text/javascript; charset=utf-8');
   drupal_add_http_header('Cache-Control', 'public');
 
-  print "function $function(){return $measurements;}";
+  print $comments . "function $data_function(){return $measurements;}$callback_function";
   exit(0);
 }
 
@@ -3830,16 +3839,22 @@ function logger_forecast_access($permission) {
 /**
  * Access callback ensuring the validity of the tokens informed in jsonp calls. 
  */
-function logger_sensor_jsonp_access($meter, $token) {
+function logger_jsonp_sensor_access($meter) {
 
-  $token = db_select('logger_tokens', 't')
-    ->fields('t', array('meter'))
-    ->condition('t.meter', $meter)
-    ->condition('t.token', $token)
-    ->execute()
-    ->fetchObject();
+  if (isset($_REQUEST['token'])) {
 
-  return $token != NULL;
+    $found = db_select('logger_tokens', 't')
+      ->fields('t', array('meter'))
+      ->condition('t.meter', $meter)
+      ->condition('t.token', $_REQUEST['token'])
+      ->execute()
+      ->fetchField();
+
+    return $found != NULL;
+  }
+  else {
+    return FALSE;
+  }
 }
 
 /**
