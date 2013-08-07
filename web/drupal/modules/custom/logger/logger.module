@@ -561,11 +561,20 @@ function logger_mobile_page() {
 
   if ($user->uid) {
     $forecast_access = logger_forecast_access('view forecast charts');
+    $temperature_access = logger_temperature_access('view logger charts');
+    $pressure_access = logger_pressure_access('view logger charts');
+    $humidity_access = logger_humidity_access('view logger charts');
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      ($temperature_access ?
+      logger_create_mobile_page_icon('temperature.png', t('Temperature'),       '/temperature') : '') .
+      ($pressure_access ?
+      logger_create_mobile_page_icon('pressure.png',    t('Pressure'),          '/pressure') : '') .
+      ($humidity_access ?
+      logger_create_mobile_page_icon('humidity.png',    t('Humidity'),          '/humidity') : '') .
       ($forecast_access ?
       logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') .
       logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/balance') : '') .
