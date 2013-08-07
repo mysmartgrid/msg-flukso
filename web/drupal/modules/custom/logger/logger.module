@@ -1622,7 +1622,17 @@ function logger_get_line_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, 0);
+    $price = $chart->prices[$sensor->type_id];
+    $price = $price ? $price : $sensor->price;
+
+    //TODO: make a single call
+    if ($sensor->virtual) {
+      $aggregated = logger_get_aggregated_sensors($sensor->meter);
+      $measurements = logger_rrd_query_agg($aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
+    else {
+      $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_line_series_data($chart, $measurements);
 
@@ -1889,7 +1899,7 @@ function logger_format_line_series_data($chart, $measurements) {
 
     $integer = (int) strstr($measurements[$timestamp], '.', TRUE);
     $integer *= $integer < 0 ? -1 : 1;
-    $decimals = $integer > 99 ? 1 : $decimals > 9 ? 2 : 3;
+    $decimals = $integer > 99 ? 1 : $integer > 9 ? 2 : 3;
     $formatted[$timestamp] = number_format($value, $decimals, '.', '');
   }
   return $formatted;
