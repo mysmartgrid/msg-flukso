@@ -77,7 +77,7 @@ function msgcommons_get_units_options($type_id) {
 
   $options = array();
   foreach ($result as $unit) {
-    $options[$unit->symbol] = $unit->name;
+    $options[$unit->symbol] = t($unit->name);
   }
   return $options;
 }

@@ -479,6 +479,15 @@ function logger_menu() {
     'type' => MENU_CALLBACK
   );
 
+  $items['token/reset'] = array(
+    'page callback' => 'logger_token_reset',
+    'page arguments' => array(2),
+    'access callback' => 'logger_sensor_access',
+    'access arguments' => array('manage sensors', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc'
+  );
+
   //Other operations
 
   $items['admin/config/logger'] = array(
@@ -561,11 +570,20 @@ function logger_mobile_page() {
 
   if ($user->uid) {
     $forecast_access = logger_forecast_access('view forecast charts');
+    $temperature_access = logger_temperature_access('view logger charts');
+    $pressure_access = logger_pressure_access('view logger charts');
+    $humidity_access = logger_humidity_access('view logger charts');
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      ($temperature_access ?
+      logger_create_mobile_page_icon('temperature.png', t('Temperature'),       '/temperature') : '') .
+      ($pressure_access ?
+      logger_create_mobile_page_icon('pressure.png',    t('Pressure'),          '/pressure') : '') .
+      ($humidity_access ?
+      logger_create_mobile_page_icon('humidity.png',    t('Humidity'),          '/humidity') : '') .
       ($forecast_access ?
       logger_create_mobile_page_icon('forecast.png',    t('Forecast'),          '/forecast') .
       logger_create_mobile_page_icon('balance.png',     t('Balance'),           '/balance') : '') .
@@ -1622,7 +1640,17 @@ function logger_get_line_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, 0);
+    $price = $chart->prices[$sensor->type_id];
+    $price = $price ? $price : $sensor->price;
+
+    //TODO: make a single call
+    if ($sensor->virtual) {
+      $aggregated = logger_get_aggregated_sensors($sensor->meter);
+      $measurements = logger_rrd_query_agg($aggregated, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
+    else {
+      $measurements = logger_rrd_query_sensor($sensor, $chart->unit, $chart->period, $chart->resolution, $price);
+    }
 
     $data['series'][$sensor->uid][$sensor->username][$sensor->meter][$sensor->type] = logger_format_line_series_data($chart, $measurements);
 
@@ -1889,7 +1917,7 @@ function logger_format_line_series_data($chart, $measurements) {
 
     $integer = (int) strstr($measurements[$timestamp], '.', TRUE);
     $integer *= $integer < 0 ? -1 : 1;
-    $decimals = $integer > 99 ? 1 : $decimals > 9 ? 2 : 3;
+    $decimals = $integer > 99 ? 1 : $integer > 9 ? 2 : 3;
     $formatted[$timestamp] = number_format($value, $decimals, '.', '');
   }
   return $formatted;

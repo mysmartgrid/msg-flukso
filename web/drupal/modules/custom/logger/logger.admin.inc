@@ -130,8 +130,9 @@ function logger_usersensors_page() {
     $sensors = $query
       ->fields('lm', array('meter', 'function', 'virtual'))
       ->fields('lt', array('token', 'permissions'))
-      ->condition('lm.device', $device->device, '=')
+      ->condition('lm.device', $device->device)
       ->orderBy('lm.function', 'DESC')
+      ->orderBy('lm.meter', 'DESC')
       ->execute();
 
     $rows = array();
@@ -145,7 +146,7 @@ function logger_usersensors_page() {
         $row[] = '';
         $row[] = '';
         $row[] = t('Inactive');
-        $operations = l(t('Activate'), 'sensor/edit/' . $sensor->meter);
+        $operations .= l(t('Activate'), 'sensor/edit/' . $sensor->meter) . '<br>';
       }
       else {
         $row[] = mb_wordwrap($sensor->function, 16, "<br>", TRUE);
@@ -153,9 +154,11 @@ function logger_usersensors_page() {
         $row[] = t('Active');
         $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
 
-        $operations .= $sensor->virtual ? 
+        $operations .= ($sensor->virtual ?
           l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
-          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter);
+          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter)) . '<br>';
+
+        $operations .= l(t('Reset Token'), 'token/reset/' . $sensor->meter);
       }
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
@@ -603,16 +606,19 @@ function logger_sensor_form_submit($form, &$form_state) {
     logger_set_virtual_sensor_aggregations($meter, $aggregated_meters);
   }
 
-  $prev_forecast = $form_state['values']['prev_forecast'];
+  if (isset($form_state['values']['prev_forecast'])) {
 
-  if ($prev_forecast == 1 && $forecast == 0) {
-    pvcast_delete_plant($meter);
-  }
-  elseif ($prev_forecast == 0 && $forecast == 1) {
-    pvcast_create_plant($meter, $latitude, $longitude);
-  }
-  elseif ($prev_forecast == 1 && $forecast == 1) {
-    pvcast_update_plant($meter, $latitude, $longitude);
+    $prev_forecast = $form_state['values']['prev_forecast'];
+
+    if ($prev_forecast == 1 && $forecast == 0) {
+      pvcast_delete_plant($meter);
+    }
+    elseif ($prev_forecast == 0 && $forecast == 1) {
+      pvcast_create_plant($meter, $latitude, $longitude);
+    }
+    elseif ($prev_forecast == 1 && $forecast == 1) {
+      pvcast_update_plant($meter, $latitude, $longitude);
+    }
   }
 
   $form_state['redirect'] = "sensor/mylist";
@@ -995,6 +1001,26 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
     }
   }
   return !$error;
+}
+
+/**
+ * Resets a sensor token.
+ */
+function logger_token_reset($meter) {
+
+  db_delete('logger_tokens')
+    ->condition('meter', $meter)
+    ->execute();
+
+  db_insert('logger_tokens')
+    ->fields(array(
+      'token' => md5(uniqid(rand(), TRUE)),
+      'meter' => $meter,
+      'permissions' => 62
+    ))
+    ->execute();
+
+  drupal_goto("sensor/mylist");
 }
 
 /**
