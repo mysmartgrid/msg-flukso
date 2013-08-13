@@ -202,7 +202,7 @@ function logger_sensor_edition_page($meter = NULL) {
   if ($meter) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
+      ->fields('m', array('device', 'meter', 'external_id', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter);
 
     $query->join('logger_devices', 'd', 'd.device = m.device');
@@ -220,6 +220,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor = new stdClass();
     $sensor->device = NULL;
     $sensor->meter = NULL;
+    $sensor->external_id = NULL;
     $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
     $sensor->forecast = 1;
@@ -322,6 +323,19 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
   }
 
+  if ($sensor->sensor_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->sensor_type_id == LIBKLIO_DEVICE_TYPE_ID) {
+    $form['external_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('External Id'),
+      '#description' => t("The sensor external id."),
+      '#maxlength' => 32,
+      '#size' => 32,
+      '#required' => TRUE,
+      '#default_value' => $sensor->external_id,
+      '#attributes' => array('readonly' => 'readonly')
+    );
+  }
+
   $form['type'] = array(
     '#type' => 'select',
     '#title' => t('Type'),
@@ -368,10 +382,6 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->unit_name . ' (' . $sensor->unit_symbol . ')',
     '#attributes' => array('readonly' => 'readonly')
   );
-
-  if ($sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
-    $form['function']['#attributes']['readonly'] = 'readonly';
-  }
 
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {

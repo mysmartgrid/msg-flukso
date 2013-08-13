@@ -57,30 +57,15 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-    IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
-    if
-      %When defined, Key is validated 
-      IsKeyDefined == true ->
-        {Key, ValidKey} = check_key(proplists:get_value(<<"key">>, JsonData));
-      true ->
-        ValidKey = true
-    end,
+    {Key, ValidKey} = check_optional_key(JsonData),
+    {TypeId, ValidType} = check_optional_device_type(JsonData),
 
-    IsTypeDefined = proplists:is_defined(<<"type">>, JsonData),
-    if
-      %When defined, type is validated
-      IsTypeDefined == true ->
-        {Type, ValidType} = check_device_type(proplists:get_value(<<"type">>, JsonData));
-      true ->
-        ValidType = true
-    end,
-
-    State = #state{device = Device, digest = Digest},
+    State = #state{device = Device, digest = Digest, typeId = TypeId},
 
     {case {ValidVersion, ValidDevice, ValidDigest, ValidKey, ValidType} of
         {true, true, true, true, true} -> false;
@@ -91,9 +76,10 @@ malformed_POST(ReqData, _State) ->
 
 malformed_GET(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+
     State = #state{device = Device, digest = Digest},
 
     {case {ValidVersion, ValidDevice, ValidDigest} of
@@ -105,7 +91,7 @@ malformed_GET(ReqData, _State) ->
 
 malformed_DELETE(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
 
@@ -150,8 +136,7 @@ is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
     {case mysql:get_result_rows(Result) of
 
       %If device is found, use the key stored in the database
-      [[Key]] ->
-           check_digest(Key, ReqData, ClientDigest);
+      [[Key]] -> check_digest(Key, ReqData, ClientDigest);
 
       %Otherwise, return false
       _ -> false
@@ -172,9 +157,10 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
 
     Sensors = [{struct, [
         {<<"meter">>, Meter},
+        {<<"externalid">>, ExternalId},
         {<<"function">>, Function},
         {<<"description">>, SensorDescription},
-        {<<"unit">>, Unit}]} || [Meter, Function, SensorDescription, Unit] <- _Sensors],
+        {<<"unit">>, Unit}]} || [Meter, ExternalId, Function, SensorDescription, Unit] <- _Sensors],
 
     Encoded = mochijson2:encode({struct, [
               {<<"description">>, DeviceDescription},
@@ -209,7 +195,7 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
 % JSON: {"key":12345678901234567890123456789012}
 % Mochijson2: {struct,[{<<"key">>, 12345678901234567890123456789012}]}
 %
-process_post(ReqData, #state{device = Device} = State) ->
+process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
     {data, Result} = mysql:execute(pool, device_props, [Device]),
 
@@ -272,17 +258,6 @@ process_post(ReqData, #state{device = Device} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
-        TypeId = case proplists:is_defined(<<"type">>, JsonData) of
-          true ->
-            case proplists:get_value(<<"type">>, JsonData) of
-              <<"flukso2">> -> ?FLUKSO2_DEVICE_TYPE_ID;
-              <<"vzlogger">> -> ?VZLOGGER_DEVICE_TYPE_ID;
-              <<"libklio">> -> ?LIBKLIO_DEVICE_TYPE_ID;
-              _ -> ?UNKNOWN_DEVICE_TYPE_ID
-            end;
-          _ -> ?FLUKSO2_DEVICE_TYPE_ID 
-        end,
-
         mysql:execute(pool, device_insert,
           [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
     end,
@@ -336,7 +311,7 @@ delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State)
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
 
     Sensors = mysql:get_result_rows(_Result),
-    [delete_device_sensor(Meter) || [Meter, Function, Description, Unit] <- Sensors],
+    [delete_device_sensor(Meter) || [Meter, ExternalId, Function, Description, Unit] <- Sensors],
 
     mysql:execute(pool, event_delete, [Device]),
     mysql:execute(pool, notification_delete, [Device]),

@@ -52,7 +52,7 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
+    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
     {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
     {Event, ValidEvent} = check_event(wrq:path_info(event, ReqData)),
 

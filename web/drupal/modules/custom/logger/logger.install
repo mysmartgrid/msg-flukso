@@ -186,6 +186,11 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '10',
       ),
+      'external_id' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
       'device' => array(
         'type' => 'varchar',
         'length' => '32',
@@ -1201,4 +1206,42 @@ function logger_update_7059() {
   exec("cd $path; mv dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1.rrd 5715a57b0c8ec958727ab3bb206d8b6e.rrd;");
 
   return st('Test sensor meter has been updated.');
+}
+
+/**
+ * Add field 'external_id' in table logger_meter.
+ */
+function logger_update_7061() {
+
+  db_add_field('logger_meters', 'external_id', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => FALSE
+  ));
+
+  db_update('logger_meters')
+    ->expression('external_id', 'meter')
+    ->execute();
+
+  db_change_field('logger_meters', 'external_id', 'external_id', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => TRUE
+  ));
+  return st('Field logger_meters.external_id has been created.');
+}
+
+/**
+ * Creates the Device Type: RaspBerry Pi Store.
+ */
+function logger_update_7062() {
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'RaspBerry Pi Store'
+    ))
+    ->execute();
+
+  return st('Device Type RaspBerry Pi Store has been created.');
 }

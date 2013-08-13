@@ -52,11 +52,12 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
-define('FLUKSO1_DEVICE_TYPE_ID',  1);
-define('FLUKSO2_DEVICE_TYPE_ID',  2);
-define('VZLOGGER_DEVICE_TYPE_ID', 3);
-define('LIBKLIO_DEVICE_TYPE_ID',  4);
-define('CLONED_DEVICE_TYPE_ID',   5);
+define('FLUKSO1_DEVICE_TYPE_ID',       1);
+define('FLUKSO2_DEVICE_TYPE_ID',       2);
+define('VZLOGGER_DEVICE_TYPE_ID',      3);
+define('LIBKLIO_DEVICE_TYPE_ID',       4);
+define('CLONED_DEVICE_TYPE_ID',        5);
+define('RASPBERRY_PI_DEVICE_TYPE_ID',  6);
 
 function logger_init() {
 
@@ -1994,7 +1995,7 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('uid', 'meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
     ->isNotNull('m.function');
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
@@ -2342,11 +2343,6 @@ function theme_logger_line_chart_area($variables) {
   //In order to avoid a bug in Dygraphs
   $yvalue2 += ($yvalue2 != 0 && $yvalue2 % 10 == 0 ? 1 : 0);
 
-  $visibility = array();
-  foreach ($chart->sensors as $sensor) {
-    $visibility[] .= $sensor->visible ? "true" : "false";
-  }
-
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
     'drawCallback' => 'updateLineChartForm',
@@ -2355,12 +2351,20 @@ function theme_logger_line_chart_area($variables) {
     'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false',
     'fillAlpha' => $chart->context == 'onsite' ? 1 : 0.15, //FIXME: create a property on the chart object
-    'visibility' => '[' . implode(', ', $visibility) . ']',
     'xAxisLabelFormatter' => 'Dygraph.dateAxisFormatter',
     'xValueFormatter' => 'Dygraph.dateString_',
     'xValueParser' => 'function(x) { return 1000 * parseInt(x); }',
     'xTicker' => 'Dygraph.dateTicker'
   );
+
+  if (!$chart->aggregate_sensors) {
+    $visibility = array();
+    foreach ($chart->sensors as $sensor) {
+      $visibility[] .= $sensor->visible ? "true" : "false";
+    }
+    $chart_properties['visibility'] = '[' . implode(', ', $visibility) . ']';
+  }
+
   if ($chart->show_slider) {
     $chart_properties['zoomCallback'] = 'updateSliderChart';
   }
@@ -2369,10 +2373,13 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $icons = "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
+  $icons = '<div style="float: right;">' . ($chart->popup ? 
+    "<a href='/power'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
+    "<a href='/popup/power'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") . '</div>'.
+    '<div style="float: right; margin-right: 3px;">' .
+    "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" . '</div>';
 
-  $output = logger_create_interval_menu($chart) .
-    '<div style="float: right;">' . $icons . '</div>' .
+  $output = logger_create_interval_menu($chart) . $icons .
     '<div>' . $chart->unit . '</div>' .
     logger_create_dygraph($chart, TRUE, $chart_properties);
 
@@ -3763,7 +3770,7 @@ function logger_sensor_access($permission, $meter) {
 
   $uid = db_select('logger_meters', 'm')
     ->fields('m', array('uid'))
-    ->condition('m.meter', $meter, '=')
+    ->condition('m.meter', $meter)
     ->execute()
     ->fetchField();
 
