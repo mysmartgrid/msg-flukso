@@ -249,6 +249,11 @@ function logger_schema() {
         'not null' => TRUE,
         'unasigned' => TRUE,
       ),
+      'resolution_unit_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
       'forecast' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -387,6 +392,55 @@ function logger_schema() {
 
 function logger_install() {
   drupal_set_message(st('Created logger module tables.'));
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 0,
+      'name' => 'Unknown'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Flukso 1.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Flukso 2.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'VZLogger'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'LibKlio Store'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Cloned Device'
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'RaspBerry Pi'
+    ))
+    ->execute();
 
   db_insert('logger_meter_type')
     ->fields(array(
@@ -1232,16 +1286,30 @@ function logger_update_7061() {
 }
 
 /**
- * Creates the Device Type: RaspBerry Pi Store.
+ * Creates the Device Type: RaspBerry Pi.
  */
 function logger_update_7062() {
 
   db_insert('logger_device_type')
     ->fields(array(
       'id' => 6,
-      'name' => 'RaspBerry Pi Store'
+      'name' => 'RaspBerry Pi'
     ))
     ->execute();
 
   return st('Device Type RaspBerry Pi Store has been created.');
+}
+
+/**
+ * Updates logger_meters.factor.
+ */
+function logger_update_7063() {
+
+  db_update('logger_meters')
+    ->fields(array(
+      'factor' => 1000
+    ))
+    ->execute();
+
+  return st('Field logger_meters.factor has been updated.');
 }

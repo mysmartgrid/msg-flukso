@@ -170,7 +170,7 @@ function logger_menu() {
     'title' => 'Your power consumption and production',
     'description' => 'Show the power consumption page',
     'page callback' => 'logger_power_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
   );
@@ -931,13 +931,16 @@ function logger_line_chart_page($interval, $context, $title, $sensors, $types, $
     array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider, FALSE, $popup);
 
   drupal_set_title($title);
-
   $form = drupal_get_form('logger_linechart_form', $chart);
-  $rendered_form = $popup ? '' : drupal_render($form);
+
+  if ($popup) { 
+    drupal_add_js("jQuery(document).keyup(function(e) { if (e.keyCode == 27) { window.location = '/power'; } });",
+      array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 290));
+  }
 
   return (empty($introduction) ? '' : $introduction . '<br><br>') .
   
-    theme('logger_line_chart_area', array('chart' => $chart)) . $rendered_form;
+    theme('logger_line_chart_area', array('chart' => $chart)) . drupal_render($form); 
 }
 
 /**
@@ -1641,7 +1644,7 @@ function logger_get_line_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $price = $chart->prices[$sensor->type_id];
+    $price = isset($chart->prices[$sensor->type_id]) ? $chart->prices[$sensor->type_id] : NULL;
     $price = $price ? $price : $sensor->price;
 
     //TODO: make a single call
@@ -2374,10 +2377,10 @@ function theme_logger_line_chart_area($variables) {
   }
 
   $icons = '<div style="float: right;">' . ($chart->popup ? 
-    "<a href='/power'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
-    "<a href='/popup/power'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") . '</div>'.
+    "<a href='/power' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
+    "<a href='/popup/power' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") . "</div>".
     '<div style="float: right; margin-right: 3px;">' .
-    "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" . '</div>';
+    "<a href='javascript: expandLineChart();' title='" . t('Zoom Out') . "'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" . "</div>";
 
   $output = logger_create_interval_menu($chart) . $icons .
     '<div>' . $chart->unit . '</div>' .
@@ -2661,13 +2664,10 @@ function logger_create_chart_legend($chart) {
     }
   }
 
-  if (logger_is_mobile_device()) {
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
 
-    $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
-
-    drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); resizeCharts(); } );", $options);
-    drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
-  }
+  drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); resizeCharts(); } );", $options);
+  drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
 
   return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
@@ -2805,7 +2805,9 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $form['context'] = array(
     '#type' => 'hidden',
     '#required' => TRUE,
-    '#default_value' => $chart->context
+    '#default_value' => $chart->context,
+    '#prefix' => '<div class="form-part">',
+    '#weight' => -500
   );
 
   $form[$chart->context . '_unit'] = array(
@@ -2859,7 +2861,8 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Refresh'),
-    '#weight' => 200
+    '#weight' => 200,
+    '#suffix' => '</div>'
   );
   return $form;
 }
@@ -2926,7 +2929,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#default_value' => 0,
     '#attributes' => array('onchange' => $on_change_reset_js),
     '#access' => $chart->context == 'power',
-    '#weight' => -100
+    '#weight' => -100,
   );
 
   $form['smoothing_level'] = array(
@@ -2948,6 +2951,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#default_value' => logger_get_variable('step_plot', 0),
     '#return_value' => 1,
     '#attributes' => array('onclick' => $on_change_js), //In IE, onchange does not work
+    '#prefix' => '</div><div class="form-part">',
   );
 
   $form['filled_graph'] = array(
@@ -2975,6 +2979,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#title' => t('Time Period'),
     '#description' => t("Enter the time period shown on the X axis, and click the Refresh button."),
     '#text-align' => 'center',
+    '#prefix' => '</div><div class="form-part">',
   );
 
   $form['resolution'] = array(
@@ -2996,7 +3001,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#options' => $meter_options,
     '#required' => TRUE,
     '#attributes' => array('onclick' => $on_change_js), //In IE, onchange does not work
-    '#access' => $chart->context == 'onsite'
+    '#access' => $chart->context == 'onsite',
   );
   return $form;
 }

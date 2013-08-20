@@ -836,6 +836,16 @@ form #main h3.search {
         color: #555;
 }
 
+#undocked .form-item .description {
+  font-size: 0.9em;
+  display: block;
+  clear: both;
+  padding: 4px 10px;
+  border-top: solid #fff 5px;
+  color: #888;
+  background: #eee;
+}
+
 /****************
  * Main Content *
  ****************/
@@ -1812,6 +1822,13 @@ ul.cat li input {
 #main form.form fieldset.submit{
 	margin-right:9.78em;
 	padding:0;
+}
+
+div.form-part {
+        width: 610px;
+        float: left;
+        margin-left: 5px;
+        background-color: white;
 }
 
 .form-item,

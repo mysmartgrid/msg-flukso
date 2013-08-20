@@ -1794,6 +1794,14 @@ ul.con input {
 	height:1.33em;
 	width:12.25em;
 }
+
+div.form-part {
+        width: 610px;
+        float: left;
+        margin-left: 5px;
+        background-color: white;
+}
+
 #edit-serial {
 	width:10em;
 }

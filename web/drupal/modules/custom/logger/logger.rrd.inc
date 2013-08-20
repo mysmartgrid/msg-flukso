@@ -582,7 +582,7 @@ function logger_rrd_parse_exported_lines($lines) {
       $timestamp = trim(substr($line, 0, $div_pos));
       $value = trim(substr($line, $div_pos + 1));
 
-      if ($value != 'nan') {
+      if ($value != 'nan' && is_numeric($value)) {
         $data[$timestamp] = number_format($value, 11, '.', '');
       }
     }
