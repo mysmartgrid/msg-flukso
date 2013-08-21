@@ -51,12 +51,21 @@
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
 -define(INVALID_TIMESTAMP_EVENT_ID,       202).
 
--define(HTTP_OK,                   200).
--define(HTTP_BAD_ARGUMENT,         400).
--define(HTTP_FORBIDDEN,            403).
--define(HTTP_INVALID_TIMESTAMP,    470).
--define(HTTP_INVALID_UNIT,         471).
--define(HTTP_INVALID_MEASUREMENT,  472).
+-define(HTTP_OK,                    200).
+-define(HTTP_BAD_ARGUMENT,          400).
+-define(HTTP_UNAUTHORIZED,          401).
+-define(HTTP_FORBIDDEN,             403).
+-define(HTTP_INVALID_TIMESTAMP,     470).
+-define(HTTP_INVALID_UNIT,          471).
+-define(HTTP_INVALID_MEASUREMENT,   472).
+-define(HTTP_INVALID_TYPE,          473).
+-define(HTTP_INVALID_ID,            474).
+-define(HTTP_INVALID_KEY,           475).
+-define(HTTP_INVALID_TIME_PERIOD,   476).
+-define(HTTP_INVALID_EVENT,         477).
+-define(HTTP_INTERNAL_SERVER_ERROR, 500).
+-define(HTTP_NOT_IMPLEMENTED,       501).
+
 
 -define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
 -define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
@@ -73,8 +82,9 @@
          rrdStart,
          rrdEnd,
          rrdResolution,
-         rrdFactor,
          unitId,
+         unitFactor,
+         rrdFactor,%deprecated
          typeId,
          token,
          device,
@@ -165,7 +175,7 @@ check_optional_device_type(JsonData) ->
 
 
 check_token(undefined, undefined) ->
-    {false, false};
+    {undefined, false};
 
 check_token(Token, undefined) ->
     check_hex(Token, 32);

@@ -58,115 +58,137 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
 
-    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
-    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {Version, true} ->
 
-    State = #state{rrdSensor = RrdSensor, digest = Digest},
+        case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+          {Digest, true} ->
 
-    ErrorCode = case {ValidVersion, ValidSensor, ValidDigest} of
-      {true, true, true} ->
-        try
-          {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-          Payload = {
-            proplists:get_value(<<"measurements">>, JsonData),
-            proplists:get_value(<<"config">>, JsonData)},
+            case check_sensor(wrq:path_info(sensor, ReqData)) of
+              {RrdSensor, true} ->
 
-            case Payload of
-              {undefined, undefined} -> ?HTTP_BAD_ARGUMENT;
-              {undefined, Config} -> ?HTTP_OK;
-              {Measurements, undefined} ->
-                %Valid measurement timestamp: from -7 days to +5 minutes
-                ServerTimestamp = unix_time(),
-                FromTime = ServerTimestamp - ?WEEK,
-                ToTime = ServerTimestamp + 5 * ?MINUTE,
-                InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
-                case length(InvalidTimestamps) of
-                  0 -> ?HTTP_OK;
-                  _ -> ?HTTP_INVALID_TIMESTAMP 
+                try
+                  {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+                  Payload = {
+                    proplists:get_value(<<"measurements">>, JsonData),
+                    proplists:get_value(<<"config">>, JsonData)},
+
+                  ErrorCode = case Payload of
+                    {undefined, undefined} -> ?HTTP_BAD_ARGUMENT;
+                    {undefined, Config} -> ?HTTP_OK;
+                    {Measurements, undefined} -> ?HTTP_OK;
+                    _ -> ?HTTP_BAD_ARGUMENT
+                  end,
+
+                  case ErrorCode of
+                    ?HTTP_OK -> {false, ReqData, #state{rrdSensor = RrdSensor, digest = Digest}};
+                    _ -> ErrorCode
+                  end
+                catch  
+                  _:_ -> ?HTTP_BAD_ARGUMENT
                 end;
-              _ -> ?HTTP_BAD_ARGUMENT
-            end
-        catch
-          _:_ -> ?HTTP_BAD_ARGUMENT
+              _ -> ?HTTP_INVALID_ID
+            end;
+          _ -> ?HTTP_UNAUTHORIZED
         end;
-      _ -> ?HTTP_BAD_ARGUMENT
+      _ -> ?HTTP_NOT_IMPLEMENTED
     end,
 
-    {case ErrorCode of
-        ?HTTP_OK -> false;
-        _ -> {halt, ErrorCode}
-     end,
-    ReqData, State}.
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 malformed_GET(ReqData, _State) ->
 
-    {Version, ValidVersion} = check_version(
-      wrq:get_req_header("X-Version", ReqData), 
-      wrq:get_qs_value("version", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData), wrq:get_qs_value("version", ReqData)) of
+      {Version, true} ->
 
-    TokenHeader = wrq:get_req_header("X-Token", ReqData),
-    {Token, ValidToken} = case TokenHeader of
-      undefined -> {undefined, true};
-      _ -> check_token(TokenHeader, wrq:get_qs_value("token", ReqData))
+        case check_sensor(wrq:path_info(sensor, ReqData)) of
+          {RrdSensor, true} ->
+
+            case check_time(
+              wrq:get_qs_value("interval", ReqData),
+              wrq:get_qs_value("start", ReqData),
+              wrq:get_qs_value("end", ReqData),
+              wrq:get_qs_value("resolution", ReqData)) of
+
+              {RrdStart, RrdEnd, RrdResolution, true} ->
+                
+                case check_unit(wrq:get_qs_value("unit", ReqData)) of
+                  {UnitId, UnitFactor, true} ->
+
+                    case check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)) of
+                      {JsonpCallback, true} ->
+
+                        DigestHeader = wrq:get_req_header("X-Digest", ReqData),
+                        {Digest, ValidDigest} = case DigestHeader of undefined -> {undefined, true}; _ -> check_digest(DigestHeader) end,
+                        {Token, ValidToken} = check_token(wrq:get_req_header("X-Token", ReqData), wrq:get_qs_value("token", ReqData)),
+
+                        Authenticated = case {Digest, ValidDigest, Token, ValidToken} of
+                          {undefined, ValidDigest, undefined, ValidToken} -> false;
+                          {Digest, true, undefined, ValidToken} -> true;
+                          {undefined, ValidDigest, Token, true} -> true;
+                          {Digest, true, Token, true} -> true;
+                          _ -> false
+                        end,
+ 
+                        case Authenticated of
+                          true ->
+                            {false, ReqData, #state{
+                              rrdSensor = RrdSensor,
+                              rrdStart = RrdStart,
+                              rrdEnd = RrdEnd,
+                              rrdResolution = RrdResolution,
+                              unitId = UnitId,
+                              unitFactor = UnitFactor,
+                              token = Token,
+                              digest = Digest,
+                              jsonpCallback = JsonpCallback}};
+
+                          _ -> ?HTTP_UNAUTHORIZED
+                        end;
+                      _ -> ?HTTP_BAD_ARGUMENT
+                    end;
+                  _ -> ?HTTP_INVALID_UNIT
+                end;
+              _ -> ?HTTP_INVALID_TIME_PERIOD
+            end;
+          _ -> ?HTTP_INVALID_ID
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
     end,
 
-    DigestHeader = wrq:get_req_header("X-Digest", ReqData),
-    {Digest, ValidDigest} = case DigestHeader of
-      undefined -> {undefined, true};
-      _ -> check_digest(DigestHeader)
-    end,
-
-    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
-    {RrdStart, RrdEnd, RrdResolution, ValidTime} = check_time(
-      wrq:get_qs_value("interval", ReqData), 
-      wrq:get_qs_value("start", ReqData), 
-      wrq:get_qs_value("end", ReqData), 
-      wrq:get_qs_value("resolution", ReqData)),
-
-    {UnitId, UnitFactor, ValidUnit} = check_unit(wrq:get_qs_value("unit", ReqData)),
-
-    %TODO: avoid this calculation
-    {_data, _Result} = mysql:execute(pool, sensor_device_type, [RrdSensor]),
-    [[DeviceTypeId]] = mysql:get_result_rows(_Result),
-    RrdFactor = case DeviceTypeId of
-      ?LIBKLIO_DEVICE_TYPE_ID -> UnitFactor;
-      _ -> UnitFactor * 1000
-    end,
-
-    {JsonpCallback, ValidJsonpCallback} = check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)),
-
-    State = #state{rrdSensor = RrdSensor, 
-                   rrdStart = RrdStart,
-                   rrdEnd = RrdEnd,
-                   rrdResolution = RrdResolution,
-                   rrdFactor = RrdFactor,
-                   unitId = UnitId,
-                   token = Token,
-                   digest = Digest,
-                   jsonpCallback = JsonpCallback},
-
-    {case {ValidVersion, ValidSensor, ValidTime, ValidUnit, ValidToken, ValidDigest, ValidJsonpCallback} of
-	{true, true, true, true, true, true, true} -> false;
-	_ -> true
-     end, 
-    ReqData, State}.
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 malformed_DELETE(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {RrdSensor, ValidSensor} = check_sensor(wrq:path_info(sensor, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {_Version, true} ->
 
-    State = #state{rrdSensor = RrdSensor, digest = Digest},
+        case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+          {Digest, true} ->
 
-    {case {ValidVersion, ValidSensor, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+            case check_sensor(wrq:path_info(sensor, ReqData)) of
+              {RrdSensor, true} ->
+                {false, ReqData, #state{rrdSensor = RrdSensor, digest = Digest}};
+
+              _ -> ?HTTP_INVALID_ID
+            end;
+          _ -> ?HTTP_UNAUTHORIZED
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
+
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 is_authorized(ReqData, State) ->
@@ -206,7 +228,7 @@ is_auth_GET(ReqData, #state{rrdSensor = RrdSensor, token = Token, digest = Clien
       {data, Result} = mysql:execute(pool, permissions, [RrdSensor, Token]),
         case mysql:get_result_rows(Result) of
           [[62]] -> true;
-          _Permission -> "Access refused"
+          _Permission -> "Access denied"
         end;
 
       _ ->
@@ -223,26 +245,21 @@ is_auth_DELETE(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = Stat
 
     {data, Result} = mysql:execute(pool, sensor_key, [Sensor]),
 
-    case mysql:get_result_rows(Result) of
-
+    {case mysql:get_result_rows(Result) of
       %Sensor is found
-      [[_Key]] ->
-        Key = _Key,
-        Auth = check_digest(Key, ReqData, ClientDigest);
+      [[Key]] -> check_digest(Key, ReqData, ClientDigest);
 
-      %Sensor is not found %TODO: improve this function
-      _ ->
-        Auth = true 
+      %Sensor is not found
+      _ -> true 
     end,
-
-    {Auth, ReqData, State}.
+    ReqData, State}.
 
 
 content_types_provided(ReqData, State) -> 
     {[{"application/json", to_json}], ReqData, State}.
 
 
-to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, rrdFactor = RrdFactor, jsonpCallback = JsonpCallback} = State) -> 
+to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, unitFactor = UnitFactor, jsonpCallback = JsonpCallback} = State) -> 
 
     % Check if sensor is virtual
     {data, Result} = mysql:execute(pool, sensor_agg, [RrdSensor]),
@@ -251,7 +268,7 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
 
         % Ordinary sensor
         [] ->
-            {ok, Series} = query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor),
+            {ok, Series} = query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor),
             Series;
 
         % Virtual sensor
@@ -259,7 +276,7 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
             AggSensors = RrdSensors,
 
             % Create a list of [Timestamp, Value] for every sensor
-            AllSeries = [[query_sensor(AggSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor)] || [AggSensor] <- AggSensors],
+            AllSeries = [[query_sensor(AggSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor)] || [AggSensor] <- AggSensors],
 
             % Merge all pairs [Timestamp, Value]
             Merged = lists:merge([Series || [{ok, Series}] <- AllSeries]),
@@ -289,15 +306,18 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
     ReqData, State}.
 
 
-query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, RrdFactor) ->
+query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor) ->
 
     %debugging
     %io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
 
+    {data, Result} = mysql:execute(pool, sensor_factor, [RrdSensor]),
+    [[RrdFactor]] = mysql:get_result_rows(Result),
+
     case rrd_fetch(?BASE_PATH, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
        {ok, Response} ->
            Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-           Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
+           Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor * UnitFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
            Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
            Final = lists:merge(Datapoints, Nans),
            {ok, Final};
@@ -337,16 +357,16 @@ process_post(ReqData, State) ->
 %
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
-    {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
-
     ExternalId = get_optional_value(<<"externalid">>, Params, Sensor),
     Function = proplists:get_value(<<"function">>, Params),
     Description = get_optional_value(<<"description">>, Params, ""),
 
+    {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
+
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[_Uid, Device, UnitId]] ->
+      [[_Uid, Device, UnitId, RrdFactor]] ->
         {updated, _Result} = mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
         RrdResponse = "ok",
         ErrorCode = ?HTTP_OK;
@@ -379,7 +399,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
                   _ -> ?ENERGY_CONSUMPTION_SENSOR_TYPE_ID
                 end,
 
-                mysql:execute(pool, sensor_insert, [Sensor, Timestamp, 0, SensorType, ExternalId, Function, Description, 0, 0, 0, 0, UnitId, Device]),
+                mysql:execute(pool, sensor_insert, [Sensor, Timestamp, SensorType, ExternalId, Function, Description, UnitId, Device]),
                 mysql:execute(pool, token_insert, [Token, Sensor, 62]),
 
                 RrdResponse = "ok",
@@ -387,10 +407,11 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
               % RRD file could not be created
               {error, RrdResponse} ->
-                ErrorCode = ?HTTP_BAD_ARGUMENT,
+                ErrorCode = ?HTTP_INTERNAL_SERVER_ERROR,
                 logger(0, <<"rrdcreate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData)
             end;
 
+          %Unit is not valid
           _ ->
             ErrorCode = ?HTTP_INVALID_UNIT,
             RrdResponse = "Invalid unit"
@@ -418,7 +439,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[Uid, Device, UnitId]] ->
+      [[Uid, Device, UnitId, RrdFactor]] ->
 
         ServerTimestamp = unix_time(),
 
@@ -430,10 +451,12 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
           {error, Reason} -> 1
         end,
 
-        {data, _Result} = mysql:execute(pool, device_type, [Device]),
-        [[DeviceTypeId]] = mysql:get_result_rows(_Result),
+        %Old flukso devices have measurements stored in Wh, rather than Ws, so the unit factor has to be adjusted
+        {data, _Result} = mysql:execute(pool, unit_factor, [UnitId]),
+        [[UnitFactor]] = mysql:get_result_rows(_Result),
+        Factor = UnitFactor * RrdFactor,
 
-        case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) of
+        case parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, Factor) of
 
           %Measurements are valid
           {ok, RrdData} ->
@@ -491,33 +514,32 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, UnitId, DeviceTypeId) ->
-
-  %TODO: use field storage_unit_id
-  [[Factor]] = case DeviceTypeId of
-    ?LIBKLIO_DEVICE_TYPE_ID ->
-      {data, Result} = mysql:execute(pool, unit_factor, [UnitId]),
-      mysql:get_result_rows(Result);
-    _ ->
-      [[1]]
-  end, 
+parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, Factor) ->
 
   try
-    Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
-    {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
+    %Valid measurement timestamp: from -7 days to +5 minutes
+    FromTime = ServerTimestamp - ?WEEK,
+    ToTime = ServerTimestamp + 5 * ?MINUTE,
+    InvalidTimestamps = lists:filter(fun([Time, Counter]) -> (Time < FromTime) or (Time > ToTime) end, Measurements),
+    case length(InvalidTimestamps) of
+      0 ->
+        Sorted = lists:sort(fun([Time1, Counter1], [Time2, Counter2]) -> Time1 < Time2 end, Measurements),
+        {Filtered, MultipleSend} = lists:partition(fun([Time1, Counter1]) -> RrdTimestamp < Time1 end, Sorted),
 
-    if
-      length(Filtered) > 0 ->
-        {ok, [[integer_to_list(Time), ":", integer_to_list(trunc(float(Counter) / Factor)), " "] || [Time, Counter] <- Filtered]};
+        if
+          length(Filtered) > 0 ->
+            {ok, [[integer_to_list(Time), ":", integer_to_list(trunc(float(Counter) / Factor)), " "] || [Time, Counter] <- Filtered]};
 
-      true ->
-        {error, time}
+          true ->
+            {error, time}
+        end;
+      _ -> {error, time}
     end
-
   catch
     _:_ ->
       {error, error}
   end.
+
 
 delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
 

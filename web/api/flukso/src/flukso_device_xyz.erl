@@ -51,56 +51,69 @@ malformed_request(ReqData, State) ->
     case wrq:method(ReqData) of
         'POST'   -> malformed_POST(ReqData, State);
         'GET'    -> malformed_GET(ReqData, State);
-        'DELETE' -> malformed_DELETE(ReqData, State)
+        'DELETE' -> malformed_GET(ReqData, State)
     end.
 
 
 malformed_POST(ReqData, _State) ->
 
-    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {Version, true} ->
 
-    {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-    {Key, ValidKey} = check_optional_key(JsonData),
-    {TypeId, ValidType} = check_optional_device_type(JsonData),
+        case check_device(wrq:path_info(device, ReqData)) of
+          {Device, true} ->
 
-    State = #state{device = Device, digest = Digest, typeId = TypeId},
+            case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+              {Digest, true} ->
 
-    {case {ValidVersion, ValidDevice, ValidDigest, ValidKey, ValidType} of
-        {true, true, true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+                {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+                case check_optional_key(JsonData) of
+                  {Key, true} ->
+
+                    case check_optional_device_type(JsonData) of
+                      {TypeId, true} ->
+                        {false, ReqData, #state{device = Device, digest = Digest, typeId = TypeId}};
+
+                      _ -> ?HTTP_INVALID_TYPE 
+                    end;
+                  _ -> ?HTTP_INVALID_KEY
+                end;
+              _ -> ?HTTP_UNAUTHORIZED
+            end;
+          _ -> ?HTTP_INVALID_ID
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
+
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 malformed_GET(ReqData, _State) ->
 
-    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {Version, true} ->
 
-    State = #state{device = Device, digest = Digest},
+        case check_device(wrq:path_info(device, ReqData)) of
+          {Device, true} ->
 
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+            case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+              {Digest, true} ->
+                {false, ReqData, #state{device = Device, digest = Digest}};
 
+              _ -> ?HTTP_UNAUTHORIZED
+            end;
+          _ -> ?HTTP_INVALID_ID
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
 
-malformed_DELETE(ReqData, _State) ->
-
-    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(device, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
-
-    State = #state{device = Device, digest = Digest},
-
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
-    end, ReqData, State}.
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 is_authorized(ReqData, State) ->

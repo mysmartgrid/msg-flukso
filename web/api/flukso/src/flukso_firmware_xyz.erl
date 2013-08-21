@@ -53,17 +53,27 @@ malformed_request(ReqData, State) ->
 
 malformed_GET(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(firmware, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {Version, true} ->
 
-    State = #state{device = Device, digest = Digest},
+        case check_device(wrq:path_info(firmware, ReqData)) of
+          {Device, true} ->
 
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+            case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+              {Digest, true} ->
+                {false, ReqData, #state{device = Device, digest = Digest}};
+
+              _ -> ?HTTP_UNAUTHORIZED
+            end;
+          _ -> ?HTTP_INVALID_ID
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
+
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 is_authorized(ReqData, State) ->

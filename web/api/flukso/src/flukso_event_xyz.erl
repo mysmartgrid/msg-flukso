@@ -52,20 +52,32 @@ malformed_request(ReqData, State) ->
 
 malformed_POST(ReqData, _State) ->
 
-    {Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
-    {Event, ValidEvent} = check_event(wrq:path_info(event, ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData), wrq:get_qs_value("version", ReqData)) of
+      {Version, true} ->
 
-    {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-    {Device, ValidDevice} = check_device(proplists:get_value(<<"device">>, JsonData)),
+        case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+          {Digest, true} ->
 
-    State = #state{event = Event, device = Device, digest = Digest},
+            case check_device(wrq:path_info(device, ReqData)) of
+              {Device, true} ->
 
-    {case {ValidVersion, ValidEvent, ValidDevice, ValidDigest} of
-        {true, true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+                case check_event(wrq:path_info(event, ReqData)) of
+                  {Event, true} ->
+                    {false, ReqData, #state{device = Device, digest = Digest}};
+
+                  _ -> ?HTTP_INVALID_EVENT
+                end;
+              _ -> ?HTTP_INVALID_ID
+            end;
+          _ -> ?HTTP_UNAUTHORIZED
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
+
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 is_authorized(ReqData, State) ->
