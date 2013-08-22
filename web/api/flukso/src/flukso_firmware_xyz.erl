@@ -124,14 +124,14 @@ to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
                 digest_response(Key, Answer, ReqData, State, false);
 
               _ ->
-                {{halt, 404}, ReqData, State}
+                {{halt, ?HTTP_FORBIDDEN}, ReqData, State}
             end;
 
           true ->
-            {{halt, 404}, ReqData, State}
+            {{halt, ?HTTP_BAD_ARGUMENT}, ReqData, State}
         end;
 
       _ ->
         %Internal Server Error (logical error, that must never occur)
-        {{halt, 500}, ReqData, State}
+        {{halt, ?HTTP_INTERNAL_SERVER_ERROR}, ReqData, State}
     end.

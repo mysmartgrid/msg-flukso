@@ -20,7 +20,7 @@
 %%
 
 -module(flukso_event_xyz).
--author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
+-author('Ely de Oliveira <ely.oliveira@itwm.fraunhofer.de>').
 
 -export([init/1,
          allowed_methods/2,
@@ -99,12 +99,6 @@ is_auth_POST(ReqData, #state{event = Event, device = Device, digest = ClientDige
     ReqData, State}.
 
 
-%
-% Event message example:
-%
-% JSON: {"device":"01234567890123456789012345678901"}
-% Mochijson2: {struct,[{<<"device">>,   "01234567890123456789012345678901"}]}
-%
 process_post(ReqData, #state{event = Event, device = Device} = State) ->
 
     {data, Result} = mysql:execute(pool, device_props, [Device]),

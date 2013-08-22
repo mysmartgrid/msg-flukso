@@ -20,7 +20,7 @@
 %%
 
 -module(flukso_device_xyz).
--author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
+-author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>, Ely de Oliveira <ely.oliveira@itwm.fraunhofer.de>').
 
 -export([init/1,
          allowed_methods/2,
@@ -186,28 +186,6 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
     ReqData, State}.
 
 
-%
-% Heartbeat message example:
-%
-% JSON: {"memtotal":13572,"version":210,"memcached":3280,"membuffers":1076,"memfree":812,"uptime":17394,"reset":1,
-%        "firmware":{"version":"2.3.1-1","releasetime":"20120131_1845"}}
-% Mochijson2: {struct,[{<<"memtotal">>,   13572},
-%                      {<<"version">>,      210},
-%                      {<<"memcached">>,   3280},
-%                      {<<"membuffers">>,  1076},
-%                      {<<"memfree">>,      812},
-%                      {<<"uptime">>,     17394},
-%                      {<<"reset">>,          1},
-%                      {<<"firmware">>,  {struct, [{<<"version">>,     "2.3.1-1"},
-%                                                  {<<"releasetime">>, "20120131_1845"},
-%                                                  {<<"build">>,       "f0ba69e4fea1d0c411a068e5a19d0734511805bd"},
-%                                                  {<<"tag">>,         "flukso-2.0.3-rc1-19-gf0ba69e"}]}]}}
-%
-% Config message example:
-%
-% JSON: {"key":12345678901234567890123456789012}
-% Mochijson2: {struct,[{<<"key">>, 12345678901234567890123456789012}]}
-%
 process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
     {data, Result} = mysql:execute(pool, device_props, [Device]),

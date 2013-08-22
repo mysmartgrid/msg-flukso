@@ -20,7 +20,7 @@
 %%
 
 -module(flukso_sensor_xyz).
--author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
+-author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>, Ely de Oliveira <ely.oliveira@itwm.fraunhofer.de>').
 
 -export([init/1,
          allowed_methods/2,
@@ -349,12 +349,6 @@ process_post(ReqData, State) ->
     end.
 
 
-%
-% Config message example:
-%
-% JSON: {"config":{"device":"12345678901234567890123456789012","type":"electricity","enable":0,"class":"analog","current":50,"voltage":230}}
-% Mochijson2: {struct,[{<<"config">>, {struct,[{<<"device">>,<<"12345678901234567890123456789012">>}, {<<"type">>,<<"electricity">>}, ... ]} }]}
-%
 process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
     ExternalId = get_optional_value(<<"externalid">>, Params, Sensor),
@@ -426,12 +420,6 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     wrq:set_resp_body(JsonResponse, ReqData), State}.
 
 
-%
-% Measurement message example:
-%
-% JSON: {"measurements":[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}
-% Mochijson2: {struct,[{<<"measurements">>,[[<TS1>,<VALUE1>],...,[<TSn>,<VALUEn>]]}]}
-%
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
 
     {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
