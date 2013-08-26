@@ -30,11 +30,12 @@
 -define(MONTH, 2419200).
 -define(YEAR, 31536000).
 
--define(UNKNOWN_DEVICE_TYPE_ID,  0).
--define(FLUKSO1_DEVICE_TYPE_ID,  1).
--define(FLUKSO2_DEVICE_TYPE_ID,  2).
--define(VZLOGGER_DEVICE_TYPE_ID, 3).
--define(LIBKLIO_DEVICE_TYPE_ID,  4).
+-define(UNKNOWN_DEVICE_TYPE_ID,      0).
+-define(FLUKSO1_DEVICE_TYPE_ID,      1).
+-define(FLUKSO2_DEVICE_TYPE_ID,      2).
+-define(VZLOGGER_DEVICE_TYPE_ID,     3).
+-define(LIBKLIO_DEVICE_TYPE_ID,      4).
+-define(RASPBERRY_PI_DEVICE_TYPE_ID, 6).
 
 -define(NO_COMMUNICATION_EVENT_ID,       1).
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
@@ -50,9 +51,21 @@
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
 -define(INVALID_TIMESTAMP_EVENT_ID,       202).
 
--define(HTTP_OK,                200).
--define(HTTP_BAD_ARGUMENT,      400).
--define(HTTP_INVALID_TIMESTAMP, 470).
+-define(HTTP_OK,                    200).
+-define(HTTP_BAD_ARGUMENT,          400).
+-define(HTTP_UNAUTHORIZED,          401).
+-define(HTTP_FORBIDDEN,             403).
+-define(HTTP_INVALID_TIMESTAMP,     470).
+-define(HTTP_INVALID_UNIT,          471).
+-define(HTTP_INVALID_MEASUREMENT,   472).
+-define(HTTP_INVALID_TYPE,          473).
+-define(HTTP_INVALID_ID,            474).
+-define(HTTP_INVALID_KEY,           475).
+-define(HTTP_INVALID_TIME_PERIOD,   476).
+-define(HTTP_INVALID_EVENT,         477).
+-define(HTTP_INTERNAL_SERVER_ERROR, 500).
+-define(HTTP_NOT_IMPLEMENTED,       501).
+
 
 -define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
 -define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
@@ -69,8 +82,10 @@
          rrdStart,
          rrdEnd,
          rrdResolution,
-         rrdFactor,
          unitId,
+         unitFactor,
+         rrdFactor,%deprecated
+         typeId,
          token,
          device,
          event,
@@ -87,28 +102,34 @@ check_version(Version) ->
 
 check_version(undefined, undefined) ->
     {false, false};
+
 check_version(Version, undefined) ->
     check_version(Version);
+
 check_version(undefined, Version) ->
     check_version(Version);
+
 check_version(_, _) ->
     {false, false}.
 
 
 check_event(Event) ->
     {Event, case Event of
-        BROWNOUT_EVENT_ID -> true;
-        FIRMWARE_UPGRADED_EVENT_ID -> true;
-        FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
+        ?BROWNOUT_EVENT_ID -> true;
+        ?FIRMWARE_UPGRADED_EVENT_ID -> true;
+        ?FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
         _ -> false
     end}.
 
 check_event(undefined, undefined) ->
     {false, false};
+
 check_event(Event, undefined) ->
     check_event(Event);
+
 check_event(undefined, Event) ->
     check_event(Event);
+
 check_event(_, _) ->
     {false, false}.
 
@@ -122,25 +143,54 @@ check_device(Device) ->
 check_key(Key) ->
     check_hex(Key, 32).
 
+check_optional_key(JsonData) ->
+    IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
+    if
+      %When defined, Key is validated
+      IsKeyDefined == true ->
+        check_key(proplists:get_value(<<"key">>, JsonData));
+      true ->
+        {undefined, true}
+    end.
+
 check_device_type(Type) ->
-    {Type, case Type of
-        <<"flukso2">> -> true;
-        <<"vzlogger">> -> true;
-        <<"libklio">> -> true;
-        _ -> false
-    end}.
+    case Type of
+        <<"flukso2">> -> {?FLUKSO2_DEVICE_TYPE_ID, true};
+        <<"vzlogger">> -> {?VZLOGGER_DEVICE_TYPE_ID, true};
+        <<"libklio">> -> {?LIBKLIO_DEVICE_TYPE_ID, true};
+        <<"raspberrypi">> -> {?RASPBERRY_PI_DEVICE_TYPE_ID, true};
+        _ -> {?UNKNOWN_DEVICE_TYPE_ID, false}
+    end.
+
+check_optional_device_type(JsonData) ->
+    IsDefined = proplists:is_defined(<<"type">>, JsonData),
+    if
+      %When defined, type is validated
+      IsDefined == true ->
+        Type = proplists:get_value(<<"type">>, JsonData),
+        check_device_type(Type);
+      true ->
+        {?FLUKSO2_DEVICE_TYPE_ID, true}
+    end.
+
 
 check_token(undefined, undefined) ->
-    {false, false};
+    {undefined, false};
+
 check_token(Token, undefined) ->
     check_hex(Token, 32);
+
 check_token(undefined, Token) ->
     check_hex(Token, 32);
+
+
 check_token(_, _) ->
     {false, false}.
 
+
 check_digest(Digest) ->
     check_hex(Digest, 40).
+
 
 check_hex(String, Length) ->
     io:write(String),
@@ -149,13 +199,16 @@ check_hex(String, Length) ->
         _ -> {false, false}
     end.
 
+
 check_time(undefined, undefined, _End, _Resolution) ->
     {false, false, false, false};
+
 check_time(Interval, undefined, undefined, undefined) ->
     case default_resolution(Interval) of
         false -> {false, false, false, false};
         DefResolution -> check_time(Interval, undefined, undefined, DefResolution)
     end;
+
 check_time(Interval, undefined, undefined, Resolution) ->
     Now = unix_time(),
     case {time_to_seconds(Interval), time_to_seconds(Resolution)} of
@@ -166,10 +219,13 @@ check_time(Interval, undefined, undefined, Resolution) ->
             AlignedStart = AlignedEnd - IntervalSec,
             {integer_to_list(AlignedStart), integer_to_list(AlignedEnd), integer_to_list(ResolutionSec), true}
     end;
+
 check_time(undefined, Start, undefined, Resolution) ->
     check_time(undefined, Start, integer_to_list(unix_time()), Resolution);
+
 check_time(undefined, Start, End, undefined) ->
     check_time(undefined, Start, End, "minute");
+
 check_time(undefined, Start, End, Resolution) ->
     case {re:run(Start, "[0-9]+", []), re:run(End, "[0-9]+", []), time_to_seconds(Resolution)} of
         {_, _, false} -> {false, false, false, false};
@@ -179,27 +235,22 @@ check_time(undefined, Start, End, Resolution) ->
             {integer_to_list(AlignedStart), integer_to_list(AlignedEnd), integer_to_list(ResolutionSec), true};
         _ -> {false, false, false, false}
     end;
+
 check_time(_, _, _, _) ->
     {false, false, false, false}.
 
 
-check_unit(Unit) ->
-    UnitString = string:to_lower(Unit),
-    {UnitString,
-      case UnitString of
-        "watt" -> true;
-        "kwhperyear" -> true;
-        "kwh" -> true;
-        "wh" -> true;
-        "degc" -> true;
-        "hpa" -> true;
-        "rh" -> true;
-        _ -> false  
-      end}.
+check_unit(UnitString) ->
+    {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+    case mysql:get_result_rows(_Result) of
+      [[Id, Factor, Type]] -> {Id, Factor, true};
+      _ -> {0, 0, false}
+    end.
 
 
 check_jsonp_callback(undefined) ->
     {undefined, true};
+
 check_jsonp_callback(JsonpCallback) ->
     Length = string:len(JsonpCallback),
 

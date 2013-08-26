@@ -53,17 +53,27 @@ malformed_request(ReqData, State) ->
 
 malformed_GET(ReqData, _State) ->
 
-    {_Version, ValidVersion} = check_version(wrq:get_req_header("X-Version", ReqData)),
-    {Device, ValidDevice} = check_device(wrq:path_info(firmware, ReqData)),
-    {Digest, ValidDigest} = check_digest(wrq:get_req_header("X-Digest", ReqData)),
+    Return = case check_version(wrq:get_req_header("X-Version", ReqData)) of
+      {Version, true} ->
 
-    State = #state{device = Device, digest = Digest},
+        case check_device(wrq:path_info(firmware, ReqData)) of
+          {Device, true} ->
 
-    {case {ValidVersion, ValidDevice, ValidDigest} of
-        {true, true, true} -> false;
-        _ -> true
-     end,
-    ReqData, State}.
+            case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
+              {Digest, true} ->
+                {false, ReqData, #state{device = Device, digest = Digest}};
+
+              _ -> ?HTTP_UNAUTHORIZED
+            end;
+          _ -> ?HTTP_INVALID_ID
+        end;
+      _ -> ?HTTP_NOT_IMPLEMENTED
+    end,
+
+    case Return of
+      {false, ReqData, State} -> Return;
+      _ -> {{halt, Return}, ReqData, undefined}
+    end.
 
 
 is_authorized(ReqData, State) ->
@@ -114,14 +124,14 @@ to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
                 digest_response(Key, Answer, ReqData, State, false);
 
               _ ->
-                {{halt, 404}, ReqData, State}
+                {{halt, ?HTTP_FORBIDDEN}, ReqData, State}
             end;
 
           true ->
-            {{halt, 404}, ReqData, State}
+            {{halt, ?HTTP_BAD_ARGUMENT}, ReqData, State}
         end;
 
       _ ->
         %Internal Server Error (logical error, that must never occur)
-        {{halt, 500}, ReqData, State}
+        {{halt, ?HTTP_INTERNAL_SERVER_ERROR}, ReqData, State}
     end.
