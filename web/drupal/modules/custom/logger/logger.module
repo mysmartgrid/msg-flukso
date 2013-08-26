@@ -179,7 +179,7 @@ function logger_menu() {
     'title' => 'Your Temperature Measurements',
     'description' => 'Show the temperature measurements page',
     'page callback' => 'logger_temperature_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_temperature_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -189,7 +189,7 @@ function logger_menu() {
     'title' => 'Your Pressure Measurements',
     'description' => 'Show the pressure measurements page',
     'page callback' => 'logger_pressure_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_pressure_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -199,7 +199,7 @@ function logger_menu() {
     'title' => 'Your Humidity Measurements',
     'description' => 'Show the humidity measurements page',
     'page callback' => 'logger_humidity_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_humidity_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -270,7 +270,7 @@ function logger_menu() {
     'title' => 'Your power production forecast',
     'description' => 'Show the power consumption and production forecast page',
     'page callback' => 'logger_forecast_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_forecast_access',
     'access arguments' => array('view forecast charts'),
     'type' => MENU_CALLBACK,
@@ -289,6 +289,14 @@ function logger_menu() {
   $items['popup/power'] = array(
     'description' => 'A page containing only the power chart',
     'page callback' => 'logger_power_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/forecast'] = array(
+    'description' => 'A page containing only the forecast chart',
+    'page callback' => 'logger_forecast_page',
     'page arguments' => array(2, TRUE),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
@@ -677,54 +685,58 @@ function logger_power_page($interval, $popup = FALSE) {
  * Builds the temperature page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the temperature page.
  */
-function logger_temperature_page($interval) {
+function logger_temperature_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(TEMPERATURE_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'temperature');
 
-  return logger_line_chart_page($interval, 'temperature', t('Your temperature measurements'), $sensors, $types, '°C');
+  return logger_line_chart_page($interval, 'temperature', t('Your temperature measurements'), $sensors, $types, '°C', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the pressure page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the pressure page.
  */
-function logger_pressure_page($interval) {
+function logger_pressure_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(PRESSURE_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'pressure');
 
-  return logger_line_chart_page($interval, 'pressure', t('Your pressure measurements'), $sensors, $types, 'hPa');
+  return logger_line_chart_page($interval, 'pressure', t('Your pressure measurements'), $sensors, $types, 'hPa', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the humidity page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the humidity page.
  */
-function logger_humidity_page($interval) {
+function logger_humidity_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(HUMIDITY_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'humidity');
 
-  return logger_line_chart_page($interval, 'humidity', t('Your humidity measurements'), $sensors, $types, '%r.h.');
+  return logger_line_chart_page($interval, 'humidity', t('Your humidity measurements'), $sensors, $types, '%r.h.', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the power production forecast page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the power production forecast page.
  */
-function logger_forecast_page($interval) {
+function logger_forecast_page($interval, $popup = FALSE) {
 
   global $user;
 
@@ -732,7 +744,7 @@ function logger_forecast_page($interval) {
   $types = array(ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'forecast');
 
-  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'W', NULL, FALSE);
+  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'W', NULL, FALSE, $popup);
 }
 
 /**
@@ -2376,11 +2388,14 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $icons = '<div style="float: right;">' . ($chart->popup ? 
-    "<a href='/power' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
-    "<a href='/popup/power' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") . "</div>".
+  $icons = '<div style="float: right;">' . ($chart->popup ?
+    "<a href='/" . $chart->context . "' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
+    "<a href='/popup/" . $chart->context . "' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") .
+    "</div>".
+
     '<div style="float: right; margin-right: 3px;">' .
-    "<a href='javascript: expandLineChart();' title='" . t('Zoom Out') . "'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" . "</div>";
+    "<a href='javascript: expandLineChart();' title='" . t('Zoom Out') . "'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" .
+    "</div>";
 
   $output = logger_create_interval_menu($chart) . $icons .
     '<div>' . $chart->unit . '</div>' .
