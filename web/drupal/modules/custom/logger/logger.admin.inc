@@ -38,6 +38,8 @@ function logger_userdevices_page() {
     ->fields('d', array('device', 'serial', 'access', 'firmware_version', 'uptime', 'type_id'))
     ->condition('d.uid', $user->uid, '=')
     ->orderBy('d.serial');
+  $query->join('logger_device_type', 't', 'd.type_id = t.id');
+  $query->addField('t', 'remote_support');
   $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
   $query->addField('r', 'requested', 'support_requested');
 
@@ -54,8 +56,7 @@ function logger_userdevices_page() {
       l(t('History'), "event/log/list/$device->device") . '<br>' .
       l(t('Edit'), "device/edit/$device->device");
 
-    //FIXME: create a field in table logger_device_type for setting whether the device supports remote support
-    if (($device->type_id == FLUKSO2_DEVICE_TYPE_ID || $device->type_id == LIBKLIO_DEVICE_TYPE_ID) && user_access('request device remote support', $user)) {
+    if ($device->remote_support && user_access('request device remote support', $user)) {
 
       $support_link = $device->support_requested ?
         l(t('Suspend Support'), "device/support/suspend/$device->device") :
@@ -180,11 +181,14 @@ function logger_usersensors_page() {
  */
 function logger_device_edition_page($id) {
 
-  $device = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'description'))
-    ->condition('d.device', $id)
-    ->execute()
-    ->fetchObject();
+  $query = db_select('logger_devices', 'd')
+    ->fields('d', array('device', 'serial', 'description', 'firmware_version'))
+    ->condition('d.device', $id);
+
+  $query->join('logger_device_type', 't', 'd.type_id = t.id');
+  $query->addField('t', 'name', 'type_name');
+
+  $device = $query->execute()->fetchObject();
 
   $form = drupal_get_form('logger_device_form', $device);
 
@@ -202,7 +206,7 @@ function logger_sensor_edition_page($meter = NULL) {
   if ($meter) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
+      ->fields('m', array('device', 'meter', 'external_id', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter);
 
     $query->join('logger_devices', 'd', 'd.device = m.device');
@@ -220,6 +224,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor = new stdClass();
     $sensor->device = NULL;
     $sensor->meter = NULL;
+    $sensor->external_id = NULL;
     $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
     $sensor->forecast = 1;
@@ -239,6 +244,28 @@ function logger_sensor_edition_page($meter = NULL) {
 }
 
 function logger_device_form($form, &$form_state, $device) {
+
+  $form['type'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Type'),
+    '#description' => t("The device type."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => FALSE,
+    '#default_value' => $device->type_name,
+    '#attributes' => array('readonly' => 'readonly')
+  );
+
+  $form['firmware'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Firmware Version'),
+    '#description' => t("The device firmware version."),
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => FALSE,
+    '#default_value' => $device->firmware_version,
+    '#attributes' => array('readonly' => 'readonly')
+  );
 
   $form['device'] = array(
     '#type' => 'textfield',
@@ -322,6 +349,19 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
   }
 
+  if ($sensor->sensor_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->sensor_type_id == LIBKLIO_DEVICE_TYPE_ID) {
+    $form['external_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('External Id'),
+      '#description' => t("The sensor external id."),
+      '#maxlength' => 32,
+      '#size' => 32,
+      '#required' => TRUE,
+      '#default_value' => $sensor->external_id,
+      '#attributes' => array('readonly' => 'readonly')
+    );
+  }
+
   $form['type'] = array(
     '#type' => 'select',
     '#title' => t('Type'),
@@ -368,10 +408,6 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->unit_name . ' (' . $sensor->unit_symbol . ')',
     '#attributes' => array('readonly' => 'readonly')
   );
-
-  if ($sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
-    $form['function']['#attributes']['readonly'] = 'readonly';
-  }
 
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {

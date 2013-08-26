@@ -462,6 +462,7 @@ function chumby_create_daemon_config($params, $sensor, $tmp_path) {
   $daemonconfig = fopen($tmp_path . '/daemonconfig.lua', 'w');
   if ($daemonconfig) {
 
+    //TODO: use device version
     $params['version'] = $sensor->serial > 100000000 ? 2 : 1;
     $params['ip'] = $params['auto'][1] ? '' : $params['ip'];
     $params['token'] = $sensor->token;

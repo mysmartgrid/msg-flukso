@@ -24,7 +24,7 @@
  */
 
 //DEBUG
- //error_reporting(E_ALL);
+//error_reporting(E_ALL);
 //ini_set('display_errors', TRUE);
 //ini_set('display_startup_errors', TRUE);
 
@@ -52,11 +52,12 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
-define('FLUKSO1_DEVICE_TYPE_ID',  1);
-define('FLUKSO2_DEVICE_TYPE_ID',  2);
-define('VZLOGGER_DEVICE_TYPE_ID', 3);
-define('LIBKLIO_DEVICE_TYPE_ID',  4);
-define('CLONED_DEVICE_TYPE_ID',   5);
+define('FLUKSO1_DEVICE_TYPE_ID',       1);
+define('FLUKSO2_DEVICE_TYPE_ID',       2);
+define('VZLOGGER_DEVICE_TYPE_ID',      3);
+define('LIBKLIO_DEVICE_TYPE_ID',       4);
+define('CLONED_DEVICE_TYPE_ID',        5);
+define('RASPBERRY_PI_DEVICE_TYPE_ID',  6);
 
 function logger_init() {
 
@@ -169,7 +170,7 @@ function logger_menu() {
     'title' => 'Your power consumption and production',
     'description' => 'Show the power consumption page',
     'page callback' => 'logger_power_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
   );
@@ -178,7 +179,7 @@ function logger_menu() {
     'title' => 'Your Temperature Measurements',
     'description' => 'Show the temperature measurements page',
     'page callback' => 'logger_temperature_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_temperature_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -188,7 +189,7 @@ function logger_menu() {
     'title' => 'Your Pressure Measurements',
     'description' => 'Show the pressure measurements page',
     'page callback' => 'logger_pressure_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_pressure_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -198,7 +199,7 @@ function logger_menu() {
     'title' => 'Your Humidity Measurements',
     'description' => 'Show the humidity measurements page',
     'page callback' => 'logger_humidity_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_humidity_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -269,7 +270,7 @@ function logger_menu() {
     'title' => 'Your power production forecast',
     'description' => 'Show the power consumption and production forecast page',
     'page callback' => 'logger_forecast_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_forecast_access',
     'access arguments' => array('view forecast charts'),
     'type' => MENU_CALLBACK,
@@ -288,6 +289,14 @@ function logger_menu() {
   $items['popup/power'] = array(
     'description' => 'A page containing only the power chart',
     'page callback' => 'logger_power_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/forecast'] = array(
+    'description' => 'A page containing only the forecast chart',
+    'page callback' => 'logger_forecast_page',
     'page arguments' => array(2, TRUE),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
@@ -676,54 +685,58 @@ function logger_power_page($interval, $popup = FALSE) {
  * Builds the temperature page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the temperature page.
  */
-function logger_temperature_page($interval) {
+function logger_temperature_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(TEMPERATURE_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'temperature');
 
-  return logger_line_chart_page($interval, 'temperature', t('Your temperature measurements'), $sensors, $types, '°C');
+  return logger_line_chart_page($interval, 'temperature', t('Your temperature measurements'), $sensors, $types, '°C', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the pressure page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the pressure page.
  */
-function logger_pressure_page($interval) {
+function logger_pressure_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(PRESSURE_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'pressure');
 
-  return logger_line_chart_page($interval, 'pressure', t('Your pressure measurements'), $sensors, $types, 'hPa');
+  return logger_line_chart_page($interval, 'pressure', t('Your pressure measurements'), $sensors, $types, 'hPa', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the humidity page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the humidity page.
  */
-function logger_humidity_page($interval) {
+function logger_humidity_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(HUMIDITY_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'humidity');
 
-  return logger_line_chart_page($interval, 'humidity', t('Your humidity measurements'), $sensors, $types, '%r.h.');
+  return logger_line_chart_page($interval, 'humidity', t('Your humidity measurements'), $sensors, $types, '%r.h.', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the power production forecast page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the power production forecast page.
  */
-function logger_forecast_page($interval) {
+function logger_forecast_page($interval, $popup = FALSE) {
 
   global $user;
 
@@ -731,7 +744,7 @@ function logger_forecast_page($interval) {
   $types = array(ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'forecast');
 
-  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'W', NULL, FALSE);
+  return logger_line_chart_page($interval, 'forecast', t('Your power production forecast'), $sensors, $types, 'W', NULL, FALSE, $popup);
 }
 
 /**
@@ -930,13 +943,16 @@ function logger_line_chart_page($interval, $context, $title, $sensors, $types, $
     array($yvalue1, $yvalue2), FALSE, $prices, $filled, $step_plot, $smoothing_level, $show_slider, FALSE, $popup);
 
   drupal_set_title($title);
-
   $form = drupal_get_form('logger_linechart_form', $chart);
-  $rendered_form = $popup ? '' : drupal_render($form);
+
+  if ($popup) { 
+    drupal_add_js("jQuery(document).keyup(function(e) { if (e.keyCode == 27) { window.location = '/power'; } });",
+      array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 290));
+  }
 
   return (empty($introduction) ? '' : $introduction . '<br><br>') .
   
-    theme('logger_line_chart_area', array('chart' => $chart)) . $rendered_form;
+    theme('logger_line_chart_area', array('chart' => $chart)) . drupal_render($form); 
 }
 
 /**
@@ -1640,7 +1656,7 @@ function logger_get_line_chart_data($chart) {
 
   foreach ($chart->sensors as &$sensor) {
 
-    $price = $chart->prices[$sensor->type_id];
+    $price = isset($chart->prices[$sensor->type_id]) ? $chart->prices[$sensor->type_id] : NULL;
     $price = $price ? $price : $sensor->price;
 
     //TODO: make a single call
@@ -1994,7 +2010,7 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('uid', 'meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
     ->isNotNull('m.function');
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
@@ -2342,11 +2358,6 @@ function theme_logger_line_chart_area($variables) {
   //In order to avoid a bug in Dygraphs
   $yvalue2 += ($yvalue2 != 0 && $yvalue2 % 10 == 0 ? 1 : 0);
 
-  $visibility = array();
-  foreach ($chart->sensors as $sensor) {
-    $visibility[] .= $sensor->visible ? "true" : "false";
-  }
-
   $chart_properties = array(
     'dateWindow' => "[$xvalue1, $xvalue2]",
     'drawCallback' => 'updateLineChartForm',
@@ -2355,12 +2366,20 @@ function theme_logger_line_chart_area($variables) {
     'rollPeriod' => $chart->smoothing_level,
     'fillGraph' => $chart->filled ? 'true' : 'false',
     'fillAlpha' => $chart->context == 'onsite' ? 1 : 0.15, //FIXME: create a property on the chart object
-    'visibility' => '[' . implode(', ', $visibility) . ']',
     'xAxisLabelFormatter' => 'Dygraph.dateAxisFormatter',
     'xValueFormatter' => 'Dygraph.dateString_',
     'xValueParser' => 'function(x) { return 1000 * parseInt(x); }',
     'xTicker' => 'Dygraph.dateTicker'
   );
+
+  if (!$chart->aggregate_sensors) {
+    $visibility = array();
+    foreach ($chart->sensors as $sensor) {
+      $visibility[] .= $sensor->visible ? "true" : "false";
+    }
+    $chart_properties['visibility'] = '[' . implode(', ', $visibility) . ']';
+  }
+
   if ($chart->show_slider) {
     $chart_properties['zoomCallback'] = 'updateSliderChart';
   }
@@ -2369,10 +2388,16 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $icons = "<a href='javascript: expandLineChart();'><img src='/" . LOGGER_REL_PATH . "/img/expand.png'></a>";
+  $icons = '<div style="float: right;">' . ($chart->popup ?
+    "<a href='/" . $chart->context . "' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
+    "<a href='/popup/" . $chart->context . "' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") .
+    "</div>".
 
-  $output = logger_create_interval_menu($chart) .
-    '<div style="float: right;">' . $icons . '</div>' .
+    '<div style="float: right; margin-right: 3px;">' .
+    "<a href='javascript: expandLineChart();' title='" . t('Zoom Out') . "'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" .
+    "</div>";
+
+  $output = logger_create_interval_menu($chart) . $icons .
     '<div>' . $chart->unit . '</div>' .
     logger_create_dygraph($chart, TRUE, $chart_properties);
 
@@ -2654,13 +2679,10 @@ function logger_create_chart_legend($chart) {
     }
   }
 
-  if (logger_is_mobile_device()) {
+  $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
 
-    $options = array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 201);
-
-    drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); resizeCharts(); } );", $options);
-    drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
-  }
+  drupal_add_js("jQuery(window).resize( function() { resizeTable('" . LOGGER_TABLE_ID . "'); resizeCharts(); } );", $options);
+  drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
 
   return theme_table(array('header' => $header, 'rows' => $lines, 'attributes' => array('id' => LOGGER_TABLE_ID, 'class' => 'resizable'),
     'caption' => '', 'empty' => '', 'sticky' => FALSE, 'colgroups' => array())) .
@@ -2798,7 +2820,9 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $form['context'] = array(
     '#type' => 'hidden',
     '#required' => TRUE,
-    '#default_value' => $chart->context
+    '#default_value' => $chart->context,
+    '#prefix' => '<div class="form-part">',
+    '#weight' => -500
   );
 
   $form[$chart->context . '_unit'] = array(
@@ -2852,7 +2876,8 @@ function logger_create_chart_form($form, $submit_js, $chart) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Refresh'),
-    '#weight' => 200
+    '#weight' => 200,
+    '#suffix' => '</div>'
   );
   return $form;
 }
@@ -2919,7 +2944,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#default_value' => 0,
     '#attributes' => array('onchange' => $on_change_reset_js),
     '#access' => $chart->context == 'power',
-    '#weight' => -100
+    '#weight' => -100,
   );
 
   $form['smoothing_level'] = array(
@@ -2941,6 +2966,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#default_value' => logger_get_variable('step_plot', 0),
     '#return_value' => 1,
     '#attributes' => array('onclick' => $on_change_js), //In IE, onchange does not work
+    '#prefix' => '</div><div class="form-part">',
   );
 
   $form['filled_graph'] = array(
@@ -2968,6 +2994,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#title' => t('Time Period'),
     '#description' => t("Enter the time period shown on the X axis, and click the Refresh button."),
     '#text-align' => 'center',
+    '#prefix' => '</div><div class="form-part">',
   );
 
   $form['resolution'] = array(
@@ -2989,7 +3016,7 @@ function logger_linechart_form($form, &$form_state, $chart) {
     '#options' => $meter_options,
     '#required' => TRUE,
     '#attributes' => array('onclick' => $on_change_js), //In IE, onchange does not work
-    '#access' => $chart->context == 'onsite'
+    '#access' => $chart->context == 'onsite',
   );
   return $form;
 }
@@ -3763,7 +3790,7 @@ function logger_sensor_access($permission, $meter) {
 
   $uid = db_select('logger_meters', 'm')
     ->fields('m', array('uid'))
-    ->condition('m.meter', $meter, '=')
+    ->condition('m.meter', $meter)
     ->execute()
     ->fetchField();
 

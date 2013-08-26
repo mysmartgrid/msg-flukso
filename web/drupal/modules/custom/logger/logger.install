@@ -19,7 +19,15 @@ function logger_schema() {
         'type' => 'varchar',
         'length' => '30',
         'not null' => TRUE,
-      )
+      ),
+      'remote_support' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '5',
+      ),
     ),
     'primary key' => array('id')
   );
@@ -186,6 +194,11 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '10',
       ),
+      'external_id' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
       'device' => array(
         'type' => 'varchar',
         'length' => '32',
@@ -240,6 +253,11 @@ function logger_schema() {
         'disp-width' => '10',
       ),
       'unit_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'resolution_unit_id' => array(
         'type' => 'int',
         'not null' => TRUE,
         'unasigned' => TRUE,
@@ -382,6 +400,62 @@ function logger_schema() {
 
 function logger_install() {
   drupal_set_message(st('Created logger module tables.'));
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 0,
+      'name' => 'Unknown',
+      'remote_support' => 0
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Flukso 1.0',
+      'remote_support' => 0
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Flukso 2.0',
+      'remote_support' => 1
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'VZLogger',
+      'remote_support' => 0
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'LibKlio Store',
+      'remote_support' => 0
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Cloned Device',
+      'remote_support' => 0
+    ))
+    ->execute();
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'RaspBerry Pi',
+      'remote_support' => 1
+    ))
+    ->execute();
 
   db_insert('logger_meter_type')
     ->fields(array(
@@ -1201,4 +1275,87 @@ function logger_update_7059() {
   exec("cd $path; mv dvd1mtmtmtmtmtmtmtmtmtmtmtmtmtm1.rrd 5715a57b0c8ec958727ab3bb206d8b6e.rrd;");
 
   return st('Test sensor meter has been updated.');
+}
+
+/**
+ * Add field 'external_id' in table logger_meter.
+ */
+function logger_update_7061() {
+
+  db_add_field('logger_meters', 'external_id', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => FALSE
+  ));
+
+  db_update('logger_meters')
+    ->expression('external_id', 'meter')
+    ->execute();
+
+  db_change_field('logger_meters', 'external_id', 'external_id', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => TRUE
+  ));
+  return st('Field logger_meters.external_id has been created.');
+}
+
+/**
+ * Creates the Device Type: RaspBerry Pi.
+ */
+function logger_update_7062() {
+
+  db_insert('logger_device_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'RaspBerry Pi'
+    ))
+    ->execute();
+
+  return st('Device Type RaspBerry Pi Store has been created.');
+}
+
+/**
+ * Updates logger_meters.factor.
+ */
+function logger_update_7063() {
+
+  db_update('logger_meters')
+    ->fields(array(
+      'factor' => 1000
+    ))
+    ->execute();
+
+  return st('Field logger_meters.factor has been updated.');
+}
+
+/**
+ * Add field 'remote_support' in table logger_device_type.
+ */
+function logger_update_7064() {
+
+  db_add_field('logger_device_type', 'remote_support', array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '5'
+  ));
+
+  db_update('logger_device_type')
+    ->fields(array(
+      'remote_support' => 1
+    ))
+    ->condition('id', 2)
+    ->execute();
+
+  db_update('logger_device_type')
+    ->fields(array(
+      'remote_support' => 1
+    ))
+    ->condition('id', 6)
+    ->execute();
+
+  return st('Field logger_device_type.remote_support has been created.');
 }
