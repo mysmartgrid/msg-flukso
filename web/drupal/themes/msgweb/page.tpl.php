@@ -14,7 +14,7 @@
       <div role="section">
         <div class="headings">
           <?php if ($title != "") { ?><h2 class="content-title"><?php print $title; ?></h2><?php } else { ?>
-          <?php if ($node->title != ""): ?><h2 class="content-title"><?php print $node->title; ?></h2><?php endif; } ?>
+          <?php if (isset($node->title) && $node->title != ""): ?><h2 class="content-title"><?php print $node->title; ?></h2><?php endif; } ?>
         </div>
       </div>
       <div class="section" role="section">

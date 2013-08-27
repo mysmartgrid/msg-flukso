@@ -346,6 +346,8 @@ function logger_rrd_query_agg($sensors, $unit, $period, $step, $price = NULL) {
     //Sum all measurements of a particular time
     $def .= "CDEF:$series_id=$variables$operators ";
 
+    $period = logger_rrd_adjust_period('none', $step, $period);
+
     return logger_rrd_export($def, $series_id, REQUEST_TIME, FALSE, $period, $step);
   }
   else {
@@ -543,6 +545,9 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     save_file($script_path, "#!/bin/bash\n" . $command);
     $command = "/bin/sh $script_path";
   }
+
+  //FIXME
+  append_file("/tmp/rrd.command." . $user->uid . '.' . REQUEST_TIME . '.txt', "\n" . $command);
 
   $lines = array();
   $error = 0;

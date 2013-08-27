@@ -144,7 +144,7 @@ function logger_menu() {
     'title' => 'Overview',
     'description' => 'Show the project overview',
     'page callback' => 'logger_overview_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
@@ -283,6 +283,15 @@ function logger_menu() {
     'page arguments' => array(1),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('detect anomalies'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/overview'] = array(
+    'title' => 'Overview',
+    'description' => 'Show the project overview',
+    'page callback' => 'logger_overview_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
 
@@ -785,9 +794,10 @@ function logger_balance_page($interval) {
  * Builds the overview page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the overview page.
  */
-function logger_overview_page($interval) {
+function logger_overview_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
 
@@ -838,7 +848,7 @@ function logger_overview_page($interval) {
   $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types);
 
-  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $types, 'W', $introduction);
+  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $types, 'W', $introduction, TRUE, $popup);
 }
 
 /**
@@ -2348,6 +2358,8 @@ function theme_logger_overview_topic($variables) {
  */
 function theme_logger_line_chart_area($variables) {
 
+  global $user;
+
   $chart = $variables['chart'];
 
   $xvalue1 = $chart->xaxis[0] * 1000;
@@ -2388,11 +2400,13 @@ function theme_logger_line_chart_area($variables) {
     $chart_properties['valueRange'] = "[$yvalue1, $yvalue2]";
   }
 
-  $icons = '<div style="float: right;">' . ($chart->popup ?
-    "<a href='/" . $chart->context . "' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
-    "<a href='/popup/" . $chart->context . "' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>") .
-    "</div>".
-
+  $icons = (logger_is_mobile_device() || !(isset($user->uid) && $user->uid > 0) ? '' :
+    '<div style="float: right;">' .
+       ($chart->popup ?
+          "<a href='/" . $chart->context . "' title='" . t('Minimize') . "'><img src='/" . LOGGER_REL_PATH . "/img/minimize.png'></a>" :
+          "<a href='/popup/" . $chart->context . "' title='" . t('Maximize') . "'><img src='/" . LOGGER_REL_PATH . "/img/maximize.png'></a>"
+       ) .
+    "</div>" ) .
     '<div style="float: right; margin-right: 3px;">' .
     "<a href='javascript: expandLineChart();' title='" . t('Zoom Out') . "'><img src='/" . LOGGER_REL_PATH . "/img/zoom-out.png'></a>" .
     "</div>";
