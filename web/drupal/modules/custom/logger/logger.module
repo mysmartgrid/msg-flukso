@@ -218,7 +218,7 @@ function logger_menu() {
     'title' => 'Your power balance',
     'description' => 'Show the power balance page',
     'page callback' => 'logger_balance_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('view logger charts'),
     'type' => MENU_CALLBACK,
@@ -280,7 +280,7 @@ function logger_menu() {
     'title' => 'Your Power Production Anomalies',
     'description' => 'Show power production anomalies page',
     'page callback' => 'logger_anomaly_page',
-    'page arguments' => array(1),
+    'page arguments' => array(1, FALSE),
     'access callback' => 'logger_producer_access',
     'access arguments' => array('detect anomalies'),
     'type' => MENU_CALLBACK,
@@ -306,6 +306,30 @@ function logger_menu() {
   $items['popup/forecast'] = array(
     'description' => 'A page containing only the forecast chart',
     'page callback' => 'logger_forecast_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/balance'] = array(
+    'description' => 'A page containing only the balance chart',
+    'page callback' => 'logger_balance_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/balance'] = array(
+    'description' => 'A page containing only the balance chart',
+    'page callback' => 'logger_balance_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/anomaly'] = array(
+    'description' => 'A page containing only the anomaly chart',
+    'page callback' => 'logger_anomaly_page',
     'page arguments' => array(2, TRUE),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
@@ -747,8 +771,6 @@ function logger_humidity_page($interval, $popup = FALSE) {
  */
 function logger_forecast_page($interval, $popup = FALSE) {
 
-  global $user;
-
   $interval = logger_check_interval($interval, 'f3days');
   $types = array(ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'forecast');
@@ -762,24 +784,23 @@ function logger_forecast_page($interval, $popup = FALSE) {
  * @param $interval The time interval.
  * @return the power production anomalies page.
  */
-function logger_anomaly_page($interval) {
-
-  global $user;
+function logger_anomaly_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
   $types = array(ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_subscribed_sensors($types, 'anomaly');
 
-  return logger_line_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types, 'W');
+  return logger_line_chart_page($interval, 'anomaly', t('Power production anomalies'), $sensors, $types, 'W', NULL, TRUE, $popup);
 }
 
 /**
  * Builds the power balance page.
  *
  * @param $interval The time interval.
+ * @param $popup    Whether or not the page is a popup (optional).
  * @return the power balance page.
  */
-function logger_balance_page($interval) {
+function logger_balance_page($interval, $popup = FALSE) {
 
   global $user;
 
@@ -787,7 +808,7 @@ function logger_balance_page($interval) {
   $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE);
   $sensors = logger_get_sensors($types, array($user->uid));
 
-  return logger_line_chart_page($interval, 'balance', t('Your power balance'), $sensors, $types, 'W');
+  return logger_line_chart_page($interval, 'balance', t('Your power balance'), $sensors, $types, 'W', NULL, TRUE, $popup);
 }
 
 /**
@@ -3384,12 +3405,15 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
 
     case TEMPERATURE_UNIT_TYPE_ID:
       $query->condition('id', TEMPERATURE_SENSOR_TYPE);
+      break;
 
     case PRESSURE_UNIT_TYPE_ID:
       $query->condition('id', PRESSURE_SENSOR_TYPE);
+      break;
 
     case HUMIDITY_UNIT_TYPE_ID:
       $query->condition('id', HUMIDITY_SENSOR_TYPE);
+      break;
 
     default:
        $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
