@@ -2013,9 +2013,10 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
 function notification_query_limit_consumption_violations($notifiable, $maximum) {
 
   $list = NULL;
-  $measurements = logger_query_device_measurements('hour', $notifiable['device']);
+  $measurements = logger_query_device_measurements('hour', $notifiable['device'], 'W');
 
-  $limit_up = $notifiable['limit_up'] * $notifiable['unit_factor'];
+  //Convert limit to Watt
+  $limit_up = ($notifiable['limit_up'] / $notifiable['unit_factor']) * 3.6;
 
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {
@@ -2034,7 +2035,9 @@ function notification_query_limit_consumption_violations($notifiable, $maximum) 
             number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
         }
       }
-      $list .= $sublist;
+      if ($sublist) {
+        $list .= $sublist;
+      }
     }
   }
   return $list ? array('timestamp' => $timestamp, 'list' => $list) : NULL;
