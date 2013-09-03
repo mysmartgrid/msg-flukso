@@ -997,6 +997,7 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
       'meter' => $meter,
       'uid' => $uid,
       'device' => $device,
+      'external_id' => $meter,
       'created' => $created,
       'function' => $function,
       'type' => $type,
