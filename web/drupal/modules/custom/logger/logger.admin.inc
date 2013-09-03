@@ -349,7 +349,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
   }
 
-  if ($sensor->sensor_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->sensor_type_id == LIBKLIO_DEVICE_TYPE_ID) {
+  if ($sensor->device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
     $form['external_id'] = array(
       '#type' => 'textfield',
       '#title' => t('External Id'),
