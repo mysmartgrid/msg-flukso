@@ -58,12 +58,15 @@ mysql_prepare() ->
     mysql:prepare(sensor_config, <<"UPDATE logger_meters SET external_id = ?, function = ?, description = ?, unit_id = ? WHERE meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_version, description FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_props, <<"SELECT sha, upgrade, resets, firmware_id, description FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_firmware, <<"SELECT d.sha, d.upgrade, f.version FROM logger_devices d, logger_device_firmware f WHERE d.firmware_id = f.id AND d.device = ?">>),
     mysql:prepare(device_type, <<"SELECT type_id FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_version = ?, description = ? WHERE device = ?">>),
+    mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, upgrade = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_id = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_upgrade_update, <<"UPDATE logger_devices SET upgrade = ? WHERE device = ?">>),
-    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_version, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_id, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
+
+    mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, device_type_id, upgradable FROM logger_device_firmware WHERE version = ?">>),
 
     mysql:prepare(notification_delete, <<"DELETE FROM notification WHERE device = ?">>),
 

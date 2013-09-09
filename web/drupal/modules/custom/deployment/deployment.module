@@ -509,9 +509,12 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   $query->leftJoin($sensor_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
-  $query->fields('d', array('serial', 'device', 'firmware_version', 'description'))
+  $query->fields('d', array('serial', 'device', 'description'))
     ->fields('u', array('name', 'uid'))
     ->addField('u', 'mail', 'email');
+
+  $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
+  $query->addField('f', 'version', 'firmware_version');
 
   if (isset($filter['user_name'])) {
     $query->condition('u.name', '%' . $filter['user_name'] . '%', 'LIKE');

@@ -66,7 +66,6 @@
 -define(HTTP_INTERNAL_SERVER_ERROR, 500).
 -define(HTTP_NOT_IMPLEMENTED,       501).
 
-
 -define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
 -define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
 -define(TEMPERATURE_SENSOR_TYPE_ID,        3).
@@ -76,6 +75,8 @@
 -define(TEMPERATURE_UNIT_TYPE_ID,          3).
 -define(PRESSURE_UNIT_TYPE_ID,             5).
 -define(HUMIDITY_UNIT_TYPE_ID,             6).
+
+-define(UNKNOWN_FIRMWARE_ID,  0).
 
 -record(state,
         {rrdSensor,

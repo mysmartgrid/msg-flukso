@@ -163,7 +163,7 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State) ->
     {data, Result} = mysql:execute(pool, device_props, [Device]),
-    [[Key, Upgrade, Resets, FirmwareVersion, DeviceDescription]] = mysql:get_result_rows(Result),
+    [[Key, Upgrade, Resets, FirmwareId, DeviceDescription]] = mysql:get_result_rows(Result),
 
     {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
     _Sensors = mysql:get_result_rows(_Result),
@@ -196,7 +196,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets, OldFirmwareVersion, OldDescription]] ->
+      [[Key, Upgrade, Resets, OldFirmwareId, OldDescription]] ->
 
         Version = get_optional_value(<<"version">>, JsonData, 0),
         Reset = get_optional_value(<<"reset">>, JsonData, 0),
@@ -224,20 +224,25 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
         IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
 
-        FirmwareVersion = if
+        FirmwareId = if
           IsFirmwareInformed == true ->
-            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            proplists:get_value(<<"version">>, Firmware);
-            %TODO: process <<"build">> and <<"tag">>
+            {struct, FirmwareVersion} = proplists:get_value(<<"firmware">>, JsonData),
+            proplists:get_value(<<"version">>, FirmwareVersion),
+
+            {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion]),
+            case mysql:get_result_rows(_Result) of
+              [[_FirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareDeviceTypeId, FirmwareUpgradable]] -> _FirmwareId; %TODO: validate other properties
+              _ -> ?UNKNOWN_FIRMWARE_ID
+            end;
 
           true ->
-            OldFirmwareVersion
+            OldFirmwareId
         end,
 
         Description = get_optional_value(<<"description">>, JsonData, OldDescription),
 
         mysql:execute(pool, device_update,
-          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareVersion, Description, Device]),
+          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -250,7 +255,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, "2.0.0-0", 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
+          [Device, Serial, 0, Key, Timestamp, 0, 0, ?UNKNOWN_FIRMWARE_ID, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),

@@ -35,13 +35,18 @@ function logger_userdevices_page() {
   drupal_set_title(t('My Devices'));
 
   $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'access', 'firmware_version', 'uptime', 'type_id'))
+    ->fields('d', array('device', 'serial', 'access', 'uptime', 'type_id'))
     ->condition('d.uid', $user->uid, '=')
     ->orderBy('d.serial');
+
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'remote_support');
+
   $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
   $query->addField('r', 'requested', 'support_requested');
+
+  $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
+  $query->addField('f', 'version', 'firmware_version');
 
   $devices = $query->execute();
 
@@ -182,11 +187,14 @@ function logger_usersensors_page() {
 function logger_device_edition_page($id) {
 
   $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'description', 'firmware_version'))
+    ->fields('d', array('device', 'serial', 'description'))
     ->condition('d.device', $id);
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');
+
+  $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
+  $query->addField('f', 'version', 'firmware_version');
 
   $device = $query->execute()->fetchObject();
 
@@ -857,7 +865,7 @@ function logger_device_clone($device_id) {
       'version' => $device->version,
       'resets' => $device->resets,
       'country' => $device->country,
-      'firmware_version' => $device->firmware_version
+      'firmware_id' => 0
     ))
     ->execute();
 
