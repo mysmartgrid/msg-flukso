@@ -821,6 +821,7 @@ function logger_balance_page($interval, $popup = FALSE) {
 function logger_overview_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
+  $device_types = array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID);
 
   $introduction = '';
   $cache_id = 'logger_overview';
@@ -848,7 +849,6 @@ function logger_overview_page($interval, $popup = FALSE) {
     }
 
     //Counters
-    $device_types = array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID);
     $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid AND type_id IN (:types)";
     $devcounter = db_query($sql, array(':uid' => 0, ':types' => $device_types))->fetchField();
 
@@ -2079,6 +2079,9 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   }
   if ($only_forecast) {
     $query->condition('m.forecast', 1);
+  }
+  if (!empty($device_types)) {
+    $query->condition('d.type_id', $device_types, 'IN');
   }
   if (!empty($area)) {
     $query
@@ -3407,22 +3410,26 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
   }
 
   //FIXME: find a better way of filtering the sensor types
-  switch ($unit_type_id) {
 
-    case TEMPERATURE_UNIT_TYPE_ID:
-      $query->condition('id', TEMPERATURE_SENSOR_TYPE);
-      break;
+  if ($unit_type_id != NULL) {
 
-    case PRESSURE_UNIT_TYPE_ID:
-      $query->condition('id', PRESSURE_SENSOR_TYPE);
-      break;
+    switch ($unit_type_id) {
+ 
+      case TEMPERATURE_UNIT_TYPE_ID:
+        $query->condition('id', TEMPERATURE_SENSOR_TYPE);
+        break;
 
-    case HUMIDITY_UNIT_TYPE_ID:
-      $query->condition('id', HUMIDITY_SENSOR_TYPE);
-      break;
+      case PRESSURE_UNIT_TYPE_ID:
+        $query->condition('id', PRESSURE_SENSOR_TYPE);
+        break;
 
-    default:
-       $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
+      case HUMIDITY_UNIT_TYPE_ID:
+        $query->condition('id', HUMIDITY_SENSOR_TYPE);
+        break;
+ 
+      default:
+        $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
+    }
   }
 
   $result = $query->fields('t', array('id', 'name'))

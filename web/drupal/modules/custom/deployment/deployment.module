@@ -21,9 +21,9 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
-//ini_set('display_errors', TRUE);
-//ini_set('display_startup_errors', TRUE);
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
 
 //Device states
 define('UNINSTALLED_STATE_ID',        1);
@@ -35,6 +35,7 @@ define('OFFLINE_STATE_ID',            6);
 define('NO_MEASUREMENT_STATE_ID',     7);
 define('NO_HEARTBEAT_STATE_ID',       8);
 define('INVALID_TIMESTAMP_STATE_ID',  9);
+define('MISSING_SENSORS_STATE_ID',   10);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_PATH', DRUPAL_ROOT . '/' . DEPLOYMENT_REL_PATH);
@@ -167,6 +168,10 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
           $message = t('This device has sent a measurement with an invalid time at %latest.', $latest);
           break;
 
+        case MISSING_SENSORS_STATE_ID:
+          $message = t('This device has been installed, but no sensor is associated with it.');
+          break;
+
         case WORKING_STATE_ID:
           $message = t('This device is working fine. Latest message received at %latest.', $latest);
           break;
@@ -200,7 +205,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
     
       $result = db_select('logger_meters', 'm')
         ->fields('m', array('meter', 'function'))
-        ->condition('m.device', $device['device'], '=')
+        ->condition('m.device', $device['device'])
         ->orderBy('m.function', 'DESC')
         ->execute();
 
@@ -365,7 +370,12 @@ function deployment_download_chart_file() {
   $offset = get_timezone_offset();
   $time = 0;
 
-  $summaries = db_query("SELECT * FROM {deployment_summary} ORDER BY time, state_id");
+  $summaries = db_select('deployment_summary', 's')
+    ->fields('s')
+    ->orderBy('time')
+    ->orderBy('state_id')
+    ->execute();
+
   foreach ($summaries as $summary) {
 
     if ($summary->time != $time) {
@@ -406,7 +416,10 @@ function deployment_download_list_file() {
  */
  function deployment_get_all_states() {
 
-  $result = db_query("SELECT SQL_CACHE id, name FROM {deployment_state}");
+  $result = db_select('deployment_state', 's')
+    ->fields('s', array('id', 'name'))
+    ->orderBy('s.flow_order')
+    ->execute();
 
   $states = array();
   foreach ($result as $state) {
@@ -429,7 +442,7 @@ function deployment_get_devices($filter = array(), $header = NULL, $page_limit =
   $result = deployment_query_devices($filter, $header, $page_limit);
 
   $data = array(); 
-  while ($device = $result->fetchAssoc()) {
+  foreach ($result as $device) {
 
     $device['state'] = $states[$device['state_id']];
     $device['latest'] = date('d.m.y H:i', $device['latest']);
@@ -448,7 +461,32 @@ function deployment_get_devices($filter = array(), $header = NULL, $page_limit =
  */
 function deployment_query_devices($filter = array(), $header = NULL, $page_limit = NULL) {
 
+  $devices = array();
+
+  if (!isset($filter['state_id']) || $filter['state_id'] == 0) {
+
+    $states = db_select('deployment_state', 's')
+      ->fields('s', array('id'))
+      ->execute();
+
+    foreach ($states as $state) {
+
+      $filter['state_id'] = $state->id;
+      $selected = deployment_query_devices($filter, $header, $page_limit);
+      $devices = array_merge($devices, $selected);
+    }
+    return $devices;
+  }
+
+  $state_id = $filter['state_id'];
   $now = REQUEST_TIME;
+
+  $sensor_query = db_select('logger_meters', 'm')
+    ->fields('m', array('device'))
+    ->groupBy('m.device');
+  $sensor_query->addExpression('MAX(m.access)', 'access');
+  $sensor_query->addExpression('MAX(c.corrupted)', 'corrupted');
+  $sensor_query->addExpression('MAX(t.unsynchronized)', 'unsynchronized');
 
   $corrupted_events_query = db_select('event_log', 'l')
     ->fields('l', array('device'))
@@ -456,6 +494,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
     ->condition('l.time', $now - 15 * MINUTE, '>')
     ->groupBy('l.device');
   $corrupted_events_query->addExpression('MAX(l.time)', 'corrupted');
+  $sensor_query->leftJoin($corrupted_events_query, 'c', 'm.device = c.device');
 
   $invalid_time_events_query = db_select('event_log', 'l')
     ->fields('l', array('device'))
@@ -463,19 +502,11 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
     ->condition('l.time', $now - 15 * MINUTE, '>')
     ->groupBy('l.device');
   $invalid_time_events_query->addExpression('MAX(l.time)', 'unsynchronized');
-
-  $sensor_query = db_select('logger_meters', 'm')
-    ->fields('m', array('device'))
-    ->groupBy('m.device');
-  $sensor_query->leftJoin($corrupted_events_query, 'c', 'm.device = c.device');
   $sensor_query->leftJoin($invalid_time_events_query, 't', 'm.device = t.device');
-  $sensor_query->addExpression('MAX(m.access)', 'access');
-  $sensor_query->addExpression('MAX(c.corrupted)', 'corrupted');
-  $sensor_query->addExpression('MAX(t.unsynchronized)', 'unsynchronized');
 
   $query = db_select('logger_devices', 'd');
   $query->leftJoin('users', 'u', 'u.uid = d.uid');
-  $query->join($sensor_query, 'm', 'm.device = d.device');
+  $query->leftJoin($sensor_query, 'm', 'm.device = d.device');
   $query->groupBy('d.uid');
   $query->groupBy('d.serial');
   $query->fields('d', array('serial', 'device', 'firmware_version', 'description'))
@@ -491,7 +522,7 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   }
 
   if (isset($filter['serial'])) {
-    $query->condition('d.serial', $filter['serial'], '=');
+    $query->condition('d.serial', $filter['serial']);
   }
 
   if (isset($filter['device'])) {
@@ -513,18 +544,18 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   $offline_timeout = $now - DAY;
   $communication_timeout = $now - 2 * HOUR;
 
-  $state_id = isset($filter['state_id']) ? $filter['state_id'] : '';
   $state_id_field = $state_id;
   $latest_field = "IF(d.access > 0, d.access, d.created)";
 
   switch ($state_id) {
     case UNINSTALLED_STATE_ID:
-      $query->condition('d.uid', 0, '=')
+      $query->condition('d.uid', 0)
+        ->isNotNull('m.access')
         ->condition('d.access', $registration_timeout, '<');
       break;
 
     case UNREGISTERED_STATE_ID:
-      $query->condition('d.uid', 0, '=')
+      $query->condition('d.uid', 0)
         ->condition('d.access', $registration_timeout, '>=');
       break;
 
@@ -587,32 +618,12 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
             ->condition('m.access', $communication_timeout, '>='));
       break;
 
-    default:
-      $latest_field = "
-        IF (m.corrupted IS NOT NULL, m.corrupted,
-          IF (m.unsynchronized IS NOT NULL, m.unsynchronized,
-            IF (d.access = 0, d.created,
-              IF (d.access >= $communication_timeout AND m.access > 0 AND m.access < $offline_timeout, m.access,
-                IF (m.access = 0, d.created, d.access)
-              )
-            )
-          )
-        )";
+    case MISSING_SENSORS_STATE_ID:
+      $query->isNull('m.access');
+      break; 
 
-      $state_id_field = "
-        IF (d.uid = 0,
-          IF (d.access < $registration_timeout, " . UNINSTALLED_STATE_ID . ", " . UNREGISTERED_STATE_ID . "),
-          IF (m.corrupted IS NOT NULL, " . CORRUPTED_STATE_ID . ",
-            IF (m.unsynchronized IS NOT NULL, " . INVALID_TIMESTAMP_STATE_ID . ",
-              IF (d.access < $offline_timeout,
-                IF (m.access < $offline_timeout, " . OFFLINE_STATE_ID . ", " . NO_HEARTBEAT_STATE_ID . "),
-                IF (d.access < $communication_timeout, " . NO_COMMUNICATION_STATE_ID . ",
-                   IF (m.access < $offline_timeout, " . NO_MEASUREMENT_STATE_ID . ", " . WORKING_STATE_ID . ")
-                )
-              )
-            )
-          )
-        )";
+    default:
+      return array();
   }
 
   $query->addExpression($state_id_field, 'state_id');
@@ -628,7 +639,12 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
     $query->extend('TableSort')->orderByHeader($header);
   }
 
-  return $query->execute();
+  $result = $query->execute();
+  while ($device = $result->fetchAssoc()) {
+
+    $devices[] = $device;
+  }
+  return $devices;
 }
 
 function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, $email, $type_id) {
@@ -666,7 +682,7 @@ function deployment_listfilter_form($form, &$form_state, $state_id, $user_name, 
     '#description' => t('Enter part of the user email.')
   );
 
-  $types = logger_get_sensor_types_options();
+  $types = logger_get_sensor_types_options(NULL, NULL);
   $types[0] = t('All');
 
   $form['type_id'] = array(
