@@ -1430,7 +1430,7 @@ function logger_update_7064() {
 /**
  * Creates table logger_device_firmware.
  */
-function logger_update_7073() {
+function logger_update_7077() {
 
   db_create_table('logger_device_firmware', drupal_get_schema_unprocessed('logger', 'logger_device_firmware'));
 
@@ -1450,13 +1450,13 @@ function logger_update_7073() {
   db_insert('logger_device_firmware')
     ->fields(array(
       'id' => 1,
-      'version' => '1.0.0',
+      'version' => '1.0.0-0',
       'release_time' => '20100601_0000',
       'build' => '10010010010010010010010010010010',
-      'tag' => 'flukso-1.0.0',
+      'tag' => 'flukso-1.0.0-0',
       'device_type_id' => 1,
       'upgradable' => 0,
-      'description' => 'Flukso Version 1.0.0',
+      'description' => 'Flukso Version 1.0.0-0',
 
     ))
     ->execute();
@@ -1464,26 +1464,26 @@ function logger_update_7073() {
   db_insert('logger_device_firmware')
     ->fields(array(
       'id' => 2,
-      'version' => '2.0.0',
+      'version' => '2.0.0-0',
       'release_time' => '20110601_0000',
       'build' => '20020020020020020020020020020020',
-      'tag' => 'flukso-2.0.0',
+      'tag' => 'flukso-2.0.0-0',
       'device_type_id' => 2,
       'upgradable' => 0,
-      'description' => 'Flukso Version 2.0.0'
+      'description' => 'Flukso Version 2.0.0-0'
     ))
     ->execute();
 
   db_insert('logger_device_firmware')
     ->fields(array(
       'id' => 3,
-      'version' => '2.0.2',
+      'version' => '2.0.2-0',
       'release_time' => '20110701_0000',
       'build' => '20220220220220220220220220220222',
       'tag' => 'flukso-2.0.2',
       'device_type_id' => 2,
       'upgradable' => 0,
-      'description' => 'Flukso Version 2.0.2'
+      'description' => 'Flukso Version 2.0.2-0'
     ))
     ->execute();
 
@@ -1581,13 +1581,52 @@ function logger_update_7073() {
   db_insert('logger_device_firmware')
     ->fields(array(
       'id' => 11,
-      'version' => '1.0.0',
+      'version' => '1.0.0-0',
       'release_time' => '20130701_0000',
       'build' => '10010010010010010010010010010010',
       'tag' => 'raspberry-pi-1.0.0',
-      'device_type_id' => 3,
+      'device_type_id' => 6,
       'upgradable' => 1,
       'description' => 'Raspberry Pi Version 1.0.0'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 13,
+      'version' => '2.0.5-2',
+      'release_time' => '20130901_0000',
+      'build' => '20522052205220522052205220522052',
+      'tag' => 'flukso-2.0.5-2',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.0.5-2'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 14,
+      'version' => '2.0.5-3',
+      'release_time' => '20130902_0000',
+      'build' => '20532053205320532053205320532053',
+      'tag' => 'flukso-2.0.5-3',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.0.5-3'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 15,
+      'version' => '2.0.5-4',
+      'release_time' => '20130903_0000',
+      'build' => '20542054205420542054205420542054',
+      'tag' => 'flukso-2.0.5-4',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.0.5-4'
     ))
     ->execute();
 
@@ -1597,7 +1636,7 @@ function logger_update_7073() {
 /**
  * Add field firmware_id to table logger_devices.
  */
-function logger_update_7074() {
+function logger_update_7078() {
 
   db_add_field('logger_devices', 'firmware_id', array(
     'type' => 'int',
@@ -1624,14 +1663,14 @@ function logger_update_7074() {
     ->fields(array(
       'firmware_id' => 2
     ))
-    ->condition('firmware_version', '2.0.0')
+    ->condition('firmware_version', '2.0.0-0')
     ->execute();
 
   db_update('logger_devices')
     ->fields(array(
       'firmware_id' => 3
     ))
-    ->condition('firmware_version', '2.0.2')
+    ->condition('firmware_version', '2.0.2-0')
     ->execute();
 
   db_update('logger_devices')
@@ -1676,5 +1715,36 @@ function logger_update_7074() {
     ->condition('firmware_version', '2.0.4-rc3')
     ->execute();
 
+  db_update('logger_devices')
+    ->fields(array(
+      'firmware_id' => 13
+    ))
+    ->condition('firmware_version', '2.0.5-2')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'firmware_id' => 14
+    ))
+    ->condition('firmware_version', '2.0.5-3')
+    ->execute();
+
+  db_update('logger_devices')
+    ->fields(array(
+      'firmware_id' => 15
+    ))
+    ->condition('firmware_version', '2.0.5-4')
+    ->execute();
+
   return st('Add field firmware_id to table logger_devices.');
+}
+
+/**
+ * Drop field firmware_version from table logger_devices.
+ */
+function logger_update_7079() {
+
+  db_drop_field('logger_devices', 'firmware_version');
+
+  return st('Field firmware_version has been droped from table logger_devices.');
 }

@@ -226,12 +226,12 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
         FirmwareId = if
           IsFirmwareInformed == true ->
-            {struct, FirmwareVersion} = proplists:get_value(<<"firmware">>, JsonData),
-            proplists:get_value(<<"version">>, FirmwareVersion),
+            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
+            FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
 
-            {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion]),
+            {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
             case mysql:get_result_rows(_Result) of
-              [[_FirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareDeviceTypeId, FirmwareUpgradable]] -> _FirmwareId; %TODO: validate other properties
+              [[_FirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareUpgradable]] -> _FirmwareId; %TODO: validate other properties from struct Firmware
               _ -> ?UNKNOWN_FIRMWARE_ID
             end;
 

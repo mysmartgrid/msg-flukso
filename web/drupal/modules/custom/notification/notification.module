@@ -2021,7 +2021,6 @@ function notification_query_limit_consumption_violations($notifiable, $maximum) 
   foreach ($measurements as $meter => $data) {
     foreach ($data as $function => $values) {
       $sublist = NULL;
-      $total = 0;
 
       foreach ($values as $timestamp => $value) {
 
@@ -2034,9 +2033,6 @@ function notification_query_limit_consumption_violations($notifiable, $maximum) 
           $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
           $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
             number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
-        }
-        if (++$total > 50) {
-          break;
         }
       }
       if ($sublist) {

@@ -102,7 +102,7 @@ is_auth_POST(ReqData, #state{event = Event, device = Device, digest = ClientDige
 process_post(ReqData, #state{event = Event, device = Device} = State) ->
 
     {data, Result} = mysql:execute(pool, device_props, [Device]),
-    [[Key, Upgrade, Resets, FirmwareVersion, Description]] = mysql:get_result_rows(Result),
+    [[Key, Upgrade, Resets, FirmwareId, Description]] = mysql:get_result_rows(Result),
 
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
     Timestamp = unix_time(),

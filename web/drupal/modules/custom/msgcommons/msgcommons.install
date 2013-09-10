@@ -158,7 +158,7 @@ function msgcommons_install() {
       'id' => 4,
       'name' => 'Kilowatt',
       'symbol' => 'kW',
-      'factor' => 3600,
+      'factor' => (3.6 / 1000),
       'string_id' => 'kw',
       'type_id' => 2
     ))
@@ -961,4 +961,19 @@ function msgcommons_update_7025() {
     ->execute();
 
   return st('Create unit hectopascal.');
+}
+
+/**
+ * Update the kilowatt factor.
+ */
+function msgcommons_update_7026() {
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000)
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  return st('Update the kilowatt factor.');
 }

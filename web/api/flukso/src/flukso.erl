@@ -54,7 +54,7 @@ mysql_prepare() ->
     mysql:prepare(sensor_agg, <<"SELECT meter FROM logger_aggregated_meters WHERE virtual_meter = ?">>),
     mysql:prepare(sensor_agg_delete, <<"DELETE FROM logger_aggregated_meters WHERE meter = ?">>),
     mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, external_id, function, description, phase, constant, value, factor, unit_id, price, latitude, longitude) SELECT ?, uid, device, ?, 0, ?, ?, ?, ?, 0, 0, 0, 1, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, uid, device, created, access, type, external_id, function, description, phase, constant, value, factor, unit_id, price, latitude, longitude) SELECT ?, uid, device, ?, 0, ?, ?, ?, ?, 0, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
     mysql:prepare(sensor_config, <<"UPDATE logger_meters SET external_id = ?, function = ?, description = ?, unit_id = ? WHERE meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
@@ -66,10 +66,8 @@ mysql_prepare() ->
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_id, upgrade, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
 
-    mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, device_type_id, upgradable FROM logger_device_firmware WHERE version = ?">>),
-
+    mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, upgradable FROM logger_device_firmware WHERE version = ? AND device_type_id = ?">>),
     mysql:prepare(notification_delete, <<"DELETE FROM notification WHERE device = ?">>),
-
     mysql:prepare(msgdump_delete, <<"DELETE FROM msgdump WHERE meter = ?">>),
 
     mysql:prepare(event_insert, <<"INSERT INTO event_log (device, event_id, time) VALUES (?, ?, ?)">>),
