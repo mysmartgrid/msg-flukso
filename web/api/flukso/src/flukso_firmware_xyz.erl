@@ -99,11 +99,14 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
-    {data, Result} = mysql:execute(pool, device_props, [Device]),
+    {data, Result} = mysql:execute(pool, device_firmware, [Device]),
 
     case mysql:get_result_rows(Result) of
 
-      [[Key, Upgrade, Resets, CurrentVersion, Description]] ->
+      [[Key, Upgrade, CurrentVersion, false]] ->
+        {{halt, ?HTTP_NON_UPGRADABLE_FIRMWARE}, ReqData, State};
+
+      [[Key, Upgrade, CurrentVersion, true]] ->
 
         if
           Upgrade > 0 ->

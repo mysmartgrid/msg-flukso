@@ -616,5 +616,7 @@ function logger_rrd_get_unit_factor($unit, $price = NULL, $device_type_id = 0) {
   if (strpos($unit, '€') != FALSE && $price) {
     $factor *= $price; 
   }
-  return $factor * ($device_type_id == LIBKLIO_DEVICE_TYPE_ID ? 1 : 1000);
+
+  //TODO: get rid of this test later
+  return $factor * ($device_type_id == LIBKLIO_DEVICE_TYPE_ID || $device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID ? 1 : 1000);
 }

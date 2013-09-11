@@ -821,6 +821,7 @@ function logger_balance_page($interval, $popup = FALSE) {
 function logger_overview_page($interval, $popup = FALSE) {
 
   $interval = logger_check_interval($interval, 'hour');
+  $device_types = array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID);
 
   $introduction = '';
   $cache_id = 'logger_overview';
@@ -848,8 +849,8 @@ function logger_overview_page($interval, $popup = FALSE) {
     }
 
     //Counters
-    $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid AND type_id <> :cloned";
-    $devcounter = db_query($sql, array(':uid' => 0, ':cloned' => CLONED_DEVICE_TYPE_ID))->fetchField();
+    $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid AND type_id IN (:types)";
+    $devcounter = db_query($sql, array(':uid' => 0, ':types' => $device_types))->fetchField();
 
     $sql = "SELECT COUNT(*) FROM {users} u WHERE EXISTS(
       SELECT 1 FROM {logger_devices} d WHERE d.uid = u.uid)";
@@ -866,10 +867,10 @@ function logger_overview_page($interval, $popup = FALSE) {
     cache_set($cache_id, $introduction, 'cache_page', REQUEST_TIME + 1 * DAY);
   }
 
-  $types = array(ENERGY_CONSUMPTION_SENSOR_TYPE);
-  $sensors = logger_get_sensors($types);
+  $sensor_types = array(ENERGY_CONSUMPTION_SENSOR_TYPE);
+  $sensors = logger_get_sensors($sensor_types, NULL, FALSE, FALSE, TRUE, array(), $device_types);
 
-  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $types, 'W', $introduction, TRUE, $popup);
+  return logger_line_chart_page($interval, 'overview', t('Overall View'), $sensors, $sensor_types, 'W', $introduction, TRUE, $popup);
 }
 
 /**
@@ -2027,16 +2028,17 @@ function logger_format_legend_record($value, $record_time, $interval, $complemen
 /**
  * Returns an array containing sensors owned by the informed users.
  *
- * @param $types             The types of sensors to be returned (default: all).
+ * @param $sensor_types      The types of sensors to be returned (default: all).
  * @param $user_ids          The user ids of sensor owners (default: all).
  * @param $virtual           Whether virtual sensors can be returned (default: false).
  * @param $only_forecast     Whether only forecast sensors can be returned (default: false).
  * @param $include_visitors  Whether sensors belonging to users with role 'Visitor' can be returned (default: true).
  * @param $area              The geographical area where the sensors must be located.
  *                           (format: array('latitude' => array(min, max), 'longitude' => array(min, max))).
+ * @param $device_types      The types of devices whose sensors are to be returned (default: all).
  * @return the array of sensors.
  */
-function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE, $include_visitors = TRUE, $area = array()) {
+function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE, $include_visitors = TRUE, $area = array(), $device_types = NULL) {
 
   global $user;
 
@@ -2066,8 +2068,8 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   $query->join('users', 'u', 'u.uid = m.uid');
   $query->addField('u', 'name', 'username');
 
-  if (!empty($types)) {
-    $query->condition('m.type', $types, 'IN');
+  if (!empty($sensor_types)) {
+    $query->condition('m.type', $sensor_types, 'IN');
   }
   if (!empty($user_ids)) {
     $query->condition('u.uid', $user_ids, 'IN');
@@ -2077,6 +2079,9 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
   }
   if ($only_forecast) {
     $query->condition('m.forecast', 1);
+  }
+  if (!empty($device_types)) {
+    $query->condition('d.type_id', $device_types, 'IN');
   }
   if (!empty($area)) {
     $query
@@ -2094,6 +2099,10 @@ function logger_get_sensors($types = NULL, $user_ids = NULL, $include_virtual = 
     $visitor->condition('r.name', 'Visitor');
 
     $query->notExists($visitor);
+  }
+
+  if (!empty($device_types)) {
+    $query->condition('d.type_id', $device_types, 'IN');
   }
 
   $query->orderBy('u.name');
@@ -3401,22 +3410,26 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
   }
 
   //FIXME: find a better way of filtering the sensor types
-  switch ($unit_type_id) {
 
-    case TEMPERATURE_UNIT_TYPE_ID:
-      $query->condition('id', TEMPERATURE_SENSOR_TYPE);
-      break;
+  if ($unit_type_id != NULL) {
 
-    case PRESSURE_UNIT_TYPE_ID:
-      $query->condition('id', PRESSURE_SENSOR_TYPE);
-      break;
+    switch ($unit_type_id) {
+ 
+      case TEMPERATURE_UNIT_TYPE_ID:
+        $query->condition('id', TEMPERATURE_SENSOR_TYPE);
+        break;
 
-    case HUMIDITY_UNIT_TYPE_ID:
-      $query->condition('id', HUMIDITY_SENSOR_TYPE);
-      break;
+      case PRESSURE_UNIT_TYPE_ID:
+        $query->condition('id', PRESSURE_SENSOR_TYPE);
+        break;
 
-    default:
-       $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
+      case HUMIDITY_UNIT_TYPE_ID:
+        $query->condition('id', HUMIDITY_SENSOR_TYPE);
+        break;
+ 
+      default:
+        $query->condition('id', array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE), 'IN');
+    }
   }
 
   $result = $query->fields('t', array('id', 'name'))

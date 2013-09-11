@@ -214,7 +214,7 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
         {struct, Params} = proplists:get_value(<<"config">>, JsonData),
         Device = proplists:get_value(<<"device">>, Params),
-        {_data, _Result} = mysql:execute(pool, device_key, [Device]),
+        {data, _Result} = mysql:execute(pool, device_key, [Device]),
         mysql:get_result_rows(_Result)
     end,
 
@@ -371,7 +371,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
         Device = proplists:get_value(<<"device">>, Params),
 
         UnitString = get_optional_value(<<"unit">>, Params, "wh"),
-        {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+        {data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
 
         case mysql:get_result_rows(_Result) of
 
@@ -393,7 +393,12 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
                   _ -> ?ENERGY_CONSUMPTION_SENSOR_TYPE_ID
                 end,
 
-                mysql:execute(pool, sensor_insert, [Sensor, Timestamp, SensorType, ExternalId, Function, Description, UnitId, Device]),
+                % Flukso 2 devices store values in Wh and not in Ws
+                {data, Res} = mysql:execute(pool, device_type, [Device]),
+                [[DeviceType]] = mysql:get_result_rows(Res),
+                RrdFactor = case DeviceType of ?FLUKSO2_DEVICE_TYPE_ID -> 1000; _ -> 1 end,
+
+                mysql:execute(pool, sensor_insert, [Sensor, Timestamp, SensorType, ExternalId, Function, Description, RrdFactor, UnitId, Device]),
                 mysql:execute(pool, token_insert, [Token, Sensor, 62]),
 
                 RrdResponse = "ok",
