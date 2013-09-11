@@ -103,7 +103,10 @@ to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     case mysql:get_result_rows(Result) of
 
-      [[Key, Upgrade, CurrentVersion]] ->
+      [[Key, Upgrade, CurrentVersion, false]] ->
+        {{halt, ?HTTP_NON_UPGRADABLE_FIRMWARE}, ReqData, State};
+
+      [[Key, Upgrade, CurrentVersion, true]] ->
 
         if
           Upgrade > 0 ->

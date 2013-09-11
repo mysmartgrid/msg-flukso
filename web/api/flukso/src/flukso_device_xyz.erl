@@ -165,7 +165,7 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
     {data, Result} = mysql:execute(pool, device_props, [Device]),
     [[Key, Upgrade, Resets, FirmwareId, DeviceDescription]] = mysql:get_result_rows(Result),
 
-    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+    {data, _Result} = mysql:execute(pool, device_sensors, [Device]),
     _Sensors = mysql:get_result_rows(_Result),
 
     Sensors = [{struct, [
@@ -224,25 +224,31 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
         IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
 
-        FirmwareId = if
+        {FirmwareId, NewUpgrade} = if
           IsFirmwareInformed == true ->
             {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
             FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
 
             {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
             case mysql:get_result_rows(_Result) of
-              [[_FirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareUpgradable]] -> _FirmwareId; %TODO: validate other properties from struct Firmware
-              _ -> ?UNKNOWN_FIRMWARE_ID
+
+              [[NewFirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareUpgradable]] ->
+                {NewFirmwareId,
+                  case NewFirmwareId of
+                    OldFirmwareId -> 0; %If device has the firmware version defined in the server
+                    _ -> Upgrade
+                  end};
+              _ -> {?UNKNOWN_FIRMWARE_ID, 0}
             end;
 
           true ->
-            OldFirmwareId
+            {OldFirmwareId, Upgrade}
         end,
 
         Description = get_optional_value(<<"description">>, JsonData, OldDescription),
 
         mysql:execute(pool, device_update,
-          [Timestamp, Version, Upgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
+          [Timestamp, Version, NewUpgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -267,7 +273,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 compose_support_tag(Device) ->
 
     %Check if device has requested remote support, and if a port is available
-    {_data, _Result} = mysql:execute(pool, support_slot, [Device]),
+    {data, _Result} = mysql:execute(pool, support_slot, [Device]),
 
     case mysql:get_result_rows(_Result) of
 
@@ -304,7 +310,7 @@ compose_support_tag(Device) ->
 
 delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
-    {_data, _Result} = mysql:execute(pool, device_sensors, [Device]),
+    {data, _Result} = mysql:execute(pool, device_sensors, [Device]),
 
     Sensors = mysql:get_result_rows(_Result),
     [delete_device_sensor(Meter) || [Meter, ExternalId, Function, Description, Unit] <- Sensors],

@@ -214,7 +214,7 @@ is_auth_POST(ReqData, #state{rrdSensor = Sensor, digest = ClientDigest} = State)
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
         {struct, Params} = proplists:get_value(<<"config">>, JsonData),
         Device = proplists:get_value(<<"device">>, Params),
-        {_data, _Result} = mysql:execute(pool, device_key, [Device]),
+        {data, _Result} = mysql:execute(pool, device_key, [Device]),
         mysql:get_result_rows(_Result)
     end,
 

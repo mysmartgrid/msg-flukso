@@ -1478,9 +1478,9 @@ function logger_update_7077() {
     ->fields(array(
       'id' => 3,
       'version' => '2.0.2-0',
-      'release_time' => '20110701_0000',
+      'release_time' => '20111005_0000',
       'build' => '20220220220220220220220220220222',
-      'tag' => 'flukso-2.0.2',
+      'tag' => 'flukso-2.0.2-0',
       'device_type_id' => 2,
       'upgradable' => 0,
       'description' => 'Flukso Version 2.0.2-0'
@@ -1747,4 +1747,116 @@ function logger_update_7079() {
   db_drop_field('logger_devices', 'firmware_version');
 
   return st('Field firmware_version has been droped from table logger_devices.');
+}
+
+/**
+ * Add firmware patches.
+ */
+function logger_update_7080() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 16,
+      'version' => '2.0.2-1',
+      'release_time' => '20110701_0000',
+      'build' => '20212021202120212021202120212021',
+      'tag' => 'flukso-2.0.2-1',
+      'device_type_id' => 2,
+      'upgradable' => 0,
+      'description' => 'Flukso Version 2.0.2-1'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 17,
+      'version' => '2.0.2-1a',
+      'release_time' => '20130911_0000',
+      'build' => '2021a2021a2021a2021a2021a2021a20',
+      'tag' => 'flukso-2.0.2-1a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.2-1'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 18,
+      'version' => '2.0.3-1a',
+      'release_time' => '20130911_0000',
+      'build' => '2031a2031a2031a2031a2031a2031a20',
+      'tag' => 'flukso-2.0.3-1a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.3-1'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 19,
+      'version' => '2.0.4-1a',
+      'release_time' => '20130911_0000',
+      'build' => '2041a2041a2041a2041a2041a2041a20',
+      'tag' => 'flukso-2.0.4-1a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.4-1'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 20,
+      'version' => '2.0.4-2a',
+      'release_time' => '20130911_0000',
+      'build' => '2042a2042a2042a2042a2042a2042a20',
+      'tag' => 'flukso-2.0.4-2a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.4-2'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 21,
+      'version' => '2.0.4-3a',
+      'release_time' => '20130911_0000',
+      'build' => '2043a2043a2043a2043a2043a2043a20',
+      'tag' => 'flukso-2.0.4-3a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.4-3'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 22,
+      'version' => '2.0.4-4a',
+      'release_time' => '20130911_0000',
+      'build' => '2044a2044a2044a2044a2044a2044a20',
+      'tag' => 'flukso-2.0.4-4a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.4-4'
+    ))
+    ->execute();
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 23,
+      'version' => '2.0.4-rc3a',
+      'release_time' => '20130911_0000',
+      'build' => '204rc3a204rc3a204rc3a204rc3a204r',
+      'tag' => 'flukso-2.0.4-rc3a',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Patch for Flukso Version 2.0.4-rc3a'
+    ))
+    ->execute();
+
+  return st('Firmware patches have been added.');
 }

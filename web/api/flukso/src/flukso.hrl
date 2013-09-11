@@ -51,20 +51,21 @@
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
 -define(INVALID_TIMESTAMP_EVENT_ID,       202).
 
--define(HTTP_OK,                    200).
--define(HTTP_BAD_ARGUMENT,          400).
--define(HTTP_UNAUTHORIZED,          401).
--define(HTTP_FORBIDDEN,             403).
--define(HTTP_INVALID_TIMESTAMP,     470).
--define(HTTP_INVALID_UNIT,          471).
--define(HTTP_INVALID_MEASUREMENT,   472).
--define(HTTP_INVALID_TYPE,          473).
--define(HTTP_INVALID_ID,            474).
--define(HTTP_INVALID_KEY,           475).
--define(HTTP_INVALID_TIME_PERIOD,   476).
--define(HTTP_INVALID_EVENT,         477).
--define(HTTP_INTERNAL_SERVER_ERROR, 500).
--define(HTTP_NOT_IMPLEMENTED,       501).
+-define(HTTP_OK,                      200).
+-define(HTTP_BAD_ARGUMENT,            400).
+-define(HTTP_UNAUTHORIZED,            401).
+-define(HTTP_FORBIDDEN,               403).
+-define(HTTP_INVALID_TIMESTAMP,       470).
+-define(HTTP_INVALID_UNIT,            471).
+-define(HTTP_INVALID_MEASUREMENT,     472).
+-define(HTTP_INVALID_TYPE,            473).
+-define(HTTP_INVALID_ID,              474).
+-define(HTTP_INVALID_KEY,             475).
+-define(HTTP_INVALID_TIME_PERIOD,     476).
+-define(HTTP_INVALID_EVENT,           477).
+-define(HTTP_NON_UPGRADABLE_FIRMWARE, 478).
+-define(HTTP_INTERNAL_SERVER_ERROR,   500).
+-define(HTTP_NOT_IMPLEMENTED,         501).
 
 -define(ENERGY_CONSUMPTION_SENSOR_TYPE_ID, 1).
 -define(ENERGY_PRODUCTION_SENSOR_TYPE_ID,  2).
@@ -242,7 +243,7 @@ check_time(_, _, _, _) ->
 
 
 check_unit(UnitString) ->
-    {_data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
+    {data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
     case mysql:get_result_rows(_Result) of
       [[Id, Factor, Type]] -> {Id, Factor, true};
       _ -> {0, 0, false}
