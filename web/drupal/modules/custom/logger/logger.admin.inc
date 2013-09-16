@@ -179,6 +179,42 @@ function logger_usersensors_page() {
 }
 
 /**
+ * Builds the firmware releases page.
+ *
+ * @return the firmware releases page.
+ */
+function logger_releases_page() {
+
+  drupal_set_title(t('Firmware Releases'));
+
+  $type_id = isset($_REQUEST['device_type_id']) ? $_REQUEST['device_type_id'] : 0;
+
+  $query = db_select('logger_device_firmware', 'f')
+    ->fields('f', array('version', 'release_time', 'build', 'tag'))
+    ->orderBy('f.version');
+
+  if ($type_id > 0) {
+    $query->condition('f.device_type_id', $type_id);
+  }
+  $releases = $query->execute();
+
+  $header = array(t('Version'), t('Time'), 'Build', 'Tag');
+  $rows = array();
+  foreach ($releases as $release) {
+    $rows[] = array($release->version, $release->release_time, $release->build, $release->tag);
+  }
+
+  $form = drupal_get_form('logger_releasesfilter_form', $type_id);
+
+  return
+    drupal_render($form) .
+
+    theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+      'empty' => t('No firmware releases available.'), 'sticky' => FALSE, 'colgroups' => array(),
+      'attributes' => array('id' => 'releases-list')));
+}
+
+/**
  * Builds the device edition page.
  *
  * @param $id  The device id.
@@ -517,6 +553,28 @@ function logger_userprivacy_form($form, &$form_state) {
   return $form;
 }
 
+function logger_releasesfilter_form($form, &$form_state, $type_id) {
+
+  $types = logger_get_device_types_options();
+  $types[0] = t('All');
+
+  $form['device_type_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Device Type'),
+    '#description' => t('Select the device type.'),
+    '#options' => $types,
+    '#default_value' => $type_id,
+    '#required' => TRUE,
+    '#attributes' => array('onchange' => "document.getElementById('logger-releasesfilter-form').submit();")
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Filter')
+  );
+  return $form;
+}
+
 function logger_deviceactivation_form_validate($form, &$form_state) {
 
   $code = $form_state['values']['code'];
@@ -681,6 +739,16 @@ function logger_userprivacy_form_submit($form, &$form_state) {
 
   // page redirection to the home page after form submission
   $form_state['redirect'] = 'logger';
+}
+
+function logger_releasesfilter_form_submit($form, &$form_state) {
+
+  $form_state['redirect'] = 'firmware/list';
+
+  $form_state['redirect'] = array('firmware/list', array(
+    'query' => array(
+      'device_type_id' => $form_state['values']['device_type_id'],
+  )));
 }
 
 /**

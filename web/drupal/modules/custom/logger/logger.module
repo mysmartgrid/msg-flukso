@@ -125,6 +125,10 @@ function logger_permission() {
       'title' => t('attend device remote support requests'),
       'description' => t('Attend remote support requests.'),
     ),
+    'list firmware releases' => array(
+      'title' => t('list firmware releases'),
+      'description' => t('list firmware releases'),
+    ),
   );
 }
 
@@ -548,6 +552,14 @@ function logger_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
     'weight' => 2,
+  );
+
+  $items['firmware/list'] = array(
+    'title' => 'Firmware Releases',
+    'page callback' => 'logger_releases_page',
+    'access arguments' => array('list firmware releases'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
   );
   return $items;
 }
@@ -3435,6 +3447,25 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
   $result = $query->fields('t', array('id', 'name'))
     ->distinct(TRUE)
     ->orderBy('id')
+    ->execute();
+
+  $options = array();
+  foreach ($result as $type) {
+    $options[$type->id] = t($type->name);
+  }
+  return $options;
+}
+
+/**
+ * Returns a list of device types.
+ *
+ * @return an array of device types.
+ */
+function logger_get_device_types_options() {
+
+  $result = db_select('logger_device_type', 't')
+    ->fields('t', array('id', 'name'))
+    ->orderBy('t.id')
     ->execute();
 
   $options = array();
