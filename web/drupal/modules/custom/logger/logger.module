@@ -24,9 +24,10 @@
  */
 
 //DEBUG
-//error_reporting(E_ALL);
-//ini_set('display_errors', TRUE);
-//ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+//FIXME
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);
@@ -556,8 +557,16 @@ function logger_menu() {
 
   $items['firmware/list'] = array(
     'title' => 'Firmware Releases',
-    'page callback' => 'logger_releases_page',
+    'page callback' => 'logger_firmwarereleases_page',
     'access arguments' => array('list firmware releases'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['firmware/upgrade'] = array(
+    'title' => 'Firmware Update',
+    'page callback' => 'logger_firmwareupgrade_page',
+    'access arguments' => array('list firmware releases'),//FIXME: find a better name
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
   );
@@ -4033,6 +4042,7 @@ function logger_cron() {
   //First quarter of an hour
   if ($rest >= 45 * MINUTE) {
     logger_remove_expired_support_requests();
+    logger_remove_expired_firmware_upgrade_requests();
   }
 
   //Second quarter of an hour
@@ -4086,6 +4096,16 @@ function logger_remove_expired_support_requests() {
 
     logger_remove_support_key($device->device);
   }
+}
+
+/**
+ * Removes firmware upgrade requests older than 1 day.
+ */
+function logger_remove_expired_firmware_upgrade_requests() {
+
+  db_delete('logger_firmware_upgrade_request')
+    ->condition('requested', REQUEST_TIME - DAY, '<')
+    ->execute();
 }
 
 /**

@@ -451,6 +451,38 @@ function logger_schema() {
     'primary key' => array('id')
   );
 
+  $schema['logger_firmware_upgrade_request'] = array(
+    'description' => 'The device firmware upgrade request.',
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+      'firmware_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
+      'requested' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'approved' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array('device')
+  );
+
   return $schema;
 }
 
@@ -1859,4 +1891,14 @@ function logger_update_7080() {
     ->execute();
 
   return st('Firmware patches have been added.');
+}
+
+/**
+ * Create table logger_firmware_upgrade_request.
+ */
+function logger_update_7082() {
+
+  db_create_table('logger_firmware_upgrade_request', drupal_get_schema_unprocessed('logger', 'logger_firmware_upgrade_request'));
+
+  return st('Table logger_firmware_upgrade_request has been created.');
 }
