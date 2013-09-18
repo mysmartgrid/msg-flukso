@@ -196,7 +196,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets, OldFirmwareId, OldDescription]] ->
+      [[Key, Upgrade, Resets, CurrentFirmwareId, CurrentDescription]] ->
 
         Version = get_optional_value(<<"version">>, JsonData, 0),
         Reset = get_optional_value(<<"reset">>, JsonData, 0),
@@ -225,27 +225,46 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
 
         {FirmwareId, NewUpgrade} = if
-          IsFirmwareInformed == true ->
-            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
 
-            {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
+          %Device has informed a firmware version
+          IsFirmwareInformed == true ->
+
+            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
+            InformedVersion = proplists:get_value(<<"version">>, Firmware),
+
+            {data, _Result} = mysql:execute(pool, firmware_props, [InformedVersion, TypeId]),
             case mysql:get_result_rows(_Result) of
 
-              [[NewFirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareUpgradable]] ->
-                {NewFirmwareId,
-                  case NewFirmwareId of
-                    OldFirmwareId -> 0; %If device has the firmware version defined in the server
-                    _ -> Upgrade
-                  end};
+              %Known firmware version
+              [[InformedFirmwareId, _Time, _Build, _Tag, _Upg]] ->
+
+                %Check if there is an upgrade request
+                {data, R} = mysql:execute(pool, firmware_upgrade_props, [Device]),
+                case mysql:get_result_rows(R) of
+
+                  %Upgrade request found, and device has performed a firmware upgrade
+                  [[K, T, FromVersion, InformedVersion]] ->
+
+                    %Delete upgrade request
+                    mysql:execute(pool, firmware_upgrade_delete, [Device]),
+                    {InformedFirmwareId, 0};
+
+                  %Upgrade request found, but device has not yet performed a firmware upgrade
+                  [[K, T, FromVersion, ToVersion]] -> {CurrentFirmwareId, Upgrade};
+
+                  %No upgrade request found
+                  _ -> {InformedFirmwareId, 0}
+                end;
+
+              %Unknown firmware version
               _ -> {?UNKNOWN_FIRMWARE_ID, 0}
             end;
 
-          true ->
-            {OldFirmwareId, Upgrade}
+          %Device has not informed its firmware version
+          true -> {CurrentFirmwareId, Upgrade}
         end,
 
-        Description = get_optional_value(<<"description">>, JsonData, OldDescription),
+        Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
 
         mysql:execute(pool, device_update,
           [Timestamp, Version, NewUpgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),

@@ -99,42 +99,28 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
-    {data, Result} = mysql:execute(pool, device_firmware, [Device]),
+    {data, Result} = mysql:execute(pool, firmware_upgrade_props, [Device]),
 
     case mysql:get_result_rows(Result) of
 
-      [[Key, Upgrade, CurrentVersion, false]] ->
-        {{halt, ?HTTP_NON_UPGRADABLE_FIRMWARE}, ReqData, State};
+      [[Key, DeviceTypeId, FromVersion, ToVersion]] ->
+        Path = string:concat(?FIRMWARE_UPGRADES_PATH, "archives/"),
+        Args = string:concat(Device, string:concat(" ", string:concat(integer_to_list(DeviceTypeId), string:concat(" ", string:concat(binary_to_list(FromVersion), string:concat(" ", binary_to_list(ToVersion))))))),
+        os:cmd(string:concat(string:concat(Path, "create-archive.sh "), Args)),
+        FilePath = string:concat(Path, Device),
 
-      [[Key, Upgrade, CurrentVersion, true]] ->
+        case file:read_file(FilePath) of
 
-        if
-          Upgrade > 0 ->
+          {ok, File} ->
+            file:delete(FilePath),
+            Answer = [{<<"data">>, base64:encode(File)}],
+            mysql:execute(pool, firmware_upgrade_delete, [Device]),
+            digest_response(Key, Answer, ReqData, State, false);
 
-            Path = string:concat(?FIRMWARE_UPGRADES_PATH, "archives/"),
-            Args = string:concat(Device, string:concat(" ", erlang:binary_to_list(CurrentVersion))),
-            os:cmd(string:concat(string:concat(Path, "create-archive.sh "), Args)),
-            FilePath = string:concat(Path, Device),
-            
-            case file:read_file(FilePath) of
-
-              {ok, File} ->
-                file:delete(FilePath),
-                Answer = [{<<"data">>, base64:encode(File)}],
-
-                mysql:execute(pool, device_upgrade_update, [0, Device]),
-
-                digest_response(Key, Answer, ReqData, State, false);
-
-              _ ->
-                {{halt, ?HTTP_FORBIDDEN}, ReqData, State}
-            end;
-
-          true ->
-            {{halt, ?HTTP_BAD_ARGUMENT}, ReqData, State}
+          _ ->
+            {{halt, ?HTTP_FORBIDDEN}, ReqData, State}
         end;
 
       _ ->
-        %Internal Server Error (logical error, that must never occur)
-        {{halt, ?HTTP_INTERNAL_SERVER_ERROR}, ReqData, State}
+        {{halt, ?HTTP_NON_UPGRADABLE_FIRMWARE}, ReqData, State}
     end.

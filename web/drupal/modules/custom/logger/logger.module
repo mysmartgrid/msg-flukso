@@ -24,9 +24,10 @@
  */
 
 //DEBUG
-#error_reporting(E_ALL);
-#ini_set('display_errors', TRUE);
-#ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+#FIXME:
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);

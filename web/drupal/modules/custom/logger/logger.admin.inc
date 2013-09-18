@@ -196,10 +196,6 @@ function logger_firmwarereleases_page() {
   $query->join('logger_device_type', 't', 'f.device_type_id = t.id');
   $query->addField('t', 'name', 'device_type');
 
-  $query->leftJoin('logger_devices', 'd', 'd.firmware_id = f.id');
-  $query->addExpression('COUNT(*)', 'total');
-  $query->groupBy('f.id');
-
   if ($type_id > 0) {
     $query->condition('f.device_type_id', $type_id);
   }
@@ -208,6 +204,12 @@ function logger_firmwarereleases_page() {
   $header = array(t('Version'), t('Device Type'), t('Time'), 'Build', 'Tag', 'Upgradable', 'Total');
   $rows = array();
   foreach ($releases as $release) {
+
+    $query = db_select('logger_devices', 'd')
+      ->condition('d.firmware_id', $release->id);
+    $query->addExpression('COUNT(*)');
+    $total = $query->execute()->fetchField();
+
     $rows[] = array(
       $release->version,
       $release->device_type,
@@ -215,11 +217,11 @@ function logger_firmwarereleases_page() {
       wordwrap($release->build, 16, "\n", TRUE),
       $release->tag,
       $release->upgradable ? t('Yes') : t('No'),
-      $release->upgradable ?
-        l($release->total, "firmware/upgrade", array('query' => array(
+      $release->upgradable && $total > 0 ?
+        l($total, "firmware/upgrade", array('query' => array(
           'device_type_id' => $release->device_type_id,
           'from_version' => $release->id
-        ))) : $release->total
+        ))) : $total
     );
   }
 
@@ -751,7 +753,7 @@ function logger_deviceactivation_form_validate($form, &$form_state) {
 
     $count = $query
       ->condition('d.device', "$code%", 'LIKE')
-      ->condition('d.uid', 0, '=')
+      ->condition('d.uid', 0)
       ->execute()
       ->fetchField();
 
@@ -948,9 +950,7 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
 
     foreach ($selected as $device) {
 
-      db_delete('logger_firmware_upgrade_request')
-        ->condition('device', $device)
-        ->execute();
+      logger_remove_firmware_upgrade_request($device);
 
       if ($form_state['values']['to_version'] > 0) {
 
@@ -1116,7 +1116,7 @@ function logger_device_remove($device) {
 
   $flukso = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
-    ->condition('d.device', $device, '=')
+    ->condition('d.device', $device)
     ->execute()
     ->fetchObject();
 
@@ -1389,6 +1389,14 @@ function logger_remove_firmware_upgrade_request($device) {
   db_delete('logger_firmware_upgrade_request')
     ->condition('device', $device)
     ->execute();
+
+  //TODO: get rid of this flag later
+  db_update('logger_devices')
+    ->fields(array(
+      'upgrade' => 0
+    ))
+    ->condition('device', $device)
+    ->execute();
 }
 
 /**
@@ -1399,6 +1407,14 @@ function logger_firmware_upgrade_approve($device) {
   db_update('logger_firmware_upgrade_request')
     ->fields(array(
       'approved' => time()
+    ))
+    ->condition('device', $device)
+    ->execute();
+
+  //TODO: get rid of this flag later
+  db_update('logger_devices')
+    ->fields(array(
+      'upgrade' => 999 
     ))
     ->condition('device', $device)
     ->execute();

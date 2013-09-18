@@ -1902,3 +1902,20 @@ function logger_update_7082() {
 
   return st('Table logger_firmware_upgrade_request has been created.');
 }
+
+/**
+ * Updates Firmware releases.
+ */
+function logger_update_7084() {
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => 'ec378baf8a24ea9bb9de48306fcd39a5',
+      'tag' => 'hexapi-0.9.0-dev',
+      'release_time' => '20130916_0000'
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  return st('Firmware releases have been updated');
+}
