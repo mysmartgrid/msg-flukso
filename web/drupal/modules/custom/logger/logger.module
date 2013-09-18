@@ -24,10 +24,9 @@
  */
 
 //DEBUG
-error_reporting(E_ALL);
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
-//FIXME
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);
@@ -129,6 +128,14 @@ function logger_permission() {
     'list firmware releases' => array(
       'title' => t('list firmware releases'),
       'description' => t('list firmware releases'),
+    ),
+    'manage firmware releases' => array(
+      'title' => t('manage firmware upgrade'),
+      'description' => t('manage firmware upgrade'),
+    ),
+    'approve firmware upgrade' => array(
+      'title' => t('approve firmware upgrade'),
+      'description' => t('approve firmware upgrade'),
     ),
   );
 }
@@ -535,6 +542,46 @@ function logger_menu() {
     'file' => 'logger.admin.inc'
   );
 
+
+  //Firmware operations
+
+  $items['firmware/list'] = array(
+    'title' => 'Firmware Releases',
+    'page callback' => 'logger_firmwarereleases_page',
+    'access arguments' => array('list firmware releases'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['firmware/upgrade'] = array(
+    'title' => 'Firmware Update',
+    'page callback' => 'logger_firmwareupgrade_page',
+    'access arguments' => array('manage firmware upgrades'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['firmware/approve'] = array(
+    'title' => 'Firmware Update',
+    'page callback' => 'logger_firmware_upgrade_approve',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('approve firmware upgrade', 2),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
+  );
+
+  $items['firmware/disapprove'] = array(
+    'title' => 'Firmware Update',
+    'page callback' => 'logger_firmware_upgrade_disapprove',
+    'page arguments' => array(2),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('approve firmware upgrade', 2),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
+  );
+
+
   //Other operations
 
   $items['admin/config/logger'] = array(
@@ -553,22 +600,6 @@ function logger_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
     'weight' => 2,
-  );
-
-  $items['firmware/list'] = array(
-    'title' => 'Firmware Releases',
-    'page callback' => 'logger_firmwarereleases_page',
-    'access arguments' => array('list firmware releases'),
-    'type' => MENU_LOCAL_TASK,
-    'file' => 'logger.admin.inc',
-  );
-
-  $items['firmware/upgrade'] = array(
-    'title' => 'Firmware Update',
-    'page callback' => 'logger_firmwareupgrade_page',
-    'access arguments' => array('list firmware releases'),//FIXME: find a better name
-    'type' => MENU_LOCAL_TASK,
-    'file' => 'logger.admin.inc',
   );
   return $items;
 }
@@ -920,6 +951,31 @@ function logger_relative_energy_consumption_page() {
 function logger_energy_page($interval) {
 
   global $user;
+
+  $query = db_select('logger_firmware_upgrade_request', 'u');
+  $query->join('logger_devices', 'd', 'd.device = u.device');
+  $query->join('logger_device_firmware', 'f', 'f.id = u.firmware_id');
+  $query->join('logger_device_type', 't', 't.id = d.type_id');
+  $query->condition('d.uid', $user->uid);
+  $query->condition('u.approved', 0);
+  $query->addField('f', 'version');
+  $query->addField('d', 'serial');
+  $query->addField('d', 'device');
+  $query->addField('t', 'name', 'device_type');
+  $upgrade = $query->execute()->fetchObject();
+
+  if ($upgrade) {
+
+    drupal_set_message(t('A firmware upgrade is available for your %type device, serial number %serial. ' . 
+      "Do you want to upgrade it to version %version? !yes !no",
+       array(
+         '%type'    => $upgrade->device_type,
+         '%serial'  => $upgrade->serial,
+         '%version' => $upgrade->version,
+         '!yes'     => l(t('Yes'), "firmware/approve/$upgrade->device"),
+         '!no'      => l(t('No'), "firmware/disapprove/$upgrade->device"),
+    )), 'warning');
+  }
 
   $interval = logger_check_interval($interval, 'week');
   $all_types_options = logger_get_sensor_types_options($user->uid);
@@ -4104,7 +4160,7 @@ function logger_remove_expired_support_requests() {
 function logger_remove_expired_firmware_upgrade_requests() {
 
   db_delete('logger_firmware_upgrade_request')
-    ->condition('requested', REQUEST_TIME - DAY, '<')
+    ->condition('requested', REQUEST_TIME - WEEK, '<')
     ->execute();
 }
 

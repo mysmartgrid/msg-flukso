@@ -1392,6 +1392,35 @@ function logger_remove_firmware_upgrade_request($device) {
 }
 
 /**
+ * Approves a firmware upgrade.
+ */
+function logger_firmware_upgrade_approve($device) {
+
+  db_update('logger_firmware_upgrade_request')
+    ->fields(array(
+      'approved' => time()
+    ))
+    ->condition('device', $device)
+    ->execute();
+
+  drupal_set_message('The firmware of your device is going to be upgraded. Please, make sure it remains on during the next 2 hours.', 'warning');
+
+  drupal_goto("energy");
+}
+
+/**
+ * Disapproves a firmware upgrade.
+ */
+function logger_firmware_upgrade_disapprove($device) {
+
+  logger_remove_firmware_upgrade_request($device);
+
+  drupal_set_message('The firmware upgrade has been rejected.', 'warning');
+
+  drupal_goto("energy");
+}
+
+/**
  * Validates the uniqueness of a sensor function.
  *
  * @param $function The function to be validated.
