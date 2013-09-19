@@ -683,7 +683,7 @@ function logger_firmwareupgradefilter_form($form, &$form_state) {
 
   $devices = $query->execute();
 
-  $header = array(t('Serial'), t('Id'), t('From Version'), t('To Version'), t('Requested'), t('Approved'));
+  $header = array(t('Serial'), t('Device Id'), t('From Version'), t('To Version'), t('Requested'), t('User Approval'));
   $rows = array();
   foreach ($devices as $device) {
     $rows[$device->device] = array(
@@ -728,6 +728,13 @@ function logger_firmwareupgradefilter_form($form, &$form_state) {
     '#empty_option' => t('None'),
   );
 
+  $form['approved'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Pre-approved'),
+    '#description' => t("Check if you do not want to wait for the user's approval."),
+    '#default_value' => 0
+  );
+
   $form['table'] = array(
     '#type' => 'tableselect',
     '#header' => $header,
@@ -738,7 +745,7 @@ function logger_firmwareupgradefilter_form($form, &$form_state) {
 
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Update')
+    '#value' => t('Request')
   );
   return $form;
 }
@@ -958,7 +965,8 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
           ->fields(array(
             'device' => $device,
             'firmware_id' => $form_state['values']['to_version'], 
-            'requested' => time()
+            'requested' => time(),
+            'approved' => ($form_state['values']['approved'] > 0 ? time() : 0)
           ))
           ->execute();
       }
