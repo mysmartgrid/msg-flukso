@@ -58,12 +58,14 @@ malformed_POST(ReqData, _State) ->
         case check_digest(wrq:get_req_header("X-Digest", ReqData)) of
           {Digest, true} ->
 
-            case check_device(wrq:path_info(device, ReqData)) of
+            {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
+
+            case check_device(proplists:get_value(<<"device">>, JsonData)) of
               {Device, true} ->
 
                 case check_event(wrq:path_info(event, ReqData)) of
                   {Event, true} ->
-                    {false, ReqData, #state{device = Device, digest = Digest}};
+                    {false, ReqData, #state{device = Device, event = Event, digest = Digest}};
 
                   _ -> ?HTTP_INVALID_EVENT
                 end;

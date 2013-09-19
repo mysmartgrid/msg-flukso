@@ -275,7 +275,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
       _ ->
         %Function unix_time() returns unique ids (as long as this code runs on a single machine).
         Serial = Timestamp,
-        Upgrade = 0,
+        NewUpgrade = 0,
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
@@ -284,7 +284,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     end,
 
     Support = compose_support_tag(Device),
-    Answer = lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support),
+    Answer = lists:append([{<<"upgrade">>, NewUpgrade}, {<<"timestamp">>, Timestamp}], Support),
 
     digest_response(Key, Answer, ReqData, State).
 

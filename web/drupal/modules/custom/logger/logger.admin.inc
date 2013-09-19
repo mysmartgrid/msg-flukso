@@ -1419,7 +1419,7 @@ function logger_firmware_upgrade_approve($device) {
     ->condition('device', $device)
     ->execute();
 
-  drupal_set_message('The firmware of your device is going to be upgraded. Please, make sure it remains on during the next 2 hours.', 'warning');
+  drupal_set_message('The firmware of your device is going to be upgraded. Please, make sure it remains up and running during the next 2 hours.', 'warning');
 
   drupal_goto("energy");
 }

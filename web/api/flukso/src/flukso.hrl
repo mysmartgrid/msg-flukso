@@ -116,12 +116,18 @@ check_version(_, _) ->
 
 
 check_event(Event) ->
-    {Event, case Event of
-        ?BROWNOUT_EVENT_ID -> true;
-        ?FIRMWARE_UPGRADED_EVENT_ID -> true;
-        ?FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
-        _ -> false
-    end}.
+
+  E = case is_integer(Event) of
+    true -> Event;
+    _ -> list_to_integer(Event)
+  end,
+
+  {E, case E of
+      ?BROWNOUT_EVENT_ID -> true;
+      ?FIRMWARE_UPGRADED_EVENT_ID -> true;
+      ?FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
+      _ -> false
+  end}.
 
 check_event(undefined, undefined) ->
     {false, false};
@@ -386,4 +392,3 @@ int_to_hex(N) when N < 256 -> [hex(N div 16), hex(N rem 16)].
 
 hex(N) when N < 10 -> $0+N;
 hex(N) when N >= 10, N < 16 -> $a + (N-10).
-

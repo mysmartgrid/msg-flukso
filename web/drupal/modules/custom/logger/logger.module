@@ -24,10 +24,9 @@
  */
 
 //DEBUG
-error_reporting(E_ALL);
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
-#FIXME:
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);
@@ -130,13 +129,13 @@ function logger_permission() {
       'title' => t('list firmware releases'),
       'description' => t('list firmware releases'),
     ),
-    'manage firmware releases' => array(
-      'title' => t('manage firmware upgrade'),
-      'description' => t('manage firmware upgrade'),
+    'manage firmware upgrades' => array(
+      'title' => t('manage firmware upgrades'),
+      'description' => t('manage firmware upgrades'),
     ),
-    'approve firmware upgrade' => array(
-      'title' => t('approve firmware upgrade'),
-      'description' => t('approve firmware upgrade'),
+    'approve firmware upgrades' => array(
+      'title' => t('approve firmware upgrades'),
+      'description' => t('approve firmware upgrades'),
     ),
   );
 }
@@ -567,7 +566,7 @@ function logger_menu() {
     'page callback' => 'logger_firmware_upgrade_approve',
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
-    'access arguments' => array('approve firmware upgrade', 2),
+    'access arguments' => array('approve firmware upgrades', 2),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
   );
@@ -577,7 +576,7 @@ function logger_menu() {
     'page callback' => 'logger_firmware_upgrade_disapprove',
     'page arguments' => array(2),
     'access callback' => 'logger_device_access',
-    'access arguments' => array('approve firmware upgrade', 2),
+    'access arguments' => array('approve firmware upgrades', 2),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc',
   );
