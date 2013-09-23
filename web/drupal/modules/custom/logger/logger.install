@@ -80,24 +80,11 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '5',
       ),
-      'firmware_version' => array( //FIXME: remove field
-        'type' => 'varchar',
-        'length' => '10',
-        'not null' => TRUE,
-      ),
       'firmware_id' => array(
         'type' => 'int',
         'not null' => TRUE,
         'unasigned' => TRUE,
         'default' => 0
-      ),
-      'upgrade' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'size' => 'small',
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '5',
       ),
       'resets' => array(
         'type' => 'int',
@@ -2112,3 +2099,14 @@ function logger_update_7089() {
 
   return st('Firmware releases have been updated');
 }
+
+/**
+ * Drops field upgrade from table logger_devices.
+ */
+function logger_update_7090() {
+
+  db_drop_field('logger_devices', 'upgrade');
+
+  return st('Field logger_devices.upgrade has been dropped.');
+}
+

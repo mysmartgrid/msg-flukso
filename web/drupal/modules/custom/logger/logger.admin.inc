@@ -1397,14 +1397,6 @@ function logger_remove_firmware_upgrade_request($device) {
   db_delete('logger_firmware_upgrade_request')
     ->condition('device', $device)
     ->execute();
-
-  //TODO: get rid of this flag later
-  db_update('logger_devices')
-    ->fields(array(
-      'upgrade' => 0
-    ))
-    ->condition('device', $device)
-    ->execute();
 }
 
 /**
@@ -1415,14 +1407,6 @@ function logger_firmware_upgrade_approve($device) {
   db_update('logger_firmware_upgrade_request')
     ->fields(array(
       'approved' => time()
-    ))
-    ->condition('device', $device)
-    ->execute();
-
-  //TODO: get rid of this flag later
-  db_update('logger_devices')
-    ->fields(array(
-      'upgrade' => 999 
     ))
     ->condition('device', $device)
     ->execute();
