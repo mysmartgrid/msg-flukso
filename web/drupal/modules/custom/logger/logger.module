@@ -879,44 +879,47 @@ function logger_overview_page($interval, $popup = FALSE) {
   $cache_id = 'logger_overview';
   $cache = cache_get($cache_id, 'cache_page');
 
-  if (isset($cache->data)) {
-    $introduction = $cache->data;
-  }
-  else {
+  if (!$popup) {
 
-    //General explanation
-    $introduction = theme('logger_overview_topic', array('title' => NULL, 'body' =>
-      t('<b>mySmartGrid</b> is the smart device control for your home. ' .
-      'It enables you to understand your energy consumption and share your ' .
-      'experiences with others.'), 'link' => 'content/das-projekt'));
-
-    //Latest blogpost
-    $sql = 'SELECT nid FROM {node} WHERE type = :type ORDER BY created DESC';
-    $nid = db_query_range($sql, 0, 1, array(':type' => "blogpost"))->fetchField();
-
-    if ($nid) {
-      $blog = node_load($nid);
-      $introduction .= theme('logger_overview_topic', array('title' => t('Blog:') . $blog->title,
-        'body' => $blog->body['und'][0]['safe_value'], 'link' => 'blog'));
+    if (isset($cache->data)) {
+      $introduction = $cache->data;
     }
+    else {
 
-    //Counters
-    $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid AND type_id IN (:types)";
-    $devcounter = db_query($sql, array(':uid' => 0, ':types' => $device_types))->fetchField();
+      //General explanation
+      $introduction = theme('logger_overview_topic', array('title' => NULL, 'body' =>
+        t('<b>mySmartGrid</b> is the smart device control for your home. ' .
+        'It enables you to understand your energy consumption and share your ' .
+        'experiences with others.'), 'link' => 'content/das-projekt'));
 
-    $sql = "SELECT COUNT(*) FROM {users} u WHERE EXISTS(
-      SELECT 1 FROM {logger_devices} d WHERE d.uid = u.uid)";
+      //Latest blogpost
+      $sql = 'SELECT nid FROM {node} WHERE type = :type ORDER BY created DESC';
+      $nid = db_query_range($sql, 0, 1, array(':type' => "blogpost"))->fetchField();
 
-    $usercounter = db_query($sql)->fetchField();
+      if ($nid) {
+        $blog = node_load($nid);
+        $introduction .= theme('logger_overview_topic', array('title' => t('Blog:') . $blog->title,
+          'body' => $blog->body['und'][0]['safe_value'], 'link' => 'blog'));
+      }
 
-    $introduction .= theme('logger_overview_topic', array('title' => t('Total Consumption of All Participants'), 'body' =>
-      t('Currently, <b>@devcounter</b> Flukso devices are installed in <b>@usercounter</b> households. ' .
-        'The following chart shows their aggregate electricity consumption.',
-        array(
-          '@devcounter' => $devcounter,
-          '@usercounter' => $usercounter ))));
+      //Counters
+      $sql = "SELECT COUNT(*) FROM {logger_devices} WHERE uid <> :uid AND type_id IN (:types)";
+      $devcounter = db_query($sql, array(':uid' => 0, ':types' => $device_types))->fetchField();
+
+      $sql = "SELECT COUNT(*) FROM {users} u WHERE EXISTS(
+        SELECT 1 FROM {logger_devices} d WHERE d.uid = u.uid)";
+
+      $usercounter = db_query($sql)->fetchField();
+
+      $introduction .= theme('logger_overview_topic', array('title' => t('Total Consumption of All Participants'), 'body' =>
+        t('Currently, <b>@devcounter</b> Flukso devices are installed in <b>@usercounter</b> households. ' .
+          'The following chart shows their aggregate electricity consumption.',
+          array(
+            '@devcounter' => $devcounter,
+            '@usercounter' => $usercounter ))));
   
-    cache_set($cache_id, $introduction, 'cache_page', REQUEST_TIME + 1 * DAY);
+      cache_set($cache_id, $introduction, 'cache_page', REQUEST_TIME + 1 * DAY);
+    }
   }
 
   $sensor_types = array(ENERGY_CONSUMPTION_SENSOR_TYPE);
