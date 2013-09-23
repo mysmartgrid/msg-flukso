@@ -1906,9 +1906,19 @@ function logger_update_7086() {
 }
 
 /**
- * Updates Firmware releases.
+ * Drops field upgrade from table logger_devices.
  */
 function logger_update_7089() {
+
+  db_drop_field('logger_devices', 'upgrade');
+
+  return st('Field logger_devices.upgrade has been dropped.');
+}
+
+/**
+ * Updates Firmware releases.
+ */
+function logger_update_7091() {
 
   db_update('logger_device_firmware')
     ->fields(array(
@@ -1930,7 +1940,7 @@ function logger_update_7089() {
   db_update('logger_device_firmware')
     ->fields(array(
       'build' => '2002002002002002002002002002002020202020',
-      'upgradable' => 0
+      'upgradable' => 1 
     ))
     ->condition('id', 2)
     ->execute();
@@ -1938,7 +1948,7 @@ function logger_update_7089() {
   db_update('logger_device_firmware')
     ->fields(array(
       'build' => '2022022022022022022022022022022220222022',
-      'upgradable' => 0
+      'upgradable' => 1
     ))
     ->condition('id', 3)
     ->execute();
@@ -2099,14 +2109,3 @@ function logger_update_7089() {
 
   return st('Firmware releases have been updated');
 }
-
-/**
- * Drops field upgrade from table logger_devices.
- */
-function logger_update_7090() {
-
-  db_drop_field('logger_devices', 'upgrade');
-
-  return st('Field logger_devices.upgrade has been dropped.');
-}
-
