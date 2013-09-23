@@ -128,18 +128,20 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    Key = case mysql:get_result_rows(Result) of
+    {case mysql:get_result_rows(Result) of
 
       %If device is found, use the key stored in the database
-      [[_Key]] -> _Key;
+      [[Key]] -> check_digest(Key, ReqData, ClientDigest);
 
       %Otherwise, use key informed in the request
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-        proplists:get_value(<<"key">>, JsonData)
-    end,   
+        case proplists:is_defined(<<"key">>, JsonData) of
 
-    {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+          true -> check_digest(proplists:get_value(<<"key">>, JsonData), ReqData, ClientDigest);
+          _ -> {halt, ?HTTP_NOT_FOUND}
+        end
+    end, ReqData, State}.
 
 
 is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->

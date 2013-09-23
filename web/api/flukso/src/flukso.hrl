@@ -55,6 +55,7 @@
 -define(HTTP_BAD_ARGUMENT,            400).
 -define(HTTP_UNAUTHORIZED,            401).
 -define(HTTP_FORBIDDEN,               403).
+-define(HTTP_NOT_FOUND,               404).
 -define(HTTP_INVALID_TIMESTAMP,       470).
 -define(HTTP_INVALID_UNIT,            471).
 -define(HTTP_INVALID_MEASUREMENT,     472).
