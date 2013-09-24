@@ -78,7 +78,8 @@
 -define(PRESSURE_UNIT_TYPE_ID,             5).
 -define(HUMIDITY_UNIT_TYPE_ID,             6).
 
--define(UNKNOWN_FIRMWARE_ID,  0).
+-define(UNKNOWN_FIRMWARE_ID,         0).
+-define(FLUKSO2_DEFAULT_FIRMWARE_ID, 2).
 
 -record(state,
         {rrdSensor,

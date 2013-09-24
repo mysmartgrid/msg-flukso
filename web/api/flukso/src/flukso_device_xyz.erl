@@ -195,75 +195,71 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     Timestamp = unix_time(),
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
+    Version = get_optional_value(<<"version">>, JsonData, 0),
+    Reset = get_optional_value(<<"reset">>, JsonData, 0),
+    Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
+    Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
+    Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
+    Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
+    Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
+
+    {InformedVersion, InformedFirmwareId} = case proplists:is_defined(<<"firmware">>, JsonData) of
+
+      true ->
+        {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
+        FV = proplists:get_value(<<"version">>, Firmware),
+        {data, _Result} = mysql:execute(pool, firmware_props, [FV, TypeId]),
+
+        {FV, case mysql:get_result_rows(_Result) of
+          [[KnownFirmwareId, _Time, _Build, _Tag, _Upg]] -> KnownFirmwareId;
+          _ -> ?UNKNOWN_FIRMWARE_ID
+        end};
+
+      _ -> {undefined, undefined}
+    end,
+
     case mysql:get_result_rows(Result) of
 
       %Device exists
       [[Key, Resets, CurrentFirmwareId, CurrentDescription]] ->
 
-        Version = get_optional_value(<<"version">>, JsonData, 0),
-        Reset = get_optional_value(<<"reset">>, JsonData, 0),
-        Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
-        Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
-        Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
-        Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
-        Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
+        {NewKey, NewResets} = case  proplists:is_defined(<<"key">>, JsonData) of
 
-        IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
-
-        if
            %New Device Message - 2nd invocation
-           IsKeyInformed == true ->
-
-            %Key can be changed, but the encryption is based on the formed key
-            NewKey = proplists:get_value(<<"key">>, JsonData),
-            NewResets = 0;
+           true -> {proplists:get_value(<<"key">>, JsonData), 0}; %Key can be changed, but the encryption is based on the formed key
             
           %Heartbeat Message
-          true ->
-            NewKey = Key, %Key is not changed
-            NewResets = Resets + Reset
+          _ -> {Key, Resets + Reset} %Same Key
         end,
 
-        IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
-
-        {FirmwareId, Upgrade} = if
-
-          %Device has informed a firmware version
-          IsFirmwareInformed == true ->
-
-            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            InformedVersion = proplists:get_value(<<"version">>, Firmware),
-
-            {data, _Result} = mysql:execute(pool, firmware_props, [InformedVersion, TypeId]),
-            case mysql:get_result_rows(_Result) of
-
-              %Known firmware version
-              [[InformedFirmwareId, _Time, _Build, _Tag, _Upg]] ->
-
-                %Check if there is an upgrade request
-                {data, R} = mysql:execute(pool, firmware_upgrade_props, [Device]),
-                case mysql:get_result_rows(R) of
-
-                  %Upgrade request found, and device has performed a firmware upgrade
-                  [[K, T, FromVersion, InformedVersion]] ->
-
-                    %Delete upgrade request
-                    mysql:execute(pool, firmware_upgrade_delete, [Device]),
-                    {InformedFirmwareId, 0};
-
-                  %Upgrade request found, but device has not yet performed a firmware upgrade
-                  [[K, T, FromVersion, ToVersion]] -> {CurrentFirmwareId, 999};
-
-                  %No upgrade request found
-                  _ -> {InformedFirmwareId, 0}
-                end;
-
-              %Unknown firmware version
-              _ -> {?UNKNOWN_FIRMWARE_ID, 0}
-            end;
+        {FirmwareId, Upgrade} = case InformedFirmwareId of
 
           %Device has not informed its firmware version
-          true -> {CurrentFirmwareId, 0}
+          undefined -> {CurrentFirmwareId, 0};
+
+          %Unknown firmware version
+          ?UNKNOWN_FIRMWARE_ID -> {InformedFirmwareId, 0};
+
+          %Known firmware version
+          _ ->
+
+            %Check if there is an upgrade request
+            {data, R} = mysql:execute(pool, firmware_upgrade_props, [Device]),
+            case mysql:get_result_rows(R) of
+
+              %Upgrade request found, and device has performed a firmware upgrade
+              [[K, T, FromVersion, InformedVersion]] ->
+
+                %Delete upgrade request
+                mysql:execute(pool, firmware_upgrade_delete, [Device]),
+                {InformedFirmwareId, 0};
+
+              %Upgrade request found, but device has not yet performed a firmware upgrade
+              [[K, T, FromVersion, ToVersion]] -> {CurrentFirmwareId, 999};
+
+              %No upgrade request found
+              _ -> {InformedFirmwareId, 0}
+            end
         end,
 
         Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
@@ -281,8 +277,17 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
+        FirmwareId = case InformedFirmwareId of
+          undefined -> case TypeId of
+              %Old releases of Flukso 2 never inform the firmware version. So, this field must be set here.
+              ?FLUKSO2_DEVICE_TYPE_ID -> ?FLUKSO2_DEFAULT_FIRMWARE_ID;
+              _ -> ?UNKNOWN_FIRMWARE_ID
+            end;
+          _ -> InformedFirmwareId
+        end,
+
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, ?UNKNOWN_FIRMWARE_ID, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
+          [Device, Serial, 0, Key, Timestamp, FirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),

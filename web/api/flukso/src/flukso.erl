@@ -61,7 +61,7 @@ mysql_prepare() ->
     mysql:prepare(device_props, <<"SELECT sha, resets, firmware_id, description FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_type, <<"SELECT type_id FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_id = ?, description = ? WHERE device = ?">>),
-    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, access, version, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, uart_oe, sensor, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
 
     mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, upgradable FROM logger_device_firmware WHERE version = ? AND device_type_id = ?">>),
