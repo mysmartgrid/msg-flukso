@@ -415,9 +415,9 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#title' => t('Device'),
     '#description' => t('Select the device where this sensor belongs.'),
     '#default_value' => $sensor->device,
-    '#required' => TRUE
+    '#required' => TRUE,
+    '#options' => $sensor->virtual ? $options : array($sensor->device => $options[$sensor->device])
   );
-  $form['device']['#options'] = $sensor->virtual ? $options : array($sensor->device => $options[$sensor->device]);
 
   if ($sensor->meter) {
     $form['meter'] = array(
@@ -432,21 +432,18 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     );
 
     $form['token'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Current Token'),
-      '#description' => t("This is the current access token."),
-      '#maxlength' => 32,
-      '#size' => 32,
+      '#type' => 'hidden',
       '#required' => TRUE,
-      '#default_value' => $sensor->token,
-      '#weight' => 100,
-      '#attributes' => array('readonly' => 'readonly')
+      '#default_value' => $sensor->token
     );
 
     $form['reset_token'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Reset Token'),
-      '#description' => t("Check if you want to generate a new access token."),
+      '#type' => 'radios',
+      '#title' => t('Token'),
+      '#options' => array(
+          0 => t('Keep current token: !token', array('!token' => str_repeat('&nbsp;', 20) . "$sensor->token")),
+          1 => t('Generate a new token.')),
+      '#description' => t('Select which authentication token to use.'),
       '#default_value' => 0,
       '#weight' => 101
     );
@@ -454,12 +451,16 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     $form['domains'] = array(
       '#type' => 'textarea',
       '#title' => t('Authorized Web Domains'),
-      '#description' => t('If you want to query the measurements of this sensor from another websites, please enter the list of web domains authorized to do so (for example: www.yourcompany.com). The domains must be specified either in multiple lines or separated by space.'),
+      '#description' => t("If you want to allow other websites to query the measurements of this sensor, " . 
+        "please inform their domains above (for example: www.yourcompany.com). " . 
+        "The domains must be specified either in multiple lines or separated by space. Click !here for more information.", array(
+          '!here' => l(t('here'), 'http://developer.mysmartgrid.de/doku.php?id=jsonpinterface'))),
       '#rows' => 3,
       '#resizable' => FALSE,
       '#default_value' => $sensor->domains,
       '#element_validate' => array('logger_token_domains_validate'),
-      '#weight' => 102
+      '#weight' => 102,
+      '#access' => user_has_role('Expert')
     );
   }
 

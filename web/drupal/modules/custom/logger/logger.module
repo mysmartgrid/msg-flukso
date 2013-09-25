@@ -2482,7 +2482,8 @@ function theme_logger_line_chart_area($variables) {
     'xAxisLabelFormatter' => 'Dygraph.dateAxisFormatter',
     'xValueFormatter' => 'Dygraph.dateString_',
     'xValueParser' => 'function(x) { return 1000 * parseInt(x); }',
-    'xTicker' => 'Dygraph.dateTicker'
+    'xTicker' => 'Dygraph.dateTicker',
+    'yValueFormatter' => 'formatYValue'
   );
 
   if (!$chart->aggregate_sensors) {
@@ -2520,7 +2521,6 @@ function theme_logger_line_chart_area($variables) {
 
     $slider_properties = array(
       'gridLineColor' => '"transparent"',
-      'yValueFormatter' => 'hideZero',
       'zoomCallback' => 'updateLineChart',
       'clickCallback' => 'slideLineChart',
       'underlayCallback' => 'highlightLineChart',
@@ -2532,7 +2532,8 @@ function theme_logger_line_chart_area($variables) {
       'xAxisLabelFormatter' => $chart_properties['xAxisLabelFormatter'],
       'xValueFormatter' => $chart_properties['xValueFormatter'],
       'xValueParser' => $chart_properties['xValueParser'],
-      'xTicker' => $chart_properties['xTicker']
+      'xTicker' => $chart_properties['xTicker'],
+      'yValueFormatter' => 'formatYValue',
     );
 
     $output .= logger_create_dygraph($chart, FALSE, $slider_properties, TRUE);
@@ -4163,7 +4164,7 @@ function logger_remove_expired_support_requests() {
 function logger_remove_expired_firmware_upgrade_requests() {
 
   db_delete('logger_firmware_upgrade_request')
-    ->condition('requested', REQUEST_TIME - WEEK, '<')
+    ->condition('requested', REQUEST_TIME - 2 * HOUR, '<')
     ->execute();
 }
 
