@@ -533,15 +533,6 @@ function logger_menu() {
     'type' => MENU_CALLBACK
   );
 
-  $items['token/reset'] = array(
-    'page callback' => 'logger_token_reset',
-    'page arguments' => array(2),
-    'access callback' => 'logger_sensor_access',
-    'access arguments' => array('manage sensors', 2),
-    'type' => MENU_CALLBACK,
-    'file' => 'logger.admin.inc'
-  );
-
 
   //Firmware operations
 
@@ -4046,20 +4037,29 @@ function logger_forecast_access($permission) {
  */
 function logger_jsonp_sensor_access($meter) {
 
+    $token = db_select('logger_tokens', 't')
+      ->fields('t', array('token', 'domains'))
+      ->condition('t.meter', $meter)
+      ->execute()
+      ->fetchObject();
+
   if (isset($_REQUEST['token'])) {
 
-    $found = db_select('logger_tokens', 't')
-      ->fields('t', array('meter'))
-      ->condition('t.meter', $meter)
-      ->condition('t.token', $_REQUEST['token'])
-      ->execute()
-      ->fetchField();
+    return $token->token == $_REQUEST['token'];
+  }
+  elseif (isset($_SERVER['HTTP_REFERER']) && !empty($_SERVER['HTTP_REFERER'])) {
 
-    return $found != NULL;
+    $referrer = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST);
+    $authorized = strtok($token->domains, ' ');
+
+    while ($authorized !== FALSE) {
+      if ($referrer == $authorized) {
+        return TRUE;
+      }
+      $authorized = strtok($token->domains);
+    }
   }
-  else {
-    return FALSE;
-  }
+  return FALSE;
 }
 
 /**

@@ -163,8 +163,6 @@ function logger_usersensors_page() {
         $operations .= ($sensor->virtual ?
           l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
           l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter)) . '<br>';
-
-        $operations .= l(t('Reset Token'), 'token/reset/' . $sensor->meter);
       }
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
@@ -296,6 +294,10 @@ function logger_sensor_edition_page($meter = NULL) {
     $query->addField('un', 'name', 'unit_name');
     $query->addField('un', 'type_id', 'unit_type_id');
 
+    $query->join('logger_tokens', 'k', 'k.meter = m.meter');
+    $query->addField('k', 'token', 'token');
+    $query->addField('k', 'domains', 'domains');
+
     $sensor = $query->execute()
       ->fetchObject();
   }
@@ -315,6 +317,8 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->unit_name = t('Watt-hour');
     $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
     $sensor->device_type_id = FLUKSO2_DEVICE_TYPE_ID;
+    $sensor->token = md5(uniqid(rand(), TRUE));
+    $sensor->domains = '';
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -425,6 +429,37 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#required' => TRUE,
       '#default_value' => $sensor->meter,
       '#attributes' => array('readonly' => 'readonly')
+    );
+
+    $form['token'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Current Token'),
+      '#description' => t("This is the current access token."),
+      '#maxlength' => 32,
+      '#size' => 32,
+      '#required' => TRUE,
+      '#default_value' => $sensor->token,
+      '#weight' => 100,
+      '#attributes' => array('readonly' => 'readonly')
+    );
+
+    $form['reset_token'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Reset Token'),
+      '#description' => t("Check if you want to generate a new access token."),
+      '#default_value' => 0,
+      '#weight' => 101
+    );
+
+    $form['domains'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Authorized Web Domains'),
+      '#description' => t('If you want to query the measurements of this sensor from another websites, please enter the list of web domains authorized to do so (for example: www.yourcompany.com). The domains must be specified either in multiple lines or separated by space.'),
+      '#rows' => 3,
+      '#resizable' => FALSE,
+      '#default_value' => $sensor->domains,
+      '#element_validate' => array('logger_token_domains_validate'),
+      '#weight' => 102
     );
   }
 
@@ -553,6 +588,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t("Save"),
+    '#weight' => 200
   );
 
   drupal_add_js("jQuery(document).ready( function() { showSensorForecastFields(); } );", array('type' => 'inline', 'scope' => 'footer'));
@@ -687,7 +723,7 @@ function logger_firmwareupgradefilter_form($form, &$form_state) {
   $rows = array();
   foreach ($devices as $device) {
     $rows[$device->device] = array(
-      $device->serial,
+      l($device->serial, "deployment/checkup/serial/$device->serial"),
       wordwrap($device->device, 16, "\n", TRUE),
       $device->from_version,
       empty($device->to_version) ? '' : $device->to_version,
@@ -806,7 +842,13 @@ function logger_sensor_form_validate($form, &$form_state) {
     }
   }
 
-  if (!$in_edition) {
+  if ($in_edition) {
+
+    $domains = $form_state['values']['domains'];
+    $token = isset($form_state['values']['reset_token']) && $form_state['values']['reset_token'] ? NULL : $form_state['values']['token'];
+    logger_token_save($meter, $token, $form_state['values']['domains']);
+  }
+  else {
     $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
 
     if (count($aggregated_meters) < 2) {
@@ -1349,23 +1391,21 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
 }
 
 /**
- * Resets a sensor token.
+ * Saves a sensor token.
  */
-function logger_token_reset($meter) {
+function logger_token_save($meter, $token = NULL, $domains = '') {
 
-  db_delete('logger_tokens')
+  if (!$token) {
+    $token = md5(uniqid(rand(), TRUE));
+  }
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'domains' => $domains,
+      'token' => $token
+    ))
     ->condition('meter', $meter)
     ->execute();
-
-  db_insert('logger_tokens')
-    ->fields(array(
-      'token' => md5(uniqid(rand(), TRUE)),
-      'meter' => $meter,
-      'permissions' => 62
-    ))
-    ->execute();
-
-  drupal_goto("sensor/mylist");
 }
 
 /**
@@ -1454,4 +1494,11 @@ function logger_sensor_function_validate($function, $meter) {
     $count = $query->execute()->fetchField();
   }
   return $count == 0;
+}
+
+function logger_token_domains_validate($field, $form_state) {
+
+  if (isset($form_state['values']['domains']) && !empty($form_state['values']['domains']) && !valid_domains($form_state['values']['domains'])) {
+    form_error($field, t('Invalid web domains.'));
+  }
 }

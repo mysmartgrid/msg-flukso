@@ -203,8 +203,10 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
     Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
 
+    %Check if firmware has been informed
     {InformedVersion, InformedFirmwareId} = case proplists:is_defined(<<"firmware">>, JsonData) of
 
+      %Firmware informed
       true ->
         {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
         FV = proplists:get_value(<<"version">>, Firmware),
@@ -215,7 +217,14 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
           _ -> ?UNKNOWN_FIRMWARE_ID
         end};
 
-      _ -> {undefined, undefined}
+      %Firmware not informed
+      _ ->
+        case TypeId of
+          %Old releases of Flukso 2 never inform the firmware version. So, this field must be set here.
+          ?FLUKSO2_DEVICE_TYPE_ID -> {?FLUKSO2_DEFAULT_FIRMWARE_VERSION, ?FLUKSO2_DEFAULT_FIRMWARE_ID};
+
+          _ -> {undefined, ?UNKNOWN_FIRMWARE_ID}
+        end
     end,
 
     case mysql:get_result_rows(Result) of
@@ -223,27 +232,25 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
       %Device exists
       [[Key, Resets, CurrentFirmwareId, CurrentDescription]] ->
 
+        %Decide which key to use
         {NewKey, NewResets} = case  proplists:is_defined(<<"key">>, JsonData) of
 
-           %New Device Message - 2nd invocation
-           true -> {proplists:get_value(<<"key">>, JsonData), 0}; %Key can be changed, but the encryption is based on the formed key
+          %New Device Message - 2nd invocation
+          true -> {proplists:get_value(<<"key">>, JsonData), 0}; %Key can be changed, but the encryption is based on the formed key
             
           %Heartbeat Message
           _ -> {Key, Resets + Reset} %Same Key
         end,
 
-        {FirmwareId, Upgrade} = case InformedFirmwareId of
+        {FirmwareId, Upgrade} = case InformedVersion of
 
           %Device has not informed its firmware version
           undefined -> {CurrentFirmwareId, 0};
 
-          %Unknown firmware version
-          ?UNKNOWN_FIRMWARE_ID -> {InformedFirmwareId, 0};
-
-          %Known firmware version
+          %Device has informed its firmware version
           _ ->
 
-            %Check if there is an upgrade request
+            %Check if there is an upgrade request for the device
             {data, R} = mysql:execute(pool, firmware_upgrade_props, [Device]),
             case mysql:get_result_rows(R) of
 
@@ -277,17 +284,8 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
-        FirmwareId = case InformedFirmwareId of
-          undefined -> case TypeId of
-              %Old releases of Flukso 2 never inform the firmware version. So, this field must be set here.
-              ?FLUKSO2_DEVICE_TYPE_ID -> ?FLUKSO2_DEFAULT_FIRMWARE_ID;
-              _ -> ?UNKNOWN_FIRMWARE_ID
-            end;
-          _ -> InformedFirmwareId
-        end,
-
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, FirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
+          [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),

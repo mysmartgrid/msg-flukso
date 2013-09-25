@@ -33,7 +33,7 @@ function logger_schema() {
   );
 
   $schema['logger_devices'] = array(
-    'description' => "Contains the Fluksometer device ID's.",
+    'description' => "Stores devices.",
     'fields' => array(
       'device' => array(
         'type' => 'varchar',
@@ -173,7 +173,7 @@ function logger_schema() {
   );
 
   $schema['logger_meters'] = array(
-    'description' => "Contains the Fluksometer meter ID's.",
+    'description' => "Stores sensors.",
     'fields' => array(
       'meter' => array(
         'type' => 'varchar',
@@ -289,6 +289,33 @@ function logger_schema() {
     'primary key' => array('meter')
   );
 
+  $schema['logger_tokens'] = array(
+    'description' => "Stores sensor access tokens.",
+    'fields' => array(
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'token' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'permissions' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 62
+      ),
+     'domains' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('token')
+  );
+
   $schema['logger_meter_storage_period'] = array(
     'description' => "Storage periods of sensor measurements.",
     'fields' => array(
@@ -312,7 +339,7 @@ function logger_schema() {
   );
 
   $schema['logger_aggregated_meters'] = array(
-    'description' => "Sensors aggregated by virtual sensors.",
+    'description' => "Stores sensors aggregated by virtual sensors.",
     'fields' => array(
       'virtual_meter' => array(
         'type' => 'varchar',
@@ -389,7 +416,7 @@ function logger_schema() {
   );
 
   $schema['logger_device_firmware'] = array(
-    'description' => 'The device firmware releases.',
+    'description' => 'Stores device firmware releases.',
     'fields' => array(
       'id' => array(
         'type' => 'int',
@@ -439,7 +466,7 @@ function logger_schema() {
   );
 
   $schema['logger_firmware_upgrade_request'] = array(
-    'description' => 'The device firmware upgrade request.',
+    'description' => 'Stores device firmware upgrade requests.',
     'fields' => array(
       'device' => array(
         'type' => 'varchar',
@@ -2108,4 +2135,24 @@ function logger_update_7091() {
     ->execute();
 
   return st('Firmware releases have been updated');
+}
+
+/**
+ * Add field 'domains' to table logger_tokens.
+ */
+function logger_update_7093() {
+
+  db_add_field('logger_tokens', 'domains', array(
+        'type' => 'text',
+        'not null' => FALSE,
+  ));
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'domains' => 'www.mysmartgrid.de'
+    ))
+    ->condition('meter', '5715a57b0c8ec958727ab3bb206d8b6e')
+    ->execute();
+
+  return st('Field logger_tokens.domains has been added.');
 }
