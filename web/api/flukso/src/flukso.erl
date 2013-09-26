@@ -59,6 +59,7 @@ mysql_prepare() ->
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_props, <<"SELECT sha, resets, firmware_id, description FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(device_serial, <<"SELECT serial FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_type, <<"SELECT type_id FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_id = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),

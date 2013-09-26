@@ -155,14 +155,11 @@ check_key(Key) ->
     check_hex(Key, 32).
 
 check_optional_key(JsonData) ->
-    IsKeyDefined = proplists:is_defined(<<"key">>, JsonData),
-    if
-      %When defined, Key is validated
-      IsKeyDefined == true ->
-        check_key(proplists:get_value(<<"key">>, JsonData));
-      true ->
-        {undefined, true}
+    case proplists:is_defined(<<"key">>, JsonData) of
+      true -> check_key(proplists:get_value(<<"key">>, JsonData));
+      _ -> {undefined, true}
     end.
+
 
 check_device_type(Type) ->
     case Type of
@@ -174,14 +171,11 @@ check_device_type(Type) ->
     end.
 
 check_optional_device_type(JsonData) ->
-    IsDefined = proplists:is_defined(<<"type">>, JsonData),
-    if
-      %When defined, type is validated
-      IsDefined == true ->
+    case proplists:is_defined(<<"type">>, JsonData) of
+      true ->
         Type = proplists:get_value(<<"type">>, JsonData),
         check_device_type(Type);
-      true ->
-        {?FLUKSO2_DEVICE_TYPE_ID, true}
+      _ -> {?UNKNOWN_DEVICE_TYPE_ID, true}
     end.
 
 

@@ -71,9 +71,20 @@ malformed_POST(ReqData, _State) ->
                   {Key, true} ->
 
                     case check_optional_device_type(JsonData) of
+                      %Device type not informed
+                      {?UNKNOWN_DEVICE_TYPE_ID, true} ->
+                        {data, Result} = mysql:execute(pool, device_serial, [Device]),%FIXME: get rid of this test
+                        {false, ReqData, #state{device = Device, digest = Digest, typeId =
+                          case mysql:get_result_rows(Result) of
+                            [[Serial]] -> if Serial < 99000000 -> ?FLUKSO1_DEVICE_TYPE_ID; true -> ?FLUKSO2_DEVICE_TYPE_ID end;
+                            _ -> ?FLUKSO2_DEVICE_TYPE_ID
+                          end}};
+
+                      %Valid device type informed
                       {TypeId, true} ->
                         {false, ReqData, #state{device = Device, digest = Digest, typeId = TypeId}};
 
+                      %Invalid device type
                       _ -> ?HTTP_INVALID_TYPE 
                     end;
                   _ -> ?HTTP_INVALID_KEY
@@ -209,10 +220,10 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
       %Firmware informed
       true ->
         {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-        FV = proplists:get_value(<<"version">>, Firmware),
-        {data, _Result} = mysql:execute(pool, firmware_props, [FV, TypeId]),
+        FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
+        {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
 
-        {FV, case mysql:get_result_rows(_Result) of
+        {FirmwareVersion, case mysql:get_result_rows(_Result) of
           [[KnownFirmwareId, _Time, _Build, _Tag, _Upg]] -> KnownFirmwareId;
           _ -> ?UNKNOWN_FIRMWARE_ID
         end};
