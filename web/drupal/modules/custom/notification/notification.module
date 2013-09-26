@@ -311,7 +311,7 @@ function notification_list_page() {
   foreach ($result as $object) {
 
     $event_name = t($object->event_name) . ($object->unit_id == 0 ? '' :
-      '<br>(' . $object->limit_up . ' ' . t($object->unit) . ')');
+      '<br>(' . number_format($object->limit_up, 2, '.', '') . ' ' . t($object->unit) . ')');
 
     $id = $object->device . '/' . $object->event_id . '/' . $object->limit_up . '/' . $object->unit_id;
 
@@ -874,15 +874,15 @@ function notification_limit_up_validate($field, $form_state) {
       ->execute()
       ->fetchField();
 
-    $converted_limit = $limit_up * $factor;
+    $converted_limit = ($limit_up / $factor) * 3.6;
 
     if (($event_id == NO_COMMUNICATION_EVENT_ID || $event_id == COMMUNICATION_RESTORED_EVENT_ID) && $converted_limit < 30 * MINUTE) {
 
       form_error($field, t('Delay time can not be less than 30 minutes.'));
     }
-    elseif (($event_id == LOW_CONSUMPTION_EVENT_ID || $event_id == PEAK_CONSUMPTION_EVENT_ID) && ($converted_limit < 1 || $converted_limit > 999999999)) {
+    elseif (($event_id == LOW_CONSUMPTION_EVENT_ID || $event_id == PEAK_CONSUMPTION_EVENT_ID) && ($converted_limit < 1 || $converted_limit > 999999999000)) {
 
-      form_error($field, t('Consumption limit can not be lesser than 1 watt / min or greater than 999.999.999 watt / min.'));
+      form_error($field, t('Consumption limit can not be lesser than 1 Watt or greater than 999.999 Kilowatt.'));
     }
     elseif ($event_id == SUMMARY_REPORT_EVENT_ID && ($converted_limit < DAY || $converted_limit > 6 * MONTH)) {
 

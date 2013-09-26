@@ -33,7 +33,7 @@ function logger_schema() {
   );
 
   $schema['logger_devices'] = array(
-    'description' => "Contains the Fluksometer device ID's.",
+    'description' => "Stores devices.",
     'fields' => array(
       'device' => array(
         'type' => 'varchar',
@@ -80,24 +80,11 @@ function logger_schema() {
         'default' => 0,
         'disp-width' => '5',
       ),
-      'firmware_version' => array( //FIXME: remove field
-        'type' => 'varchar',
-        'length' => '10',
-        'not null' => TRUE,
-      ),
       'firmware_id' => array(
         'type' => 'int',
         'not null' => TRUE,
         'unasigned' => TRUE,
         'default' => 0
-      ),
-      'upgrade' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'size' => 'small',
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '5',
       ),
       'resets' => array(
         'type' => 'int',
@@ -186,7 +173,7 @@ function logger_schema() {
   );
 
   $schema['logger_meters'] = array(
-    'description' => "Contains the Fluksometer meter ID's.",
+    'description' => "Stores sensors.",
     'fields' => array(
       'meter' => array(
         'type' => 'varchar',
@@ -302,6 +289,33 @@ function logger_schema() {
     'primary key' => array('meter')
   );
 
+  $schema['logger_tokens'] = array(
+    'description' => "Stores sensor access tokens.",
+    'fields' => array(
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'token' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'permissions' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 62
+      ),
+     'domains' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('token')
+  );
+
   $schema['logger_meter_storage_period'] = array(
     'description' => "Storage periods of sensor measurements.",
     'fields' => array(
@@ -325,7 +339,7 @@ function logger_schema() {
   );
 
   $schema['logger_aggregated_meters'] = array(
-    'description' => "Sensors aggregated by virtual sensors.",
+    'description' => "Stores sensors aggregated by virtual sensors.",
     'fields' => array(
       'virtual_meter' => array(
         'type' => 'varchar',
@@ -402,7 +416,7 @@ function logger_schema() {
   );
 
   $schema['logger_device_firmware'] = array(
-    'description' => 'The device firmware releases.',
+    'description' => 'Stores device firmware releases.',
     'fields' => array(
       'id' => array(
         'type' => 'int',
@@ -421,7 +435,7 @@ function logger_schema() {
       ),
       'build' => array(
         'type' => 'varchar',
-        'length' => '32',
+        'length' => '40',
         'not null' => TRUE,
       ),
       'tag' => array(
@@ -449,6 +463,38 @@ function logger_schema() {
       ),
     ),
     'primary key' => array('id')
+  );
+
+  $schema['logger_firmware_upgrade_request'] = array(
+    'description' => 'Stores device firmware upgrade requests.',
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+      'firmware_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
+      'requested' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'approved' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array('device')
   );
 
   return $schema;
@@ -1859,4 +1905,254 @@ function logger_update_7080() {
     ->execute();
 
   return st('Firmware patches have been added.');
+}
+
+/**
+ * Create table logger_firmware_upgrade_request.
+ */
+function logger_update_7082() {
+
+  db_create_table('logger_firmware_upgrade_request', drupal_get_schema_unprocessed('logger', 'logger_firmware_upgrade_request'));
+
+  return st('Table logger_firmware_upgrade_request has been created.');
+}
+
+/**
+ * Resize field build of table logger_device_firmware.
+ */
+function logger_update_7086() {
+
+  db_change_field('logger_device_firmware', 'build', 'build',
+    array(
+      'type' => 'varchar',
+      'length' => '40',
+      'not null' => TRUE,
+  ));
+
+  return st('Field logger_meters.function has been changed.');
+}
+
+/**
+ * Drops field upgrade from table logger_devices.
+ */
+function logger_update_7089() {
+
+  db_drop_field('logger_devices', 'upgrade');
+
+  return st('Field logger_devices.upgrade has been dropped.');
+}
+
+/**
+ * Updates Firmware releases.
+ */
+function logger_update_7091() {
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '0000000000000000000000000000000000000000',
+      'tag' => 'unknown',
+      'upgradable' => 0
+    ))
+    ->condition('id', 0)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '1001001001001001001001001001001010101010',
+      'upgradable' => 0
+    ))
+    ->condition('id', 1)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2002002002002002002002002002002020202020',
+      'upgradable' => 1 
+    ))
+    ->condition('id', 2)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2022022022022022022022022022022220222022',
+      'upgradable' => 1
+    ))
+    ->condition('id', 3)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2031203120312031203120312031203120312031',
+      'upgradable' => 1
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2041204120412041204120412041204120412041',
+      'upgradable' => 1
+    ))
+    ->condition('id', 5)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2042204220422042204220422042204220422042',
+      'upgradable' => 1
+    ))
+    ->condition('id', 6)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2043204320432043204320432043204220432043',
+      'upgradable' => 1
+    ))
+    ->condition('id', 7)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2044204420442044204420442044204220442044',
+      'upgradable' => 1
+    ))
+    ->condition('id', 8)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2044320443204432044320443204432020443204',
+      'upgradable' => 1
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '1001001001001001001001001001001010011001',
+      'upgradable' => 0
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => 'ec378baf8a24ea9bb9de48306fcd39a5f3f0315a',
+      'tag' => 'hexapi-0.9.0-dev',
+      'release_time' => '20130916_0000',
+      'upgradable' => 1
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2052205220522052205220522052205220522052',
+      'upgradable' => 1
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2053205320532053205320532053205320532053',
+      'upgradable' => 1
+    ))
+    ->condition('id', 14)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2054205420542054205420542054205420542054',
+      'upgradable' => 1
+    ))
+    ->condition('id', 15)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2021202120212021202120212021202120212021',
+      'upgradable' => 1 
+    ))
+    ->condition('id', 16)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2021a2021a2021a2021a2021a2021a202021a202',
+      'upgradable' => 1
+    ))
+    ->condition('id', 17)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2031a2031a2031a2031a2031a2031a2031a231a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 18)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2041a2041a2041a2041a2041a2041a2041a241a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 19)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2042a2042a2042a2042a2042a2042a2042a242a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 20)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2043a2043a2043a2043a2043a2043a2043a243a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 21)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '2044a2044a2044a2044a2044a2044a2044a244a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 22)
+    ->execute();
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'build' => '204rc3a204rc3a204rc3a204rc3a204rc3a2c3a2',
+      'upgradable' => 1
+    ))
+    ->condition('id', 23)
+    ->execute();
+
+  return st('Firmware releases have been updated');
+}
+
+/**
+ * Add field 'domains' to table logger_tokens.
+ */
+function logger_update_7093() {
+
+  db_add_field('logger_tokens', 'domains', array(
+        'type' => 'text',
+        'not null' => FALSE,
+  ));
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'domains' => 'www.mysmartgrid.de'
+    ))
+    ->condition('meter', '5715a57b0c8ec958727ab3bb206d8b6e')
+    ->execute();
+
+  return st('Field logger_tokens.domains has been added.');
 }

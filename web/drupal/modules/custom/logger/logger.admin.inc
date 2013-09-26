@@ -163,8 +163,6 @@ function logger_usersensors_page() {
         $operations .= ($sensor->virtual ?
           l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
           l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter)) . '<br>';
-
-        $operations .= l(t('Reset Token'), 'token/reset/' . $sensor->meter);
       }
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
@@ -176,6 +174,77 @@ function logger_usersensors_page() {
      'attributes' => array('id' => $table_id, 'class' => 'resizable')));
   }
   return $output;
+}
+
+/**
+ * Builds the firmware releases page.
+ *
+ * @return the firmware releases page.
+ */
+function logger_firmwarereleases_page() {
+
+  drupal_set_title(t('Firmware Releases'));
+
+  $type_id = isset($_REQUEST['device_type_id']) ? $_REQUEST['device_type_id'] : 0;
+
+  $query = db_select('logger_device_firmware', 'f')
+    ->fields('f', array('id', 'version', 'release_time', 'build', 'tag', 'device_type_id', 'upgradable'))
+    ->orderBy('f.version');
+
+  $query->join('logger_device_type', 't', 'f.device_type_id = t.id');
+  $query->addField('t', 'name', 'device_type');
+
+  if ($type_id > 0) {
+    $query->condition('f.device_type_id', $type_id);
+  }
+  $releases = $query->execute();
+
+  $header = array(t('Version'), t('Device Type'), t('Time'), 'Build', 'Tag', 'Upgradable', 'Total');
+  $rows = array();
+  foreach ($releases as $release) {
+
+    $query = db_select('logger_devices', 'd')
+      ->condition('d.firmware_id', $release->id);
+    $query->addExpression('COUNT(*)');
+    $total = $query->execute()->fetchField();
+
+    $rows[] = array(
+      $release->version,
+      $release->device_type,
+      $release->release_time,
+      wordwrap($release->build, 16, "\n", TRUE),
+      $release->tag,
+      $release->upgradable ? t('Yes') : t('No'),
+      $release->upgradable && $total > 0 ?
+        l($total, "firmware/upgrade", array('query' => array(
+          'device_type_id' => $release->device_type_id,
+          'from_version' => $release->id
+        ))) : $total
+    );
+  }
+
+  $form = drupal_get_form('logger_firmwarereleasesfilter_form', $type_id);
+
+  return
+    drupal_render($form) .
+
+    theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
+      'empty' => t('No firmware releases available.'), 'sticky' => FALSE, 'colgroups' => array(),
+      'attributes' => array('id' => 'firmwarereleases-list')));
+}
+
+/**
+ * Builds the firmware upgrade page.
+ *
+ * @return the firmware upgrade page.
+ */
+function logger_firmwareupgrade_page() {
+
+  drupal_set_title(t('Device Firmware Upgrade'));
+
+  $form = drupal_get_form('logger_firmwareupgradefilter_form');
+
+  return drupal_render($form);
 }
 
 /**
@@ -225,6 +294,10 @@ function logger_sensor_edition_page($meter = NULL) {
     $query->addField('un', 'name', 'unit_name');
     $query->addField('un', 'type_id', 'unit_type_id');
 
+    $query->join('logger_tokens', 'k', 'k.meter = m.meter');
+    $query->addField('k', 'token', 'token');
+    $query->addField('k', 'domains', 'domains');
+
     $sensor = $query->execute()
       ->fetchObject();
   }
@@ -244,6 +317,8 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->unit_name = t('Watt-hour');
     $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
     $sensor->device_type_id = FLUKSO2_DEVICE_TYPE_ID;
+    $sensor->token = md5(uniqid(rand(), TRUE));
+    $sensor->domains = '';
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -340,9 +415,9 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#title' => t('Device'),
     '#description' => t('Select the device where this sensor belongs.'),
     '#default_value' => $sensor->device,
-    '#required' => TRUE
+    '#required' => TRUE,
+    '#options' => $sensor->virtual ? $options : array($sensor->device => $options[$sensor->device])
   );
-  $form['device']['#options'] = $sensor->virtual ? $options : array($sensor->device => $options[$sensor->device]);
 
   if ($sensor->meter) {
     $form['meter'] = array(
@@ -354,6 +429,38 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#required' => TRUE,
       '#default_value' => $sensor->meter,
       '#attributes' => array('readonly' => 'readonly')
+    );
+
+    $form['token'] = array(
+      '#type' => 'hidden',
+      '#required' => TRUE,
+      '#default_value' => $sensor->token
+    );
+
+    $form['reset_token'] = array(
+      '#type' => 'radios',
+      '#title' => t('Token'),
+      '#options' => array(
+          0 => t('Keep current token: !token', array('!token' => str_repeat('&nbsp;', 20) . "$sensor->token")),
+          1 => t('Generate a new token.')),
+      '#description' => t('Select which authentication token to use.'),
+      '#default_value' => 0,
+      '#weight' => 101
+    );
+
+    $form['domains'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Authorized Web Domains'),
+      '#description' => t("If you want to allow other websites to query the measurements of this sensor, " . 
+        "please inform their domains above (for example: www.yourcompany.com). " . 
+        "The domains must be specified either in multiple lines or separated by space. Click !here for more information.", array(
+          '!here' => l(t('here'), 'http://developer.mysmartgrid.de/doku.php?id=jsonpinterface'))),
+      '#rows' => 3,
+      '#resizable' => FALSE,
+      '#default_value' => $sensor->domains,
+      '#element_validate' => array('logger_token_domains_validate'),
+      '#weight' => 102,
+      '#access' => user_has_role('Expert')
     );
   }
 
@@ -482,6 +589,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t("Save"),
+    '#weight' => 200
   );
 
   drupal_add_js("jQuery(document).ready( function() { showSensorForecastFields(); } );", array('type' => 'inline', 'scope' => 'footer'));
@@ -517,6 +625,168 @@ function logger_userprivacy_form($form, &$form_state) {
   return $form;
 }
 
+function logger_firmwarereleasesfilter_form($form, &$form_state, $type_id) {
+
+  $types = logger_get_device_types_options();
+  $types[0] = t('All');
+
+  $form['device_type_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Device Type'),
+    '#description' => t('Select the device type.'),
+    '#options' => $types,
+    '#default_value' => $type_id,
+    '#required' => TRUE,
+    '#attributes' => array('onchange' => "document.getElementById('logger-firmwarereleasesfilter-form').submit();")
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Filter')
+  );
+  return $form;
+}
+
+function logger_firmwareupgradefilter_form($form, &$form_state) {
+
+  $device_type_id = isset($_REQUEST['device_type_id']) ? $_REQUEST['device_type_id'] : FLUKSO2_DEVICE_TYPE_ID;
+  $from_version = isset($_REQUEST['from_version']) ? $_REQUEST['from_version'] : 9; //FIXME: create constant
+
+  //Select device types with upgradable firmware releases
+  $upgradable = db_select('logger_device_firmware', 'f')
+    ->condition('f.upgradable', 1);
+  $upgradable->addExpression('1');
+  $upgradable->where('t.id = f.device_type_id');
+  $query = db_select('logger_device_type', 't')
+    ->fields('t', array('id', 'name'))
+    ->orderBy('t.name');
+  $query->exists($upgradable);
+  $result = $query->execute();
+
+  $device_types = array();
+  foreach ($result as $type) {
+    $device_types[$type->id] = $type->name;
+  }
+
+  //Select upgradable firmware releases of a certain device type
+  $result = db_select('logger_device_firmware', 'f')
+    ->fields('f', array('id', 'version'))
+    ->condition('f.device_type_id', $device_type_id)
+    ->condition('f.upgradable', 1)
+    ->orderBy('f.version')
+    ->execute();
+
+  $from_versions = array();
+  foreach($result as $firmware) {
+    $from_versions[$firmware->id] = $firmware->version;
+  }
+  reset($from_versions);
+  $from_version = isset($from_versions[$from_version]) ? $from_version : key($from_versions);
+
+  //Select upgradable firmware releases that can be used as target
+  $result = db_select('logger_device_firmware', 'f')
+    ->fields('f', array('id', 'version'))
+    ->condition('f.device_type_id', $device_type_id)
+    ->condition('f.upgradable', 1)
+    ->condition('f.version', $from_versions[$from_version], '>')
+    ->orderBy('f.version')
+    ->execute();
+
+  $to_versions = array();
+  foreach($result as $firmware) {
+    $to_versions[$firmware->id] = $firmware->version;
+  }
+
+  //List of devices
+  $query = db_select('logger_devices', 'd')
+    ->fields('d', array('device', 'serial'))
+    ->orderBy('d.serial');
+  $query->leftJoin('logger_firmware_upgrade_request', 'r', 'r.device = d.device');
+  $query->addField('r', 'requested');
+  $query->addField('r', 'approved');
+
+  $query->leftJoin('logger_device_firmware', 'f', 'f.id = r.firmware_id');
+  $query->addField('f', 'version', 'to_version');
+
+  $query->join('logger_device_firmware', 'w', 'w.id = d.firmware_id');
+  $query->addField('w', 'version', 'from_version');
+
+  if ($from_version > 0) {
+    $query->condition('d.firmware_id', $from_version);
+  }
+  elseif ($device_type_id > 0) {
+    $query->condition('w.device_type_id', $device_type_id);
+  }
+
+  $devices = $query->execute();
+
+  $header = array(t('Serial'), t('Device Id'), t('From Version'), t('To Version'), t('Requested'), t('User Approval'));
+  $rows = array();
+  foreach ($devices as $device) {
+    $rows[$device->device] = array(
+      l($device->serial, "deployment/checkup/serial/$device->serial"),
+      wordwrap($device->device, 16, "\n", TRUE),
+      $device->from_version,
+      empty($device->to_version) ? '' : $device->to_version,
+      $device->requested > 0 ? date('d-M H:i', $device->requested) : '',
+      $device->approved > 0 ? date('d-M H:i', $device->approved) : ''
+    );
+  }
+
+  $submit = "document.getElementById('logger-firmwareupgradefilter-form').submit()";
+
+  $form['device_type_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Device Type'),
+    '#description' => t('Select the device type.'),
+    '#options' => $device_types,
+    '#default_value' => $device_type_id,
+    '#required' => TRUE,
+    '#attributes' => array('onchange' =>
+      "document.getElementById('edit-from-version').selectedIndex = -1; " .
+      "document.getElementById('edit-to-version').selectedIndex = -1; $submit;") 
+  );
+
+  $form['from_version'] = array(
+    '#type' => 'select',
+    '#title' => t('From Version'),
+    '#description' => t('Select the current firmware version.'),
+    '#options' => $from_versions,
+    '#default_value' => $from_version,
+    '#attributes' => array('onchange' =>
+      "document.getElementById('edit-to-version').selectedIndex = -1; $submit;")
+  );
+
+  $form['to_version'] = array(
+    '#type' => 'select',
+    '#title' => t('To Version'),
+    '#description' => t('Select the target firmware version.'),
+    '#options' => $to_versions,
+    '#empty_option' => t('None'),
+  );
+
+  $form['approved'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Pre-approved'),
+    '#description' => t("Check if you do not want to wait for the user's approval."),
+    '#default_value' => 0
+  );
+
+  $form['table'] = array(
+    '#type' => 'tableselect',
+    '#header' => $header,
+    '#options' => $rows,
+    '#multiple' => TRUE,
+    '#empty' => t('No devices found.'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Request')
+  );
+  return $form;
+}
+
 function logger_deviceactivation_form_validate($form, &$form_state) {
 
   $code = $form_state['values']['code'];
@@ -527,7 +797,7 @@ function logger_deviceactivation_form_validate($form, &$form_state) {
 
     $count = $query
       ->condition('d.device', "$code%", 'LIKE')
-      ->condition('d.uid', 0, '=')
+      ->condition('d.uid', 0)
       ->execute()
       ->fetchField();
 
@@ -573,7 +843,13 @@ function logger_sensor_form_validate($form, &$form_state) {
     }
   }
 
-  if (!$in_edition) {
+  if ($in_edition) {
+
+    $domains = $form_state['values']['domains'];
+    $token = isset($form_state['values']['reset_token']) && $form_state['values']['reset_token'] ? NULL : $form_state['values']['token'];
+    logger_token_save($meter, $token, $form_state['values']['domains']);
+  }
+  else {
     $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
 
     if (count($aggregated_meters) < 2) {
@@ -581,6 +857,31 @@ function logger_sensor_form_validate($form, &$form_state) {
     }
   }
 }
+
+function logger_firmwareupgradefilter_form_validate($form, &$form_state) {
+
+  if (isset($form_state['values']['from_version']) && isset($form_state['values']['to_version']) && $form_state['values']['from_version'] > 0 && $form_state['values']['to_version'] > 0){
+
+    $from = logger_get_device_firmware($form_state['values']['from_version']);
+    $to = logger_get_device_firmware($form_state['values']['to_version']);
+
+    if (!$from || !$to || $from->upgradable != 1 || $to->upgradable != 1 || !($from->version < $to->version) ||
+        $from->device_type_id != $form_state['values']['device_type_id'] || $to->device_type_id != $from->device_type_id) {
+
+      form_set_error('to_version', t('Invalid firmware upgrade.'));
+    }
+  }
+}
+
+function logger_get_device_firmware($id) {
+
+  return db_select('logger_device_firmware', 'f')
+    ->fields('f', array('id', 'version', 'upgradable', 'device_type_id'))
+    ->condition('f.id', $id)
+    ->execute()
+    ->fetchObject();
+}
+
 
 function logger_device_form_submit($form, &$form_state) {
 
@@ -681,6 +982,44 @@ function logger_userprivacy_form_submit($form, &$form_state) {
 
   // page redirection to the home page after form submission
   $form_state['redirect'] = 'logger';
+}
+
+function logger_firmwarereleasesfilter_form_submit($form, &$form_state) {
+
+  $form_state['redirect'] = array('firmware/list', array(
+    'query' => array(
+      'device_type_id' => $form_state['values']['device_type_id'],
+  )));
+}
+
+function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
+
+  if (isset($form_state['values']['to_version'])) {
+
+    $selected = array_filter($form_state['values']['table']);
+
+    foreach ($selected as $device) {
+
+      logger_remove_firmware_upgrade_request($device);
+
+      if ($form_state['values']['to_version'] > 0) {
+
+        db_insert('logger_firmware_upgrade_request')
+          ->fields(array(
+            'device' => $device,
+            'firmware_id' => $form_state['values']['to_version'], 
+            'requested' => time(),
+            'approved' => ($form_state['values']['approved'] > 0 ? time() : 0)
+          ))
+          ->execute();
+      }
+    }
+  }
+
+  $form_state['redirect'] = array('firmware/upgrade', array('query' => array(
+    'device_type_id' => $form_state['values']['device_type_id'],
+    'from_version' => $form_state['values']['from_version']
+  )));
 }
 
 /**
@@ -819,12 +1158,16 @@ function logger_device_remove($device) {
     logger_rrd_remove($sensor->meter);
   }
 
+  logger_remove_firmware_upgrade_request($device);
+
   //FIXME: define a hook
   notification_remove_by_device($device);
 
+  logger_remove_firmware_upgrade_request($device);
+
   $flukso = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
-    ->condition('d.device', $device, '=')
+    ->condition('d.device', $device)
     ->execute()
     ->fetchObject();
 
@@ -1049,23 +1392,21 @@ function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions
 }
 
 /**
- * Resets a sensor token.
+ * Saves a sensor token.
  */
-function logger_token_reset($meter) {
+function logger_token_save($meter, $token = NULL, $domains = '') {
 
-  db_delete('logger_tokens')
+  if (!$token) {
+    $token = md5(uniqid(rand(), TRUE));
+  }
+
+  db_update('logger_tokens')
+    ->fields(array(
+      'domains' => $domains,
+      'token' => $token
+    ))
     ->condition('meter', $meter)
     ->execute();
-
-  db_insert('logger_tokens')
-    ->fields(array(
-      'token' => md5(uniqid(rand(), TRUE)),
-      'meter' => $meter,
-      'permissions' => 62
-    ))
-    ->execute();
-
-  drupal_goto("sensor/mylist");
 }
 
 /**
@@ -1085,6 +1426,47 @@ function logger_set_virtual_sensor_aggregations($virtual_meter, $aggregated_mete
       ))
       ->execute();
   }
+}
+
+/**
+ * Removes a firmware upgrade request.
+ *
+ * @param $device The device id.
+ */
+function logger_remove_firmware_upgrade_request($device) {
+
+  db_delete('logger_firmware_upgrade_request')
+    ->condition('device', $device)
+    ->execute();
+}
+
+/**
+ * Approves a firmware upgrade.
+ */
+function logger_firmware_upgrade_approve($device) {
+
+  db_update('logger_firmware_upgrade_request')
+    ->fields(array(
+      'approved' => time()
+    ))
+    ->condition('device', $device)
+    ->execute();
+
+  drupal_set_message('The firmware of your device is going to be upgraded. Please, make sure it remains up and running during the next 2 hours.', 'warning');
+
+  drupal_goto("energy");
+}
+
+/**
+ * Disapproves a firmware upgrade.
+ */
+function logger_firmware_upgrade_disapprove($device) {
+
+  logger_remove_firmware_upgrade_request($device);
+
+  drupal_set_message('The firmware upgrade has been rejected.', 'warning');
+
+  drupal_goto("energy");
 }
 
 /**
@@ -1113,4 +1495,11 @@ function logger_sensor_function_validate($function, $meter) {
     $count = $query->execute()->fetchField();
   }
   return $count == 0;
+}
+
+function logger_token_domains_validate($field, $form_state) {
+
+  if (isset($form_state['values']['domains']) && !empty($form_state['values']['domains']) && !valid_domains($form_state['values']['domains'])) {
+    form_error($field, t('Invalid web domains.'));
+  }
 }

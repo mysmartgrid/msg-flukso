@@ -117,4 +117,12 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
 
     $this->assertFalse(file_exists($dir));
   }
+
+  function testValidDomains() {
+
+    $this->assertTrue(valid_domains('www.host.com'));
+    $this->assertTrue(valid_domains('www.host.com domain.com'));
+    $this->assertFalse(valid_domains('kai@www.host.com'));
+    $this->assertFalse(valid_domains(''));
+  }
 }

@@ -157,7 +157,7 @@ function deployment_install() {
     ->fields(array(
       'id' => 10,
       'name' => 'Missing Sensors',
-      'description' => "The device is registered, but contains an empty list of sensors.",
+      'description' => "The device is installed, but the associated list of sensors is empty.",
       'flow_order' => 0,
     ))
     ->execute();
@@ -307,4 +307,26 @@ function deployment_update_7008() {
         ->execute();
     }
     return st("Entries have been added to table deployment_summary.");
+}
+
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7010() {
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.",
+    ))
+    ->condition('id', 5)
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is installed, but the associated list of sensors is empty.",
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
 }

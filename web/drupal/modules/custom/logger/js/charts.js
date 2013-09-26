@@ -118,8 +118,15 @@ function percentToPx(value, max) {
   }
 }
 
-function hideZero(value) {
-  return value == 0 ? "" : value.toFixed(2);
+function formatYValue(value) {
+
+  if (value == null || isNaN(value - 0)) {
+    return '';
+  } else {
+    var abs = Math.abs(value);
+    value = abs >= 0.01 ? value.toFixed(2) : abs >= 0.001 ? value.toFixed(3) : value;
+    return abs > 0 && abs < 0.001 ? '0.000...' : value;
+  }
 }
 
 function updateLineChartForm(chart) {
@@ -384,12 +391,11 @@ function updateLineLegend(chart) {
         if (timestamp >= minVisibleDate && timestamp <= maxVisibleDate) {
 
           var value = chart.getValue(v, s);
-          value = value ? value : 0;
-          last = value;
-          max = value > max ? value : max;
-          min = value < min ? value : min;
 
-          if (value != 0) {
+          if (value != null && !isNaN(value - 0)) {
+            last = value;
+            max = value > max ? value : max;
+            min = value < min ? value : min;
             sum += value;
             total++;
           }
@@ -412,13 +418,7 @@ function updateLineLegendValue(name, i, value) {
 
   var div = document.getElementById(name + --i);
   if (div) {
-    if (value && !isNaN(value - 0)) {
-      var abs = Math.abs(value);
-      value = abs >= 0.01 ? value.toFixed(2) : abs >= 0.001 ? value.toFixed(3) : value;
-      div.innerHTML = abs == 0 ? '' : abs < 0.001 ? '0.000...' : value;
-    } else {
-      div.innerHTML = '';
-    }
+    div.innerHTML = formatYValue(value);
   }
 }
 

@@ -71,9 +71,20 @@ malformed_POST(ReqData, _State) ->
                   {Key, true} ->
 
                     case check_optional_device_type(JsonData) of
+                      %Device type not informed
+                      {?UNKNOWN_DEVICE_TYPE_ID, true} ->
+                        {data, Result} = mysql:execute(pool, device_serial, [Device]),%FIXME: get rid of this test
+                        {false, ReqData, #state{device = Device, digest = Digest, typeId =
+                          case mysql:get_result_rows(Result) of
+                            [[Serial]] -> if Serial < 99000000 -> ?FLUKSO1_DEVICE_TYPE_ID; true -> ?FLUKSO2_DEVICE_TYPE_ID end;
+                            _ -> ?FLUKSO2_DEVICE_TYPE_ID
+                          end}};
+
+                      %Valid device type informed
                       {TypeId, true} ->
                         {false, ReqData, #state{device = Device, digest = Digest, typeId = TypeId}};
 
+                      %Invalid device type
                       _ -> ?HTTP_INVALID_TYPE 
                     end;
                   _ -> ?HTTP_INVALID_KEY
@@ -128,18 +139,20 @@ is_auth_POST(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, Result} = mysql:execute(pool, device_key, [Device]),
 
-    Key = case mysql:get_result_rows(Result) of
+    {case mysql:get_result_rows(Result) of
 
       %If device is found, use the key stored in the database
-      [[_Key]] -> _Key;
+      [[Key]] -> check_digest(Key, ReqData, ClientDigest);
 
       %Otherwise, use key informed in the request
       _ ->
         {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
-        proplists:get_value(<<"key">>, JsonData)
-    end,   
+        case proplists:is_defined(<<"key">>, JsonData) of
 
-    {check_digest(Key, ReqData, ClientDigest), ReqData, State}.
+          true -> check_digest(proplists:get_value(<<"key">>, JsonData), ReqData, ClientDigest);
+          _ -> {halt, ?HTTP_NOT_FOUND}
+        end
+    end, ReqData, State}.
 
 
 is_auth_GET(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
@@ -163,7 +176,7 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State) ->
     {data, Result} = mysql:execute(pool, device_props, [Device]),
-    [[Key, Upgrade, Resets, FirmwareId, DeviceDescription]] = mysql:get_result_rows(Result),
+    [[Key, Resets, FirmwareId, DeviceDescription]] = mysql:get_result_rows(Result),
 
     {data, _Result} = mysql:execute(pool, device_sensors, [Device]),
     _Sensors = mysql:get_result_rows(_Result),
@@ -193,62 +206,84 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     Timestamp = unix_time(),
     {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
 
+    Version = get_optional_value(<<"version">>, JsonData, 0),
+    Reset = get_optional_value(<<"reset">>, JsonData, 0),
+    Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
+    Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
+    Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
+    Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
+    Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
+
+    %Check if firmware has been informed
+    {InformedVersion, InformedFirmwareId} = case proplists:is_defined(<<"firmware">>, JsonData) of
+
+      %Firmware informed
+      true ->
+        {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
+        FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
+        {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
+
+        {FirmwareVersion, case mysql:get_result_rows(_Result) of
+          [[KnownFirmwareId, _Time, _Build, _Tag, _Upg]] -> KnownFirmwareId;
+          _ -> ?UNKNOWN_FIRMWARE_ID
+        end};
+
+      %Firmware not informed
+      _ ->
+        case TypeId of
+          %Old releases of Flukso 2 never inform the firmware version. So, this field must be set here.
+          ?FLUKSO2_DEVICE_TYPE_ID -> {?FLUKSO2_DEFAULT_FIRMWARE_VERSION, ?FLUKSO2_DEFAULT_FIRMWARE_ID};
+
+          _ -> {undefined, ?UNKNOWN_FIRMWARE_ID}
+        end
+    end,
+
     case mysql:get_result_rows(Result) of
 
       %Device exists
-      [[Key, Upgrade, Resets, OldFirmwareId, OldDescription]] ->
+      [[Key, Resets, CurrentFirmwareId, CurrentDescription]] ->
 
-        Version = get_optional_value(<<"version">>, JsonData, 0),
-        Reset = get_optional_value(<<"reset">>, JsonData, 0),
-        Uptime = get_optional_value(<<"uptime">>, JsonData, 0),
-        Memtotal = get_optional_value(<<"memtotal">>, JsonData, 0),
-        Memcached = get_optional_value(<<"memcached">>, JsonData, 0),
-        Membuffers = get_optional_value(<<"membuffers">>, JsonData, 0),
-        Memfree = get_optional_value(<<"memfree">>, JsonData, 0),
+        %Decide which key to use
+        {NewKey, NewResets} = case  proplists:is_defined(<<"key">>, JsonData) of
 
-        IsKeyInformed = proplists:is_defined(<<"key">>, JsonData),
-
-        if
-           %New Device Message - 2nd invocation
-           IsKeyInformed == true ->
-
-            %Key can be changed, but the encryption is based on the formed key
-            NewKey = proplists:get_value(<<"key">>, JsonData),
-            NewResets = 0;
+          %New Device Message - 2nd invocation
+          true -> {proplists:get_value(<<"key">>, JsonData), 0}; %Key can be changed, but the encryption is based on the formed key
             
           %Heartbeat Message
-          true ->
-            NewKey = Key, %Key is not changed
-            NewResets = Resets + Reset
+          _ -> {Key, Resets + Reset} %Same Key
         end,
 
-        IsFirmwareInformed = proplists:is_defined(<<"firmware">>, JsonData),
+        {FirmwareId, Upgrade} = case InformedVersion of
 
-        {FirmwareId, NewUpgrade} = if
-          IsFirmwareInformed == true ->
-            {struct, Firmware} = proplists:get_value(<<"firmware">>, JsonData),
-            FirmwareVersion = proplists:get_value(<<"version">>, Firmware),
+          %Device has not informed its firmware version
+          undefined -> {CurrentFirmwareId, 0};
 
-            {data, _Result} = mysql:execute(pool, firmware_props, [FirmwareVersion, TypeId]),
-            case mysql:get_result_rows(_Result) of
+          %Device has informed its firmware version
+          _ ->
 
-              [[NewFirmwareId, FirmwareReleaseTime, FirmwareBuild, FirmwareTag, FirmwareUpgradable]] ->
-                {NewFirmwareId,
-                  case NewFirmwareId of
-                    OldFirmwareId -> 0; %If device has the firmware version defined in the server
-                    _ -> Upgrade
-                  end};
-              _ -> {?UNKNOWN_FIRMWARE_ID, 0}
-            end;
+            %Check if there is an upgrade request for the device
+            {data, R} = mysql:execute(pool, firmware_upgrade_props, [Device]),
+            case mysql:get_result_rows(R) of
 
-          true ->
-            {OldFirmwareId, Upgrade}
+              %Upgrade request found, and device has performed a firmware upgrade
+              [[K, T, FromVersion, InformedVersion]] ->
+
+                %Delete upgrade request
+                mysql:execute(pool, firmware_upgrade_delete, [Device]),
+                {InformedFirmwareId, 0};
+
+              %Upgrade request found, but device has not yet performed a firmware upgrade
+              [[K, T, FromVersion, ToVersion]] -> {CurrentFirmwareId, 999};
+
+              %No upgrade request found
+              _ -> {InformedFirmwareId, 0}
+            end
         end,
 
-        Description = get_optional_value(<<"description">>, JsonData, OldDescription),
+        Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
 
         mysql:execute(pool, device_update,
-          [Timestamp, Version, NewUpgrade, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
+          [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
 
         mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
 
@@ -261,7 +296,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
         mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, 0, 0, ?UNKNOWN_FIRMWARE_ID, 0, 0, 0, 0, 0, 0, 0, 0, 0, "DE", Description, TypeId])
+          [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
     end,
 
     Support = compose_support_tag(Device),

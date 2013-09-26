@@ -745,3 +745,14 @@ function msgcommons_cron() {
     rmoldfiles(MSGCOMMONS_PATH . '/tmp', HOUR);
   }
 }
+
+/**
+ * Verifies if a list of domains contains valid names.
+ * 
+ * @param $domains A comma-separated list of domains.
+ * @return TRUE if all domain names are valid. FALSE otherwise.
+ */
+function valid_domains($domains) {
+
+  return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9\-\_\.\\s]+[a-zA-Z0-9]$/', $domains);
+}

@@ -88,11 +88,11 @@ function notification_schema() {
         'disp-width' => '10',
       ),
       'limit_up' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
+        'type' => 'float',
+        'size' => 'big',
+        'precision' => 24,
+        'scale' => 15,
         'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '10',
       ),
       'unit_id' => array(
         'type' => 'int',
@@ -698,4 +698,20 @@ function notification_update_7013() {
     ->execute();
 
   return st("Unit 'month' has been added to event 'summary report'.");
+}
+
+/**
+ * Resize field limit_up of table notification.
+ */
+function notification_update_7014() {
+
+  db_change_field('notification', 'limit_up', 'limit_up', array(
+      'type' => 'float',
+      'size' => 'big',
+      'precision' => 24,
+      'scale' => 15,
+      'not null' => TRUE,
+  ));
+
+  return st("Field limit_up has been resized.");
 }
