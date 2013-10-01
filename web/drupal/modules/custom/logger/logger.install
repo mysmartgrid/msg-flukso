@@ -189,7 +189,7 @@ function logger_schema() {
       ),
       'external_id' => array(
         'type' => 'varchar',
-        'length' => '32',
+        'length' => '64',
         'not null' => TRUE,
       ),
       'device' => array(
@@ -2155,4 +2155,18 @@ function logger_update_7093() {
     ->execute();
 
   return st('Field logger_tokens.domains has been added.');
+}
+
+/**
+ * Resize field 'external_id' in table logger_meters.
+ */
+function logger_update_7094() {
+
+  db_change_field('logger_meters', 'external_id', 'external_id',
+    array(
+      'type' => 'varchar',
+      'length' => '64',
+      'not null' => TRUE,
+  ));
+  return st('Field logger_tokens.external_id has been resized.');
 }
