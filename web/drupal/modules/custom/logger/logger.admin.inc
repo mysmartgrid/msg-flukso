@@ -469,8 +469,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#type' => 'textfield',
       '#title' => t('External Id'),
       '#description' => t("The sensor external id."),
-      '#maxlength' => 32,
-      '#size' => 32,
+      '#maxlength' => 64,
+      '#size' => 64,
       '#required' => TRUE,
       '#default_value' => $sensor->external_id,
       '#attributes' => array('readonly' => 'readonly')
