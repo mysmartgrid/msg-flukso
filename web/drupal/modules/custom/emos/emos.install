@@ -1,0 +1,89 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the EMOS module.
+ */
+
+function emos_schema() {
+
+  $schema['emos_rasp_image'] = array(
+    'description' => 'The EMOS Raspberry PI image request.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'device_ip' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+      'gateway_ip' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+      'netmask' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+      'requested' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}
+
+function emos_install() {
+
+  drupal_set_message(st('Created EMOS module tables.'));
+
+  $tmp = DRUPAL_ROOT . '/' . drupal_get_path('module', 'emos') . '/tmp';
+  $var_tmp = "/var/tmpdata/rasp-images";
+
+  exec("ln -s $var_tmp $tmp");
+
+  drupal_set_message(st('Created EMOS module directories.'));
+}
+
+function emos_uninstall() {
+  drupal_set_message(st('Removed EMOS tables.'));
+
+  $tmp = DRUPAL_ROOT . '/' . drupal_get_path('module', 'emos') . '/tmp'; 
+  exec("rm $tmp");
+
+  drupal_set_message(st('Removed EMOS directories.'));
+}
+
+function emos_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Create table emos_rasp_image.
+ */
+function emos_update_7082() {
+
+  db_create_table('emos_rasp_image', drupal_get_schema_unprocessed('emos', 'emos_rasp_image'));
+
+  return st('Table emos_rasp_image has been created.');
+}

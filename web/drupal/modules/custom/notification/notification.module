@@ -1972,7 +1972,9 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       $notifiable['until_time'] = date(NOTIFICATION_TIMESTAMP_FORMAT, $notifiable['until_time']);
     }
 
-    foreach ($notifiable as $key => $value) {
+    $vars = $notifiable;
+    $vars['limit_up'] = number_format($vars['limit_up'], 2, '.', '');
+    foreach ($vars as $key => $value) {
 
       $variables["%$key"] = $value;
       $variables["!$key"] = $value;
@@ -2017,6 +2019,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
  */
 function notification_query_limit_consumption_violations($notifiable, $maximum) {
 
+  $free_rows = 50;
   $list = NULL;
   $measurements = logger_query_device_measurements('hour', $notifiable['device'], 'W', ENERGY_CONSUMPTION_SENSOR_TYPE);
 
@@ -2036,9 +2039,12 @@ function notification_query_limit_consumption_violations($notifiable, $maximum) 
 
           date_default_timezone_set($notifiable['timezone']);
 
-          $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
-          $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
-            number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
+          if ($free_rows > 0) {
+            $sublist = $sublist ? $sublist : t('Sensor') . ': ' . $function . '<br> ';
+            $sublist .= date(NOTIFICATION_TIMESTAMP_FORMAT, $timestamp) . ' - ' .
+              number_format($value, 2, '.', '') . ' ' . t('Watt') . '<br> ';
+          }
+          $free_rows--;
         }
       }
       if ($sublist) {

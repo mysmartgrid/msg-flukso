@@ -1,0 +1,364 @@
+<?php
+
+/**
+ * @file
+ * This module provides personalized EMOS images.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//DEBUG
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
+
+define('EMOS_REL_PATH', drupal_get_path('module', 'emos'));
+define('EMOS_TMP', DRUPAL_ROOT . '/' . drupal_get_path('module', 'emos') . '/tmp');
+define('RASP_IMAGE_FILE_NAME', 'rasp-image');
+
+function emos_permission() {
+
+  return array(
+    'EMOS base station image' => array(
+      'title' => t('EMOS base station image'),
+      'description' => t('Generate EMOS base station image.'),
+    ),
+  );
+}
+
+function emos_menu() {
+
+  $items['emos1'] = array(
+    'title' => "EMOS base station image",
+    'description' => 'Shows the EMOS base station image form page.',
+    'page callback' => 'emos_image_page1',
+    'access arguments' => array('EMOS base station image'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['emos2'] = array(
+    'title' => "EMOS base station image",
+    'description' => 'Shows the EMOS base station image download page.',
+    'page callback' => 'emos_image_page2',
+    'page arguments' => array(1),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array('Generate EMOS base image', 1),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['emos/file'] = array(
+    'title' => 'Download EMOS base station image',
+    'description' => 'Downloads the EMOS base station compressed image file.',
+    'page callback' => 'emos_download_file',
+    'page arguments' => array(2),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array('Generate EMOS base image', 2),
+    'type' => MENU_CALLBACK
+  );
+  return $items;
+}
+
+/**
+ * Access callback ensuring the EMOS image is accessible only to the owner.
+ */
+function emos_image_access($permission, $id) {
+
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
+
+  $uid = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('uid'))
+    ->condition('f.id', $id)
+    ->execute()
+    ->fetchField();
+
+  return $uid == $GLOBALS['user']->uid && user_access($permission);
+}
+
+function emos_image_page1() {
+
+  global $base_url;
+  global $user;
+
+  $image_id = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('id'))
+    ->condition('f.uid', $user->uid)
+    ->execute()
+    ->fetchField();
+
+  if ($image_id) {
+
+    drupal_goto("emos2/$image_id");
+  }
+  else {
+
+    drupal_set_title(t('EMOS base station image'));
+
+    $output = t('This wizard provides you with a step-by-step explanation on how to obtain and install an EMOS base station image file.') . '<br><br>';
+
+    $output .= emos_step(1, 'Make sure you have the following devices at hand.', array(),
+      '<table><tr align="center">' .
+      "<td><img src=\"$base_url/files/images/memory-stick.jpg\"/></td>" .
+      "<td><img src=\"$base_url/files/images/sd-card.png\"/></td>" .
+      "<td><img src=\"$base_url/files/images/sd-card-reader.jpg\"/></td>" .
+      '</tr><tr align="center">' .
+      '<td>' . t('USB Memory stick') . '</td>' .
+      '<td>' . t('SD card (8 GB)') . '</td>' .
+      '<td>' . t('SD card reader') . '</td>' .
+      '</tr></table><br>');
+
+    $output .= emos_step(2, 'Now, inform the IP addresses below and click the "Generate" button.');
+
+    $form = drupal_get_form('emos_image_form');
+    $output .= drupal_render($form);
+
+    return $output;
+  }
+}
+
+/**
+ * Builds the EMOS image page.
+ *
+ * @param $image_id  The image id.
+ * @return the EMOS image page.
+ */
+function emos_image_page2($image_id) {
+
+  $image = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('id', 'device_ip', 'gateway_ip', 'netmask', 'requested'))
+    ->condition('f.id', $image_id)
+    ->execute()
+    ->fetchObject();
+
+  if ($image) {
+    drupal_set_title(t('EMOS base station image'));
+
+    $rows = array(
+      array(t('Device IP'), $image->device_ip),
+      array(t('Gateway IP'), $image->gateway_ip),
+      array(t('Netmask'), $image->netmask),
+      array(t('Requested'), date('d.m.Y H:i', $image->requested)));
+
+    $table = '<br>' . theme_table(array('header' => NULL, 'rows' => $rows, 'attributes' => array(),
+      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) . '<br><br>';
+
+    $done = EMOS_TMP . "/$image_id.done";
+    $imager_link = array('!imager' => l('Win32 Disk Imager', 'http://sourceforge.net/projects/win32diskimager'));
+
+    if (file_exists($done)) {
+
+      $path = EMOS_TMP . "/$image_id.zip";
+      $size = (int) (filesize($path) / 1024000);
+
+      $output =
+        emos_step(5, 'The EMOS base station image has been generated. Please, click the link below to download the file.') .
+
+          '<p><p><div style="text-align: center">' . l(t('Download (!size MB)', array('!size' => $size)), "emos/file/$image_id") . '</div>' . $table .
+
+        emos_step(6, 'After saving the file, uncompress it. You will find one file named ' . RASP_IMAGE_FILE_NAME . '.img.') .
+
+        emos_step(7, 'Finally, install the image on your SD card using a program like the !imager.', $imager_link);
+
+        $cancelation_caption = 'Restart';
+    }
+    else {
+      $progress = (int) (time() - $image->requested) * 100 / (5 * MINUTE);
+      $progress = $progress > 95 ? 95 : $progress;
+
+      $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
+      drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
+      drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
+        array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
+
+      drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
+        'http-equiv' => 'refresh', 'content' => "10;URL=/emos2/$image_id")), 'emos_image');
+
+      $output = emos_step(3, 'The EMOS base station image is being generated. This process takes less than 5 minutes.') .
+        '<p><p><div id="progressbar"></div>' . $table .
+
+        emos_step(4, 'While you wait, please make sure you have a program like the !imager installed on your computer. ' .
+          'This program will be used in the next steps to install the generated image on your SD card. You may leave this ' .
+          'page and return later, if you want.', $imager_link) . '<p><p>';
+
+      $cancelation_caption = 'Cancel';
+    }
+    $form = drupal_get_form('emos_cancelation_form', $image_id, $cancelation_caption);
+    $output .= drupal_render($form);
+  }
+  else {
+    $output = emos_image_page1();
+  }
+  return $output;
+}
+
+function emos_step($number, $message, $args = array(), $complement = '') {
+
+  return '<p><b>' . t('Step') . " $number - </b> " . t($message, $args) . '</p>' . $complement;
+}
+
+function emos_image_form($form, &$form_state) {
+
+  global $user;
+
+  $form['device_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Device IP address'),
+    '#description' => t('Enter the IP address of the Raspberry PI device (for example: 192.168.1.1).'),
+  );
+
+  $form['gateway_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Gateway IP address'),
+    '#description' => t('Enter the network gateway address (for example: 192.168.1.254).'),
+  );
+
+  $form['netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Network mask'),
+    '#description' => t('Enter the network mask (for example: 255.255.255.0).'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Generate"),
+  );
+  return $form;
+}
+
+function emos_cancelation_form($form, &$form_state, $image_id, $cancelation_caption) {
+
+  global $user;
+
+  $form['id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $image_id,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t($cancelation_caption),
+  );
+  return $form;
+}
+
+function emos_image_form_validate($form, &$form_state) {
+
+  $ip_options = array('options' => array('regexp' => '//'));
+
+  if (!filter_var($form_state['values']['device_ip'], FILTER_VALIDATE_IP) ||
+     strpos('.' . $form_state['values']['device_ip'] . '.', '.0.') != FALSE ||
+     strpos('.' . $form_state['values']['device_ip'] . '.', '.255.') != FALSE) {
+
+    form_set_error('device_ip', t('Please enter a valid IP address.'));
+  }
+
+  if (!filter_var($form_state['values']['gateway_ip'], FILTER_VALIDATE_IP) ||
+      strpos('.' . $form_state['values']['gateway_ip'] . '.', '.0.') != FALSE ||
+      strpos('.' . $form_state['values']['gateway_ip'] . '.', '.255.') != FALSE ||
+      filter_var($form_state['values']['gateway_ip'] == $form_state['values']['device_ip'])) {
+
+    form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
+  }
+
+  if (!filter_var($form_state['values']['netmask'], FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/(255)\.(0|255)\.(0|255)\.(0|255)/')))) {
+
+    form_set_error('netmask', t('Please enter a valid Network mask.'));
+  }
+}
+
+function emos_image_form_submit($form, &$form_state) {
+
+  global $user;
+
+  $image_id = md5(uniqid(rand(), TRUE));
+  $device_ip = $form_state['values']['device_ip'];
+  $gateway_ip = $form_state['values']['gateway_ip'];
+  $netmask = $form_state['values']['netmask'];
+
+  db_delete('emos_rasp_image')
+    ->condition('uid', $user->uid)
+    ->execute();
+
+  db_insert('emos_rasp_image')
+    ->fields(array(
+      'id' => $image_id,
+      'uid' => $user->uid,
+      'device_ip' => $device_ip,
+      'gateway_ip' => $gateway_ip,
+      'netmask' => $netmask,
+      'requested' => time()
+    ))
+    ->execute();
+
+  jobqueue_produce('emos-image', base64_encode("id::$image_id|ip::$device_ip|gateway::$gateway_ip|netmask::$netmask"));
+
+  $form_state['redirect'] = "emos2/$image_id";
+}
+
+function emos_cancelation_form_submit($form, &$form_state) {
+
+  emos_remove_image($form_state['values']['id']);
+  $form_state['redirect'] = "emos1";
+}
+
+function emos_remove_image($id) {
+
+  db_delete('emos_rasp_image')
+    ->condition('id', $id)
+    ->execute();
+ 
+  rmfiles(EMOS_TMP . "/$id*");
+}
+
+function emos_download_file($image_id) {
+
+  $file_path = EMOS_TMP . "/$image_id.zip";
+  if (file_exists($file_path)) {
+
+    $handler = fopen($file_path, "rb");
+    drupal_add_http_header('Pragma', 'public');
+    drupal_add_http_header('Content-Type', 'application/zip; charset=utf-8');
+    drupal_add_http_header('Content-Disposition', 'attachment; filename="' . RASP_IMAGE_FILE_NAME . '.zip"');
+    drupal_add_http_header('Content-Length', filesize($file_path));
+    drupal_add_http_header('Cache-Control', 'public');
+
+    ob_end_clean();
+    fpassthru($handler);
+    fclose($handler);
+  }
+  else {
+    drupal_set_message(t('The file is no longer available for download. Please generate a new image file and download it within 15 minutes.'));
+    $form_state['redirect'] = "emos1";
+  }
+}
+
+function emos_cron() {
+
+  //Runs only in the last 15 minutes
+  if (REQUEST_TIME % HOUR <= 15 * MINUTE) {
+
+    $timeout = 30 * MINUTE;
+    rmoldfiles(EMOS_TMP, $timeout);
+
+    db_delete('emos_rasp_image')
+      ->condition('requested', REQUEST_TIME - $timeout, '<')
+      ->execute();
+  }
+}
+
