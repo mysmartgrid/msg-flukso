@@ -35,7 +35,7 @@ function emos_permission() {
     'EMOS base station image' => array(
       'title' => t('EMOS base station image'),
       'description' => t('Generate EMOS base station image.'),
-    ),
+    )
   );
 }
 
@@ -55,7 +55,7 @@ function emos_menu() {
     'page callback' => 'emos_image_page2',
     'page arguments' => array(1),
     'access callback' => 'emos_image_access',
-    'access arguments' => array('Generate EMOS base image', 1),
+    'access arguments' => array(1),
     'type' => MENU_CALLBACK
   );
 
@@ -65,7 +65,7 @@ function emos_menu() {
     'page callback' => 'emos_download_file',
     'page arguments' => array(2),
     'access callback' => 'emos_image_access',
-    'access arguments' => array('Generate EMOS base image', 2),
+    'access arguments' => array(2),
     'type' => MENU_CALLBACK
   );
   return $items;
@@ -74,7 +74,7 @@ function emos_menu() {
 /**
  * Access callback ensuring the EMOS image is accessible only to the owner.
  */
-function emos_image_access($permission, $id) {
+function emos_image_access($id) {
 
   if ($GLOBALS['user']->uid == 1) {
     return TRUE;
@@ -86,7 +86,7 @@ function emos_image_access($permission, $id) {
     ->execute()
     ->fetchField();
 
-  return $uid == $GLOBALS['user']->uid && user_access($permission);
+  return user_access('EMOS base station image') && !($uid && $uid != $GLOBALS['user']->uid);
 }
 
 function emos_image_page1() {
@@ -165,18 +165,18 @@ function emos_image_page2($image_id) {
       $size = (int) (filesize($path) / 1024000);
 
       $output =
-        emos_step(5, 'The EMOS base station image has been generated. Please, click the link below to download the file.') .
+        emos_step(5, 'Done! The EMOS base station image has been generated. Please, click the link below to download the image file.') .
 
           '<p><p><div style="text-align: center">' . l(t('Download (!size MB)', array('!size' => $size)), "emos/file/$image_id") . '</div>' . $table .
 
-        emos_step(6, 'After saving the file, uncompress it. You will find one file named ' . RASP_IMAGE_FILE_NAME . '.img.') .
+        emos_step(6, 'After saving the file, uncompress it. You will find a file named ' . RASP_IMAGE_FILE_NAME . '.img.') .
 
         emos_step(7, 'Finally, install the image on your SD card using a program like the !imager.', $imager_link);
 
         $cancelation_caption = 'Restart';
     }
     else {
-      $progress = (int) (time() - $image->requested) * 100 / (5 * MINUTE);
+      $progress = (int) (time() - $image->requested) * 100 / (7 * MINUTE);
       $progress = $progress > 95 ? 95 : $progress;
 
       $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
@@ -189,12 +189,12 @@ function emos_image_page2($image_id) {
       drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
         'http-equiv' => 'refresh', 'content' => "10;URL=/emos2/$image_id")), 'emos_image');
 
-      $output = emos_step(3, 'The EMOS base station image is being generated. This process takes less than 5 minutes.') .
+      $output = emos_step(3, 'The EMOS base station image is being generated. This process takes around 7 minutes. Please, wait. ' . 
+        'You may leave this page and return later, if you need.') .
         '<p><p><div id="progressbar"></div>' . $table .
 
         emos_step(4, 'While you wait, please make sure you have a program like the !imager installed on your computer. ' .
-          'This program will be used in the next steps to install the generated image on your SD card. You may leave this ' .
-          'page and return later, if you want.', $imager_link) . '<p><p>';
+          'This program will be used in the next steps to install the generated image on your SD card.', $imager_link) . '<p><p>';
 
       $cancelation_caption = 'Cancel';
     }
@@ -306,7 +306,7 @@ function emos_image_form_submit($form, &$form_state) {
     ))
     ->execute();
 
-  jobqueue_produce('emos-image', base64_encode("id::$image_id|ip::$device_ip|gateway::$gateway_ip|netmask::$netmask"));
+  jobqueue_produce('rasp-image', base64_encode("id::$image_id|ip::$device_ip|gateway::$gateway_ip|netmask::$netmask"));
 
   $form_state['redirect'] = "emos2/$image_id";
 }
@@ -343,8 +343,9 @@ function emos_download_file($image_id) {
     fclose($handler);
   }
   else {
-    drupal_set_message(t('The file is no longer available for download. Please generate a new image file and download it within 15 minutes.'));
-    $form_state['redirect'] = "emos1";
+    drupal_set_message(t('The file is no longer available for download. Please generate a new image file and download it within 1 hour.'));
+    emos_remove_image($image_id);
+    drupal_goto("emos1");
   }
 }
 
@@ -353,7 +354,7 @@ function emos_cron() {
   //Runs only in the last 15 minutes
   if (REQUEST_TIME % HOUR <= 15 * MINUTE) {
 
-    $timeout = 30 * MINUTE;
+    $timeout = 90 * MINUTE;
     rmoldfiles(EMOS_TMP, $timeout);
 
     db_delete('emos_rasp_image')
