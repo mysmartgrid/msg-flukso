@@ -210,7 +210,7 @@ function logger_firmwarereleases_page() {
 
     $rows[] = array(
       $release->version,
-      $release->device_type,
+      t($release->device_type),
       $release->release_time,
       wordwrap($release->build, 16, "\n", TRUE),
       $release->tag,
