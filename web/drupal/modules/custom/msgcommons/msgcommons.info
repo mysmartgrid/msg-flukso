@@ -5,6 +5,4 @@ package = mySmartGrid
 core = 7.x
 version = 7.x-0.1
 
-dependencies[] = recaptcha 
-
 files[] = msgcommons.test
