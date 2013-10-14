@@ -131,7 +131,7 @@ function emos_call_salesforce() {
   ));
 
   if ($response->code == 200) {
-    emos_send_registration_email($postdata);
+    emos_send_registration_email();
     print $response->data;
   }
   else {
@@ -148,7 +148,7 @@ function emos_copy_salesforce_post_data() {
   $attributes = $_POST;
 
   //DEBUG
-  $attributes = emos_dummy_data();
+  #$attributes = emos_dummy_data();
 
   foreach ($attributes as $key => $value) {
     if ($postdata != '') {
@@ -199,8 +199,6 @@ function emos_dummy_data() {
 
 /**
  * Send an email to the mySmartGrid ticket system informing of the new EMOS participant registration.
- *
- * @param $device  The EMOS participant data.
  */
 function emos_send_registration_email($data) {
 
@@ -210,14 +208,14 @@ function emos_send_registration_email($data) {
   $variables = array(
     "!uid" => (isset($user->uid) ? $user->uid : 0),
     "!base_url" => $base_url,
-    "%first_name" => $data['first_name'],
-    "%last_name" => $data['last_name'],
-    "%email" => $data['email'],
-    "%company" => $data['company'],
-    "%phone" => $data['phone'],
-    "%street" => $data['street'],
-    "%zip" => $data['zip'],
-    "%city" => $data['city']
+    "%first_name" => $_POST['first_name'],
+    "%last_name" => $_POST['last_name'],
+    "%email" => $_POST['email'],
+    "%company" => $_POST['company'],
+    "%phone" => $_POST['phone'],
+    "%street" => $_POST['street'],
+    "%zip" => $_POST['zip'],
+    "%city" => $_POST['city']
   );
 
   $subject = t('EMOS Participant Registration');
@@ -233,8 +231,8 @@ function emos_send_registration_email($data) {
     'Zip: %zip <br>' .
     'City: %city <br><br>', $variables);
 
-  $body .= t(isset($user->id) ? "Click <a href='!base_url/user/!uid'>here</a> to see the user profile page.<br><br>" :
-     'The user was not authenticated when he made this request, so it is not possible to identify his account.');
+  $body .= t((isset($user->uid) ? "Click <a href='!base_url/user/!uid'>here</a> to see the user profile page.<br><br>" :
+     'The user was not authenticated when he made this request, so it is not possible to identify his account.<br><br>'), $variables);
 
   $body .= t('Best regards<br>mySmartGrid System');
 
