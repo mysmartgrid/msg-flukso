@@ -273,7 +273,7 @@ function emos_image_page1() {
       "<td><img src=\"$base_url/files/images/sd-card-reader.jpg\"/></td>" .
       '</tr><tr align="center">' .
       '<td>' . t('USB Memory stick') . '</td>' .
-      '<td>' . t('SD card (8 GB)') . '</td>' .
+      '<td>' . t('SD card (4 GB)') . '</td>' .
       '<td>' . t('SD card reader') . '</td>' .
       '</tr></table><br>');
 
