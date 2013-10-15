@@ -2,7 +2,7 @@
 
 /**
  * @file
- * This module provides personalized EMOS images.
+ * This module provides functionalities related to the EMOS project.
  *
  * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
  *
@@ -27,14 +27,14 @@
 
 define('EMOS_REL_PATH', drupal_get_path('module', 'emos'));
 define('EMOS_TMP', DRUPAL_ROOT . '/' . drupal_get_path('module', 'emos') . '/tmp');
-define('RASP_IMAGE_FILE_NAME', 'rasp-image');
+define('HEXABUS_IMAGE_FILE_NAME', 'hexabus-base-image');
 
 function emos_permission() {
 
   return array(
-    'EMOS base station image' => array(
-      'title' => t('EMOS base station image'),
-      'description' => t('Generate EMOS base station image.'),
+    'Hexabus base station image' => array(
+      'title' => t('Hexabus base station image'),
+      'description' => t('Generate the Hexabus base station image.'),
     )
   );
 }
@@ -42,16 +42,16 @@ function emos_permission() {
 function emos_menu() {
 
   $items['emos1'] = array(
-    'title' => "EMOS base station image",
-    'description' => 'Shows the EMOS base station image form page.',
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the first page of the Hexabus base station image wizard.',
     'page callback' => 'emos_image_page1',
-    'access arguments' => array('EMOS base station image'),
+    'access arguments' => array('Hexabus base station image'),
     'type' => MENU_NORMAL_ITEM
   );
 
   $items['emos2'] = array(
-    'title' => "EMOS base station image",
-    'description' => 'Shows the EMOS base station image download page.',
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the second page of the Hexabus base station image wizard.',
     'page callback' => 'emos_image_page2',
     'page arguments' => array(1),
     'access callback' => 'emos_image_access',
@@ -60,8 +60,8 @@ function emos_menu() {
   );
 
   $items['emos/file'] = array(
-    'title' => 'Download EMOS base station image',
-    'description' => 'Downloads the EMOS base station compressed image file.',
+    'title' => 'Hexabus base station image download',
+    'description' => 'Downloads the Hexabus base station image file.',
     'page callback' => 'emos_download_file',
     'page arguments' => array(2),
     'access callback' => 'emos_image_access',
@@ -81,7 +81,7 @@ function emos_menu() {
 }
 
 /**
- * Access callback ensuring the EMOS image is accessible only to the owner.
+ * Access callback ensuring the Hexabus image is accessible only to the owner.
  */
 function emos_image_access($id) {
 
@@ -95,7 +95,7 @@ function emos_image_access($id) {
     ->execute()
     ->fetchField();
 
-  return user_access('EMOS base station image') && !($uid && $uid != $GLOBALS['user']->uid);
+  return user_access('Hexabus base station image') && !($uid && $uid != $GLOBALS['user']->uid);
 }
 
 /**
@@ -239,6 +239,12 @@ function emos_send_registration_email($data) {
   jobqueue_send_email('msg-support@itwm.fhg.de', $subject, $body);
 }
 
+/**
+ * Builds the page 1 of the Hexabus base station image wizard.
+ *
+ * @param $image_id  The image id.
+ * @return page 1 of the Hexabus base station image wizard.
+ */
 function emos_image_page1() {
 
   global $base_url;
@@ -256,9 +262,9 @@ function emos_image_page1() {
   }
   else {
 
-    drupal_set_title(t('EMOS base station image'));
+    drupal_set_title(t('Hexabus base station image'));
 
-    $output = t('This wizard provides you with a step-by-step explanation on how to obtain and install an EMOS base station image file.') . '<br><br>';
+    $output = t('This wizard provides you with a step-by-step explanation on how to obtain and install an Hexabus base station image file.') . '<br><br>';
 
     $output .= emos_step(1, 'Make sure you have the following devices at hand.', array(),
       '<table><tr align="center">' .
@@ -281,12 +287,14 @@ function emos_image_page1() {
 }
 
 /**
- * Builds the EMOS image page.
+ * Builds the page 2 of the Hexabus base station image wizard.
  *
  * @param $image_id  The image id.
- * @return the EMOS image page.
+ * @return page 2 of the Hexabus base station image wizard.
  */
 function emos_image_page2($image_id) {
+
+  global $base_url;
 
   $image = db_select('emos_rasp_image', 'f')
     ->fields('f', array('id', 'device_ip', 'gateway_ip', 'netmask', 'requested'))
@@ -295,7 +303,7 @@ function emos_image_page2($image_id) {
     ->fetchObject();
 
   if ($image) {
-    drupal_set_title(t('EMOS base station image'));
+    drupal_set_title(t('Hexabus base station image'));
 
     $rows = array(
       array(t('Device IP'), $image->device_ip),
@@ -315,18 +323,21 @@ function emos_image_page2($image_id) {
       $size = (int) (filesize($path) / 1024000);
 
       $output =
-        emos_step(5, 'Done! The EMOS base station image has been generated. Please, click the link below to download the image file.') .
+        emos_step(5, 'Done! The Hexabus base station image has been generated. Please, click the link below to download the image file.') .
 
           '<p><p><div style="text-align: center">' . l(t('Download (!size MB)', array('!size' => $size)), "emos/file/$image_id") . '</div>' . $table .
 
-        emos_step(6, 'After saving the file, uncompress it. You will find a file named ' . RASP_IMAGE_FILE_NAME . '.img.') .
+        emos_step(6, 'After saving the file, uncompress it. You will find a file named ' . HEXABUS_IMAGE_FILE_NAME . '.img.') .
+
+          "<p align=\"center\"><img src=\"$base_url/files/images/hexabus-image-files.jpg\"/><br><br></p>" .
 
         emos_step(7, 'Finally, install the image on your SD card using a program like the !imager.', $imager_link);
 
         $cancelation_caption = 'Restart';
     }
     else {
-      $progress = (int) (time() - $image->requested) * 100 / (7 * MINUTE);
+      $duration = 4;
+      $progress = (int) (time() - $image->requested) * 100 / ($duration * MINUTE);
       $progress = $progress > 95 ? 95 : $progress;
 
       $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
@@ -339,8 +350,8 @@ function emos_image_page2($image_id) {
       drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
         'http-equiv' => 'refresh', 'content' => "10;URL=/emos2/$image_id")), 'emos_image');
 
-      $output = emos_step(3, 'The EMOS base station image is being generated. This process takes around 7 minutes. Please, wait. ' . 
-        'You may leave this page and return later, if you need.') .
+      $output = emos_step(3, 'The Hexabus base station image is being generated. This process takes around %duration minutes. Please, wait. ' . 
+        'You may leave this page and return later, if you need.', array('%duration' => $duration)) .
         '<p><p><div id="progressbar"></div>' . $table .
 
         emos_step(4, 'While you wait, please make sure you have a program like the !imager installed on your computer. ' .
@@ -375,7 +386,7 @@ function emos_image_form($form, &$form_state) {
   $form['gateway_ip'] = array(
     '#type' => 'textfield',
     '#title' => t('Gateway IP address'),
-    '#description' => t('Enter the network gateway address (for example: 192.168.1.254).'),
+    '#description' => t('Enter the IP address of the network gateway (for example: 192.168.1.254).'),
   );
 
   $form['netmask'] = array(
@@ -484,7 +495,7 @@ function emos_download_file($image_id) {
     $handler = fopen($file_path, "rb");
     drupal_add_http_header('Pragma', 'public');
     drupal_add_http_header('Content-Type', 'application/zip; charset=utf-8');
-    drupal_add_http_header('Content-Disposition', 'attachment; filename="' . RASP_IMAGE_FILE_NAME . '.zip"');
+    drupal_add_http_header('Content-Disposition', 'attachment; filename="' . HEXABUS_IMAGE_FILE_NAME . '.zip"');
     drupal_add_http_header('Content-Length', filesize($file_path));
     drupal_add_http_header('Cache-Control', 'public');
 
