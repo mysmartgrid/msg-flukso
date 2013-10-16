@@ -2174,11 +2174,11 @@ function logger_update_7094() {
 /**
  * Updates the Raspberry Pi image version.
  */
-function logger_update_7095() {
+function logger_update_7096() {
 
   db_update('logger_device_firmware')
     ->fields(array(
-      'version' => '0.9.0',
+      'version' => '0.9.0-0',
       'build' => 'ec378baf8a24ea9bb9de48306fcd39a5f3f0315a',
       'tag' => 'hexapi-0.9.0-dev',
       'release_time' => '20130916_0000',
