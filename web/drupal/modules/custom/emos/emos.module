@@ -59,6 +59,16 @@ function emos_menu() {
     'type' => MENU_CALLBACK
   );
 
+  $items['emos3'] = array(
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the last page of the Hexabus base station image wizard.',
+    'page callback' => 'emos_image_page3',
+    'page arguments' => array(1),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK
+  );
+
   $items['emos/file'] = array(
     'title' => 'Hexabus base station image download',
     'description' => 'Downloads the Hexabus base station image file.',
@@ -315,7 +325,10 @@ function emos_image_page2($image_id) {
       'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) . '<br><br>';
 
     $done = EMOS_TMP . "/$image_id.done";
-    $imager_link = array('!imager' => l('Win32 Disk Imager', 'http://sourceforge.net/projects/win32diskimager'));
+    $links = array(
+      '!imager' => l('Win32 Disk Imager', 'http://sourceforge.net/projects/win32diskimager'),
+      '!howto' => l('here', "emos3/$image_id")
+    );
 
     if (file_exists($done)) {
 
@@ -331,7 +344,8 @@ function emos_image_page2($image_id) {
 
           "<p align=\"center\"><img src=\"$base_url/files/images/hexabus-image-files.jpg\"/><br><br></p>" .
 
-        emos_step(7, 'Finally, install the image on your SD card using a program like the !imager.', $imager_link);
+        emos_step(7, 'Finally, install the image on your SD card using a program like the !imager. ' . 
+          'For instructions on how to use this program on Windows, please click !howto.', $links);
 
         $cancelation_caption = 'Restart';
     }
@@ -355,7 +369,7 @@ function emos_image_page2($image_id) {
         '<p><p><div id="progressbar"></div>' . $table .
 
         emos_step(4, 'While you wait, please make sure you have a program like the !imager installed on your computer. ' .
-          'This program will be used in the next steps to install the generated image on your SD card.', $imager_link) . '<p><p>';
+          'This program will be used in the next steps to install the generated image on your SD card.', $links) . '<p><p>';
 
       $cancelation_caption = 'Cancel';
     }
@@ -365,6 +379,52 @@ function emos_image_page2($image_id) {
   else {
     $output = emos_image_page1();
   }
+  return $output;
+}
+
+/**
+ * Builds the page 3 of the Hexabus base station image wizard.
+ *
+ * @param $image_id  The image id.
+ * @return page 3 of the Hexabus base station image wizard.
+ */
+function emos_image_page3($image_id) {
+
+  global $base_url;
+
+  $output = emos_step(8, 'Please, plug the SD card reader on your computer, and insert the SD card in it.') .
+
+    emos_step(9, 'Then, open the Win32 Disk Imager installed on your computer. You will see the following window.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-1.png\"/><br><br></p>" .
+
+    emos_step(10, 'Please, click the folder button indicated in the picture below. A file search window will pop up. Please, select the file ' .
+      HEXABUS_IMAGE_FILE_NAME . '.img, downloaded and uncompressed in previous steps.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-2.png\"/><br><br></p>" .
+
+    emos_step(11, 'Now, click the list indicated in the picture below and select the drive of the SD card reader.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-3.png\"/><br><br></p>" .
+
+    emos_step(12, 'Now, click the button Write on the bottom of the window. You will see the following dialog box asking for confirmation. Click Yes.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-4.png\"/><br><br></p>" .
+
+    emos_step(13, 'The writing process will start and a progress bar will indicate the percentage of data written to the SD card as seen in the following picture. ' .
+      'Please, wait until it reaches 100%.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-5.png\"/><br><br></p>" .
+
+    emos_step(14, 'At the end of the process, if the write is successful, you will see the dialog box below. Click Ok.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-6.png\"/><br><br></p>" .
+
+    emos_step(15, 'Congratulations! The Hexabus base station image has been successfully installed on your SD card.');
+
+  $form = drupal_get_form('emos_cancelation_form', $image_id, 'Restart');
+  $output .= drupal_render($form);
+
   return $output;
 }
 
