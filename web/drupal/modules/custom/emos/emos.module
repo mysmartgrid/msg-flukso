@@ -278,11 +278,9 @@ function emos_image_page1() {
 
     $output .= emos_step(1, 'Make sure you have the following devices at hand.', array(),
       '<table><tr align="center">' .
-      "<td><img src=\"$base_url/files/images/memory-stick.jpg\"/></td>" .
       "<td><img src=\"$base_url/files/images/sd-card.png\"/></td>" .
       "<td><img src=\"$base_url/files/images/sd-card-reader.jpg\"/></td>" .
       '</tr><tr align="center">' .
-      '<td>' . t('USB Memory stick') . '</td>' .
       '<td>' . t('SD card (4 GB)') . '</td>' .
       '<td>' . t('SD card reader') . '</td>' .
       '</tr></table><br>');
@@ -327,7 +325,7 @@ function emos_image_page2($image_id) {
     $done = EMOS_TMP . "/$image_id.done";
     $links = array(
       '!imager' => l('Win32 Disk Imager', 'http://sourceforge.net/projects/win32diskimager'),
-      '!howto' => l('here', "emos3/$image_id")
+      '!howto' => l(t('here'), "emos3/$image_id")
     );
 
     if (file_exists($done)) {
@@ -583,4 +581,3 @@ function emos_cron() {
       ->execute();
   }
 }
-
