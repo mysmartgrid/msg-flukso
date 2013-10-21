@@ -50,19 +50,6 @@ define('HUMIDITY_UNIT_TYPE_ID',    6);
 define('MSGCOMMONS_PATH', drupal_get_path('module', 'msgcommons'));
 
 
-function msgcommons_menu() {
-
-  $items['validate/recaptcha'] = array(
-    'title' => 'Captchavalidation',
-    'description' => 'Validate a registration form recaptcha',
-    'page callback' => 'msgcommons_validate_recaptcha',
-    'page arguments' => array(2),
-    'access callback' => TRUE,
-    'type' => MENU_CALLBACK,
-  );
-  return $items;
-}
-
 /**
  * Returns an array of units of a certain type.
  *
@@ -97,98 +84,6 @@ function msgcommons_get_same_type_units_options($symbol) {
     ->fetchField();
 
   return msgcommons_get_units_options($type_id);
-}
-
-function msgcommons_validate_recaptcha() {
-
-  _recaptcha_load_library();
-
-  //was there a reCAPTCHA response?
-  if (recaptcha_captcha_validation(NULL, "reCAPTCHA")) {
-    msgcommons_call_salesforce();
-  }
-  else {
-    //set the error code so that we can display it
-    return drupal_set_message(t('Error: Captcha validation failed.'));
-  }
-}
-
-/**
- * Forwards the POST request to Salesforce.
- */
-function msgcommons_call_salesforce() {
-
-  $url = 'https://www.salesforce.com/servlet/servlet.WebToLead';
-  $headers = array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8');
-  $postdata = msgcommons_copy_salesforce_post_data();
-
-  $response = drupal_http_request($url, array(
-    'headers' => $headers,
-    'method' => 'POST',
-    'data'   => $postdata,
-  ));
-
-  if ($response->code == 200) {
-    print $response->data;
-  }
-  else {
-    return drupal_set_message(t('Our apologies. ter.'));
-  }
-}
-
-/**
- * Compose the body for a salesforce POST request, from the current request attributes.
- */
-function msgcommons_copy_salesforce_post_data() {
-
-  $postdata = '';
-  $attributes = $_POST;
-
-  //DEBUG
-  //$attributes = msgcommons_dummy_data();
-
-  foreach ($attributes as $key => $value) {
-    if ($postdata != '') {
-      $postdata .= '&';
-    }
-    $postdata .= "$key=$value";
-  }
-  return $postdata;
-}
-
-/**
- * Compose the body for a salesforce POST test request. 
- */
-function msgcommons_dummy_data() {
-
-  global $base_url;
-
-  return array(
-    'oid' => '00D2000000060mn',
-    'retURL' => "$base_url/vielen-dank",
-    //'debug' => 1,
-    //'debugEmail' => 'kai.krueger@itwm.fraunhofer.de',
-    '00N20000003bgx2' => 'Nein', // Emos Programm
-    '00N20000003Jyzz' => 'Nein', // PV Ueberwachung
-    'salutation' =>      'Herr', // Anrede
-    'first_name' =>      'Max3',
-    'last_name' => 'Musterman',
-    'street' => 'Musterring 1',
-    'zip' => '76768',
-    'city' => 'Berg',
-    'company' => 'mySmartGrid',
-    'email' => 'krueger@itwm.fhg.de',
-    'phone' => '0631 31600',
-    '00N20000003JxDf' => 'Haus', // Art der Wohnung
-    '00N20000003bgwi' => '', //'Eigentümer', // Eigentumsverhältnis
-    '00N20000003bgxC' => '', //'4 Personen', // Personen im Haushalt
-    '00N20000003JxDk' => '', // Wärmepumpe
-    '00N20000003JxDp' => '', // Photovoltaikanlage
-    '00N20000003bgz8' => '', // PV-Peakleistung
-    '00N20000003bgxM' => '', // Warmwasser-Bereitung
-    'description' => '',
-    'submit' => 'senden',
-  );
 }
 
 /**
@@ -755,4 +650,21 @@ function msgcommons_cron() {
 function valid_domains($domains) {
 
   return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9\-\_\.\\s]+[a-zA-Z0-9]$/', $domains);
+}
+
+function get_query_string(SelectQueryInterface $query) {
+
+  $string = (string) $query;
+  $arguments = $query->arguments();
+
+  if (!empty($arguments) && is_array($arguments)) {
+    foreach ($arguments as $placeholder => &$value) {
+      if (is_string($value)) {
+        $value = "'$value'";
+      }
+    }
+
+    $string = strtr($string, $arguments);
+  }
+  return $string;
 }

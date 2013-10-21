@@ -189,7 +189,7 @@ function logger_schema() {
       ),
       'external_id' => array(
         'type' => 'varchar',
-        'length' => '32',
+        'length' => '64',
         'not null' => TRUE,
       ),
       'device' => array(
@@ -2155,4 +2155,37 @@ function logger_update_7093() {
     ->execute();
 
   return st('Field logger_tokens.domains has been added.');
+}
+
+/**
+ * Resize field 'external_id' in table logger_meters.
+ */
+function logger_update_7094() {
+
+  db_change_field('logger_meters', 'external_id', 'external_id',
+    array(
+      'type' => 'varchar',
+      'length' => '64',
+      'not null' => TRUE,
+  ));
+  return st('Field logger_tokens.external_id has been resized.');
+}
+
+/**
+ * Updates the Raspberry Pi image version.
+ */
+function logger_update_7096() {
+
+  db_update('logger_device_firmware')
+    ->fields(array(
+      'version' => '0.9.0-0',
+      'build' => 'ec378baf8a24ea9bb9de48306fcd39a5f3f0315a',
+      'tag' => 'hexapi-0.9.0-dev',
+      'release_time' => '20130916_0000',
+      'upgradable' => 1
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  return st('Raspberry Pi image version has been updated.');
 }

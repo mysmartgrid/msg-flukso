@@ -1,0 +1,583 @@
+<?php
+
+/**
+ * @file
+ * This module provides functionalities related to the EMOS project.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//DEBUG
+#error_reporting(E_ALL);
+#ini_set('display_errors', TRUE);
+#ini_set('display_startup_errors', TRUE);
+
+define('EMOS_REL_PATH', drupal_get_path('module', 'emos'));
+define('EMOS_TMP', DRUPAL_ROOT . '/' . drupal_get_path('module', 'emos') . '/tmp');
+define('HEXABUS_IMAGE_FILE_NAME', 'hexabus-base-image');
+
+function emos_permission() {
+
+  return array(
+    'Hexabus base station image' => array(
+      'title' => t('Hexabus base station image'),
+      'description' => t('Generate the Hexabus base station image.'),
+    )
+  );
+}
+
+function emos_menu() {
+
+  $items['emos1'] = array(
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the first page of the Hexabus base station image wizard.',
+    'page callback' => 'emos_image_page1',
+    'access arguments' => array('Hexabus base station image'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['emos2'] = array(
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the second page of the Hexabus base station image wizard.',
+    'page callback' => 'emos_image_page2',
+    'page arguments' => array(1),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['emos3'] = array(
+    'title' => "Hexabus base station image",
+    'description' => 'Shows the last page of the Hexabus base station image wizard.',
+    'page callback' => 'emos_image_page3',
+    'page arguments' => array(1),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['emos/file'] = array(
+    'title' => 'Hexabus base station image download',
+    'description' => 'Downloads the Hexabus base station image file.',
+    'page callback' => 'emos_download_file',
+    'page arguments' => array(2),
+    'access callback' => 'emos_image_access',
+    'access arguments' => array(2),
+    'type' => MENU_CALLBACK
+  );
+
+  $items['emos/register'] = array(
+    'title' => 'EMOS Participant Registration',
+    'description' => 'Validate a registration form recaptcha',
+    'page callback' => 'emos_register',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Access callback ensuring the Hexabus image is accessible only to the owner.
+ */
+function emos_image_access($id) {
+
+  if ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
+
+  $uid = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('uid'))
+    ->condition('f.id', $id)
+    ->execute()
+    ->fetchField();
+
+  return user_access('Hexabus base station image') && !($uid && $uid != $GLOBALS['user']->uid);
+}
+
+/**
+ * Registers an EMOS participant.
+ */
+function emos_register() {
+
+  _recaptcha_load_library();
+
+  //was there a reCAPTCHA response?
+  if (recaptcha_captcha_validation(NULL, "reCAPTCHA")) {
+    emos_call_salesforce();
+  }
+  else {
+    //set the error code so that we can display it
+    return drupal_set_message(t('Error: Captcha validation failed.'));
+  }
+}
+
+/**
+ * Forwards the POST request to Salesforce.
+ */
+function emos_call_salesforce() {
+
+  $url = 'https://www.salesforce.com/servlet/servlet.WebToLead';
+  $headers = array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8');
+  $postdata = emos_copy_salesforce_post_data();
+
+  $response = drupal_http_request($url, array(
+    'headers' => $headers,
+    'method' => 'POST',
+    'data'   => $postdata,
+  ));
+
+  if ($response->code == 200) {
+    emos_send_registration_email();
+    print $response->data;
+  }
+  else {
+    return drupal_set_message(t('Our apologies. ter.'));
+  }
+}
+
+/**
+ * Compose the body for a salesforce POST request, from the current request attributes.
+ */
+function emos_copy_salesforce_post_data() {
+
+  $postdata = '';
+  $attributes = $_POST;
+
+  //DEBUG
+  #$attributes = emos_dummy_data();
+
+  foreach ($attributes as $key => $value) {
+    if ($postdata != '') {
+      $postdata .= '&';
+    }
+    $postdata .= "$key=$value";
+  }
+  return $postdata;
+}
+
+/**
+ * Compose the body for a salesforce POST test request. 
+ */
+function emos_dummy_data() {
+
+  global $base_url;
+
+  return array(
+    'oid' => '00D2000000060mn',
+    'retURL' => "$base_url/vielen-dank",
+
+    //DEBUG
+    #'debug' => 1,
+    #'debugEmail' => 'kai.krueger@itwm.fraunhofer.de',
+
+    '00N20000003bgx2' => 'Nein', // EMOS Programm
+    '00N20000003Jyzz' => 'Nein', // PV Ueberwachung
+    'salutation' => 'Herr', // Anrede
+    'first_name' => 'Max3',
+    'last_name' => 'Musterman',
+    'street' => 'Musterring 1',
+    'zip' => '76768',
+    'city' => 'Berg',
+    'company' => 'mySmartGrid',
+    'email' => 'krueger@itwm.fhg.de',
+    'phone' => '0631 31600',
+    '00N20000003JxDf' => 'Haus', // Art der Wohnung
+    '00N20000003bgwi' => '', //'Eigentümer', // Eigentumsverhältnis
+    '00N20000003bgxC' => '', //'4 Personen', // Personen im Haushalt
+    '00N20000003JxDk' => '', // Wärmepumpe
+    '00N20000003JxDp' => '', // Photovoltaikanlage
+    '00N20000003bgz8' => '', // PV-Peakleistung
+    '00N20000003bgxM' => '', // Warmwasser-Bereitung
+    'description' => '',
+    'submit' => 'senden',
+  );
+}
+
+/**
+ * Send an email to the mySmartGrid ticket system informing of the new EMOS participant registration.
+ */
+function emos_send_registration_email($data) {
+
+  global $user;
+  global $base_url;
+
+  $variables = array(
+    "!uid" => (isset($user->uid) ? $user->uid : 0),
+    "!base_url" => $base_url,
+    "%first_name" => $_POST['first_name'],
+    "%last_name" => $_POST['last_name'],
+    "%email" => $_POST['email'],
+    "%company" => $_POST['company'],
+    "%phone" => $_POST['phone'],
+    "%street" => $_POST['street'],
+    "%zip" => $_POST['zip'],
+    "%city" => $_POST['city']
+  );
+
+  $subject = t('EMOS Participant Registration');
+
+  $body = t('Dear technician, <br><br>' .
+    'The following user has requested to join the EMOS project. <br><br>' .
+    'First Name: %first_name <br>' .
+    'Last Name: %last_name <br>' .
+    'e-mail: %email <br>' .
+    'Company: %company <br>' .
+    'Phone: %phone <br>' .
+    'Street: %street <br>' .
+    'Zip: %zip <br>' .
+    'City: %city <br><br>', $variables);
+
+  $body .= t((isset($user->uid) ? "Click <a href='!base_url/user/!uid'>here</a> to see the user profile page.<br><br>" :
+     'The user was not authenticated when he made this request, so it is not possible to identify his account.<br><br>'), $variables);
+
+  $body .= t('Best regards<br>mySmartGrid System');
+
+  jobqueue_send_email('msg-support@itwm.fhg.de', $subject, $body);
+}
+
+/**
+ * Builds the page 1 of the Hexabus base station image wizard.
+ *
+ * @param $image_id  The image id.
+ * @return page 1 of the Hexabus base station image wizard.
+ */
+function emos_image_page1() {
+
+  global $base_url;
+  global $user;
+
+  $image_id = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('id'))
+    ->condition('f.uid', $user->uid)
+    ->execute()
+    ->fetchField();
+
+  if ($image_id) {
+
+    drupal_goto("emos2/$image_id");
+  }
+  else {
+
+    drupal_set_title(t('Hexabus base station image'));
+
+    $output = t('This wizard provides you with a step-by-step explanation on how to obtain and install an Hexabus base station image file.') . '<br><br>';
+
+    $output .= emos_step(1, 'Make sure you have the following devices at hand.', array(),
+      '<table><tr align="center">' .
+      "<td><img src=\"$base_url/files/images/sd-card.png\"/></td>" .
+      "<td><img src=\"$base_url/files/images/sd-card-reader.jpg\"/></td>" .
+      '</tr><tr align="center">' .
+      '<td>' . t('SD card (4 GB)') . '</td>' .
+      '<td>' . t('SD card reader') . '</td>' .
+      '</tr></table><br>');
+
+    $output .= emos_step(2, 'Now, inform the IP addresses below and click the "Generate" button.');
+
+    $form = drupal_get_form('emos_image_form');
+    $output .= drupal_render($form);
+
+    return $output;
+  }
+}
+
+/**
+ * Builds the page 2 of the Hexabus base station image wizard.
+ *
+ * @param $image_id  The image id.
+ * @return page 2 of the Hexabus base station image wizard.
+ */
+function emos_image_page2($image_id) {
+
+  global $base_url;
+
+  $image = db_select('emos_rasp_image', 'f')
+    ->fields('f', array('id', 'device_ip', 'gateway_ip', 'netmask', 'requested'))
+    ->condition('f.id', $image_id)
+    ->execute()
+    ->fetchObject();
+
+  if ($image) {
+    drupal_set_title(t('Hexabus base station image'));
+
+    $rows = array(
+      array(t('Device IP'), $image->device_ip),
+      array(t('Gateway IP'), $image->gateway_ip),
+      array(t('Netmask'), $image->netmask),
+      array(t('Requested'), date('d.m.Y H:i', $image->requested)));
+
+    $table = '<br>' . theme_table(array('header' => NULL, 'rows' => $rows, 'attributes' => array(),
+      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) . '<br><br>';
+
+    $done = EMOS_TMP . "/$image_id.done";
+    $links = array(
+      '!imager' => l('Win32 Disk Imager', 'http://sourceforge.net/projects/win32diskimager'),
+      '!howto' => l(t('here'), "emos3/$image_id")
+    );
+
+    if (file_exists($done)) {
+
+      $path = EMOS_TMP . "/$image_id.zip";
+      $size = (int) (filesize($path) / 1024000);
+
+      $output =
+        emos_step(5, 'Done! The Hexabus base station image has been generated. Please, click the link below to download the image file.') .
+
+          '<p><p><div style="text-align: center">' . l(t('Download (!size MB)', array('!size' => $size)), "emos/file/$image_id") . '</div>' . $table .
+
+        emos_step(6, 'After saving the file, uncompress it. You will find a file named ' . HEXABUS_IMAGE_FILE_NAME . '.img.') .
+
+          "<p align=\"center\"><img src=\"$base_url/files/images/hexabus-image-files.jpg\"/><br><br></p>" .
+
+        emos_step(7, 'Finally, install the image on your SD card using a program like the !imager. ' . 
+          'For instructions on how to use this program on Windows, please click !howto.', $links);
+
+        $cancelation_caption = 'Restart';
+    }
+    else {
+      $duration = 4;
+      $progress = (int) (time() - $image->requested) * 100 / ($duration * MINUTE);
+      $progress = $progress > 95 ? 95 : $progress;
+
+      $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
+      drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
+      drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
+        array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
+
+      drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
+        'http-equiv' => 'refresh', 'content' => "10;URL=/emos2/$image_id")), 'emos_image');
+
+      $output = emos_step(3, 'The Hexabus base station image is being generated. This process takes around %duration minutes. Please, wait. ' . 
+        'You may leave this page and return later, if you need.', array('%duration' => $duration)) .
+        '<p><p><div id="progressbar"></div>' . $table .
+
+        emos_step(4, 'While you wait, please make sure you have a program like the !imager installed on your computer. ' .
+          'This program will be used in the next steps to install the generated image on your SD card.', $links) . '<p><p>';
+
+      $cancelation_caption = 'Cancel';
+    }
+    $form = drupal_get_form('emos_cancelation_form', $image_id, $cancelation_caption);
+    $output .= drupal_render($form);
+  }
+  else {
+    $output = emos_image_page1();
+  }
+  return $output;
+}
+
+/**
+ * Builds the page 3 of the Hexabus base station image wizard.
+ *
+ * @param $image_id  The image id.
+ * @return page 3 of the Hexabus base station image wizard.
+ */
+function emos_image_page3($image_id) {
+
+  global $base_url;
+
+  $output = emos_step(8, 'Please, plug the SD card reader on your computer, and insert the SD card in it.') .
+
+    emos_step(9, 'Then, open the Win32 Disk Imager installed on your computer. You will see the following window.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-1.png\"/><br><br></p>" .
+
+    emos_step(10, 'Please, click the folder button indicated in the picture below. A file search window will pop up. Please, select the file ' .
+      HEXABUS_IMAGE_FILE_NAME . '.img, downloaded and uncompressed in previous steps.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-2.png\"/><br><br></p>" .
+
+    emos_step(11, 'Now, click the list indicated in the picture below and select the drive of the SD card reader.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-3.png\"/><br><br></p>" .
+
+    emos_step(12, 'Now, click the button Write on the bottom of the window. You will see the following dialog box asking for confirmation. Click Yes.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-4.png\"/><br><br></p>" .
+
+    emos_step(13, 'The writing process will start and a progress bar will indicate the percentage of data written to the SD card as seen in the following picture. ' .
+      'Please, wait until it reaches 100%.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-5.png\"/><br><br></p>" .
+
+    emos_step(14, 'At the end of the process, if the write is successful, you will see the dialog box below. Click Ok.') .
+
+    "<p align='center'><img src=\"$base_url/files/images/win32-disk-6.png\"/><br><br></p>" .
+
+    emos_step(15, 'Congratulations! The Hexabus base station image has been successfully installed on your SD card.');
+
+  $form = drupal_get_form('emos_cancelation_form', $image_id, 'Restart');
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+function emos_step($number, $message, $args = array(), $complement = '') {
+
+  return '<p><b>' . t('Step') . " $number - </b> " . t($message, $args) . '</p>' . $complement;
+}
+
+function emos_image_form($form, &$form_state) {
+
+  global $user;
+
+  $form['device_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Device IP address'),
+    '#description' => t('Enter the IP address of the Raspberry PI device (for example: 192.168.1.1).'),
+  );
+
+  $form['gateway_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Gateway IP address'),
+    '#description' => t('Enter the IP address of the network gateway (for example: 192.168.1.254).'),
+  );
+
+  $form['netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Network mask'),
+    '#description' => t('Enter the network mask (for example: 255.255.255.0).'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Generate"),
+  );
+  return $form;
+}
+
+function emos_cancelation_form($form, &$form_state, $image_id, $cancelation_caption) {
+
+  global $user;
+
+  $form['id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $image_id,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t($cancelation_caption),
+  );
+  return $form;
+}
+
+function emos_image_form_validate($form, &$form_state) {
+
+  $ip_options = array('options' => array('regexp' => '//'));
+
+  if (!filter_var($form_state['values']['device_ip'], FILTER_VALIDATE_IP) ||
+     strpos('.' . $form_state['values']['device_ip'] . '.', '.0.') != FALSE ||
+     strpos('.' . $form_state['values']['device_ip'] . '.', '.255.') != FALSE) {
+
+    form_set_error('device_ip', t('Please enter a valid IP address.'));
+  }
+
+  if (!filter_var($form_state['values']['gateway_ip'], FILTER_VALIDATE_IP) ||
+      strpos('.' . $form_state['values']['gateway_ip'] . '.', '.0.') != FALSE ||
+      strpos('.' . $form_state['values']['gateway_ip'] . '.', '.255.') != FALSE ||
+      filter_var($form_state['values']['gateway_ip'] == $form_state['values']['device_ip'])) {
+
+    form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
+  }
+
+  if (!filter_var($form_state['values']['netmask'], FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/(255)\.(0|255)\.(0|255)\.(0|255)/')))) {
+
+    form_set_error('netmask', t('Please enter a valid Network mask.'));
+  }
+}
+
+function emos_image_form_submit($form, &$form_state) {
+
+  global $user;
+
+  $image_id = md5(uniqid(rand(), TRUE));
+  $device_ip = $form_state['values']['device_ip'];
+  $gateway_ip = $form_state['values']['gateway_ip'];
+  $netmask = $form_state['values']['netmask'];
+
+  db_delete('emos_rasp_image')
+    ->condition('uid', $user->uid)
+    ->execute();
+
+  db_insert('emos_rasp_image')
+    ->fields(array(
+      'id' => $image_id,
+      'uid' => $user->uid,
+      'device_ip' => $device_ip,
+      'gateway_ip' => $gateway_ip,
+      'netmask' => $netmask,
+      'requested' => time()
+    ))
+    ->execute();
+
+  jobqueue_produce('rasp-image', base64_encode("id::$image_id|ip::$device_ip|gateway::$gateway_ip|netmask::$netmask"));
+
+  $form_state['redirect'] = "emos2/$image_id";
+}
+
+function emos_cancelation_form_submit($form, &$form_state) {
+
+  emos_remove_image($form_state['values']['id']);
+  $form_state['redirect'] = "emos1";
+}
+
+function emos_remove_image($id) {
+
+  db_delete('emos_rasp_image')
+    ->condition('id', $id)
+    ->execute();
+ 
+  rmfiles(EMOS_TMP . "/$id*");
+}
+
+function emos_download_file($image_id) {
+
+  $file_path = EMOS_TMP . "/$image_id.zip";
+  if (file_exists($file_path)) {
+
+    $handler = fopen($file_path, "rb");
+    drupal_add_http_header('Pragma', 'public');
+    drupal_add_http_header('Content-Type', 'application/zip; charset=utf-8');
+    drupal_add_http_header('Content-Disposition', 'attachment; filename="' . HEXABUS_IMAGE_FILE_NAME . '.zip"');
+    drupal_add_http_header('Content-Length', filesize($file_path));
+    drupal_add_http_header('Cache-Control', 'public');
+
+    ob_end_clean();
+    fpassthru($handler);
+    fclose($handler);
+  }
+  else {
+    drupal_set_message(t('The file is no longer available for download. Please generate a new image file and download it within 1 hour.'));
+    emos_remove_image($image_id);
+    drupal_goto("emos1");
+  }
+}
+
+function emos_cron() {
+
+  //Runs only in the last 15 minutes
+  if (REQUEST_TIME % HOUR <= 15 * MINUTE) {
+
+    $timeout = 90 * MINUTE;
+    rmoldfiles(EMOS_TMP, $timeout);
+
+    db_delete('emos_rasp_image')
+      ->condition('requested', REQUEST_TIME - $timeout, '<')
+      ->execute();
+  }
+}

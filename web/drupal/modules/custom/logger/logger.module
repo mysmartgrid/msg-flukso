@@ -4066,22 +4066,24 @@ function logger_jsonp_sensor_access($meter) {
 /**
  * Queries the databases for measurements reported by sensors of a single device.
  *
- * @param $interval The time interval.
- * @param $device   The device's hash code.
- * @param $unit     The measurement unit.
+ * @param $interval     The time interval.
+ * @param $device       The device's hash code.
+ * @param $unit         The measurement unit.
+ * @param $sensor_type  The type of sensor to be queried.
  * @return the array of sensors' measurements, formatted as [meter][function][ [timestamp, value] ].
  */
-function logger_query_device_measurements($interval, $device, $unit = 'W') {
+function logger_query_device_measurements($interval, $device, $unit = 'W', $sensor_type = ENERGY_CONSUMPTION_SENSOR_TYPE) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
   //TODO. create a function for this query
   $query = db_select('logger_meters', 'm')
     ->fields('m', array('meter', 'function', 'price'))
-    ->condition('m.device', $device);
+    ->condition('m.device', $device)
+    ->condition('m.type', $sensor_type);
+
   $query->join('logger_devices', 'd', 'd.device = m.device');
   $query->addField('d', 'type_id', 'device_type_id');  
-
   $result = $query->execute();
 
   $resolution = logger_get_resolution($interval);
