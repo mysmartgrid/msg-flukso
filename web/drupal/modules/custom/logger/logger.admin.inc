@@ -1484,10 +1484,10 @@ function logger_sensor_function_validate($function, $meter) {
   $count = 0;
 
   if ($function) {
-    $query = db_select('logger_meters', 'm');
+    $query = db_select('logger_meters', 'm')
+      ->condition('m.function', $function)
+      ->condition('m.uid', $user->uid);
     $query->addExpression('COUNT(*)', 'count');
-    $query->condition('m.function', $function, '=')
-      ->condition('m.uid', $user->uid, '=');
 
     if ($meter) {
       $query->condition('m.meter', $meter, '<>');
