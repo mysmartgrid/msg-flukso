@@ -40,6 +40,7 @@ function logger_userdevices_page() {
     ->orderBy('d.serial');
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
+  $query->addField('t', 'name', 'type_name');
   $query->addField('t', 'remote_support');
 
   $query->leftJoin('device_support_request', 'r', 'd.device = r.device');
@@ -72,7 +73,7 @@ function logger_userdevices_page() {
 
     $row = array();
     $row[] = $device->serial;
-    $row[] = wordwrap($device->device, 16, "\n", TRUE);
+    $row[] = $device->type_name;
     $row[] = $device->firmware_version;
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
@@ -86,7 +87,7 @@ function logger_userdevices_page() {
     drupal_add_js("jQuery(document).ready( function() { resizeTable('" . LOGGER_TABLE_ID . "'); } );", $options);
   }
 
-  $header = array(t('Serial'), t('Device Id'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
+  $header = array(t('Serial'), t('Device Type'), t('Version'), t('Last heartbeat'), t('Uptime'), t('Operations'));
 
   $form = drupal_get_form('logger_deviceactivation_form');
   return drupal_render($form) . '<br><br><br>' . 
@@ -210,7 +211,7 @@ function logger_firmwarereleases_page() {
 
     $rows[] = array(
       $release->version,
-      t($release->device_type),
+      $release->device_type,
       $release->release_time,
       wordwrap($release->build, 16, "\n", TRUE),
       $release->tag,
@@ -1483,10 +1484,10 @@ function logger_sensor_function_validate($function, $meter) {
   $count = 0;
 
   if ($function) {
-    $query = db_select('logger_meters', 'm');
+    $query = db_select('logger_meters', 'm')
+      ->condition('m.function', $function)
+      ->condition('m.uid', $user->uid);
     $query->addExpression('COUNT(*)', 'count');
-    $query->condition('m.function', $function, '=')
-      ->condition('m.uid', $user->uid, '=');
 
     if ($meter) {
       $query->condition('m.meter', $meter, '<>');

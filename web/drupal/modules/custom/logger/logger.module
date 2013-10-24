@@ -3918,7 +3918,15 @@ function logger_account_access($permission) {
 
   global $user;
 
-  return $user->uid == $GLOBALS['user']->uid && user_access($permission);
+  if (user_is_anonymous()) {
+    return FALSE;
+  }
+  elseif ($GLOBALS['user']->uid == 1) {
+    return TRUE;
+  }
+  else {
+    return $user->uid == $GLOBALS['user']->uid && user_access($permission);
+  }
 }
 
 /**
@@ -3926,7 +3934,10 @@ function logger_account_access($permission) {
  */
 function logger_sensor_access($permission, $meter) {
 
-  if ($GLOBALS['user']->uid == 1) {
+  if (user_is_anonymous()) {
+    return FALSE;
+  }
+  elseif ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
 
@@ -3943,8 +3954,11 @@ function logger_sensor_access($permission, $meter) {
  * Access callback ensuring the device is accessible only to the owner.
  */
 function logger_device_access($permission, $device) {
-  
-  if ($GLOBALS['user']->uid == 1) {
+ 
+  if (user_is_anonymous()) {
+    return FALSE;
+  }
+  elseif ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
 
@@ -4000,7 +4014,10 @@ function logger_humidity_access($permission) {
  */
 function logger_sensor_type_access($permission, $sensor_type) {
 
-  if ($GLOBALS['user']->uid == 1) {
+  if (user_is_anonymous()) {
+    return FALSE;
+  }
+  elseif ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
 
@@ -4019,7 +4036,10 @@ function logger_sensor_type_access($permission, $sensor_type) {
  */
 function logger_forecast_access($permission) {
 
-  if ($GLOBALS['user']->uid == 1) {
+  if (user_is_anonymous()) {
+    return FALSE;
+  }
+  elseif ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
 
