@@ -817,12 +817,6 @@ function logger_sensor_form_validate($form, &$form_state) {
   $function = $form_state['values']['function'];
   $meter = $in_edition ? $form_state['values']['meter'] : NULL;
 
-  if (!logger_sensor_function_validate($function, $meter)) {
-
-    form_set_error('function', t('Another sensor was found with the function name: %function_name. ' .
-      'Please inform another name which has not yet been used.', array('%function_name' => $function)));
-  }
-
   if (isset($form_state['values']['price']) && !($form_state['values']['price'] > 0)) {
     form_set_error('price', t('The informed price is invalid.'));
   }
@@ -831,7 +825,6 @@ function logger_sensor_form_validate($form, &$form_state) {
     $forecast = $form_state['values']['forecast'][1];
     $latitude = $_REQUEST['coordinates_latitude'];
     $longitude = $_REQUEST['coordinates_longitude'];
-    $type = $form_state['values']['type'];
 
     if (!($latitude >= -90 && $latitude <= 90 && $longitude >= -90 && $longitude <= 90)) {
 
@@ -1047,18 +1040,10 @@ function logger_device_activate($code) {
   $i = 2;
   foreach ($sensors as $sensor) {
 
-    $function = $sensor->function;
-
-    //Find an unique name for 'function'
-    while ($function && !logger_sensor_function_validate($function, $sensor->meter)) {
-      $function = "Sensor $i";
-      $i++;
-    }
-
     db_update('logger_meters')
       ->fields(array(
         'uid' => $user->uid,
-        'function' => $function
+        'function' => $sensor->function
       ))
       ->condition('meter', $sensor->meter)
       ->execute();
@@ -1468,34 +1453,6 @@ function logger_firmware_upgrade_disapprove($device) {
   drupal_set_message('The firmware upgrade has been rejected.', 'warning');
 
   drupal_goto("energy");
-}
-
-/**
- * Validates the uniqueness of a sensor function.
- *
- * @param $function The function to be validated.
- * @param $meter    The meter which currently has the function.
- * @return TRUE if it is unique; FALSE otherwise.
- */
-function logger_sensor_function_validate($function, $meter) {
-
-  global $user;
-
-  $count = 0;
-
-  if ($function) {
-    $query = db_select('logger_meters', 'm')
-      ->condition('m.function', $function)
-      ->condition('m.uid', $user->uid);
-    $query->addExpression('COUNT(*)', 'count');
-
-    if ($meter) {
-      $query->condition('m.meter', $meter, '<>');
-    }
-
-    $count = $query->execute()->fetchField();
-  }
-  return $count == 0;
 }
 
 function logger_token_domains_validate($field, $form_state) {

@@ -235,28 +235,19 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
 
   module_load_include('inc', 'logger', 'logger.admin');
 
-  if (logger_sensor_function_validate($function, $meter)) {
-
-    $result = db_update('logger_meters')
-      ->fields(array(
-        'type' => $type,
-        'function' => $function,
-        'phase' => $phase,
-        'constant' => $constant,
-        'unit' => $unit,
-      ))
-      ->condition('meter', $meter)
-      ->execute();    
+  $result = db_update('logger_meters')
+    ->fields(array(
+      'type' => $type,
+      'function' => $function,
+      'phase' => $phase,
+      'constant' => $constant,
+      'unit' => $unit,
+    ))
+    ->condition('meter', $meter)
+    ->execute();    
     
-    drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');
-    drush_print_pipe('ok');
-  }
-  else {
-    drush_set_error(
-      'LOGGER_NON_UNIQUE_METER_FUNCTION',
-      dt('The function name: @function is already been used by another sensor.',
-        array('@function' => $function)));
-  }
+  drush_log(dt('Successfully updated meter: @meter', array('@meter' => $result)), 'ok');
+  drush_print_pipe('ok');
 }
 
 /**
