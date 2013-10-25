@@ -192,6 +192,7 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
       $rows = array(
         array(t('Serial Number'), $device['serial']),
         array(t('Device Id'), $device['device']),
+        array(t('Type'), $device['device_type_name']),
         array(t('Version'), $device['firmware_version']),
         array(t('User Id'), $device['uid']),
         array(t('User'), l($device['name'], 'user/' . $device['uid'])),
@@ -515,6 +516,9 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
 
   $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
   $query->addField('f', 'version', 'firmware_version');
+
+  $query->join('logger_device_type', 'v', 'd.type_id = v.id');
+  $query->addField('v', 'name', 'device_type_name');
 
   if (isset($filter['user_name'])) {
     $query->condition('u.name', '%' . $filter['user_name'] . '%', 'LIKE');
