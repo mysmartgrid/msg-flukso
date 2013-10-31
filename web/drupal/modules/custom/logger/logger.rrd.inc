@@ -546,8 +546,8 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     $command = "/bin/sh $script_path";
   }
 
-  //FIXME
-  append_file("/tmp/rrd.command." . $user->uid . '.' . REQUEST_TIME . '.txt', "\n" . $command);
+  //DEBUG
+  //append_file("/tmp/rrd.command." . $user->uid . '.' . REQUEST_TIME . '.txt', "\n" . $command);
 
   $lines = array();
   $error = 0;
