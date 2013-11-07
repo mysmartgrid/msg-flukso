@@ -2193,7 +2193,7 @@ function logger_update_7095() {
 /**
  * Removes old uninstalled Flukso 1.0 devices.
  */
-function logger_update_7096() {
+function logger_update_7098() {
 
   module_load_include('inc', 'logger', 'logger.admin');
 
