@@ -2189,3 +2189,26 @@ function logger_update_7095() {
 
   return st('Raspberry Pi image version has been updated.');
 }
+
+/**
+ * Removes old uninstalled Flukso 1.0 devices.
+ */
+function logger_update_7096() {
+
+  module_load_include('inc', 'logger', 'logger.admin');
+
+  $fluksos = db_select('logger_devices', 'd')
+    ->fields('d', array('device'))
+    ->condition('d.type_id', 1)
+    ->condition('d.uid', 0)
+    ->condition('d.access', 1356998400, '<')// 01.01.2013 00:00
+    ->execute();
+
+  foreach ($fluksos as $flukso) {
+
+    logger_device_remove($flukso->device);
+  }
+
+  return st('Old uninstalled Flukso 1.0 devices have been removed.');
+}
+
