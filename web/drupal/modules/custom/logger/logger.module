@@ -1361,17 +1361,10 @@ function logger_format_series_period($interval, $period, $offset = 0) {
   $start = $period['start'];
   $end = $period['end'] - 1; //from 00:00:00 until 23:59:59 on user timezone
 
-  //daylight savings
-  $start += date('I', $start) == "0" ? HOUR : 0;
-  $end += date('I', $end) == "0" ? HOUR : 0;
-
-  $period['start'] = $start;
-  $period['end'] = $end;
-
   switch ($interval) {
     case 'day':
       $formatted_time = t(date('l', $start)) . ' ' . t('day quarter ' . (ceil(date("H", $end) / 6)));
-      $complement = logger_format_period('dayquarter', $period, TRUE);
+      $complement = logger_format_period('dayquarter', $period);
       break;
     case 'week':
       $formatted_time = t(date("l", $start));
@@ -1379,7 +1372,7 @@ function logger_format_series_period($interval, $period, $offset = 0) {
       break;
     case 'month':
       $formatted_time = t('Week') . ' ' . date("W", $start);
-      $complement = logger_format_period('week', $period, TRUE);
+      $complement = logger_format_period('week', $period);
       break;
     case 'year':
       $formatted_time = t(date("M", $start));
@@ -1396,19 +1389,12 @@ function logger_format_series_period($interval, $period, $offset = 0) {
  * 
  * @param $interval      The time interval name.
  * @param $period        The pair of timestamps (start, end) that define the period.
- * @param $dst_adjusted  Whether daylight saving offset has been removed from dates.
  * @return the period of time as a string.
  */
-function logger_format_period($interval, $period, $dst_adjusted = FALSE) {
+function logger_format_period($interval, $period) {
 
   $start = $period['start'];
   $end   = $period['end'];
-
-  if (!$dst_adjusted) {
-    //daylight savings
-    $start += date('I', $start) == "0" ? HOUR : 0;
-    $end += date('I', $end) == "0" ? HOUR : 0;
-  }
 
   switch ($interval) {
     case 'hour':
