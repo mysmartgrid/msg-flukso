@@ -364,6 +364,21 @@ function append_file($file_path, $content) {
 }
 
 /**
+ * Reads the content of a JSON file.
+ *
+ * @param $path The file path.
+ * @return the JSON data as an array.
+ */
+function read_json_file($path) {
+
+  $fh = fopen($path, 'r');
+  $data = fgets($fh);
+  fclose($fh);
+
+  return json_decode($data, TRUE);
+}
+
+/**
  * Returns the timezone offset.
  *
  * @param $name The timezone name.
