@@ -73,6 +73,10 @@ function logger_permission() {
       'title' => t('view logger charts'),
       'description' => t('View logger charts.'),
     ),
+    'view statistics' => array(
+      'title' => t('view statistics'),
+      'description' => t('View power consumption statistics page.'),
+    ),
     'view forecast charts' => array(
       'title' => t('view forecast charts'),
       'description' => t('View forecast charts.'),
@@ -214,6 +218,14 @@ function logger_menu() {
     'page arguments' => array(1, FALSE),
     'access callback' => 'logger_humidity_access',
     'access arguments' => array('view logger charts'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['statistics'] = array(
+    'title' => 'Your Power Consumption Statistics',
+    'description' => 'Show the power consumption statistics page',
+    'page callback' => 'logger_statistics_page',
+    'access arguments' => array('view statistics'),
     'type' => MENU_CALLBACK,
   );
 
@@ -739,6 +751,40 @@ function logger_user_power_page($uid) {
   logger_add_user_series($uid, 'power');
 
   return logger_power_page('hour');
+}
+
+/**
+ * Builds the power consumption statistics page.
+ *
+ * @return the power consumption statistics page.
+ */
+function logger_statistics_page() {
+
+  global $user;
+
+  $statistics = read_json_file(LOGGER_PATH . "/json/user-" . $user->uid . "-statistics.json");
+
+  if (empty($statistics['base_load'])) {
+
+    return t('Base load undetermined.');
+  }
+  else {
+    $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
+    drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/raphael.2.1.0.min.js', $options);
+    drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/justgage.1.0.1.min.js', $options);
+
+    drupal_add_js("
+      var g = new JustGage({
+        id: 'gauge',
+        title: '" . t('Base Load (W)') . "',
+        value: " . $statistics['base_load'] . ",
+        min: 33,
+        max: 236,
+        showMinMax: false
+      });", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 290));
+
+    return "<div id='gauge' style='height: 15em;'></div>";
+  }
 }
 
 /**
@@ -2958,7 +3004,7 @@ function logger_create_chart_form($form, $submit_js, $chart) {
     '#default_value' => $chart->prices[ENERGY_CONSUMPTION_SENSOR_TYPE],
     '#field_suffix' => ' / kWh',
     '#access' => $show_price && !$use_sensor_prices && in_array(ENERGY_CONSUMPTION_SENSOR_TYPE, $chart->types),
-    '#element_validate' => array('element_validate_integer_positive'),
+    '#element_validate' => array('element_validate_number'),
     '#weight' => -97
   );
 
@@ -2971,7 +3017,7 @@ function logger_create_chart_form($form, $submit_js, $chart) {
     '#default_value' => $chart->prices[ENERGY_PRODUCTION_SENSOR_TYPE],
     '#field_suffix' => ' / kWh',
     '#access' => $show_price && !$use_sensor_prices && in_array(ENERGY_PRODUCTION_SENSOR_TYPE, $chart->types),
-    '#element_validate' => array('element_validate_integer_positive'),
+    '#element_validate' => array('element_validate_number'),
     '#weight' => -96
   );
 
@@ -4167,12 +4213,12 @@ function logger_remove_expired_support_requests() {
 }
 
 /**
- * Removes firmware upgrade requests older than 1 day.
+ * Removes firmware upgrade requests older than 1 week.
  */
 function logger_remove_expired_firmware_upgrade_requests() {
 
   db_delete('logger_firmware_upgrade_request')
-    ->condition('requested', REQUEST_TIME - 2 * HOUR, '<')
+    ->condition('requested', REQUEST_TIME - WEEK, '<')
     ->execute();
 }
 

@@ -603,19 +603,23 @@ function logger_rrd_parse_exported_lines($lines) {
  * @param $device_type_id the device type id (optional).
  * @return the unit conversion factor.
  */
-function logger_rrd_get_unit_factor($unit, $price = NULL, $device_type_id = 0) {//FIXME: argument
+function logger_rrd_get_unit_factor($unit, $price = NULL, $device_type_id = 0) {
+
+  //TODO: use unit id instead
+  if (strpos(" $unit", '€') > 0 && isset($price)) {
+    $unit = 'kWh';
+    $factor = $price;
+  }
+  else {
+    $factor = 1;
+  }
 
   $result = db_select('unit', 'u')
       ->fields('u', array('factor'))
       ->condition('u.symbol', $unit)
       ->execute();
 
-  $factor = count($result) == 1 ? $result->fetchField() : 1;
-
-  //TODO: use unit id instead
-  if (strpos($unit, '€') != FALSE && $price) {
-    $factor *= $price; 
-  }
+  $factor *= count($result) == 1 ? $result->fetchField() : 1;
 
   //TODO: get rid of this test later
   return $factor * ($device_type_id == LIBKLIO_DEVICE_TYPE_ID || $device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID ? 1 : 1000);
