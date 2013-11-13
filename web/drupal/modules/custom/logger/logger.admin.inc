@@ -162,8 +162,11 @@ function logger_usersensors_page() {
         $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
 
         $operations .= ($sensor->virtual ?
-          l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
-          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter)) . '<br>';
+          l(t('Remove'), 'sensor/remove/' . $sensor->meter,
+            array('attributes' => array('onclick' => "javascript: return confirm('" . t('This virtual sensor is going to be removed. Do you want to proceed?') . "');"))) :
+
+          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter,
+            array('attributes' => array('onclick' => "javascript: return confirm('" . t('This sensor is going to be deactivated. Do you want to proceed?') . "');")))) . '<br>';
       }
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
