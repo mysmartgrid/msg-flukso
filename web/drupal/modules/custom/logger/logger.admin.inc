@@ -238,6 +238,27 @@ function logger_firmwarereleases_page() {
 }
 
 /**
+ * Downloads a firmware log file.
+ *
+ * @param $device_type_id  The device type id.
+ * @param $version         The firmware version.
+ */
+function logger_firmwarelog_download($device_type_id, $version) {
+
+  $file_name = 'ChangeLog.txt';
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name");
+  drupal_add_http_header('Cache-Control', 'public');
+
+  $file_path = LOGGER_PATH . '/upgrades/versions/' . $device_type_id . '/' . $version . '/' . $file_name;
+  if (file_exists($file_path)) {
+    print file_get_contents($file_path);
+  }
+  exit(0);
+}
+
+/**
  * Builds the firmware upgrade page.
  *
  * @return the firmware upgrade page.
@@ -1022,9 +1043,12 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
 /**
  * Associates a device with the authenticated user.
  *
- * @param $code  The activation code.
+ * @param $code     The activation code.
+ * @param $callback The URL to which the request must be redirected after the device is activated.
+ *                  Inform NULL if no redirection should be performed.
+ * @param $options  An array of URL options.
  */
-function logger_device_activate($code) {
+function logger_device_activate($code, $callback = 'list/devices', $options = array()) {
 
   global $user;
 
@@ -1072,7 +1096,9 @@ function logger_device_activate($code) {
   }
   drupal_set_message(t("The device is now associated with your account."));
 
-  drupal_goto("device/mylist");
+  if ($callback) {
+    drupal_goto($callback, $options);
+  }
 }
 
 /**

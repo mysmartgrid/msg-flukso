@@ -371,11 +371,16 @@ function append_file($file_path, $content) {
  */
 function read_json_file($path) {
 
-  $fh = fopen($path, 'r');
-  $data = fgets($fh);
-  fclose($fh);
+  if (file_exists($path)) {
+    $fh = fopen($path, 'r');
+    $data = fgets($fh);
+    fclose($fh);
 
-  return json_decode($data, TRUE);
+    return json_decode($data, TRUE);
+  }
+  else {
+    return array();
+  }
 }
 
 /**
