@@ -63,3 +63,14 @@ function resizeTable(id, col1, col2) {
     }
   }
 }
+
+function toggleDeviceAssignFields() {
+
+  var form = document.getElementById('logger-deviceassign-form');
+
+  var div = document.getElementById('new-user-fields-div');
+  div.style.display = (form.new_account[0].checked ? 'none' : '');
+
+  div = document.getElementById('user-fields-div');
+  div.style.display = (form.new_account[1].checked ? 'none' : '');
+}

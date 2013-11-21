@@ -900,7 +900,6 @@ function logger_get_device_firmware($id) {
     ->fetchObject();
 }
 
-
 function logger_device_form_submit($form, &$form_state) {
 
   db_update('logger_devices')
@@ -1043,12 +1042,9 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
 /**
  * Associates a device with the authenticated user.
  *
- * @param $code     The activation code.
- * @param $callback The URL to which the request must be redirected after the device is activated.
- *                  Inform NULL if no redirection should be performed.
- * @param $options  An array of URL options.
+ * @param $code The activation code.
  */
-function logger_device_activate($code, $callback = 'list/devices', $options = array()) {
+function logger_device_assign($code) {
 
   global $user;
 
@@ -1094,11 +1090,20 @@ function logger_device_activate($code, $callback = 'list/devices', $options = ar
       ))
       ->execute();
   }
+}
+
+/**
+ * Associates a device with the authenticated user and return to the devices list page.
+ *
+ * @param $code The activation code.
+ */
+function logger_device_activate($code) {
+
+  logger_device_assign($code);
+
   drupal_set_message(t("The device is now associated with your account."));
 
-  if ($callback) {
-    drupal_goto($callback, $options);
-  }
+  drupal_goto('device/mylist');
 }
 
 /**
@@ -1112,9 +1117,15 @@ function logger_device_deactivate($device) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  $device_type_id = db_select('logger_devices', 'd')
+    ->fields('d', array('type_id'))
+    ->condition('d.device', $device)
+    ->execute()
+    ->fetchField();
+
   $sensors = db_select('logger_meters', 'm')
     ->fields('m')
-    ->condition('m.device', $device, '=')
+    ->condition('m.device', $device)
     ->execute();
 
   foreach ($sensors as $sensor) {
@@ -1129,7 +1140,9 @@ function logger_device_deactivate($device) {
       ->condition('meter', $sensor->meter)
       ->execute();
 
-    logger_rrd_clear($sensor->meter);
+    if ($device_type_id <= VZLOGGER_DEVICE_TYPE_ID) {
+      logger_rrd_clear($sensor->meter);
+    }
   }
 
   //FIXME: define a hook

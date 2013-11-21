@@ -24,9 +24,9 @@
  */
 
 //DEBUG
-#error_reporting(E_ALL);
-#ini_set('display_errors', TRUE);
-#ini_set('display_startup_errors', TRUE);
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
 
 define('ENERGY_CONSUMPTION_SENSOR_TYPE', 1);
 define('ENERGY_PRODUCTION_SENSOR_TYPE',  2);
@@ -778,7 +778,7 @@ function logger_user_power_page($uid) {
  *
  * @return the device assignment page.
  */
-function logger_device_assign_page($code, $callback) {
+function logger_device_assign_page() {
   
   $callback = isset($_REQUEST['callback']) ? urldecode($_REQUEST['callback']) : '';
   $code = isset($_REQUEST['code']) ? $_REQUEST['code'] : '';
@@ -979,7 +979,7 @@ function logger_authenticate_user($user_name, $password) {
 
 function logger_deviceassign_form_submit($form, &$form_state) {
 
-  logger_device_activate($form_state['values']['code'], NULL);
+  logger_device_assign($form_state['values']['code']);
 
   $form_state['redirect'] = array(
     $form_state['values']['callback'], array(
