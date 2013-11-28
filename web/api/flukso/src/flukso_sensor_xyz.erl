@@ -314,7 +314,7 @@ query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor) ->
     {data, Result} = mysql:execute(pool, sensor_factor, [RrdSensor]),
     [[RrdFactor]] = mysql:get_result_rows(Result),
 
-    case rrd_fetch(?BASE_PATH, RrdSensor, RrdStart, RrdEnd, RrdResolution) of
+    case rrd_fetch(RrdSensor, RrdStart, RrdEnd, RrdResolution) of
        {ok, Response} ->
            Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
            Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor * UnitFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
@@ -354,22 +354,45 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     ExternalId = get_optional_value(<<"externalid">>, Params, Sensor),
     Function = proplists:get_value(<<"function">>, Params),
     Description = get_optional_value(<<"description">>, Params, ""),
+    Device = proplists:get_value(<<"device">>, Params),
 
-    {data, Result} = mysql:execute(pool, sensor_props, [Sensor]),
+    {data, Result} = mysql:execute(pool, sensor_props, [Sensor, ExternalId]),
 
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[_Uid, Device, UnitId, RrdFactor]] ->
-        {updated, _Result} = mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
-        RrdResponse = "ok",
-        ErrorCode = ?HTTP_OK;
+      [[FoundUid, FoundSensor, FoundDevice, UnitId, _Factor]] ->
+
+        ValidExternalId = case FoundSensor of
+
+          %Same external id, different sensor id
+          Sensor ->
+            {data, Res} = mysql:execute(pool, device_uid, [Device]),
+            [[Uid]] = mysql:get_result_rows(Res),
+
+            %Validate user
+            case Uid of
+              FoundUid ->
+                move_sensor_data(FoundSensor, Device, Sensor),
+                true;
+              _ ->
+                false
+            end;
+          _ ->
+            true
+        end,
+
+        {RrdResponse, ErrorCode} = case ValidExternalId of 
+          true ->
+            mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
+            {"ok", ?HTTP_OK};
+          _ ->
+            {"Invalid external id", ?HTTP_INVALID_EXTERNAL_ID}
+       end;
 
       %Sensor is not found
       _ ->
         Timestamp = unix_time(),
-        Device = proplists:get_value(<<"device">>, Params),
-
         UnitString = get_optional_value(<<"unit">>, Params, "wh"),
         {data, _Result} = mysql:execute(pool, unit_props, [UnitString]),
 
@@ -378,7 +401,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
           %Unit is valid
           [[UnitId, Factor, UnitType]] ->
 
-            case rrd_create(?BASE_PATH, Sensor, UnitType) of
+            case rrd_create(Sensor, UnitType) of
 
               %RRD file creation was successful
               {ok, _RrdResponse} ->
@@ -427,16 +450,16 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
 
-    {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor]),
+    {data, Result} = mysql:execute(pool, sensor_props, [RrdSensor, RrdSensor]),
 
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[Uid, Device, UnitId, RrdFactor]] ->
+      [[Uid, Sensor, Device, UnitId, RrdFactor]] ->
 
         ServerTimestamp = unix_time(),
 
-        RrdTimestamp = case rrd_last(string:concat(?BASE_PATH, [RrdSensor|".rrd"])) of
+        RrdTimestamp = case rrd_last(string:concat(?BASE_PATH, [Sensor|".rrd"])) of
           % valid
           {ok, Response} -> Response;
 
@@ -460,7 +483,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
             %  string:concat(string:concat("Unsorted Measurements:\n", UnsortedList), string:concat("\nSorted Measurements:\n", RrdData)),
             %  ?INFO, ReqData),
 
-            case rrd_update(?BASE_PATH, RrdSensor, RrdData) of
+            case rrd_update(Sensor, RrdData) of
 
               %RRD files were successfully updated
               {ok, _RrdResponse} ->
@@ -536,11 +559,26 @@ parse_measurements(ServerTimestamp, RrdTimestamp, Measurements, Factor) ->
 
 delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = State) ->
 
-    mysql:execute(pool, msgdump_delete, [RrdSensor]),
-    mysql:execute(pool, sensor_agg_delete, [RrdSensor]),
-    mysql:execute(pool, sensor_storage_delete, [RrdSensor]),
-    mysql:execute(pool, token_delete, [RrdSensor]),
-    mysql:execute(pool, sensor_delete, [RrdSensor]),
+  delete_sensor(RrdSensor),
 
-    JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
-    {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+  JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
+  {true, wrq:set_resp_body(JsonResponse, ReqData), State}.
+
+
+delete_sensor(Sensor) ->
+
+  mysql:execute(pool, msgdump_delete, [Sensor]),
+  mysql:execute(pool, sensor_agg_delete, [Sensor]),
+  mysql:execute(pool, sensor_storage_delete, [Sensor]),
+  mysql:execute(pool, token_delete, [Sensor]),
+  mysql:execute(pool, sensor_delete, [Sensor]).
+
+
+move_sensor_data(FromSensor, ToDevice, ToSensor) ->
+
+  mysql:execute(pool, msgdump_delete, [FromSensor]),
+  mysql:execute(pool, sensor_agg_update, [ToSensor, FromSensor]),
+  mysql:execute(pool, sensor_storage_update, [ToSensor, FromSensor]),
+  mysql:execute(pool, token_update, [ToSensor, FromSensor]),
+  mysql:execute(pool, sensor_move, [ToDevice, ToSensor, FromSensor]),
+  rrd_rename(FromSensor, ToSensor).
