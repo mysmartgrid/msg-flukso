@@ -47,7 +47,8 @@ mysql_prepare() ->
     mysql:prepare(token_delete, <<"DELETE FROM logger_tokens WHERE meter = ?">>),
 
     mysql:prepare(sensor_key, <<"SELECT sha FROM (logger_devices ld INNER JOIN logger_meters lm ON ld.device = lm.device) WHERE lm.meter = ?">>),
-    mysql:prepare(sensor_props, <<"SELECT uid, meter, device, unit_id, factor FROM logger_meters WHERE meter = ? OR external_id = ?">>),
+    mysql:prepare(sensor_props, <<"SELECT uid, meter, device, unit_id, factor FROM logger_meters WHERE meter = ?">>),
+    mysql:prepare(sensor_by_ext_id, <<"SELECT uid, meter, device, unit_id, factor FROM logger_meters WHERE external_id = ?">>),
     mysql:prepare(sensor_factor, <<"SELECT factor FROM logger_meters WHERE meter = ?">>),
     mysql:prepare(sensor_device_type, <<"SELECT d.type_id FROM logger_devices d, logger_meters m WHERE d.device = m.device and m.meter = ?">>),
     mysql:prepare(device_sensors, <<"SELECT m.meter, m.external_id, m.function, m.description, un.string_id AS unit FROM logger_meters m, unit un WHERE m.device = ? AND m.unit_id = un.id">>),
@@ -66,7 +67,6 @@ mysql_prepare() ->
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_props, <<"SELECT sha, resets, firmware_id, description FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_serial, <<"SELECT serial FROM logger_devices WHERE device = ?">>),
-    mysql:prepare(device_uid, <<"SELECT uid FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_type, <<"SELECT type_id FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_id = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
