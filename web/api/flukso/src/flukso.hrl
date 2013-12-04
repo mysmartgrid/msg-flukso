@@ -19,8 +19,8 @@
 %% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 %%
 
--define(BASE_PATH,               "var/data/base/").
--define(FIRMWARE_UPGRADES_PATH,  "var/upgrades/").
+-define(BASE_PATH,               "/var/www/flukso-api/flukso/var/data/base/").
+-define(FIRMWARE_UPGRADES_PATH,  "/var/www/flukso-api/flukso/var/upgrades/").
 
 -define(MINUTE,     60).
 -define(QUARTER,   900).
@@ -65,6 +65,7 @@
 -define(HTTP_INVALID_TIME_PERIOD,     476).
 -define(HTTP_INVALID_EVENT,           477).
 -define(HTTP_NON_UPGRADABLE_FIRMWARE, 478).
+-define(HTTP_INVALID_EXTERNAL_ID,     479).
 -define(HTTP_INTERNAL_SERVER_ERROR,   500).
 -define(HTTP_NOT_IMPLEMENTED,         501).
 
@@ -369,15 +370,24 @@ logger(_Uid, _Type, _Message, _Severity, _ReqData) ->
     true.
 
 % erlrrd wrappers
-rrd_fetch(Path, RrdSensor, RrdStart, RrdEnd, RrdResolution) ->
-    erlrrd:fetch(erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])).
+rrd_file(Sensor) ->
+  [?BASE_PATH|[Sensor|".rrd"]].
 
-rrd_update(Path, RrdSensor, RrdData) ->
-    erlrrd:update([Path, [RrdSensor|".rrd"], " ", RrdData]).
+rrd_fetch(RrdSensor, RrdStart, RrdEnd, RrdResolution) ->
+  erlrrd:fetch(erlrrd:c([rrd_file(RrdSensor), "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])).
 
-rrd_create(Path, RrdSensor, UnitType) ->
+rrd_update(RrdSensor, RrdData) ->
+  erlrrd:update([?BASE_PATH, [RrdSensor|".rrd"], " ", RrdData]).
+
+rrd_copy(FromSensor, ToSensor) ->
+  file:copy(rrd_file(FromSensor), rrd_file(ToSensor)).
+
+rrd_create(Sensor, UnitType) ->
   %FIXME: use erlrrd:create
-  file:copy([["/var/www/flukso-api/flukso/var/data/base/template."|integer_to_list(UnitType)]|".rrd"], ["/var/www/flukso-api/flukso/var/data/base/"|[RrdSensor|".rrd"]]).
+  rrd_copy(["template."|integer_to_list(UnitType)], Sensor).
+
+rrd_rename(FromSensor, ToSensor) ->
+  file:rename(rrd_file(FromSensor), rrd_file(ToSensor)).
 
 rrd_last(RRDFile) ->
   erlrrd:last(RRDFile).

@@ -364,6 +364,26 @@ function append_file($file_path, $content) {
 }
 
 /**
+ * Reads the content of a JSON file.
+ *
+ * @param $path The file path.
+ * @return the JSON data as an array.
+ */
+function read_json_file($path) {
+
+  if (file_exists($path)) {
+    $fh = fopen($path, 'r');
+    $data = fgets($fh);
+    fclose($fh);
+
+    return json_decode($data, TRUE);
+  }
+  else {
+    return array();
+  }
+}
+
+/**
  * Returns the timezone offset.
  *
  * @param $name The timezone name.
@@ -491,7 +511,7 @@ function html2txt($html) {
  */
 function check_browser_support() {
 
-  $agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : NULL;
+  $agent = isset($_SERVER['HTTP_USER_AGENT']) ? ' ' . $_SERVER['HTTP_USER_AGENT'] : NULL;
 
   //If called by Drush
   if (empty($agent)) {
@@ -520,7 +540,8 @@ function check_browser_support() {
       array('name' => 'Chrome',   'version' => 1),
       array('name' => 'Chromium', 'version' => 1),
       array('name' => 'Safari',   'version' => 4),
-      array('name' => 'Webkit',   'version' => 5)
+      array('name' => 'Webkit',   'version' => 5),
+      array('name' => 'Mozilla',  'version' => 5),
     );
 
     foreach ($supported_browsers as $browser) {

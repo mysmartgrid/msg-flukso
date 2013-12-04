@@ -162,8 +162,11 @@ function logger_usersensors_page() {
         $operations .= l(t('Edit'), 'sensor/edit/' . $sensor->meter) . '<br>';
 
         $operations .= ($sensor->virtual ?
-          l(t('Remove'), 'sensor/remove/' . $sensor->meter) :
-          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter)) . '<br>';
+          l(t('Remove'), 'sensor/remove/' . $sensor->meter,
+            array('attributes' => array('onclick' => "javascript: return confirm('" . t('This virtual sensor is going to be removed. Do you want to proceed?') . "');"))) :
+
+          l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter,
+            array('attributes' => array('onclick' => "javascript: return confirm('" . t('This sensor is going to be deactivated. Do you want to proceed?') . "');")))) . '<br>';
       }
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
@@ -232,6 +235,27 @@ function logger_firmwarereleases_page() {
     theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
       'empty' => t('No firmware releases available.'), 'sticky' => FALSE, 'colgroups' => array(),
       'attributes' => array('id' => 'firmwarereleases-list')));
+}
+
+/**
+ * Downloads a firmware log file.
+ *
+ * @param $device_type_id  The device type id.
+ * @param $version         The firmware version.
+ */
+function logger_firmwarelog_download($device_type_id, $version) {
+
+  $file_name = 'ChangeLog.txt';
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name");
+  drupal_add_http_header('Cache-Control', 'public');
+
+  $file_path = LOGGER_PATH . '/upgrades/versions/' . $device_type_id . '/' . $version . '/' . $file_name;
+  if (file_exists($file_path)) {
+    print file_get_contents($file_path);
+  }
+  exit(0);
 }
 
 /**
@@ -876,7 +900,6 @@ function logger_get_device_firmware($id) {
     ->fetchObject();
 }
 
-
 function logger_device_form_submit($form, &$form_state) {
 
   db_update('logger_devices')
@@ -1019,9 +1042,9 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
 /**
  * Associates a device with the authenticated user.
  *
- * @param $code  The activation code.
+ * @param $code The activation code.
  */
-function logger_device_activate($code) {
+function logger_device_assign($code) {
 
   global $user;
 
@@ -1067,9 +1090,20 @@ function logger_device_activate($code) {
       ))
       ->execute();
   }
+}
+
+/**
+ * Associates a device with the authenticated user and return to the devices list page.
+ *
+ * @param $code The activation code.
+ */
+function logger_device_activate($code) {
+
+  logger_device_assign($code);
+
   drupal_set_message(t("The device is now associated with your account."));
 
-  drupal_goto("device/mylist");
+  drupal_goto('device/mylist');
 }
 
 /**
@@ -1083,9 +1117,15 @@ function logger_device_deactivate($device) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
+  $device_type_id = db_select('logger_devices', 'd')
+    ->fields('d', array('type_id'))
+    ->condition('d.device', $device)
+    ->execute()
+    ->fetchField();
+
   $sensors = db_select('logger_meters', 'm')
     ->fields('m')
-    ->condition('m.device', $device, '=')
+    ->condition('m.device', $device)
     ->execute();
 
   foreach ($sensors as $sensor) {
@@ -1100,7 +1140,9 @@ function logger_device_deactivate($device) {
       ->condition('meter', $sensor->meter)
       ->execute();
 
-    logger_rrd_clear($sensor->meter);
+    if ($device_type_id <= VZLOGGER_DEVICE_TYPE_ID) {
+      logger_rrd_clear($sensor->meter);
+    }
   }
 
   //FIXME: define a hook
