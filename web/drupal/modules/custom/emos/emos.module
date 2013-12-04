@@ -481,21 +481,19 @@ function emos_image_form_validate($form, &$form_state) {
   $ip_options = array('options' => array('regexp' => '//'));
 
   if (!filter_var($form_state['values']['device_ip'], FILTER_VALIDATE_IP) ||
-     strpos('.' . $form_state['values']['device_ip'] . '.', '.0.') != FALSE ||
      strpos('.' . $form_state['values']['device_ip'] . '.', '.255.') != FALSE) {
 
     form_set_error('device_ip', t('Please enter a valid IP address.'));
   }
 
   if (!filter_var($form_state['values']['gateway_ip'], FILTER_VALIDATE_IP) ||
-      strpos('.' . $form_state['values']['gateway_ip'] . '.', '.0.') != FALSE ||
       strpos('.' . $form_state['values']['gateway_ip'] . '.', '.255.') != FALSE ||
       filter_var($form_state['values']['gateway_ip'] == $form_state['values']['device_ip'])) {
 
     form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
   }
 
-  if (!filter_var($form_state['values']['netmask'], FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/(255)\.(0|255)\.(0|255)\.(0|255)/')))) {
+  if (!filter_var($form_state['values']['netmask'], FILTER_VALIDATE_IP) || strpos($form_state['values']['netmask'], '255.') != 0) {
 
     form_set_error('netmask', t('Please enter a valid Network mask.'));
   }
