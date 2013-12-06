@@ -1004,6 +1004,10 @@ function logger_statistics_page() {
   drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/justgage.1.0.1.min.js', $options);
   $output = '';
 
+  $introduction = t('Below you find some key measurements of your electricity consumption. <span title="Estimated as the first percentile."><b>Base load</b></span> is the lowest representative consumption and <span title="Simple arithmetic mean."><b>mean load</b></span> is the average consumption, both for the last seven days.');
+
+  $output .= $introduction;
+
   $devices = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial'))
     ->condition('d.uid', $user->uid)
@@ -1015,12 +1019,15 @@ function logger_statistics_page() {
     $device->statistics = read_json_file(LOGGER_PATH . "/json/dev-" . $device->device . "-statistics.json");
 
     logger_add_base_load_gauge($device, $devices->rowCount());
-    $output .= "<div id='gauge$device->device' style='height: 10em;'></div>";
+    $output .= "<div id='gauge_base_load$device->device' style='height: 10em;'></div>";
+    logger_add_average_gauge($device, $devices->rowCount());
+    $output .= "<div id='gauge_avg_consumpt$device->device' style='height: 10em;'></div>";
   }
 
   if (empty($output)) {
     $output = t('Base load undetermined.');
   }
+
   return $output;
 }
 
@@ -1028,12 +1035,26 @@ function logger_add_base_load_gauge($device, $count) {
 
   drupal_add_js("
     var g = new JustGage({
-      id: 'gauge$device->device',
+      id: 'gauge_base_load$device->device',
       title: '" . ($count > 1 ? "$device->serial - " : '') . t('Base Load (W)') . "',
-      value: '" . $device->statistics['base_load'] . "',
+      value: '" . round($device->statistics['base_load']) . "',
       label: '" . (empty($device->statistics['base_load']) ? t('Undetermined') : '') . "',
       min: 33,
       max: 236,
+      showMinMax: false
+    });", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 290));
+}
+
+function logger_add_average_gauge($device, $count) {
+
+  drupal_add_js("
+    var g = new JustGage({
+      id: 'gauge_avg_consumpt$device->device',
+      title: '" . ($count > 1 ? "$device->serial - " : '') . t('Mean Load (W)') . "',
+      value: '" . round($device->statistics['avg_consumpt']) . "',
+      label: '" . (empty($device->statistics['avg_consumpt']) ? t('Undetermined') : '') . "',
+      min: 215,
+      max: 897,
       showMinMax: false
     });", array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 290));
 }
