@@ -391,7 +391,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
           %External Id points to an existent sensor
           [[Uid2, Sensor2, Device2, UnitId2, Factor2]] ->
-            move_sensor_data(Sensor2, Device, Sensor),
+            move_sensor_data(binary_to_list(Sensor2), Device, Sensor),
             mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
             {"ok", ?HTTP_OK};
 
