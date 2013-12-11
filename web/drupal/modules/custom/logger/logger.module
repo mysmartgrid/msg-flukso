@@ -896,7 +896,11 @@ function logger_deviceassign_form_validate($form, &$form_state) {
     }
     else {
       $form_state['values']['uid'] = logger_authenticate_user($form_state['values']['user_name'], $form_state['values']['password']);
-      if (!$form_state['values']['uid']) {
+
+      if ($form_state['values']['uid']) {
+        $account = user_load($form_state['values']['uid']);
+      }
+      else {
         form_set_error('password', t('User authentication failed.'));
       }
     }
@@ -959,7 +963,14 @@ function logger_deviceassign_form_validate($form, &$form_state) {
       ->execute()
       ->fetchField();
 
-    if ($count != 1) {
+    if ($count == 1) {
+      $roles = $account->roles;
+      if (!in_array('EMOS', $roles)) {
+        $roles[] = 'EMOS';
+        module_invoke('user', 'save', $account, array('roles' => $roles));
+      }
+    }
+    else {
       form_set_error('code', t('The device can not be linked to your user account. Please make sure it is not already linked to another account.'));
     }
   }

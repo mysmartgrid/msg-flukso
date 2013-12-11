@@ -668,11 +668,70 @@ function msgcommons_cron() {
  * @param $domains A comma-separated list of domains.
  * @return TRUE if all domain names are valid. FALSE otherwise.
  */
-function valid_domains($domains) {
+function validate_domains($domains) {
 
   return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9\-\_\.\\s]+[a-zA-Z0-9]$/', $domains);
 }
 
+/**
+ * Verifies if a host IP is valid.
+ *
+ * @param $ip The host IP to be validated.
+ * @return TRUE if the host IP is valid. FALSE otherwise. 
+ */
+function validate_host_ip($ip) {
+
+  return filter_var($ip, FILTER_VALIDATE_IP) && strpos($ip, '255') === FALSE && $ip != '0.0.0.0';
+}
+
+/**
+ * Verifies if a subnet mask is valid.
+ *
+ * @param $netmask The subnet mask to be validated.
+ * @return TRUE if the subnet mask is valid. FALSE otherwise.
+ */
+function validate_subnet_mask($netmask) {
+
+  $bin = '';
+  foreach (explode('.', $netmask) as $octet) {
+    $bin .= decbin($octet);
+  }
+  return filter_var($netmask, FILTER_VALIDATE_IP) &&
+    strpos($bin, '0') !== FALSE && 
+    strpos($bin, '1') !== FALSE &&
+    strpos($bin, '01') === FALSE;
+}
+
+/**
+ * Returns the network address of a host IP address.
+ *
+ * @param $ip      The host IP.
+ * @param $netmask The subnet mask.
+ * @return the network IP address if the arguments are valid. NULL otherwise.
+ */
+function get_network_ip($ip, $netmask) {
+
+  $network_ip = NULL;
+
+  if (validate_host_ip($ip) && validate_subnet_mask($netmask)) {
+
+    $ip_octets = explode('.', $ip);
+    $network_ip = '';
+
+    foreach (explode('.', $netmask) as $i => $octet) {
+      $network_ip .= '.' . ($octet == 0 ? '0' : $ip_octets[$i]);
+    }
+    $network_ip = substr($network_ip, 1);
+  }
+  return $network_ip;
+}
+
+/**
+ * Convert a SelectQueryInterface object to a SQL string statement.
+ *
+ * @param $query The object to be converted.
+ * @return the SQL string statement.
+ */
 function get_query_string(SelectQueryInterface $query) {
 
   $string = (string) $query;

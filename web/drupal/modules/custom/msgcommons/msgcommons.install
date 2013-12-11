@@ -108,6 +108,13 @@ function msgcommons_install() {
     ))
     ->execute();
 
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 7,
+      'name' => '_hsbs',
+    ))
+    ->execute();
+
   //units
   db_insert('unit')
     ->fields(array(
@@ -326,6 +333,17 @@ function msgcommons_install() {
       'factor' => 0.01,
       'string_id' => 'hpa',
       'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 20,
+      'name' => '_hsbs',
+      'symbol' => '_hsbs',
+      'factor' => 1,
+      'string_id' => '_hsbs',
+      'type_id' => 9
     ))
     ->execute();
 
@@ -976,4 +994,30 @@ function msgcommons_update_7026() {
     ->execute();
 
   return st('Update the kilowatt factor.');
+}
+
+/**
+ * Create unit: _hsbs
+ */
+function msgcommons_update_7030() {
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 7,
+      'name' => '_hsbs',
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 20,
+      'name' => '_hsbs',
+      'symbol' => '_hsbs',
+      'factor' => 1,
+      'string_id' => '_hsbs',
+      'type_id' => 9
+    ))
+    ->execute();
+
+  return st('Create unit: _hsbs.');
 }

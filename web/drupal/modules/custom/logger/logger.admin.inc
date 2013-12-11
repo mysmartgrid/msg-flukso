@@ -1499,7 +1499,7 @@ function logger_firmware_upgrade_disapprove($device) {
 
 function logger_token_domains_validate($field, $form_state) {
 
-  if (isset($form_state['values']['domains']) && !empty($form_state['values']['domains']) && !valid_domains($form_state['values']['domains'])) {
+  if (isset($form_state['values']['domains']) && !empty($form_state['values']['domains']) && !validate_domains($form_state['values']['domains'])) {
     form_error($field, t('Invalid web domains.'));
   }
 }
