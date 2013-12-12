@@ -141,6 +141,19 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
     $this->assertFalse(validate_host_ip('256.1.1.1'));
     $this->assertFalse(validate_host_ip('192. 168.1.1'));
     $this->assertFalse(validate_host_ip('192.168..1.1'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/0'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/33'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32/24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32.24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/a'));
+
+    $this->assertTrue(validate_host_ip('192.168.1.1/32', '255.255.255.255'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/24', '255.0.0.0'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
   }
 
   function testValidateSubnetMask() {

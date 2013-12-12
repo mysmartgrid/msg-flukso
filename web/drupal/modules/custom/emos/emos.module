@@ -481,23 +481,26 @@ function emos_image_form_validate($form, &$form_state) {
   $device_ip = $form_state['values']['device_ip'];
   $gateway_ip = $form_state['values']['gateway_ip'];
   $netmask = $form_state['values']['netmask'];
-  $device_network = get_network_ip($device_ip, $netmask);
-  $gateway_network = get_network_ip($gateway_ip, $netmask);
-
-  if (!validate_host_ip($device_ip)) {
-    form_set_error('device_ip', t('Please enter a valid IP address.'));
-  }
-
-  if (!validate_host_ip($gateway_ip) || $gateway_ip == $device_ip) {
-    form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
-  }
 
   if (!validate_subnet_mask($netmask)) {
+
     form_set_error('netmask', t('Please enter a valid Network mask.'));
   }
+  elseif (!validate_host_ip($device_ip, $netmask)) {
 
-  if ($device_network && $gateway_network && $device_network != $gateway_network) {
-    form_set_error('gateway_ip', t('The Gateway IP and the device IP must be on the same network.'));
+    form_set_error('device_ip', t('Please enter a valid IP address.'));
+  }
+  elseif (!validate_host_ip($gateway_ip) || strpos($device_ip, $gateway_ip) !== FALSE) {
+
+    form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
+  }
+  else {
+    $device_network = get_network_ip($device_ip, $netmask);
+    $gateway_network = get_network_ip($gateway_ip, $netmask);
+
+    if ($device_network && $gateway_network && $device_network != $gateway_network) {
+      form_set_error('gateway_ip', t('The Gateway IP and the device IP must be on the same network.'));
+    }
   }
 }
 
