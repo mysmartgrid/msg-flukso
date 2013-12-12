@@ -813,7 +813,7 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#type' => 'textfield',
     '#title' => t('User Name'),
     '#description' => t("Enter your mySmartGrid user name."),
-    '#maxlength' => 20,
+    '#maxlength' => 60,
     '#size' => 20,
     '#prefix' => "<div id='user-fields-div' $div_style>"
   );
@@ -822,7 +822,7 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#type' => 'password',
     '#title' => t('Password'),
     '#description' => t("Enter your password."),
-    '#maxlength' => 20,
+    '#maxlength' => 128,
     '#size' => 20,
     '#suffix' => '</div>'
   );
@@ -833,7 +833,7 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#type' => 'textfield',
     '#title' => t('User Name'),
     '#description' => t("Enter a name for your mySmartGrid user. Spaces are allowed; punctuation is not allowed except for periods, hyphens, apostrophes, and underscores."),
-    '#maxlength' => 20,
+    '#maxlength' => 60,
     '#size' => 20,
     '#prefix' => "<div id='new-user-fields-div' $div_style>"
   );
@@ -843,7 +843,7 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#title' => t('Password'),
     '#description' => t('Enter a password for your user account. Please, do not use birth dates, dictionary words, number sequences. ' . 
       'A good password is mix of letters, numbers, and special characters, and contains at least 8 characters.'),
-    '#maxlength' => 20,
+    '#maxlength' => 128,
     '#size' => 20
   );
 
@@ -851,7 +851,7 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#type' => 'password',
     '#title' => t('Retype Password'),
     '#description' => t("Please, retype your password."),
-    '#maxlength' => 20,
+    '#maxlength' => 128,
     '#size' => 20
   );
 
@@ -906,6 +906,7 @@ function logger_deviceassign_form_validate($form, &$form_state) {
     }
   }
   else {
+
     //New user
     if (empty($form_state['values']['new_user_name'])) {
       form_set_error('new_user_name', t('Please inform a user name.'));
@@ -916,11 +917,14 @@ function logger_deviceassign_form_validate($form, &$form_state) {
     elseif (empty($form_state['values']['email'])) {
       form_set_error('email', t('Please, inform the e-mail address.'));
     }
-    elseif (user_validate_mail($form_state['values']['email'])) {//invalid when set
+    elseif (user_validate_mail($form_state['values']['email'])) {//TRUE when invalid
       form_set_error('email', t('Please, inform a valid email.'));
     }
     elseif (empty($form_state['values']['new_user_password'])) {
       form_set_error('new_user_password', t('Please, type the password.'));
+    }
+    elseif (strlen($form_state['values']['new_user_password']) < 6) {
+      form_set_error('new_user_password', t('The password must contain at least 6 characters.'));
     }
     elseif (empty($form_state['values']['new_user_password2'])) {
       form_set_error('new_user_password2', t('Please, retype the password.'));
@@ -964,11 +968,12 @@ function logger_deviceassign_form_validate($form, &$form_state) {
       ->fetchField();
 
     if ($count == 1) {
-      $roles = $account->roles;
-      if (!in_array('EMOS', $roles)) {
-        $roles[] = 'EMOS';
-        module_invoke('user', 'save', $account, array('roles' => $roles));
-      }
+      db_insert('users_roles')
+        ->fields(array(
+          'uid' => $form_state['values']['uid'],
+          'rid' => get_role_id('EMOS')
+        ))
+        ->execute();
     }
     else {
       form_set_error('code', t('The device can not be linked to your user account. Please make sure it is not already linked to another account.'));
