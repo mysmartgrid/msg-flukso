@@ -264,6 +264,10 @@ function deployment_list_page() {
       'field' => 'email'
     ),
     array(
+      'data' => t('Type'),
+      'field' => 'device_type_name'
+    ),
+    array(
       'data' => t('Latest Update'),
       'field' => 'latest'
     ),
@@ -287,7 +291,8 @@ function deployment_list_page() {
 
     $device['serial'] = l($device['serial'], 'deployment/checkup/serial/' . $device['serial']);
     $device['device'] = wordwrap($device['device'], 11, "<br>", TRUE);
-    $device['email'] = wordwrap($device['email'], 16, "<br>", TRUE);
+    $device['email'] = wordwrap($device['email'], 11, "<br>", TRUE);
+    $device['device_type_name'] = wordwrap($device['device_type_name'], 7, "<br>", TRUE);
     $device['state'] = str_replace(" ", "<br>", $device['state']);
     unset($device['state_id']);
     unset($device['firmware_version']);
