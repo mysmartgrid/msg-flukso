@@ -4258,20 +4258,13 @@ function logger_account_access($permission) {
  */
 function logger_sensor_access($permission, $meter) {
 
-  if (user_is_anonymous()) {
-    return FALSE;
-  }
-  elseif ($GLOBALS['user']->uid == 1) {
-    return TRUE;
-  }
-
-  $uid = db_select('logger_meters', 'm')
-    ->fields('m', array('uid'))
+  $device = db_select('logger_meters', 'm')
+    ->fields('m', array('device'))
     ->condition('m.meter', $meter)
     ->execute()
     ->fetchField();
 
-  return $uid == $GLOBALS['user']->uid && user_access($permission);
+  return logger_device_access($permission, $device);
 }
 
 /**
