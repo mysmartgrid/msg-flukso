@@ -541,7 +541,7 @@ function logger_menu() {
   $items['sensor/remove'] = array(
     'title' => $sensor_title,
     'page callback' => 'logger_sensor_remove',
-    'page arguments' => array(2, "sensor/mylist"),
+    'page arguments' => array(2),
     'access callback' => 'logger_sensor_access',
     'access arguments' => array('manage sensors', 2),
     'type' => MENU_CALLBACK,

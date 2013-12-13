@@ -163,7 +163,9 @@ function logger_usersensors_page() {
 
         $operations .= ($sensor->virtual ?
           l(t('Remove'), 'sensor/remove/' . $sensor->meter,
-            array('attributes' => array('onclick' => "javascript: return confirm('" . t('This virtual sensor is going to be removed. Do you want to proceed?') . "');"))) :
+            array(
+              'query' => array('next_url' => 'sensor/mylist'),
+              'attributes' => array('onclick' => "javascript: return confirm('" . t('This virtual sensor is going to be removed. Do you want to proceed?') . "');"))) :
 
           l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter,
             array('attributes' => array('onclick' => "javascript: return confirm('" . t('This sensor is going to be deactivated. Do you want to proceed?') . "');")))) . '<br>';
@@ -1334,9 +1336,8 @@ function logger_sensor_deactivate($meter) {
  * Removes a sensor and all its related data.
  * 
  * @param $meter     The sensor id.
- * @param $next_url  The URL to go, after removal (optional).
  */
-function logger_sensor_remove($meter, $next_url = NULL) {
+function logger_sensor_remove($meter) {
 
   db_delete('logger_tokens')
     ->condition('meter', $meter)
@@ -1359,8 +1360,9 @@ function logger_sensor_remove($meter, $next_url = NULL) {
 
   pvcast_delete_plant($meter);
 
-  if ($next_url) {
-    drupal_goto($next_url);
+  if (isset($_REQUEST['next_url'])) {
+
+    drupal_goto($_REQUEST['next_url']);
   }
 }
 

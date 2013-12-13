@@ -212,10 +212,15 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
 
       $sensors = array();
       while ($sensor = $result->fetchAssoc()) {
+        $sensor['operation'] = l(t('Remove'), 'sensor/remove/' . $sensor['meter'],
+            array(
+              'query' => array('next_url' => 'deployment/checkup/device/' . $device['device']),
+              'attributes' => array('onclick' => "javascript: return confirm('" .
+              t('This sensor and all its related data is going to be permanently removed. Do you want to proceed?') . "');")));
         $sensors[] = $sensor;
       }
 
-      $header = array(t('Sensor Id'), t('Function'));
+      $header = array(t('Sensor Id'), t('Function'), t('Operation'));
     
       $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $sensors, 'attributes' => array(),
         'caption' => t('Sensors'), 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
