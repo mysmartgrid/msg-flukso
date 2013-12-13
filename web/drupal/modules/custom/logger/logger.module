@@ -200,8 +200,8 @@ function logger_menu() {
     'description' => 'Show the temperature measurements page',
     'page callback' => 'logger_temperature_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_temperature_access',
-    'access arguments' => array('view logger charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . TEMPERATURE_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -210,8 +210,8 @@ function logger_menu() {
     'description' => 'Show the pressure measurements page',
     'page callback' => 'logger_pressure_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_pressure_access',
-    'access arguments' => array('view logger charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . PRESSURE_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -220,8 +220,8 @@ function logger_menu() {
     'description' => 'Show the humidity measurements page',
     'page callback' => 'logger_humidity_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_humidity_access',
-    'access arguments' => array('view logger charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . HUMIDITY_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -247,8 +247,8 @@ function logger_menu() {
     'description' => 'Show the power balance page',
     'page callback' => 'logger_balance_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_producer_access',
-    'access arguments' => array('view logger charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . ENERGY_PRODUCTION_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -257,8 +257,8 @@ function logger_menu() {
     'description' => 'Show the on-site energy consumption page',
     'page callback' => 'logger_onsite_page',
     'page arguments' => array(1),
-    'access callback' => 'logger_producer_access',
-    'access arguments' => array('view logger charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . ENERGY_PRODUCTION_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -299,8 +299,8 @@ function logger_menu() {
     'description' => 'Show the power consumption and production forecast page',
     'page callback' => 'logger_forecast_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_forecast_access',
-    'access arguments' => array('view forecast charts'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view forecast charts', '' . ENERGY_PRODUCTION_SENSOR_TYPE, TRUE),
     'type' => MENU_CALLBACK,
   );
 
@@ -309,8 +309,8 @@ function logger_menu() {
     'description' => 'Show power production anomalies page',
     'page callback' => 'logger_anomaly_page',
     'page arguments' => array(1, FALSE),
-    'access callback' => 'logger_producer_access',
-    'access arguments' => array('detect anomalies'),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('detect anomalies', '' . ENERGY_PRODUCTION_SENSOR_TYPE, TRUE),
     'type' => MENU_CALLBACK,
   );
 
@@ -686,10 +686,10 @@ function logger_mobile_page() {
   drupal_add_http_header('Cache-Control', 'private');
 
   if ($user->uid) {
-    $forecast_access = logger_forecast_access('view forecast charts');
-    $temperature_access = logger_temperature_access('view logger charts');
-    $pressure_access = logger_pressure_access('view logger charts');
-    $humidity_access = logger_humidity_access('view logger charts');
+    $forecast_access = logger_sensor_type_access('view forecast charts', ENERGY_PRODUCTION_SENSOR_TYPE, TRUE);
+    $temperature_access = logger_sensor_type_access('view logger charts', TEMPERATURE_SENSOR_TYPE);
+    $pressure_access = logger_sensor_type_access('view logger charts', PRESSURE_SENSOR_TYPE);
+    $humidity_access = logger_sensor_type_access('view logger charts', HUMIDITY_SENSOR_TYPE);
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
@@ -883,6 +883,8 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
 
 function logger_deviceassign_form_validate($form, &$form_state) {
 
+  //TODO: simplify this function
+
   module_load_include('inc', 'logger', 'logger.admin');
 
   //User already has an account
@@ -906,7 +908,6 @@ function logger_deviceassign_form_validate($form, &$form_state) {
     }
   }
   else {
-
     //New user
     if (empty($form_state['values']['new_user_name'])) {
       form_set_error('new_user_name', t('Please inform a user name.'));
@@ -2438,7 +2439,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('uid', 'meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
     ->isNotNull('m.function');
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
@@ -2450,17 +2451,18 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   $query->addExpression('TRUE', 'visible');
 
   $query->join('logger_devices', 'd', 'd.device = m.device');
+  $query->addField('d', 'uid');
   $query->addField('d', 'type_id', 'device_type_id');
 
   if (user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');
   }
   else {
-    $query->join('logger_users', 'lu', 'lu.uid = m.uid');
+    $query->join('logger_users', 'lu', 'lu.uid = d.uid');
     $query->addField('lu', 'private', 'private');
   }
 
-  $query->join('users', 'u', 'u.uid = m.uid');
+  $query->join('users', 'u', 'u.uid = d.uid');
   $query->addField('u', 'name', 'username');
 
   if (!empty($sensor_types)) {
@@ -2488,7 +2490,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
 
     $visitor = db_select('users_roles', 'ur')
       ->fields('ur', array('uid'))
-      ->condition('ur.uid', 'm.uid');
+      ->condition('ur.uid', 'd.uid');
 
     $visitor->join('role', 'r', 'r.rid = ur.rid');
     $visitor->condition('r.name', 'Visitor');
@@ -3802,7 +3804,8 @@ function logger_get_sensor_types_options($uid = NULL, $unit_type_id = ENERGY_UNI
 
   if (isset($uid)) {
     $query->join('logger_meters', 'm', 't.id = m.type');
-    $query->condition('uid', $uid);
+    $query->join('logger_devices', 'd', 'd.device = m.device');
+    $query->condition('d.uid', $uid);
   }
 
   //FIXME: find a better way of filtering the sensor types
@@ -4055,9 +4058,10 @@ function logger_get_users_options() {
   $query->join('logger_users', 'lu', 'lu.uid = u.uid');
   $query->condition('lu.private', 0);
 
-  $query->join('logger_meters', 'm', 'm.uid = u.uid');
+  $query->join('logger_devices', 'd', 'd.uid = lu.uid');
+  $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->isNotNull('m.function')
-    ->condition('m.uid', 0, '>')
+    ->condition('d.uid', 0, '>')
     ->orderBy('u.name');
 
   $fluksonians = $query->execute();
@@ -4295,41 +4299,14 @@ function logger_device_access($permission, $device) {
 }
 
 /**
- * Access callback ensuring the producer pages are accessible only to users who have production sensors.
- */
-function logger_producer_access($permission) {
-
-  return logger_sensor_type_access($permission, ENERGY_PRODUCTION_SENSOR_TYPE);
-}
-
-/**
- * Access callback ensuring the temperature pages are accessible only to users who have temperature sensors.
- */
-function logger_temperature_access($permission) {
-
-  return logger_sensor_type_access($permission, TEMPERATURE_SENSOR_TYPE);
-}
-
-/**
- * Access callback ensuring the pressure pages are accessible only to users who have pressure sensors.
- */
-function logger_pressure_access($permission) {
-
-  return logger_sensor_type_access($permission, PRESSURE_SENSOR_TYPE);
-}
-
-/**
- * Access callback ensuring the humidity pages are accessible only to users who have humidity sensors.
- */
-function logger_humidity_access($permission) {
-
-  return logger_sensor_type_access($permission, HUMIDITY_SENSOR_TYPE);
-}
-
-/**
  * Access callback ensuring the some pages are accessible only to users who have a specific type of sensor.
+ *
+ * @param $permission   The access permission name.
+ * @param $sensor_type  The types of sensor.
+ * @param $forecast     Whether to select only sensors with flag forecast on.
+ * @return TRUE if the user is allowed to access the page. FALSE otherwise.
  */
-function logger_sensor_type_access($permission, $sensor_type) {
+function logger_sensor_type_access($permission, $sensor_type, $forecast = FALSE) {
 
   if (user_is_anonymous()) {
     return FALSE;
@@ -4337,37 +4314,9 @@ function logger_sensor_type_access($permission, $sensor_type) {
   elseif ($GLOBALS['user']->uid == 1) {
     return TRUE;
   }
-
-  $sensor = db_select('logger_meters', 'm')
-    ->fields('m', array('uid'))
-    ->condition('m.uid', $GLOBALS['user']->uid, '=')
-    ->condition('m.type', $sensor_type)
-    ->execute()
-    ->fetchObject();
-
-  return $sensor && user_access($permission);
-}
-
-/**
- * Access callback ensuring the sensor forecast page is accessible only to users who have requested forecasts.
- */
-function logger_forecast_access($permission) {
-
-  if (user_is_anonymous()) {
-    return FALSE;
+  else {
+    return user_access($permission) && count(logger_get_sensors(array((int) $sensor_type), array($GLOBALS['user']->uid), FALSE, $forecast)) > 0;
   }
-  elseif ($GLOBALS['user']->uid == 1) {
-    return TRUE;
-  }
-
-  $sensor = db_select('logger_meters', 'm')
-    ->fields('m', array('uid'))
-    ->condition('m.uid', $GLOBALS['user']->uid, '=')
-    ->condition('m.forecast', 1, '=')
-    ->execute()
-    ->fetchObject();
-
-  return $sensor && user_access($permission);
 }
 
 /**
