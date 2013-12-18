@@ -180,13 +180,6 @@ function logger_schema() {
         'length' => '32',
         'not null' => TRUE,
       ),
-      'uid' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '10',
-      ),
       'external_id' => array(
         'type' => 'varchar',
         'length' => '64',
@@ -2212,3 +2205,12 @@ function logger_update_7098() {
   return st('Old uninstalled Flukso 1.0 devices have been removed.');
 }
 
+/**
+ * Drops field uid from table logger_meters.
+ */
+function logger_update_7101() {
+
+  db_drop_field('logger_meters', 'uid');
+
+  return st('Field logger_meters.uid has been dropped.');
+}
