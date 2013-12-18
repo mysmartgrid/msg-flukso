@@ -357,8 +357,9 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     Device = proplists:get_value(<<"device">>, Params),
 
     {data, SensorResult} = mysql:execute(pool, sensor_props, [Sensor]),
+
     {data, ExtResult} = case ExternalId of
-      Sensor -> SensorResult;
+      Sensor -> {data, SensorResult};
       _ -> mysql:execute(pool, sensor_by_ext_id, [ExternalId])
     end,
 
