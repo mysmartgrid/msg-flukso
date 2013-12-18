@@ -959,25 +959,34 @@ function logger_deviceassign_form_validate($form, &$form_state) {
 
   if ($form_state['values']['uid']) {
 
+    $uid = $form_state['values']['uid'];
     $code = $form_state['values']['code'];
-    $query = db_select('logger_devices', 'd');
-    $query->addExpression('COUNT(*)', 'count');
-    $count = $query
+    $device = db_select('logger_devices', 'd')
+      ->fields('d', array('type_id'))
       ->condition('d.device', "$code%", 'LIKE')
-      ->condition('d.uid', array(0, $form_state['values']['uid']), 'IN')
+      ->condition('d.uid', array(0, $uid), 'IN')
       ->execute()
-      ->fetchField();
+      ->fetchObject();
 
-    if ($count == 1) {
+    if (!$device) {
+      form_set_error('code', t('The device can not be linked to your user account. Please make sure it is not already linked to another account.'));
+    }
+    elseif ($device->type_id == RASPBERRY_PI_DEVICE_TYPE_ID) {
+
+      //FIXME: get rid of the role 'EMOS'      
+      $rid = get_role_id('EMOS');
+
+      db_delete('users_roles')
+        ->condition('uid', $uid)
+        ->condition('rid', $rid)
+        ->execute();
+
       db_insert('users_roles')
         ->fields(array(
-          'uid' => $form_state['values']['uid'],
-          'rid' => get_role_id('EMOS')
+          'uid' => $uid,
+          'rid' => $rid
         ))
         ->execute();
-    }
-    else {
-      form_set_error('code', t('The device can not be linked to your user account. Please make sure it is not already linked to another account.'));
     }
   }
 }

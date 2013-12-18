@@ -36,7 +36,7 @@ function logger_userdevices_page() {
 
   $query = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial', 'access', 'uptime', 'type_id'))
-    ->condition('d.uid', $user->uid, '=')
+    ->condition('d.uid', $user->uid)
     ->orderBy('d.serial');
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
@@ -630,7 +630,7 @@ function logger_userprivacy_form($form, &$form_state) {
 
   $private = db_select('logger_users', 'u')
     ->fields('u', array('private'))
-    ->condition('u.uid', $user->uid, '=')
+    ->condition('u.uid', $user->uid)
     ->execute()
     ->fetchField();
 
@@ -961,7 +961,7 @@ function logger_sensor_form_submit($form, &$form_state) {
     $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
     $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
-    logger_sensor_add($meter, $user->uid, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
+    logger_sensor_add($meter, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
   }
 
   if (isset($form_state['values']['aggregated_meters'])) {
@@ -1067,7 +1067,6 @@ function logger_device_assign($code) {
 
     db_update('logger_meters')
       ->fields(array(
-        'uid' => $user->uid,
         'function' => $sensor->function
       ))
       ->condition('meter', $sensor->meter)
@@ -1134,17 +1133,7 @@ function logger_device_deactivate($device) {
 
     //FIXME: define a hook
     msgdump_remove_by_sensor($sensor->meter);
-
-    db_update('logger_meters')
-      ->fields(array(
-        'uid' => 0,
-      ))
-      ->condition('meter', $sensor->meter)
-      ->execute();
-
-    if ($device_type_id <= VZLOGGER_DEVICE_TYPE_ID) {
-      logger_rrd_clear($sensor->meter);
-    }
+    logger_rrd_clear($sensor->meter);
   }
 
   //FIXME: define a hook
@@ -1256,7 +1245,6 @@ function logger_device_clone($device_id) {
       ->fields(array(
         'device' => $new_device_id,
         'meter' => $new_meter,
-        'uid' => 0,
         'function' => empty($sensor->function) ? NULL : substr("C $sensor->function", 0, 16),
         'created' => $sensor->created,
         'access' => $sensor->access,
@@ -1369,14 +1357,13 @@ function logger_sensor_remove($meter) {
 /**
  * Adds a new device sensor.
  */
-function logger_sensor_add($meter, $uid, $device, $created, $token, $permissions, $function = NULL, $type = ENERGY_CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
+function logger_sensor_add($meter, $device, $created, $token, $permissions, $function = NULL, $type = ENERGY_CONSUMPTION_SENSOR_TYPE, $virtual = 1, $forecast = 0, $latitude = LOGGER_DEFAULT_LATITUDE, $longitude = LOGGER_DEFAULT_LONGITUDE, $price = 0.18) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $error = db_insert('logger_meters')
     ->fields(array(
       'meter' => $meter,
-      'uid' => $uid,
       'device' => $device,
       'external_id' => $meter,
       'created' => $created,

@@ -254,10 +254,12 @@ function chumby_image_form($form, &$form_state) {
 
   global $user;
 
-  $result = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'function'))
-    ->condition('m.uid', $user->uid, '=')
-    ->condition('m.virtual', 0, '=')
+  $query = db_select('logger_meters', 'm');
+  $query->join('logger_devices', 'd', 'd.device = m.device');
+
+  $result = $query->fields('m', array('meter', 'function'))
+    ->condition('d.uid', $user->uid)
+    ->condition('m.virtual', 0)
     ->isNotNull('m.function')
     ->execute();
 

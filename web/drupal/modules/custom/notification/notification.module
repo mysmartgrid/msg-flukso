@@ -1457,7 +1457,7 @@ function notification_send_measurement_anomaly_emails() {
 
   $query = notification_compose_base_query(MEASUREMENT_ANOMALY_EVENT_ID);
   $query->join('logger_meters', 'm', 'm.device = d.device');
-  $query->fields('m', array('uid', 'meter', 'price', 'function', 'latitude', 'longitude'));
+  $query->fields('m', array('meter', 'price', 'function', 'latitude', 'longitude'));
   $query->condition('m.type', ENERGY_PRODUCTION_SENSOR_TYPE);
 
   $result = $query->execute();

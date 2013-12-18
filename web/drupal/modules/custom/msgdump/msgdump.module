@@ -73,7 +73,7 @@ function msgdump_setup_page() {
 
   $dumps = $query->fields('p', array('start', 'stop', 'file'))
     ->fields('d', array('serial'))
-    ->condition('d.uid', $user->uid, '=')
+    ->condition('d.uid', $user->uid)
     ->execute();
 
   $rows = array();
@@ -113,8 +113,8 @@ function msgdump_setup_form($form, &$form_state) {
   $result = $query
     ->fields('d', array('serial'))
     ->fields('m', array('meter', 'function'))
-    ->condition('m.uid', $user->uid, '=')
-    ->condition('m.virtual', 0, '=')
+    ->condition('d.uid', $user->uid)
+    ->condition('m.virtual', 0)
     ->isNotNull('m.function')
     ->execute();
 
