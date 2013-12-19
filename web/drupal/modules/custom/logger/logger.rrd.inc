@@ -94,6 +94,28 @@ function logger_rrd_get_storage_period($meter, $step) {
 }
 
 /**
+ * Returns the lowest possible resolution that can be used to query sensors within a period of time.
+ * 
+ * @param $period The period of time as an array (start => start timestamp, end => end timestamp).
+ * @return the minimum resolution.
+ */
+function logger_rrd_get_lowest_resolution($period) {
+
+  $duration = time() - $period['start'];
+  $periods = logger_rrd_get_storage_periods();
+  $min_resolution = max(array_keys($periods));
+  $min_storage = $periods[$min_resolution];
+
+  foreach ($periods as $resolution => $storage) {
+    if ($duration < $storage && $storage < $min_storage) {
+      $min_resolution = $resolution;
+      $min_storage = $storage;
+    }
+  }
+  return $min_resolution;
+}
+
+/**
  * Adjusts the period of time of a query to the RRA limitations.
  * 
  * @param $meter   The sensor id.

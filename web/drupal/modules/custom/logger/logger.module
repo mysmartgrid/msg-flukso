@@ -1643,7 +1643,6 @@ function logger_get_relative_chart_data($chart) {
 
   foreach ($intervals as $interval => $label) {
 
-    $resolution = logger_get_resolution($interval);
     $adjustment = isset($extra_days[$interval]) ? $extra_days[$interval] * DAY : 0;
     //offset is used here to assure hour 00:00 on the user timezone and not on UTC.
     $adjustment += (($now[0] + $chart->offset) % ($interval == 'hour' ? HOUR : DAY));
@@ -1662,9 +1661,12 @@ function logger_get_relative_chart_data($chart) {
 
     $period1 = array('start' => $time1, 'end' => $time2);
     $period2 = array('start' => $time2, 'end' => $time3);
+     
+    $resolution1 = logger_rrd_get_lowest_resolution($period1);
+    $resolution2 = logger_rrd_get_lowest_resolution($period2);
 
-    $current  = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period2, $resolution, $chart->prices);
-    $previous = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period1, $resolution, $chart->prices);
+    $current  = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period2, $resolution2, $chart->prices);
+    $previous = logger_rrd_query_total_energy($chart->sensors, $chart->unit, $period1, $resolution1, $chart->prices);
 
     $so_far    = min($previous, $current);
     $remaining = max($previous - $current, 0);
@@ -1827,7 +1829,8 @@ function logger_get_energy_chart_data(&$chart) {
       }
 
       $period = array('start' => $start, 'end' => $end);
-      $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $chart->resolution, $chart->prices);
+      $resolution = logger_rrd_get_lowest_resolution($period);
+      $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $resolution, $chart->prices);
 
       $title = logger_format_series_period($chart->interval, $period);
 
