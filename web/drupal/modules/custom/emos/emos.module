@@ -83,7 +83,6 @@ function emos_menu() {
     'title' => 'EMOS Participant Registration',
     'description' => 'Validate a registration form recaptcha',
     'page callback' => 'emos_register',
-    'page arguments' => array(2),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
