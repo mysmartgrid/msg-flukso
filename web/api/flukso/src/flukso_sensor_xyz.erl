@@ -357,25 +357,26 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     Device = proplists:get_value(<<"device">>, Params),
 
     {data, SensorResult} = mysql:execute(pool, sensor_props, [Sensor]),
+
     {data, ExtResult} = case ExternalId of
-      Sensor -> SensorResult;
+      Sensor -> {data, SensorResult};
       _ -> mysql:execute(pool, sensor_by_ext_id, [ExternalId])
     end,
 
     {Response, ErrorCode} = case mysql:get_result_rows(SensorResult) of
 
       %Sensor is found
-      [[Uid, Sensor, Device, UnitId, Factor]] ->
+      [[Sensor, Device, UnitId, Factor]] ->
 
         case mysql:get_result_rows(ExtResult) of
 
           %Id and External Id point to the same Sensor
-          [[Uid, Sensor, Device, UnitId, Factor]] ->
+          [[Sensor, Device, UnitId, Factor]] ->
             mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
             {"ok", ?HTTP_OK};
 
           %External Id points to another Sensor with a different Id, which belongs to the same user
-          [[Uid, Sensor2, Device2, UnitId2, Factor2]] ->
+          [[Sensor2, Device2, UnitId2, Factor2]] ->
             move_sensor_data(Sensor2, Device, Sensor),
             mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
             {"ok", ?HTTP_OK};
@@ -390,8 +391,8 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
         case mysql:get_result_rows(ExtResult) of
 
           %External Id points to an existent sensor
-          [[Uid2, Sensor2, Device2, UnitId2, Factor2]] ->
-            move_sensor_data(Sensor2, Device, Sensor),
+          [[Sensor2, Device2, UnitId2, Factor2]] ->
+            move_sensor_data(binary_to_list(Sensor2), Device, Sensor),
             mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
             {"ok", ?HTTP_OK};
 
@@ -458,7 +459,7 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     case mysql:get_result_rows(Result) of
 
       %Sensor is found
-      [[Uid, Sensor, Device, UnitId, RrdFactor]] ->
+      [[Sensor, Device, UnitId, RrdFactor]] ->
 
         ServerTimestamp = unix_time(),
 
@@ -502,6 +503,10 @@ process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = Stat
     
               %RRD files were not successfully updated
               {error, RrdResponse} ->
+
+                {data, Res} = mysql:execute(pool, device_uid, [Device]),
+                [[Uid]] = mysql:get_result_rows(Res),
+
                 logger(Uid, <<"rrdupdate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData),
                 ErrorCode = ?HTTP_FORBIDDEN
             end;

@@ -668,11 +668,83 @@ function msgcommons_cron() {
  * @param $domains A comma-separated list of domains.
  * @return TRUE if all domain names are valid. FALSE otherwise.
  */
-function valid_domains($domains) {
+function validate_domains($domains) {
 
   return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9\-\_\.\\s]+[a-zA-Z0-9]$/', $domains);
 }
 
+/**
+ * Verifies if a host IP is valid.
+ *
+ * @param $ip      The host IP to be validated.
+ * @param $netmask The subnet mask. Required if the CIDR prefix is informed.
+ * @return TRUE if the host IP is valid. FALSE otherwise. 
+ */
+function validate_host_ip($ip, $netmask = NULL) {
+
+  $valid_cidr = TRUE;
+  $cidr_pos = strpos($ip, '/');
+
+  if ($cidr_pos > 0) {
+    $prefix = substr($ip, $cidr_pos + 1);
+    $ip = substr($ip, 0, $cidr_pos);
+
+    $valid_cidr = 
+      ((string)(int)$prefix == $prefix) && $prefix > 0 && $prefix < 33 &&
+      $netmask && substr_count(decbin(ip2long($netmask)), '1') == $prefix;
+  }
+
+  return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_RES_RANGE) &&
+    strpos($ip, '255') === FALSE && $valid_cidr;
+}
+
+/**
+ * Verifies if a subnet mask is valid.
+ *
+ * @param $netmask The subnet mask to be validated.
+ * @return TRUE if the subnet mask is valid. FALSE otherwise.
+ */
+function validate_subnet_mask($netmask) {
+
+  $valid = FALSE;
+  if (filter_var($netmask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+
+    $bin = decbin(ip2long($netmask));
+    $valid = strlen($bin) == 32 && strpos($bin, '1') !== FALSE && strpos($bin, '01') === FALSE;
+  }
+  return $valid;
+}
+
+/**
+ * Returns the network address of a host IP address.
+ *
+ * @param $ip      The host IP.
+ * @param $netmask The subnet mask.
+ * @return the network IP address if the arguments are valid. NULL otherwise.
+ */
+function get_network_ip($ip, $netmask) {
+
+  $network_ip = NULL;
+
+  if (validate_host_ip($ip, $netmask)) {
+
+    $ip_octets = explode('.', $ip);
+    $network_ip = '';
+
+    foreach (explode('.', $netmask) as $i => $octet) {
+      $network_ip .= '.' . ($octet == 0 ? '0' : $ip_octets[$i]);
+    }
+    $network_ip = substr($network_ip, 1);
+  }
+  return $network_ip;
+}
+
+/**
+ * Convert a SelectQueryInterface object to a SQL string statement.
+ *
+ * @param $query The object to be converted.
+ * @return the SQL string statement.
+ */
 function get_query_string(SelectQueryInterface $query) {
 
   $string = (string) $query;

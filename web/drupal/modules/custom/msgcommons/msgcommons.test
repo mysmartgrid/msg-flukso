@@ -118,11 +118,60 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
     $this->assertFalse(file_exists($dir));
   }
 
-  function testValidDomains() {
+  function testValidateDomains() {
 
-    $this->assertTrue(valid_domains('www.host.com'));
-    $this->assertTrue(valid_domains('www.host.com domain.com'));
-    $this->assertFalse(valid_domains('kai@www.host.com'));
-    $this->assertFalse(valid_domains(''));
+    $this->assertTrue(validate_domains('www.host.com'));
+    $this->assertTrue(validate_domains('www.host.com domain.com'));
+    $this->assertFalse(validate_domains('kai@www.host.com'));
+    $this->assertFalse(validate_domains(''));
+  }
+
+  function testValidateHostIP() {
+
+    $this->assertTrue(validate_host_ip('192.168.0.1'));
+    $this->assertTrue(validate_host_ip('192.168.1.1'));
+    $this->assertFalse(validate_host_ip('a.a.a.a'));
+    $this->assertFalse(validate_host_ip('192.255.1.1'));
+    $this->assertFalse(validate_host_ip('192.0.0.255'));
+    $this->assertFalse(validate_host_ip('192.168.1'));
+    $this->assertFalse(validate_host_ip('192.168.1.1.1'));
+    $this->assertFalse(validate_host_ip(''));
+    $this->assertFalse(validate_host_ip('192.x.168.1'));
+    $this->assertFalse(validate_host_ip('0.0.0.0'));
+    $this->assertFalse(validate_host_ip('256.1.1.1'));
+    $this->assertFalse(validate_host_ip('192. 168.1.1'));
+    $this->assertFalse(validate_host_ip('192.168..1.1'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/0'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/33'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32/24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32.24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/a'));
+
+    $this->assertTrue(validate_host_ip('192.168.1.1/32', '255.255.255.255'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/24', '255.0.0.0'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
+  }
+
+  function testValidateSubnetMask() {
+
+    $this->assertTrue(validate_subnet_mask('255.255.255.0'));
+    $this->assertTrue(validate_subnet_mask('255.255.254.0'));
+    $this->assertFalse(validate_subnet_mask('192.168.1.1'));
+    $this->assertFalse(validate_subnet_mask('255.255.0.255'));
+    $this->assertFalse(validate_subnet_mask('255.254.0.255'));
+    $this->assertFalse(validate_subnet_mask('255.254.254.255'));
+    $this->assertFalse(validate_subnet_mask('0.255.255.0'));
+    $this->assertFalse(validate_subnet_mask('0.255.255.255'));
+  }
+
+  function testGetNetworkIp() {
+
+    $this->assertEqual('168.192.1.0', get_network_ip('168.192.1.1', '255.255.255.0'));
+    $this->assertEqual('168.192.0.0', get_network_ip('168.192.1.1', '255.255.0.0'));
+    $this->assertEqual('168.192.1.0', get_network_ip('168.192.1.1', '255.255.254.0'));
   }
 }
