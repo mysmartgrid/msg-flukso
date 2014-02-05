@@ -187,14 +187,14 @@ function logger_usersensors_page() {
  *
  * @return the firmware releases page.
  */
-function logger_firmwarereleases_page() {
+function logger_firmwarelist_page() {
 
   drupal_set_title(t('Firmware Releases'));
 
   $type_id = isset($_REQUEST['device_type_id']) ? $_REQUEST['device_type_id'] : 0;
 
   $query = db_select('logger_device_firmware', 'f')
-    ->fields('f', array('id', 'version', 'release_time', 'build', 'tag', 'device_type_id', 'upgradable'))
+    ->fields('f', array('id', 'version', 'release_time', 'tag', 'device_type_id', 'upgradable'))
     ->orderBy('f.version');
 
   $query->join('logger_device_type', 't', 'f.device_type_id = t.id');
@@ -205,7 +205,7 @@ function logger_firmwarereleases_page() {
   }
   $releases = $query->execute();
 
-  $header = array(t('Version'), t('Device Type'), t('Time'), t('Build'), t('Tag'), t('Upgradable'), t('Total'));
+  $header = array(t('Version'), t('Device Type'), t('Time'), t('Tag'), t('Upgradable'), t('Total'), t('Operations'));
   $rows = array();
   foreach ($releases as $release) {
 
@@ -218,25 +218,26 @@ function logger_firmwarereleases_page() {
       $release->version,
       $release->device_type,
       $release->release_time,
-      wordwrap($release->build, 16, "\n", TRUE),
-      $release->tag,
+      wordwrap($release->tag, 16, "\n", TRUE),
       $release->upgradable ? t('Yes') : t('No'),
       $release->upgradable && $total > 0 ?
         l($total, "firmware/upgrade", array('query' => array(
           'device_type_id' => $release->device_type_id,
           'from_version' => $release->id
-        ))) : $total
+        ))) : $total,
+      l(t('Edit'), "firmware/edit/$release->id") . ' ' . l(t('Remove'), "firmware/remove/$release->id")
     );
   }
 
-  $form = drupal_get_form('logger_firmwarereleasesfilter_form', $type_id);
+  $form = drupal_get_form('logger_firmwarefilter_form', $type_id);
 
   return
-    drupal_render($form) .
+    drupal_render($form) . '<br>' .
+    l(t('Add Firmware Release'), 'firmware/edit') . '<br><br>' .
 
     theme_table(array('header' => $header, 'rows' => $rows, 'caption' => '',
       'empty' => t('No firmware releases available.'), 'sticky' => FALSE, 'colgroups' => array(),
-      'attributes' => array('id' => 'firmwarereleases-list')));
+      'attributes' => array('id' => 'firmware-list')));
 }
 
 /**
@@ -270,6 +271,38 @@ function logger_firmwareupgrade_page() {
   drupal_set_title(t('Device Firmware Upgrade'));
 
   $form = drupal_get_form('logger_firmwareupgradefilter_form');
+
+  return drupal_render($form);
+}
+
+/**
+ * Builds the firmware releases list page.
+ *
+ * @param $id The release id.
+ * @return the firmware releases list page.
+ */
+function logger_firmware_edition_page($id) {
+
+  if ($id) {
+    $release = db_select('logger_device_firmware', 'f')
+      ->fields('f', array('id', 'version', 'release_time', 'build', 'tag', 'device_type_id', 'upgradable', 'description'))
+      ->condition('f.id', $id)
+      ->execute()
+      ->fetchObject();
+  }
+  else {
+    $release = new stdClass();
+    $release->id = '';
+    $release->version = '';
+    $release->release_time = '';
+    $release->build = '';
+    $release->tag = '';
+    $release->device_type_id = UNKNOWN_DEVICE_TYPE_ID;
+    $release->upgradable = FALSE;
+    $release->description = '';
+  }
+
+  $form = drupal_get_form('logger_firmwareedition_form', $release);
 
   return drupal_render($form);
 }
@@ -652,7 +685,7 @@ function logger_userprivacy_form($form, &$form_state) {
   return $form;
 }
 
-function logger_firmwarereleasesfilter_form($form, &$form_state, $type_id) {
+function logger_firmwarefilter_form($form, &$form_state, $type_id) {
 
   $types = logger_get_device_types_options();
   $types[0] = t('All');
@@ -664,7 +697,7 @@ function logger_firmwarereleasesfilter_form($form, &$form_state, $type_id) {
     '#options' => $types,
     '#default_value' => $type_id,
     '#required' => TRUE,
-    '#attributes' => array('onchange' => "document.getElementById('logger-firmwarereleasesfilter-form').submit();")
+    '#attributes' => array('onchange' => "document.getElementById('logger-firmwarefilter-form').submit();")
   );
 
   $form['submit'] = array(
@@ -814,6 +847,94 @@ function logger_firmwareupgradefilter_form($form, &$form_state) {
   return $form;
 }
 
+function logger_firmwareedition_form($form, &$form_state, $release) {
+
+  drupal_set_title(t('Firmware Release Edition'));
+
+  //If edition mode
+  if (is_numeric($release->id)) {
+    $form['id'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $release->id,
+      '#required' => TRUE
+    );
+  }
+
+  $types = logger_get_device_types_options();
+
+  $form['device_type_id'] = array(
+    '#type' => 'select',
+    '#title' => t('Device Type'),
+    '#description' => t('Select the device type.'),
+    '#options' => $types,
+    '#default_value' => $release->device_type_id,
+    '#required' => TRUE
+  );
+
+  $form['version'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Version'),
+    '#description' => t('Please, inform the firmware release version, using format: 9.9.9-9.'),
+    '#default_value' => $release->version,
+    '#maxlength' => 11,
+    '#size' => 11,
+    '#required' => TRUE
+  );
+
+  $form['release_time'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Release Time'),
+    '#description' => t('Please, inform the release time of the release using format: YYYYMMDD_HHmm.'),
+    '#default_value' => $release->release_time,
+    '#maxlength' => 13,
+    '#size' => 13,
+    '#required' => TRUE
+  );
+
+  $form['tag'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Tag'),
+    '#description' => t('Please, inform the tag identification of the release.'),
+    '#default_value' => $release->tag,
+    '#maxlength' => 32,
+    '#size' => 32,
+    '#required' => TRUE
+  );
+
+  $form['build'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Build'),
+    '#description' => t('Please, inform the build identification of the release.'),
+    '#default_value' => $release->build,
+    '#maxlength' => 40,
+    '#size' => 40,
+    '#required' => TRUE
+  );
+
+  $form['upgradable'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Upgradable'),
+    '#description' => t("Please inform whether the release can be remotely upgraded."),
+    '#default_value' => $release->upgradable 
+  );
+
+  $form['description'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Description'),
+    '#description' => t('Please, inform the description of the release.'),
+    '#default_value' => $release->description,
+    '#maxlength' => 60,
+    '#size' => 60,
+    '#required' => TRUE
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save')
+  );
+  return $form;
+}
+
 function logger_deviceactivation_form_validate($form, &$form_state) {
 
   $code = $form_state['values']['code'];
@@ -890,6 +1011,16 @@ function logger_firmwareupgradefilter_form_validate($form, &$form_state) {
 
       form_set_error('to_version', t('Invalid firmware upgrade.'));
     }
+  }
+}
+
+function logger_firmwareedition_form_validate($form, &$form_state) {
+
+  if (!preg_match('/[0-9]+\.[0-9]+\.[0-9]+[\-][0-9]+/', $form_state['values']['version'])) {
+    form_set_error('version', t('The firmware release version is using the wrong format.'));
+  }
+  if (!preg_match('/[0-9]{8}[_][0-9]{4}/', $form_state['values']['release_time'])) {
+    form_set_error('release_time', t('The firmware release time is using the wrong format.'));
   }
 }
 
@@ -1003,7 +1134,7 @@ function logger_userprivacy_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'logger';
 }
 
-function logger_firmwarereleasesfilter_form_submit($form, &$form_state) {
+function logger_firmwarefilter_form_submit($form, &$form_state) {
 
   $form_state['redirect'] = array('firmware/list', array(
     'query' => array(
@@ -1039,6 +1170,52 @@ function logger_firmwareupgradefilter_form_submit($form, &$form_state) {
     'device_type_id' => $form_state['values']['device_type_id'],
     'from_version' => $form_state['values']['from_version']
   )));
+}
+
+function logger_firmwareedition_form_submit($form, &$form_state) {
+
+  //If edition
+  if (isset($form_state['values']['id'])) {
+
+    //FIXME
+    system("echo 1 >> /oo.txt");
+
+    db_update('logger_device_firmware')
+      ->fields(array(
+        'device_type_id' => $form_state['values']['device_type_id'],
+        'version' => $form_state['values']['version'],
+        'release_time' => $form_state['values']['release_time'],
+        'tag' => $form_state['values']['tag'],
+        'build' => $form_state['values']['build'],
+        'upgradable' => $form_state['values']['upgradable'],
+        'description' => $form_state['values']['description']
+      ))
+      ->condition('id', $form_state['values']['id'])
+      ->execute();
+  }
+  //If creation
+  else {
+
+    //FIXME
+    system("echo 2 >> /oo.txt");
+
+    db_insert('logger_device_firmware')
+      ->fields(array(
+        'device_type_id' => $form_state['values']['device_type_id'],
+        'version' => $form_state['values']['version'],
+        'release_time' => $form_state['values']['release_time'],
+        'tag' => $form_state['values']['tag'],
+        'build' => $form_state['values']['build'],
+        'upgradable' => $form_state['values']['upgradable'],
+        'description' => $form_state['values']['description']
+      ))
+      ->execute();
+  }
+
+  //FIXME
+  system("echo 3 >> /oo.txt");
+
+  $form_state['redirect'] = "firmware/list";
 }
 
 /**
@@ -1443,6 +1620,20 @@ function logger_set_virtual_sensor_aggregations($virtual_meter, $aggregated_mete
       ))
       ->execute();
   }
+}
+
+/**
+ * Removes a device firmware release.
+ *
+ * @param $id The id of the release to be removed.
+ */
+function logger_firmware_remove($id) {
+
+  db_delete('logger_device_firmware')
+    ->condition('id', $id)
+    ->execute();
+
+  drupal_goto("firmware/list");
 }
 
 /**

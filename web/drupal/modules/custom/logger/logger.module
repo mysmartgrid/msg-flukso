@@ -52,6 +52,7 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
+define('UNKNOWN_DEVICE_TYPE_ID',       0);
 define('FLUKSO1_DEVICE_TYPE_ID',       1);
 define('FLUKSO2_DEVICE_TYPE_ID',       2);
 define('VZLOGGER_DEVICE_TYPE_ID',      3);
@@ -136,6 +137,10 @@ function logger_permission() {
     'list firmware releases' => array(
       'title' => t('list firmware releases'),
       'description' => t('list firmware releases'),
+    ),
+    'manage firmware releases' => array(
+      'title' => t('manage firmware releases'),
+      'description' => t('manage firmware releases'),
     ),
     'manage firmware upgrades' => array(
       'title' => t('manage firmware upgrades'),
@@ -561,10 +566,27 @@ function logger_menu() {
 
   $items['firmware/list'] = array(
     'title' => 'Firmware Releases',
-    'page callback' => 'logger_firmwarereleases_page',
+    'page callback' => 'logger_firmwarelist_page',
     'access arguments' => array('list firmware releases'),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc'
+  );
+
+  $items['firmware/edit'] = array(
+    'title' => 'Edit Firmware Release',
+    'page callback' => 'logger_firmware_edition_page',
+    'page arguments' => array(2),
+    'access arguments' => array('manage firmware releases'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc'
+  );
+
+  $items['firmware/remove'] = array(
+    'title' => 'Firmware Removal',
+    'page callback' => 'logger_firmware_remove',
+    'access arguments' => array('manage firmware upgrades'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
   );
 
   $items['firmware/upgrade'] = array(

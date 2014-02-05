@@ -412,7 +412,7 @@ function logger_schema() {
     'description' => 'Stores device firmware releases.',
     'fields' => array(
       'id' => array(
-        'type' => 'int',
+        'type' => 'serial',
         'not null' => TRUE,
         'unasigned' => TRUE,
       ),
@@ -2206,11 +2206,62 @@ function logger_update_7098() {
 }
 
 /**
- * Drops field uid from table logger_meters.
+ * Inserts the Flukso firmware version 2.1.0-2.
  */
 function logger_update_7101() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 24,
+      'version' => '2.1.0-2',
+      'release_time' => '20140123_0000',
+      'build' => '2102210221022102210221022102210221022102',
+      'tag' => 'flukso-2.1.0-2',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.1.0-2'
+    ))
+    ->execute();
+
+  return st('Flukso firmware version 2.1.0-2 has been created.');
+}
+
+/**
+ * Drops field uid from table logger_meters.
+ */
+function logger_update_7102() {
 
   db_drop_field('logger_meters', 'uid');
 
   return st('Field logger_meters.uid has been dropped.');
 }
+
+/**
+ * Sets the 'auto increment' option of table logger_device_firmware primary key.
+ */
+function logger_update_7115() {
+
+  db_add_field('logger_device_firmware', 'old_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_query("UPDATE logger_device_firmware SET old_id = id");
+  db_query("UPDATE logger_device_firmware SET id = 12 where id = 0");
+
+  db_change_field('logger_device_firmware', 'id', 'id',
+    array(
+      'type' => 'serial',
+      'not null' => TRUE,
+      'unasigned' => TRUE
+  ));
+
+  db_query("UPDATE logger_device_firmware SET id = old_id");
+
+  db_drop_field('logger_device_firmware', 'old_id');
+
+  return st("The primary key of table logger_device_firmware is now 'auto increment'.");
+}
+
