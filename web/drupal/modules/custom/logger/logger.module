@@ -712,11 +712,15 @@ function logger_mobile_page() {
     $temperature_access = logger_sensor_type_access('view logger charts', TEMPERATURE_SENSOR_TYPE);
     $pressure_access = logger_sensor_type_access('view logger charts', PRESSURE_SENSOR_TYPE);
     $humidity_access = logger_sensor_type_access('view logger charts', HUMIDITY_SENSOR_TYPE);
+    $production_access = logger_sensor_type_access('view logger charts', ENERGY_PRODUCTION_SENSOR_TYPE);
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      logger_create_mobile_page_icon('statistics.png',  t('Statistics'),        '/statistics') .
+      ($production_access ?
+      logger_create_mobile_page_icon('onsite.png',      t('On-site Consumption'), '/onsite') : '') .
       ($temperature_access ?
       logger_create_mobile_page_icon('temperature.png', t('Temperature'),       '/temperature') : '') .
       ($pressure_access ?
