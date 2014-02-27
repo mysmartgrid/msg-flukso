@@ -1687,8 +1687,8 @@ function notification_compose_summary_report_table($type, $lines, $total_cost, $
 
       "<td></td>" . 
       "<td>" . t('Total') . "</td>" . 
-      "<td>" . $total_energy[$type] . "</td>" . 
-      "<td>" . $total_cost[$type] . "</td>" .
+      "<td>" . money_format('%.2n', $total_energy[$type]) . "</td>" . #Not monetary value, but needs 2 decimal digits
+      "<td>" . money_format('%.2n', $total_cost[$type]) . "</td>" .
 
     "</tr></tfoot></table><br><br>";
 }
