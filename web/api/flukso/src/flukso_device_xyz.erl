@@ -238,7 +238,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         end
     end,
 
-    case mysql:get_result_rows(Result) of
+    {Response, ErrorCode} = case mysql:get_result_rows(Result) of
 
       %Device exists
       [[Key, Resets, CurrentFirmwareId, CurrentDescription]] ->
@@ -282,10 +282,14 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
         Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
 
-        mysql:execute(pool, device_update,
-          [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
-
-        mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
+        case check_printable_chars(Description)  of
+          {Description, true} ->
+            mysql:execute(pool, device_update, [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
+            mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]),
+            {"ok", ?HTTP_OK};
+          _ ->
+            {"Invalid Characters", ?HTTP_INVALID_CHARS}
+        end;
 
       %New Device Message - 1st invocation
       _ ->
@@ -295,14 +299,24 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
-        mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
+        case check_printable_chars(Description)  of
+          {Description, true} ->
+             mysql:execute(pool, device_insert, [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId]),
+             {"ok", ?HTTP_OK};
+          _ ->
+            {"Invalid Characters", ?HTTP_INVALID_CHARS}
+        end
     end,
 
-    Support = compose_support_tag(Device),
-    Answer = lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support),
-
-    digest_response(Key, Answer, ReqData, State).
+    case ErrorCode of
+      ?HTTP_OK ->
+        Support = compose_support_tag(Device),
+        Answer = lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support),
+        digest_response(Key, Answer, ReqData, State);
+      _ ->
+        JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(Response)}]}),
+        {{halt, ErrorCode}, wrq:set_resp_body(JsonResponse, ReqData), State}
+    end. 
 
 
 compose_support_tag(Device) ->
