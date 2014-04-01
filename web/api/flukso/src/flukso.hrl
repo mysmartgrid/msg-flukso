@@ -207,8 +207,7 @@ check_hex(String, Length) ->
     end.
 
 check_printable_chars(String) ->
-    %{String, true}.
-    case re:run(String, "^[ a-zA-Z0-9_üäöß]+$") of
+    case re:run(String, "^[ a-zA-Z0-9_üäöß€\+\?\.\,\:\;\~\%\&\=\-]+$") of %FIXME: other chars: '"*/
         {match, Captured} -> {String, true};
         _ -> {false, false}
     end.
