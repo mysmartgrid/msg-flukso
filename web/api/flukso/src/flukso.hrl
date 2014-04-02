@@ -207,10 +207,10 @@ check_hex(String, Length) ->
     end.
 
 check_printable_chars(String) ->
-    case re:run(String, "^[ a-zA-Z0-9_üäöß€\+\?\.\,\:\;\~\%\&\=\-]+$") of %FIXME: other chars: '"*/
-        {match, Captured} -> {String, true};
-        _ -> {false, false}
-    end.
+    {String, case re:run(String, "^[\\x20-\\x7e\\xc2a1-\\xc3bf€]*$") of
+        {match, _} -> true;
+        _ -> false
+    end}.
 
 check_time(undefined, undefined, _End, _Resolution) ->
     {false, false, false, false};

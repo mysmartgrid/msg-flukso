@@ -356,9 +356,16 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     Description = get_optional_value(<<"description">>, Params, ""),
     Device = proplists:get_value(<<"device">>, Params),
 
-    {Response, ErrorCode} = case {check_printable_chars(Function), check_printable_chars(Description)}  of
+    {ExternalId, ValidExternalId} = check_printable_chars(ExternalId),
+    {Description, ValidDescription} = check_printable_chars(Description),
+    {Function, ValidFunction} = case Function of
+      undefined -> {Function, true};
+      _ -> check_printable_chars(Function)
+    end,
 
-      {{Function, true}, {Description, true}} ->
+    {Response, ErrorCode} = case {ValidFunction, ValidDescription, ValidExternalId}  of
+
+      {true, true, true} ->
 
         {data, SensorResult} = mysql:execute(pool, sensor_props, [Sensor]),
 
