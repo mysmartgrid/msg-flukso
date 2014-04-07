@@ -356,7 +356,7 @@ function logger_menu() {
     'description' => 'A page containing only the temperature chart',
     'page callback' => 'logger_temperature_page',
     'page arguments' => array(2, TRUE),
-    'access callback' => logger_sensor_type_access,
+    'access callback' => 'logger_sensor_type_access',
     'access arguments' => array('view logger charts', '' . TEMPERATURE_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
@@ -365,7 +365,7 @@ function logger_menu() {
     'description' => 'A page containing only the pressure chart',
     'page callback' => 'logger_pressure_page',
     'page arguments' => array(2, TRUE),
-    'access callback' => logger_sensor_type_access,
+    'access callback' => 'logger_sensor_type_access',
     'access arguments' => array('view logger charts', '' . PRESSURE_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
@@ -374,7 +374,7 @@ function logger_menu() {
     'description' => 'A page containing only the humidity chart',
     'page callback' => 'logger_humidity_page',
     'page arguments' => array(2, TRUE),
-    'access callback' => logger_sensor_type_access,
+    'access callback' => 'logger_sensor_type_access',
     'access arguments' => array('view logger charts', '' . HUMIDITY_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
