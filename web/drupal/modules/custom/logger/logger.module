@@ -1075,7 +1075,10 @@ function logger_statistics_page() {
   drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/raphael.2.1.0.min.js', $options);
   drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/justgage.1.0.1.min.js', $options);
 
-  $output = t('Below you find some key measurements of your electricity consumption. <span title="Estimated as the first percentile."><b>Base load</b></span> is the lowest representative consumption and <span title="Simple arithmetic mean."><b>mean load</b></span> is the average consumption, both for the last seven days.');
+  $output = t('Below you find some key measurements of your electricity consumption. ' . 
+    '<span title="Estimated as the first percentile."><b>Base load</b></span> ' .
+    'is the lowest representative consumption and <span title="Simple arithmetic mean.">' . 
+    '<b>mean load</b></span> is the average consumption, both for the last seven days.');
 
   $devices = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial'))
@@ -1096,11 +1099,6 @@ function logger_statistics_page() {
   if (empty($output)) {
     $output = t('Base load undetermined.');
   }
-
-
-
-// TEST #2 
-
 
   $options['defer'] = FALSE;
 
@@ -1124,35 +1122,39 @@ function logger_statistics_page() {
   $period = array($now[0] -$year, $now[0]);
   $step = WEEK;
 
-  $xticklabels = '[ "' . t("1-person household") . '", "'
-                     . t("2-people household") . '", "'
-                     . t("3-people household") . '", "'
-                     . t("4-people household") . '", "'
-                     . t("5-people household") . '"]';
+  $xticklabels = '[ "' .
+    t("1-person household") . '", "' .
+    t("2-people household") . '", "' .
+    t("3-people household") . '", "' .
+    t("4-people household") . '", "' .
+    t("5-people household") . '"]';
+
   $xaxislabel = '"' . t("kWh/year") . '"';
   $yaxislabel = '"' . t("Recomended Range") . '"';
   $consMark = '"' . t("Your consumption") . '"';
 
   $sensors = logger_get_sensors(array(ENERGY_CONSUMPTION_SENSOR_TYPE), array($user->uid));
   $measurements = logger_rrd_query_energy($sensors, 'Wh', $period, $step);
-  $consumption = (52/count($measurements))*array_sum($measurements)/1000 ; //estimate (if #measur.<52) of total energy cons. in kWh
+  $consumption = empty($measurements) ? 0 : (52/count($measurements))*array_sum($measurements)/1000 ; //estimate (if #measur.<52) of total energy cons. in kWh
 
-  $output .= t("The following chart shows how your yearly consumption compares to the !officially recommended !ranges.",
-    array("!officially" => l(t("officially"), "http://www.die-stromsparinitiative.de/beratung/stromcheck/index.html"), 
-          "!ranges" => l(t("ranges"), "http://www.vz-nrw.de/mediabig/218084A.pdf")) );
-  $output .= t("<div>Color code: <span style='color:black;font-weight:normal'><span style='background-color:#33DD00'> very good</span>, <span style='background-color:#EEFF00'> good</span>, <span style='background-color:#FF9900'> tolerable</span>, <span style='background-color:#FF0000'> high</span></span>.</div>");
-  $output .= "<br><br>";
+  $output .= t("The following chart shows how your yearly consumption compares to the !officially recommended !ranges.", array(
+    "!officially" => l(t("officially"), "http://www.die-stromsparinitiative.de/beratung/stromcheck/index.html"), 
+    "!ranges" => l(t("ranges"), "http://www.vz-nrw.de/mediabig/218084A.pdf"))) . "<div>" .
 
-  $optionsCreateConsumptionIndicator = "$consumption, $xticklabels, $xaxislabel, $yaxislabel, $consMark";
+    t("Color code") . ": <span style='color:black;font-weight:normal'><span style='background-color:#33DD00'> '" .
+    t("very good") . "</span>, <span style='background-color:#EEFF00'>" .
+    t("good") . "</span>, <span style='background-color:#FF9900'>" .
+    t("tolerable") . "</span>, <span style='background-color:#FF0000'> " .
+    t("high") . "</span></span></div><br><br>" .
 
-  drupal_add_js('jQuery(document).ready( function() {createConsumptionIndicator(' . $optionsCreateConsumptionIndicator . ');} );', 
-                array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 300));
+    "<div id='flot-placeholder2' style='width:610px;height:300px;margin:0 auto'></div>";
 
-  $output .= "<div id='flot-placeholder2' style='width:610px;height:300px;margin:0 auto'></div>";
+  drupal_add_js('jQuery(document).ready( function() {createConsumptionIndicator(' .
+    "$consumption, $xticklabels, $xaxislabel, $yaxislabel, $consMark" . ');} );', 
+    array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 300));
 
   return $output;
 }
-
 
 function logger_add_base_load_gauge($device, $count) {
 
