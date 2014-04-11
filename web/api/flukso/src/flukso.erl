@@ -73,6 +73,11 @@ mysql_prepare() ->
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
 
+    mysql:prepare(device_network_insert, <<"INSERT INTO logger_device_network (device, pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_network_update, <<"UPDATE logger_device_network set pending = ?, lan_enabled = ?, lan_protocol = ?, lan_ip = ?, lan_netmask = ?, lan_gateway = ?, wifi_enabled = ?, wifi_essid = ?, wifi_enc = ?, wifi_psk = ?, wifi_protocol = ?, wifi_ip = ?, wifi_netmask = ?, wifi_gateway = ? WHERE device = ?">>),
+    mysql:prepare(device_network_delete, <<"DELETE FROM logger_device_network WHERE device = ?">>),
+    mysql:prepare(device_network_props, <<"SELECT pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway FROM logger_device_network WHERE device = ?">>),
+
     mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, upgradable FROM logger_device_firmware WHERE version = ? AND device_type_id = ?">>),
     mysql:prepare(firmware_upgrade_delete, <<"DELETE FROM logger_firmware_upgrade_request WHERE device = ?">>),
     mysql:prepare(firmware_upgrade_props, <<"SELECT d.sha, d.type_id, f.version AS from_version, t.version AS to_version FROM logger_devices d, logger_device_firmware f, logger_device_firmware t, logger_firmware_upgrade_request u WHERE d.device = ? AND d.device = u.device AND d.firmware_id = f.id AND u.firmware_id = t.id AND f.upgradable = 1 AND t.upgradable = 1 AND u.approved > 0">>),

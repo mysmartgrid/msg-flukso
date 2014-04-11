@@ -155,6 +155,88 @@ function logger_schema() {
     'primary key' => array('device'),
   );
 
+  $schema['logger_device_network'] = array(
+    'description' => 'Stores the device network configuration.',
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'pending' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'lan_enabled' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'lan_protocol' => array(
+        'type' => 'varchar',
+        'length' => '6',
+        'not null' => TRUE,
+      ),
+      'lan_ip' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'lan_netmask' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'lan_gateway' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'wifi_enabled' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'wifi_essid' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => TRUE
+      ),
+      'wifi_enc' => array(
+        'type' => 'varchar',
+        'length' => 5,
+        'not null' => TRUE
+      ),
+      'wifi_psk' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => TRUE
+      ),
+      'wifi_protocol' => array(
+        'type' => 'varchar',
+        'length' => '6',
+        'not null' => TRUE,
+      ),
+      'wifi_ip' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'wifi_netmask' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE 
+      ),
+      'wifi_gateway' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+    ),
+    'primary key' => array('device')
+  );
+
   $schema['logger_meter_type'] = array(
     'description' => 'Stores the meter types.',
     'fields' => array(
@@ -2265,3 +2347,12 @@ function logger_update_7115() {
   return st("The primary key of table logger_device_firmware is now 'auto increment'.");
 }
 
+/**
+ * Creates table logger_device_network.
+ */
+function logger_update_7118() {
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been created.");
+}

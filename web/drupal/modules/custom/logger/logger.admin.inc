@@ -1234,22 +1234,6 @@ function logger_device_assign($code) {
     ->condition('device', "$code%", 'LIKE')
     ->execute();
 
-  $sensors = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'function'))
-    ->condition('m.device', "$code%", 'LIKE')
-    ->execute();
-
-  $i = 2;
-  foreach ($sensors as $sensor) {
-
-    db_update('logger_meters')
-      ->fields(array(
-        'function' => $sensor->function
-      ))
-      ->condition('meter', $sensor->meter)
-      ->execute();
-  }
-
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
   if (!user_has_role('fluksonian')) {
