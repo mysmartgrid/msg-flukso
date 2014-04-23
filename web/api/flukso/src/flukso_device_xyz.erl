@@ -246,9 +246,10 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         %Retrieve Network configuration if it exists
         {data, NResult} = mysql:execute(pool, device_network_props, [Device]),
         OldNetwork = case mysql:get_result_rows(NResult) of
-          [[_NetworkPending, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway]] ->
-            {_NetworkPending, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway};
-          _ -> undefined
+          [[1, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiEssid, _WifiEnc, _WifiPsk, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway]] ->
+            {1, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiEssid, _WifiEnc, _WifiPsk, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway};
+          _ ->
+             undefined
         end,
 
         %Decide which key to use
@@ -350,7 +351,7 @@ process_network(OldNetwork, Device, JsonData) ->
       % Query current network configuration
       {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} =
         case OldNetwork of
-          undefined -> {0, undefined, undefined, undefined, undefined, 0, undefined, undefined, undefined, undefined, undefined, undefined, undefined};
+          undefined -> {0, 0, undefined, undefined, undefined, undefined, 0, undefined, undefined, undefined, undefined, undefined, undefined, undefined};
           _ -> OldNetwork
         end,
 
@@ -437,7 +438,7 @@ compose_network_tag(Network) ->
 
   case Network of
     %If pending
-    {true, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} ->
+    {1, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} ->
 
       LanConfig = {struct, [
           {<<"enabled">>, LanEnabled},
@@ -458,7 +459,7 @@ compose_network_tag(Network) ->
           {<<"gateway">>, WifiGateway}
         ]},
 
-     [{<<network>>, {struct, [
+     [{<<"network">>, {struct, [
           {<<"lan">>, LanConfig},
           {<<"wifi">>, WifiConfig}
      ]}}];
