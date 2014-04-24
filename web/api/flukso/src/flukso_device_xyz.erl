@@ -332,9 +332,9 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
     case ErrorCode of
       ?HTTP_OK ->
         Support = compose_support_tag(Device),
-        Net = compose_network_tag(Network),
+        Config = compose_config_tag(Network, Device),
 
-        Answer = lists:append(lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support), Net),
+        Answer = lists:append(lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support), Config),
         digest_response(Key, Answer, ReqData, State);
       _ ->
         JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(Response)}]}),
@@ -348,7 +348,7 @@ process_network(OldNetwork, Device, JsonData) ->
     true ->
       {struct, Network} = proplists:get_value(<<"network">>, JsonData),
 
-      % Query current network configuration
+      %Current network configuration
       {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} =
         case OldNetwork of
           undefined -> {0, 0, undefined, undefined, undefined, undefined, 0, undefined, undefined, undefined, undefined, undefined, undefined, undefined};
@@ -358,40 +358,50 @@ process_network(OldNetwork, Device, JsonData) ->
       %If LAN properties are defined
       {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway} = case proplists:is_defined(<<"lan">>, Network) of
         true ->
-           {struct, Lan} = proplists:get_value(<<"lan">>, Network),
-           {proplists:get_value(<<"enabled">>, Lan),
-           proplists:get_value(<<"protocol">>, Lan),
-           proplists:get_value(<<"ip">>, Lan),
-           proplists:get_value(<<"netmask">>, Lan),
-           proplists:get_value(<<"gateway">>, Lan)};
+          {struct, Lan} = proplists:get_value(<<"lan">>, Network),
+          {proplists:get_value(<<"enabled">>, Lan),
+          proplists:get_value(<<"protocol">>, Lan),
+          proplists:get_value(<<"ip">>, Lan),
+          proplists:get_value(<<"netmask">>, Lan),
+          proplists:get_value(<<"gateway">>, Lan)};
         _ -> {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway}
       end,
 
       %If WIFI properties are defined
       {WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} = case proplists:is_defined(<<"wifi">>, Network) of
         true ->
-           {struct, Wifi} = proplists:get_value(<<"wifi">>, Network),
-           {proplists:get_value(<<"enabled">>, Wifi),
-           proplists:get_value(<<"essid">>, Wifi),
-           proplists:get_value(<<"enc">>, Wifi),
-           proplists:get_value(<<"psk">>, Wifi),
-           proplists:get_value(<<"protocol">>, Wifi),
-           proplists:get_value(<<"ip">>, Wifi),
-           proplists:get_value(<<"netmask">>, Wifi),
-           proplists:get_value(<<"gateway">>, Wifi)};
+          {struct, Wifi} = proplists:get_value(<<"wifi">>, Network),
+          {proplists:get_value(<<"enabled">>, Wifi),
+          proplists:get_value(<<"essid">>, Wifi),
+          proplists:get_value(<<"enc">>, Wifi),
+          proplists:get_value(<<"psk">>, Wifi),
+          proplists:get_value(<<"protocol">>, Wifi),
+          proplists:get_value(<<"ip">>, Wifi),
+          proplists:get_value(<<"netmask">>, Wifi),
+          proplists:get_value(<<"gateway">>, Wifi)};
         _ -> {OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway}
       end,
 
 
-      %FIXME: validate parameters. if invalid, return error
+      %FIXME: validate parameters. if invalid, return ?HTTP_BAD_ARGUMENT
 
-      %If network record does not exist
-      case OldNetwork of
-        undefined -> mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]);
-        _ -> mysql:execute(pool, device_network_update, [0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway, Device])
+      Pending = case OldNetwork of
+
+        %If network record does not exist
+        undefined ->
+          mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
+          0;
+
+        %Network record does exist
+        _ ->
+          Different = case {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} of
+            {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} -> 0; %Equal
+            _ -> 1 %Still different
+          end,
+          mysql:execute(pool, device_network_update, [Different]),
+          Different
       end,
-
-      {0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
+      {Pending, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
     _ -> OldNetwork
   end.
 
@@ -434,7 +444,7 @@ compose_support_tag(Device) ->
     end.
 
 
-compose_network_tag(Network) ->
+compose_config_tag(Network, Device) ->
 
   case Network of
     %If pending
@@ -459,10 +469,15 @@ compose_network_tag(Network) ->
           {<<"gateway">>, WifiGateway}
         ]},
 
-     [{<<"network">>, {struct, [
-          {<<"lan">>, LanConfig},
-          {<<"wifi">>, WifiConfig}
-     ]}}];
+     NetworkTag = {<<"network">>, {struct, [
+       {<<"lan">>, LanConfig},
+       {<<"wifi">>, WifiConfig}
+     ]}},
+
+     {data, Result} = mysql:execute(pool, device_active_sensors, [Device]),
+     SensorsTag = {<<"sensors">>, [Meter || [Meter] <- mysql:get_result_rows(Result)]},
+
+     [{<<"config">>, {struct, [NetworkTag, SensorsTag]}}];
 
     _ -> []
   end.

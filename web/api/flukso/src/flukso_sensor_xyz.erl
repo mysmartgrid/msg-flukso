@@ -108,52 +108,39 @@ malformed_GET(ReqData, _State) ->
         case check_sensor(wrq:path_info(sensor, ReqData)) of
           {RrdSensor, true} ->
 
-            case check_time(
-              wrq:get_qs_value("interval", ReqData),
-              wrq:get_qs_value("start", ReqData),
-              wrq:get_qs_value("end", ReqData),
-              wrq:get_qs_value("resolution", ReqData)) of
+            case check_authentication(ReqData) of
+              {Digest, Token, Authenticated} ->
 
-              {RrdStart, RrdEnd, RrdResolution, true} ->
-                
-                case check_unit(wrq:get_qs_value("unit", ReqData)) of
-                  {UnitId, UnitFactor, true} ->
+                Interval = wrq:get_qs_value("interval", ReqData),
+                Start = wrq:get_qs_value("start", ReqData),
+                End = wrq:get_qs_value("end", ReqData),
+                Resolution = wrq:get_qs_value("resolution", ReqData),
 
-                    case check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)) of
-                      {JsonpCallback, true} ->
+                case {Interval, Start, End, Resolution} of
+                  {undefined, undefined, undefined, undefined} ->
+                      {false, ReqData, compose_state(RrdSensor, undefined, undefined, undefined, undefined, undefined, Token, Digest, undefined)};
 
-                        DigestHeader = wrq:get_req_header("X-Digest", ReqData),
-                        {Digest, ValidDigest} = case DigestHeader of undefined -> {undefined, true}; _ -> check_digest(DigestHeader) end,
-                        {Token, ValidToken} = check_token(wrq:get_req_header("X-Token", ReqData), wrq:get_qs_value("token", ReqData)),
-
-                        Authenticated = case {Digest, ValidDigest, Token, ValidToken} of
-                          {undefined, ValidDigest, undefined, ValidToken} -> false;
-                          {Digest, true, undefined, ValidToken} -> true;
-                          {undefined, ValidDigest, Token, true} -> true;
-                          {Digest, true, Token, true} -> true;
-                          _ -> false
-                        end,
+                  _ ->
+                    case check_time(Interval, Start, End, Resolution) of
+                      {RrdStart, RrdEnd, RrdResolution, true} ->
+               
+                        io:fwrite("  check_time OK       "),
  
-                        case Authenticated of
-                          true ->
-                            {false, ReqData, #state{
-                              rrdSensor = RrdSensor,
-                              rrdStart = RrdStart,
-                              rrdEnd = RrdEnd,
-                              rrdResolution = RrdResolution,
-                              unitId = UnitId,
-                              unitFactor = UnitFactor,
-                              token = Token,
-                              digest = Digest,
-                              jsonpCallback = JsonpCallback}};
+                        case check_unit(wrq:get_qs_value("unit", ReqData)) of
+                          {UnitId, UnitFactor, true} ->
 
-                          _ -> ?HTTP_UNAUTHORIZED
+                            case check_jsonp_callback(wrq:get_qs_value("jsonp_callback", ReqData)) of
+                              {JsonpCallback, true} ->
+                                {false, ReqData, compose_state(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitId, UnitFactor, Token, Digest, JsonpCallback)};
+
+                              _ -> ?HTTP_BAD_ARGUMENT
+                            end;
+                          _ -> ?HTTP_INVALID_UNIT
                         end;
-                      _ -> ?HTTP_BAD_ARGUMENT
-                    end;
-                  _ -> ?HTTP_INVALID_UNIT
+                      _ -> ?HTTP_INVALID_TIME_PERIOD
+                    end
                 end;
-              _ -> ?HTTP_INVALID_TIME_PERIOD
+              _ -> ?HTTP_UNAUTHORIZED
             end;
           _ -> ?HTTP_INVALID_ID
         end;
@@ -164,6 +151,34 @@ malformed_GET(ReqData, _State) ->
       {false, ReqData, State} -> Return;
       _ -> {{halt, Return}, ReqData, undefined}
     end.
+
+
+compose_state(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitId, UnitFactor, Token, Digest, JsonpCallback) ->
+  #state{
+    rrdSensor = RrdSensor,
+    rrdStart = RrdStart,
+    rrdEnd = RrdEnd,
+    rrdResolution = RrdResolution,
+    unitId = UnitId,
+    unitFactor = UnitFactor,
+    token = Token,
+    digest = Digest,
+    jsonpCallback = JsonpCallback}.
+
+
+check_authentication(ReqData) ->
+
+  DigestHeader = wrq:get_req_header("X-Digest", ReqData),
+  {Digest, ValidDigest} = case DigestHeader of undefined -> {undefined, true}; _ -> check_digest(DigestHeader) end,
+  {Token, ValidToken} = check_token(wrq:get_req_header("X-Token", ReqData), wrq:get_qs_value("token", ReqData)),
+
+  {Digest, Token, case {Digest, ValidDigest, Token, ValidToken} of
+    {undefined, ValidDigest, undefined, ValidToken} -> false;
+    {Digest, true, undefined, ValidToken} -> true;
+    {undefined, ValidDigest, Token, true} -> true;
+    {Digest, true, Token, true} -> true;
+    _ -> false
+  end}.
 
 
 malformed_DELETE(ReqData, _State) ->
@@ -261,43 +276,58 @@ content_types_provided(ReqData, State) ->
 
 to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = RrdEnd, rrdResolution = RrdResolution, unitFactor = UnitFactor, jsonpCallback = JsonpCallback} = State) -> 
 
-    % Check if sensor is virtual
-    {data, Result} = mysql:execute(pool, sensor_agg, [RrdSensor]),
+    Unencoded = case RrdStart of
+      undefined ->
+        {data, Result} = mysql:execute(pool, sensor_all_props, [RrdSensor]),
+        [[Device, ExternalId, Function, Unit, Description]] = mysql:get_result_rows(Result),
 
-    AggSeries = case mysql:get_result_rows(Result) of
+        [{struct, [
+          {<<"device">>, Device},
+          {<<"externalid">>, ExternalId},
+          {<<"function">>, Function},
+          {<<"unit">>, Unit},
+          {<<"description">>, Description}
+        ]}];
 
-        % Ordinary sensor
-        [] ->
-            {ok, Series} = query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor),
-            Series;
+      _ ->
+        % Check if sensor is virtual
+        {data, Result} = mysql:execute(pool, sensor_agg, [RrdSensor]),
 
-        % Virtual sensor
-        RrdSensors ->
-            AggSensors = RrdSensors,
+        case mysql:get_result_rows(Result) of
 
-            % Create a list of [Timestamp, Value] for every sensor
-            AllSeries = [[query_sensor(AggSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor)] || [AggSensor] <- AggSensors],
+            % Ordinary sensor
+            [] ->
+                {ok, Series} = query_measurements(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor),
+                Series;
 
-            % Merge all pairs [Timestamp, Value]
-            Merged = lists:merge([Series || [{ok, Series}] <- AllSeries]),
+            % Virtual sensor
+            RrdSensors ->
+                AggSensors = RrdSensors,
 
-            % Convert NaN to zero
-            ToNumber = fun (V) ->
-                case is_number(V) of true -> V; false -> 0 end
-            end,
-            Converted = [[Timestamp, ToNumber(Value)] || [Timestamp, Value] <- Merged],
+                % Create a list of [Timestamp, Value] for every sensor
+                AllSeries = [[query_measurements(AggSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor)] || [AggSensor] <- AggSensors],
 
-            % Form a sorted list of unique timestamps
-            Timestamps = lists:usort([Timestamp || [Timestamp, Value] <- Converted]),
+                % Merge all pairs [Timestamp, Value]
+                Merged = lists:merge([Series || [{ok, Series}] <- AllSeries]),
 
-            % Sum values for every timestamp
-            SumValues = fun (T) ->
-                lists:sum([Value || [Timestamp, Value] <- Converted, Timestamp =:= T])
-            end,
-            [[Timestamp, SumValues(Timestamp)] || Timestamp <- Timestamps]
+                % Convert NaN to zero
+                ToNumber = fun (V) ->
+                    case is_number(V) of true -> V; false -> 0 end
+                end,
+                Converted = [[Timestamp, ToNumber(Value)] || [Timestamp, Value] <- Merged],
+    
+                % Form a sorted list of unique timestamps
+                Timestamps = lists:usort([Timestamp || [Timestamp, Value] <- Converted]),
+  
+                % Sum values for every timestamp
+                SumValues = fun (T) ->
+                    lists:sum([Value || [Timestamp, Value] <- Converted, Timestamp =:= T])
+                end,
+                [[Timestamp, SumValues(Timestamp)] || Timestamp <- Timestamps]
+        end
     end,
 
-    Encoded = mochijson2:encode(AggSeries),
+    Encoded = mochijson2:encode(Unencoded),
 
     {case JsonpCallback of
         undefined -> Encoded;
@@ -306,7 +336,7 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
     ReqData, State}.
 
 
-query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor) ->
+query_measurements(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor) ->
 
     %debugging
     %io:format("~s~n", [erlrrd:c([[Path, [RrdSensor|".rrd"]], "AVERAGE", ["-s ", RrdStart], ["-e ", RrdEnd], ["-r ", RrdResolution]])]),
@@ -315,16 +345,15 @@ query_sensor(RrdSensor, RrdStart, RrdEnd, RrdResolution, UnitFactor) ->
     [[RrdFactor]] = mysql:get_result_rows(Result),
 
     case rrd_fetch(RrdSensor, RrdStart, RrdEnd, RrdResolution) of
-       {ok, Response} ->
-           Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
-           Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor * UnitFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
-           Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
-           Final = lists:merge(Datapoints, Nans),
-           {ok, Final};
+      {ok, Response} ->
+        Filtered = [re:split(X, "[:][ ]", [{return,list}]) || [X] <- Response, string:str(X, ":") == 11],
+        Datapoints = [[list_to_integer(X), list_to_float(Y) * RrdFactor * UnitFactor] || [X, Y] <- Filtered, string:len(Y) /= 4],
+        Nans = [[list_to_integer(X), list_to_binary(Y)] || [X, Y] <- Filtered, string:len(Y) == 4],
+        Final = lists:merge(Datapoints, Nans),
+        {ok, Final};
 
-       {error, _Reason} ->
-           {error, _Reason}
-   end.
+      {error, _Reason} -> {error, _Reason}
+    end.
 
 
 process_post(ReqData, State) ->
