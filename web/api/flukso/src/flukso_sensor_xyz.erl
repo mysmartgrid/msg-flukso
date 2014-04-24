@@ -282,12 +282,16 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
         [[Device, ExternalId, Function, Unit, Description]] = mysql:get_result_rows(Result),
 
         [{struct, [
-          {<<"device">>, Device},
-          {<<"externalid">>, ExternalId},
-          {<<"function">>, Function},
-          {<<"unit">>, Unit},
-          {<<"description">>, Description}
-        ]}];
+          {<<"config">>,
+            {struct, [
+              {<<"device">>, Device},
+              {<<"externalid">>, ExternalId},
+              {<<"function">>, Function},
+              {<<"unit">>, Unit},
+              {<<"description">>, Description}
+            ]}
+          }]
+        }];
 
       _ ->
         % Check if sensor is virtual
