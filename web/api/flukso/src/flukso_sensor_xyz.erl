@@ -124,8 +124,6 @@ malformed_GET(ReqData, _State) ->
                     case check_time(Interval, Start, End, Resolution) of
                       {RrdStart, RrdEnd, RrdResolution, true} ->
                
-                        io:fwrite("  check_time OK       "),
- 
                         case check_unit(wrq:get_qs_value("unit", ReqData)) of
                           {UnitId, UnitFactor, true} ->
 

@@ -289,9 +289,12 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
             end
         end,
 
-        Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
+        DescriptionCheck = case CurrentDescription of
+          undefined -> {undefined, true};
+          _ -> check_printable_chars(get_optional_value(<<"description">>, JsonData, CurrentDescription))
+        end,
 
-        case check_printable_chars(Description)  of
+        case DescriptionCheck of
           {Description, true} ->
             mysql:execute(pool, device_update, [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
 
