@@ -2356,3 +2356,25 @@ function logger_update_7118() {
 
   return st("The table logger_device_network has been created.");
 }
+
+/**
+ * Inserts the Flukso firmware version 2.3.0-1.
+ */
+function logger_update_7119() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 25,
+      'version' => '2.3.0-1',
+      'release_time' => '20140410_0954',
+      'build' => '2f701f3a612605d70c2f10cf83e402e0c909ab83',
+      'tag' => 'flukso-2.0.5-rc4-305-g2f701f3',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.3.0-1'
+    ))
+    ->execute();
+
+  return st('Flukso firmware version 2.3.0-1 has been created.');
+}
+
