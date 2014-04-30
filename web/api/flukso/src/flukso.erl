@@ -64,7 +64,12 @@ mysql_prepare() ->
     mysql:prepare(sensor_agg_update, <<"UPDATE logger_aggregated_meters SET meter = ? WHERE meter = ?">>),
     mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
     mysql:prepare(sensor_storage_update, <<"UPDATE logger_meter_storage SET meter = ? WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, constant, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+
+    mysql:prepare(energy_sensor_update, <<"UPDATE logger_energy_meter SET class_id = ?, voltage = ?, current = ?, constant = ? WHERE meter = ?">>),
+    mysql:prepare(energy_sensor_insert, <<"INSERT INTO logger_energy_meter(meter, class_id, voltage, current, constant) VALUES(?, ?, ?, ?, ?)">>),
+    mysql:prepare(energy_sensor_delete, <<"DELETE FROM logger_energy_meter WHERE meter = ?">>),
+    mysql:prepare(energy_sensor_props, <<"SELECT c.name AS class, e.voltage, e.current, e.constant FROM logger_energy_meter e, logger_energy_meter_class c WHERE e.class_id = c.id AND e.meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_uid, <<"SELECT uid FROM logger_devices WHERE device = ?">>),

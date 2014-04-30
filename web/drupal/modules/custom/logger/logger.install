@@ -364,6 +364,55 @@ function logger_schema() {
     'primary key' => array('meter')
   );
 
+  $schema['logger_energy_meter_class'] = array(
+    'description' => 'Stores the energy meter classes.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
+  $schema['logger_energy_meter'] = array(
+    'description' => "Stores extra properties of energy sensors.",
+    'fields' => array(
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'class_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'voltage' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+      'current' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+      'constant' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+    ),
+    'primary key' => array('meter')
+  );
+
   $schema['logger_tokens'] = array(
     'description' => "Stores sensor access tokens.",
     'fields' => array(
@@ -666,6 +715,20 @@ function logger_install() {
     ->fields(array(
       'id' => 5,
       'name' => 'Humidity',
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Analog'
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Pulse',
     ))
     ->execute();
 
@@ -2378,3 +2441,37 @@ function logger_update_7119() {
   return st('Flukso firmware version 2.3.0-1 has been created.');
 }
 
+/**
+ * Drops field constant from table logger_meters.
+ */
+function logger_update_7120() {
+
+  db_drop_field('logger_meters', 'constant');
+
+  return st('Field constant has been dropped from table logger_meters.');
+}
+
+/**
+ * Creates tables logger_energy_meter and logger_energy_meter_class.
+ */
+function logger_update_7123() {
+
+  db_create_table('logger_energy_meter_class', drupal_get_schema_unprocessed('logger', 'logger_energy_meter_class'));
+  db_create_table('logger_energy_meter', drupal_get_schema_unprocessed('logger', 'logger_energy_meter'));
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Analog'
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Pulse',
+    ))
+    ->execute();
+
+  return st("The tables logger_energy_meter and logger_energy_meter_class have been created.");
+}

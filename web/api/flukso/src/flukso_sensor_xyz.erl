@@ -66,7 +66,6 @@ malformed_POST(ReqData, _State) ->
 
             case check_sensor(wrq:path_info(sensor, ReqData)) of
               {RrdSensor, true} ->
-
                 try
                   {struct, JsonData} = mochijson2:decode(wrq:req_body(ReqData)),
                   Payload = {
@@ -279,17 +278,26 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
         {data, Result} = mysql:execute(pool, sensor_all_props, [RrdSensor]),
         [[Device, ExternalId, Function, Unit, Description]] = mysql:get_result_rows(Result),
 
-        [{struct, [
-          {<<"config">>,
-            {struct, [
-              {<<"device">>, Device},
-              {<<"externalid">>, ExternalId},
-              {<<"function">>, Function},
-              {<<"unit">>, Unit},
-              {<<"description">>, Description}
-            ]}
-          }]
-        }];
+        Main = [
+          {<<"device">>, Device},
+          {<<"externalid">>, ExternalId},
+          {<<"function">>, Function},
+          {<<"unit">>, Unit},
+          {<<"description">>, Description}
+        ],
+
+        {data, _Result} = mysql:execute(pool, energy_sensor_props, [RrdSensor]),
+        Extra = case mysql:get_result_rows(_Result) of
+          [[Class, Voltage, Current, Constant]] -> [
+              {<<"class">>, Class},
+              {<<"voltage">>, Voltage},
+              {<<"current">>, Current},
+              {<<"constant">>, Constant}
+            ];
+          _ -> []
+        end,
+
+        [{struct, [{<<"config">>, {struct, lists:append(Main, Extra)}}]}];
 
       _ ->
         % Check if sensor is virtual
@@ -415,13 +423,13 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
               %Id and External Id point to the same Sensor
               [[Sensor, Device, UnitId, Factor]] ->
                 mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
-                {"ok", ?HTTP_OK};
+                process_energy_sensor(Params, true, Sensor);
 
               %External Id points to another Sensor with a different Id, which belongs to the same user
               [[Sensor2, Device2, UnitId2, Factor2]] ->
                 move_sensor_data(Sensor2, Device, Sensor),
                 mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
-                {"ok", ?HTTP_OK};
+                process_energy_sensor(Params, true, Sensor);
 
               %Sensor belongs to another user
               _ ->
@@ -436,7 +444,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
               [[Sensor2, Device2, UnitId2, Factor2]] ->
                 move_sensor_data(binary_to_list(Sensor2), Device, Sensor),
                 mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
-                {"ok", ?HTTP_OK};
+                process_energy_sensor(Params, true, Sensor);
 
               %Neither external id nor id points to an existent sensor
               _ ->
@@ -471,8 +479,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
                         mysql:execute(pool, sensor_insert, [Sensor, Timestamp, SensorType, ExternalId, Function, Description, RrdFactor, UnitId, Device]),
                         mysql:execute(pool, token_insert, [Token, Sensor, 62]),
-
-                        {"ok", ?HTTP_OK};
+                        process_energy_sensor(Params, false, Sensor);
 
                       % RRD file could not be created
                       {error, RrdResponse} ->
@@ -495,6 +502,25 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
      end,
     wrq:set_resp_body(JsonResponse, ReqData), State}.
 
+
+process_energy_sensor(Params, Update, Sensor) ->
+
+    %TODO: return error code if type is not energy consumption of energy production
+
+    ClassId = case get_optional_value(<<"class">>, Params, undefined) of "analog" -> 1; "pulse" -> 2; _ -> undefined end,
+    case ClassId of
+      undefined -> {"ok", ?HTTP_OK};
+      _ ->
+        Voltage = get_optional_value(<<"voltage">>, Params, "0"),
+        Current = get_optional_value(<<"current">>, Params, "0"),
+        Constant = get_optional_value(<<"current">>, Params, "0"),
+        case Update of
+          true -> mysql:execute(pool, energy_sensor_update, [ClassId, Voltage, Current, Constant, Sensor]);
+          _ -> mysql:execute(pool, energy_sensor_insert, [Sensor, ClassId, Voltage, Current, Constant])
+        end,
+        {"ok", ?HTTP_OK}
+    end.
+    
 
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
 
@@ -620,6 +646,7 @@ delete_resource(ReqData, #state{rrdSensor = RrdSensor, digest = ClientDigest} = 
 delete_sensor(Sensor) ->
 
   mysql:execute(pool, msgdump_delete, [Sensor]),
+  mysql:execute(pool, energy_sensor_delete, [Sensor]),
   mysql:execute(pool, sensor_agg_delete, [Sensor]),
   mysql:execute(pool, sensor_storage_delete, [Sensor]),
   mysql:execute(pool, token_delete, [Sensor]),
@@ -629,6 +656,7 @@ delete_sensor(Sensor) ->
 move_sensor_data(FromSensor, ToDevice, ToSensor) ->
 
   mysql:execute(pool, msgdump_delete, [FromSensor]),
+  mysql:execute(pool, energy_sensor_delete, [FromSensor]),
   mysql:execute(pool, sensor_agg_update, [ToSensor, FromSensor]),
   mysql:execute(pool, sensor_storage_update, [ToSensor, FromSensor]),
   mysql:execute(pool, token_update, [ToSensor, FromSensor]),

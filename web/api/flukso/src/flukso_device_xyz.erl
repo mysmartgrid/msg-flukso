@@ -352,7 +352,7 @@ process_network(OldNetwork, Device, JsonData) ->
       {struct, Network} = proplists:get_value(<<"network">>, JsonData),
 
       %Current network configuration
-      {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} =
+      {OldPending, OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} =
         case OldNetwork of
           undefined -> {0, 0, undefined, undefined, undefined, undefined, 0, undefined, undefined, undefined, undefined, undefined, undefined, undefined};
           _ -> OldNetwork
@@ -508,6 +508,7 @@ delete_device_sensor(Sensor) ->
   mysql:execute(pool, msgdump_delete, [Sensor]),
   mysql:execute(pool, sensor_agg_delete, [Sensor]),
   mysql:execute(pool, token_delete, [Sensor]),
+  mysql:execute(pool, energy_sensor_delete, [Sensor]),
   mysql:execute(pool, sensor_delete, [Sensor]),
 
   file:delete(string:concat(?BASE_PATH, string:concat(binary_to_list(Sensor), ".rrd"))).
