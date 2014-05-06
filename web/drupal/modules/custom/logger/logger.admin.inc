@@ -1412,7 +1412,10 @@ function logger_device_clone($device_id) {
         'price' => $sensor->price,
         'forecast' => $sensor->forecast,
         'latitude' => $sensor->latitude,
-        'longitude' => $sensor->longitude
+        'longitude' => $sensor->longitude,
+        'external_id' => $sensor->external_id,
+        'unit_id' => $sensor->unit_id,
+        'type' => $sensor->type
       ))
       ->execute();
 
