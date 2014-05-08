@@ -1080,11 +1080,15 @@ function logger_statistics_page() {
     'is the lowest representative consumption and <span title="Simple arithmetic mean.">' . 
     '<b>mean load</b></span> is the average consumption, both for the last seven days.');
 
-  $devices = db_select('logger_devices', 'd')
+  $query = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial'))
     ->condition('d.uid', $user->uid)
-    ->condition('d.type_id', array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID), 'IN')
-    ->execute();
+    ->condition('d.type_id', array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID, CLONED_DEVICE_TYPE_ID), 'IN');
+   $query->join('logger_meters', 'm', 'm.device = d.device');
+   $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE);
+   $query->distinct();
+
+  $devices = $query->execute();
 
   foreach ($devices as $device) {
 
@@ -1133,7 +1137,7 @@ function logger_statistics_page() {
   $yaxislabel = '"' . t("Recomended Range") . '"';
   $consMark = '"' . t("Your consumption") . '"';
 
-  $sensors = logger_get_sensors(array(ENERGY_CONSUMPTION_SENSOR_TYPE), array($user->uid));
+  $sensors = logger_get_sensors(array(ENERGY_CONSUMPTION_SENSOR_TYPE), array($user->uid), FALSE, FALSE, TRUE);
   $measurements = logger_rrd_query_energy($sensors, 'Wh', $period, $step);
   $consumption = empty($measurements) ? 0 : (52/count($measurements))*array_sum($measurements)/1000 ; //estimate (if #measur.<52) of total energy cons. in kWh
 
@@ -1162,7 +1166,7 @@ function logger_add_base_load_gauge($device, $count) {
     var g = new JustGage({
       id: 'gauge_base_load$device->device',
       title: '" . ($count > 1 ? "$device->serial - " : '') . t('Base Load (W)') . "',
-      value: '" . round($device->statistics['base_load']) . "',
+      value: '" . round(empty($device->statistics['base_load']) ? 0 : $device->statistics['base_load']) . "',
       label: '" . (empty($device->statistics['base_load']) ? t('Undetermined') : '') . "',
       min: 33,
       max: 236,
@@ -1176,7 +1180,7 @@ function logger_add_average_gauge($device, $count) {
     var g = new JustGage({
       id: 'gauge_avg_consumpt$device->device',
       title: '" . ($count > 1 ? "$device->serial - " : '') . t('Mean Load (W)') . "',
-      value: '" . round($device->statistics['avg_consumpt']) . "',
+      value: '" . round(empty($device->statistics['avg_consumpt']) ? 0 : $device->statistics['avg_consumpt']) . "',
       label: '" . (empty($device->statistics['avg_consumpt']) ? t('Undetermined') : '') . "',
       min: 215,
       max: 897,
