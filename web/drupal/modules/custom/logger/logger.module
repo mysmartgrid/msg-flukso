@@ -5102,7 +5102,7 @@ function logger_authenticate_hmac_sha1($auth, $message) {
 
   $hash = hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']);
 
-  if ($auth['signature'] == $hash && $auth['timestamp'] > REQUEST_TIME - 300) {
+  if ($auth['signature'] == $hash) {
     return TRUE;
   }
   else {
