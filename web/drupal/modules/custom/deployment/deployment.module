@@ -629,10 +629,8 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
       $query->condition('d.uid', 0, '>')
         ->isNull('m.corrupted')
         ->isNull('m.unsynchronized')
-        ->condition(
-          db_or()
-            ->condition('d.access', $communication_timeout, '>=')
-            ->condition('m.access', $communication_timeout, '>='));
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', $communication_timeout, '>=');
       break;
 
     case MISSING_SENSORS_STATE_ID:
