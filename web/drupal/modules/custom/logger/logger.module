@@ -1915,6 +1915,7 @@ function logger_get_energy_chart_data(&$chart) {
     $total = 0;
     $series = array();
     $data_labels = array();
+    $since = logger_get_earliest_start_time($series_sensors);
 
     $from = $chart->xaxis[0];
     $to = $chart->xaxis[1] - $sub_time_window;
@@ -1931,23 +1932,28 @@ function logger_get_energy_chart_data(&$chart) {
       }
 
       $period = array('start' => $start, 'end' => $end);
-      $resolution = logger_rrd_get_lowest_resolution($period);
-      $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $resolution, $chart->prices);
-
       $title = logger_format_series_period($chart->interval, $period);
 
-      if (!$min || ($value < $min && $time < $to)) {
-        $min = $value;
-        $min_time = $title;
-      }
+      if ($end > $since) {
 
-      if (!$max || $value > $max) {
-        $max = $value;
-        $max_time = $title;
-      }
+        $resolution = logger_rrd_get_lowest_resolution($period);
+        $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $resolution, $chart->prices);
+        $sum += $value;
+        $total++;
 
-      $sum += $value;
-      $total++;
+        if (!$min || ($value < $min && $time < $to)) {
+          $min = $value;
+          $min_time = $title;
+        }
+
+        if (!$max || $value > $max) {
+          $max = $value;
+          $max_time = $title;
+        }
+      }
+      else {
+        $value = 0;
+      }
 
       $series[$title] = $value;
       $data_labels[$title] = $value;
@@ -2553,7 +2559,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'))
     ->isNotNull('m.function');
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
@@ -2673,6 +2679,17 @@ function logger_get_subscribed_sensors($types, $context) {
   }
 
   return $selected_sensors;
+}
+
+function logger_get_earliest_start_time($series_sensors) {
+
+  $start = NULL;
+  foreach ($series_sensors as $sensor) {
+    if (empty($start) || $sensor->created < $start) {
+      $start = $sensor->created;
+    }
+  }
+  return empty($start) ? 0 : $start;
 }
 
 function logger_compare_sensors($sensor1, $sensor2) {
