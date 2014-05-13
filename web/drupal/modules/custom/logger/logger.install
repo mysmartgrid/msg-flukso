@@ -2475,3 +2475,24 @@ function logger_update_7123() {
 
   return st("The tables logger_energy_meter and logger_energy_meter_class have been created.");
 }
+
+/**
+ * Update PVCast plants.
+ */
+function logger_update_7126() {
+
+  $sensors = logger_get_sensors(array(ENERGY_PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
+
+  foreach ($sensors as $sensor) {
+
+    $plant = pvcast_get_plant($sensor->meter);
+
+    if ($plant == NULL) {
+      pvcast_create_plant($sensor->meter, $sensor->latitude, $sensor->longitude);
+    }
+    else {
+      pvcast_update_plant($sensor->meter, $sensor->latitude, $sensor->longitude);
+    }
+  }
+  return st("PVCast plants have been updated.");
+}

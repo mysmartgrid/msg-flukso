@@ -63,6 +63,19 @@ function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
 }
 
 /**
+ * Gets a PV plant.
+ *
+ * @param $alias      The PV plant alias.
+ * @return the PV plant as an array of properties (id, uuid, alias, latitude, longitude, notes).
+ */
+function pvcast_get_plant($alias) {
+
+  $response = pvcast_request('GET', "/plants/alias/$alias");
+
+  return isset($response->data) ? json_decode($response->data, TRUE) : NULL;
+}
+
+/**
  * Creates a PV plant.
  * 
  * @param $alias      The plant alias.
