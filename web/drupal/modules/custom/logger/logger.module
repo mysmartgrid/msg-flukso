@@ -4957,6 +4957,17 @@ function logger_update_pvcast_models() {
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(ENERGY_PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
     $period = logger_get_period('day', $now - 4 * WEEK, $now, FALSE);
+    $max_plants = variable_get('logger_max_pvcast_plants', 10000);
+
+    if ($max_plants - count($sensors) < 20) {
+
+      jobqueue_send_email('msg-support@itwm.fhg.de', t('PVCast credits'), t(
+        'Dear PVCast administrator,' . '<br><br>' .
+        'mySmartGrid is running out of credits. Please, raise the limit as soon as possible.' . '<br><br>' .
+        'Best regards' . '<br>' .
+        'mySmartGrid System'
+      ));
+    }
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor($sensor, 'W', $period, HOUR);
