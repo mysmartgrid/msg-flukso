@@ -48,10 +48,12 @@ mysql_prepare() ->
 
     mysql:prepare(sensor_key, <<"SELECT sha FROM (logger_devices ld INNER JOIN logger_meters lm ON ld.device = lm.device) WHERE lm.meter = ?">>),
     mysql:prepare(sensor_props, <<"SELECT meter, device, unit_id, factor FROM logger_meters WHERE meter = ?">>),
+    mysql:prepare(sensor_all_props, <<"SELECT m.device, m.external_id, m.function, un.string_id AS unit, m.description FROM logger_meters m, unit un WHERE m.unit_id = un.id AND m.meter = ?">>),
     mysql:prepare(sensor_by_ext_id, <<"SELECT meter, device, unit_id, factor FROM logger_meters WHERE external_id = ?">>),
     mysql:prepare(sensor_factor, <<"SELECT factor FROM logger_meters WHERE meter = ?">>),
     mysql:prepare(sensor_device_type, <<"SELECT d.type_id FROM logger_devices d, logger_meters m WHERE d.device = m.device and m.meter = ?">>),
     mysql:prepare(device_sensors, <<"SELECT m.meter, m.external_id, m.function, m.description, un.string_id AS unit FROM logger_meters m, unit un WHERE m.device = ? AND m.unit_id = un.id">>),
+    mysql:prepare(device_active_sensors, <<"SELECT m.meter FROM logger_meters m WHERE m.device = ? AND m.function IS NOT NULL">>),
 
     mysql:prepare(sensor_update, <<"UPDATE logger_meters SET access = ?, value = ? WHERE meter = ?">>),
     mysql:prepare(sensor_move, <<"UPDATE logger_meters SET device = ?, meter = ? WHERE meter = ?">>),
@@ -62,7 +64,12 @@ mysql_prepare() ->
     mysql:prepare(sensor_agg_update, <<"UPDATE logger_aggregated_meters SET meter = ? WHERE meter = ?">>),
     mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
     mysql:prepare(sensor_storage_update, <<"UPDATE logger_meter_storage SET meter = ? WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, constant, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+
+    mysql:prepare(energy_sensor_update, <<"UPDATE logger_energy_meter SET class_id = ?, voltage = ?, current = ?, constant = ? WHERE meter = ?">>),
+    mysql:prepare(energy_sensor_insert, <<"INSERT INTO logger_energy_meter(meter, class_id, voltage, current, constant) VALUES(?, ?, ?, ?, ?)">>),
+    mysql:prepare(energy_sensor_delete, <<"DELETE FROM logger_energy_meter WHERE meter = ?">>),
+    mysql:prepare(energy_sensor_props, <<"SELECT c.name AS class, e.voltage, e.current, e.constant FROM logger_energy_meter e, logger_energy_meter_class c WHERE e.class_id = c.id AND e.meter = ?">>),
 
     mysql:prepare(device_key, <<"SELECT sha FROM logger_devices WHERE device = ?">>),
     mysql:prepare(device_uid, <<"SELECT uid FROM logger_devices WHERE device = ?">>),
@@ -72,6 +79,11 @@ mysql_prepare() ->
     mysql:prepare(device_update, <<"UPDATE logger_devices SET access = ?, version = ?, resets = ?, uptime = ?, memtotal = ?, memfree = ?, memcached = ?, membuffers = ?, sha = ?, firmware_id = ?, description = ? WHERE device = ?">>),
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
+
+    mysql:prepare(device_network_insert, <<"INSERT INTO logger_device_network (device, pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_network_update, <<"UPDATE logger_device_network set pending = ? WHERE device = ?">>),
+    mysql:prepare(device_network_delete, <<"DELETE FROM logger_device_network WHERE device = ?">>),
+    mysql:prepare(device_network_props, <<"SELECT pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway FROM logger_device_network WHERE device = ?">>),
 
     mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, upgradable FROM logger_device_firmware WHERE version = ? AND device_type_id = ?">>),
     mysql:prepare(firmware_upgrade_delete, <<"DELETE FROM logger_firmware_upgrade_request WHERE device = ?">>),

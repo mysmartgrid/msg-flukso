@@ -605,7 +605,7 @@ function notification_create_event_fields($event_id, $default_limit_up, $default
       '#prefix' => ($idented ? '<td>' : '<td colspan="3">'),
       '#suffix' => '</td></tr>',
       '#related_event_id' => $event_id,
-      '#default_value' => $limit_up ? $limit_up : '',
+      '#default_value' => $limit_up ? number_format($limit_up, 2, '.', '') : '',
       '#unit_id' => $unit_id ? $unit_id : $default_unit_id,
       '#unit_options' => notification_get_units_options($event_id),
       '#element_validate' => array('notification_limit_up_validate'),
@@ -1687,8 +1687,8 @@ function notification_compose_summary_report_table($type, $lines, $total_cost, $
 
       "<td></td>" . 
       "<td>" . t('Total') . "</td>" . 
-      "<td>" . $total_energy[$type] . "</td>" . 
-      "<td>" . $total_cost[$type] . "</td>" .
+      "<td>" . money_format('%.2n', $total_energy[$type]) . "</td>" . #Not monetary value, but needs 2 decimal digits
+      "<td>" . money_format('%.2n', $total_cost[$type]) . "</td>" .
 
     "</tr></tfoot></table><br><br>";
 }

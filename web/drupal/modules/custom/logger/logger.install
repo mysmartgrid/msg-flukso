@@ -155,6 +155,88 @@ function logger_schema() {
     'primary key' => array('device'),
   );
 
+  $schema['logger_device_network'] = array(
+    'description' => 'Stores the device network configuration.',
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'pending' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'lan_enabled' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'lan_protocol' => array(
+        'type' => 'varchar',
+        'length' => '6',
+        'not null' => TRUE,
+      ),
+      'lan_ip' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'lan_netmask' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'lan_gateway' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'wifi_enabled' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'wifi_essid' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => TRUE
+      ),
+      'wifi_enc' => array(
+        'type' => 'varchar',
+        'length' => 5,
+        'not null' => TRUE
+      ),
+      'wifi_psk' => array(
+        'type' => 'varchar',
+        'length' => 60,
+        'not null' => TRUE
+      ),
+      'wifi_protocol' => array(
+        'type' => 'varchar',
+        'length' => '6',
+        'not null' => TRUE,
+      ),
+      'wifi_ip' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+      'wifi_netmask' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE 
+      ),
+      'wifi_gateway' => array(
+        'type' => 'varchar',
+        'length' => 14,
+        'not null' => FALSE
+      ),
+    ),
+    'primary key' => array('device')
+  );
+
   $schema['logger_meter_type'] = array(
     'description' => 'Stores the meter types.',
     'fields' => array(
@@ -277,6 +359,55 @@ function logger_schema() {
         'size' => 'normal',
         'not null' => TRUE,
         'default' => 0,
+      ),
+    ),
+    'primary key' => array('meter')
+  );
+
+  $schema['logger_energy_meter_class'] = array(
+    'description' => 'Stores the energy meter classes.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
+  $schema['logger_energy_meter'] = array(
+    'description' => "Stores extra properties of energy sensors.",
+    'fields' => array(
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'class_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'voltage' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+      'current' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+      'constant' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
       ),
     ),
     'primary key' => array('meter')
@@ -412,7 +543,7 @@ function logger_schema() {
     'description' => 'Stores device firmware releases.',
     'fields' => array(
       'id' => array(
-        'type' => 'int',
+        'type' => 'serial',
         'not null' => TRUE,
         'unasigned' => TRUE,
       ),
@@ -584,6 +715,20 @@ function logger_install() {
     ->fields(array(
       'id' => 5,
       'name' => 'Humidity',
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Analog'
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Pulse',
     ))
     ->execute();
 
@@ -2206,11 +2351,148 @@ function logger_update_7098() {
 }
 
 /**
- * Drops field uid from table logger_meters.
+ * Inserts the Flukso firmware version 2.1.0-2.
  */
 function logger_update_7101() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 24,
+      'version' => '2.1.0-2',
+      'release_time' => '20140123_0000',
+      'build' => '2102210221022102210221022102210221022102',
+      'tag' => 'flukso-2.1.0-2',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.1.0-2'
+    ))
+    ->execute();
+
+  return st('Flukso firmware version 2.1.0-2 has been created.');
+}
+
+/**
+ * Drops field uid from table logger_meters.
+ */
+function logger_update_7102() {
 
   db_drop_field('logger_meters', 'uid');
 
   return st('Field logger_meters.uid has been dropped.');
+}
+
+/**
+ * Sets the 'auto increment' option of table logger_device_firmware primary key.
+ */
+function logger_update_7115() {
+
+  db_add_field('logger_device_firmware', 'old_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_query("UPDATE logger_device_firmware SET old_id = id");
+  db_query("UPDATE logger_device_firmware SET id = 12 where id = 0");
+
+  db_change_field('logger_device_firmware', 'id', 'id',
+    array(
+      'type' => 'serial',
+      'not null' => TRUE,
+      'unasigned' => TRUE
+  ));
+
+  db_query("UPDATE logger_device_firmware SET id = old_id");
+
+  db_drop_field('logger_device_firmware', 'old_id');
+
+  return st("The primary key of table logger_device_firmware is now 'auto increment'.");
+}
+
+/**
+ * Creates table logger_device_network.
+ */
+function logger_update_7118() {
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been created.");
+}
+
+/**
+ * Inserts the Flukso firmware version 2.3.0-1.
+ */
+function logger_update_7119() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 25,
+      'version' => '2.3.0-1',
+      'release_time' => '20140410_0954',
+      'build' => '2f701f3a612605d70c2f10cf83e402e0c909ab83',
+      'tag' => 'flukso-2.0.5-rc4-305-g2f701f3',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.3.0-1'
+    ))
+    ->execute();
+
+  return st('Flukso firmware version 2.3.0-1 has been created.');
+}
+
+/**
+ * Drops field constant from table logger_meters.
+ */
+function logger_update_7120() {
+
+  db_drop_field('logger_meters', 'constant');
+
+  return st('Field constant has been dropped from table logger_meters.');
+}
+
+/**
+ * Creates tables logger_energy_meter and logger_energy_meter_class.
+ */
+function logger_update_7123() {
+
+  db_create_table('logger_energy_meter_class', drupal_get_schema_unprocessed('logger', 'logger_energy_meter_class'));
+  db_create_table('logger_energy_meter', drupal_get_schema_unprocessed('logger', 'logger_energy_meter'));
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Analog'
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Pulse',
+    ))
+    ->execute();
+
+  return st("The tables logger_energy_meter and logger_energy_meter_class have been created.");
+}
+
+/**
+ * Update PVCast plants.
+ */
+function logger_update_7126() {
+
+  $sensors = logger_get_sensors(array(ENERGY_PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
+
+  foreach ($sensors as $sensor) {
+
+    $plant = pvcast_get_plant($sensor->meter);
+
+    if ($plant == NULL) {
+      pvcast_create_plant($sensor->meter, $sensor->latitude, $sensor->longitude);
+    }
+    else {
+      pvcast_update_plant($sensor->meter, $sensor->latitude, $sensor->longitude);
+    }
+  }
+  return st("PVCast plants have been updated.");
 }

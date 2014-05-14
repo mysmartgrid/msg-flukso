@@ -66,6 +66,7 @@
 -define(HTTP_INVALID_EVENT,           477).
 -define(HTTP_NON_UPGRADABLE_FIRMWARE, 478).
 -define(HTTP_INVALID_EXTERNAL_ID,     479).
+-define(HTTP_INVALID_CHARS,           480).
 -define(HTTP_INTERNAL_SERVER_ERROR,   500).
 -define(HTTP_NOT_IMPLEMENTED,         501).
 
@@ -205,6 +206,11 @@ check_hex(String, Length) ->
         _ -> {false, false}
     end.
 
+check_printable_chars(String) ->
+    {String, case re:run(String, "^[\\x20-\\x7e\\xc2a1-\\xc3bf€]*$") of
+        {match, _} -> true;
+        _ -> false
+    end}.
 
 check_time(undefined, undefined, _End, _Resolution) ->
     {false, false, false, false};

@@ -52,6 +52,7 @@ define('LOGGER_TABLE_ID', 'logger-table');
 define('LOGGER_TIMESTAMP_FORMAT_SQL', '%d-%m-%Y %H:%i:%s');
 define('LOGGER_DEVICE_CERT_PATH', LOGGER_PATH . '/keys');
 
+define('UNKNOWN_DEVICE_TYPE_ID',       0);
 define('FLUKSO1_DEVICE_TYPE_ID',       1);
 define('FLUKSO2_DEVICE_TYPE_ID',       2);
 define('VZLOGGER_DEVICE_TYPE_ID',      3);
@@ -136,6 +137,10 @@ function logger_permission() {
     'list firmware releases' => array(
       'title' => t('list firmware releases'),
       'description' => t('list firmware releases'),
+    ),
+    'manage firmware releases' => array(
+      'title' => t('manage firmware releases'),
+      'description' => t('manage firmware releases'),
     ),
     'manage firmware upgrades' => array(
       'title' => t('manage firmware upgrades'),
@@ -347,11 +352,30 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['popup/balance'] = array(
-    'description' => 'A page containing only the balance chart',
-    'page callback' => 'logger_balance_page',
+  $items['popup/temperature'] = array(
+    'description' => 'A page containing only the temperature chart',
+    'page callback' => 'logger_temperature_page',
     'page arguments' => array(2, TRUE),
-    'access callback' => TRUE,
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . TEMPERATURE_SENSOR_TYPE, FALSE),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/pressure'] = array(
+    'description' => 'A page containing only the pressure chart',
+    'page callback' => 'logger_pressure_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . PRESSURE_SENSOR_TYPE, FALSE),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['popup/humidity'] = array(
+    'description' => 'A page containing only the humidity chart',
+    'page callback' => 'logger_humidity_page',
+    'page arguments' => array(2, TRUE),
+    'access callback' => 'logger_sensor_type_access',
+    'access arguments' => array('view logger charts', '' . HUMIDITY_SENSOR_TYPE, FALSE),
     'type' => MENU_CALLBACK,
   );
 
@@ -561,10 +585,27 @@ function logger_menu() {
 
   $items['firmware/list'] = array(
     'title' => 'Firmware Releases',
-    'page callback' => 'logger_firmwarereleases_page',
+    'page callback' => 'logger_firmwarelist_page',
     'access arguments' => array('list firmware releases'),
     'type' => MENU_LOCAL_TASK,
     'file' => 'logger.admin.inc'
+  );
+
+  $items['firmware/edit'] = array(
+    'title' => 'Edit Firmware Release',
+    'page callback' => 'logger_firmware_edition_page',
+    'page arguments' => array(2),
+    'access arguments' => array('manage firmware releases'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc'
+  );
+
+  $items['firmware/remove'] = array(
+    'title' => 'Firmware Removal',
+    'page callback' => 'logger_firmware_remove',
+    'access arguments' => array('manage firmware upgrades'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'logger.admin.inc',
   );
 
   $items['firmware/upgrade'] = array(
@@ -690,11 +731,15 @@ function logger_mobile_page() {
     $temperature_access = logger_sensor_type_access('view logger charts', TEMPERATURE_SENSOR_TYPE);
     $pressure_access = logger_sensor_type_access('view logger charts', PRESSURE_SENSOR_TYPE);
     $humidity_access = logger_sensor_type_access('view logger charts', HUMIDITY_SENSOR_TYPE);
+    $production_access = logger_sensor_type_access('view logger charts', ENERGY_PRODUCTION_SENSOR_TYPE);
 
     $output =
       logger_create_mobile_page_icon('energy.png',      t('Energy'),            '/energy') .
       logger_create_mobile_page_icon('power.png',       t('Power'),             '/power') .
       logger_create_mobile_page_icon('comparison.png',  t('Comparison'),        '/energy/relative') .
+      logger_create_mobile_page_icon('statistics.png',  t('Statistics'),        '/statistics') .
+      ($production_access ?
+      logger_create_mobile_page_icon('onsite.png',      t('On-site Consumption'), '/onsite') : '') .
       ($temperature_access ?
       logger_create_mobile_page_icon('temperature.png', t('Temperature'),       '/temperature') : '') .
       ($pressure_access ?
@@ -1024,21 +1069,22 @@ function logger_deviceassign_form_submit($form, &$form_state) {
 function logger_statistics_page() {
 
   global $user;
+  module_load_include('inc', 'logger', 'logger.rrd');
 
   $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
   drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/raphael.2.1.0.min.js', $options);
   drupal_add_js(LOGGER_REL_PATH . '/js/justGage.1.0.1/resources/js/justgage.1.0.1.min.js', $options);
-  $output = '';
 
-  $introduction = t('Below you find some key measurements of your electricity consumption. <span title="Estimated as the first percentile."><b>Base load</b></span> is the lowest representative consumption and <span title="Simple arithmetic mean."><b>mean load</b></span> is the average consumption, both for the last seven days.');
-
-  $output .= $introduction;
-
-  $devices = db_select('logger_devices', 'd')
+  $query = db_select('logger_devices', 'd')
     ->fields('d', array('device', 'serial'))
     ->condition('d.uid', $user->uid)
-    ->condition('d.type_id', array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID), 'IN')
-    ->execute();
+    ->condition('d.type_id', array(FLUKSO1_DEVICE_TYPE_ID, FLUKSO2_DEVICE_TYPE_ID, CLONED_DEVICE_TYPE_ID), 'IN');
+   $query->join('logger_meters', 'm', 'm.device = d.device');
+   $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE);
+   $query->distinct();
+
+  $devices = $query->execute();
+  $output = "";
 
   foreach ($devices as $device) {
 
@@ -1046,6 +1092,7 @@ function logger_statistics_page() {
 
     logger_add_base_load_gauge($device, $devices->rowCount());
     $output .= "<div id='gauge_base_load$device->device' style='height: 10em;'></div>";
+
     logger_add_average_gauge($device, $devices->rowCount());
     $output .= "<div id='gauge_avg_consumpt$device->device' style='height: 10em;'></div>";
   }
@@ -1053,6 +1100,61 @@ function logger_statistics_page() {
   if (empty($output)) {
     $output = t('Base load undetermined.');
   }
+
+  $output = t('Below you find some key measurements of your electricity consumption. ' .
+    '<span title="Estimated as the first percentile."><b>Base load</b></span> ' .
+    'is the lowest representative consumption and <span title="Simple arithmetic mean.">' .
+    '<b>mean load</b></span> is the average consumption, both for the last seven days.') . $output;
+
+  $options['defer'] = FALSE;
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/statistics/jquery.flot.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/statistics/jquery.flot.stack.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/statistics/jquery.flot.axislabels.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/statistics/jquery.flot.symbol.js', $options);
+
+  $options['weight']++;
+  drupal_add_js(LOGGER_REL_PATH . '/js/statistics/statistics.js', $options);
+
+  $xticklabels = '[ "' .
+    t("1-person household") . '", "' .
+    t("2-people household") . '", "' .
+    t("3-people household") . '", "' .
+    t("4-people household") . '", "' .
+    t("5-people household") . '"]';
+
+  $xaxislabel = '"' . t("kWh/year") . '"';
+  $yaxislabel = '"' . t("Recomended Range") . '"';
+  $consMark = '"' . t("Your consumption") . '"';
+
+  $now = getdate();
+  $period = array('start' => $now[0] - YEAR, 'end' => $now[0]);
+  $sensors = logger_get_sensors(array(ENERGY_CONSUMPTION_SENSOR_TYPE), array($user->uid), FALSE, FALSE, TRUE);
+  $measurements = logger_rrd_query_energy($sensors, 'Wh', $period, WEEK);
+  $consumption = empty($measurements) ? 0 : (52/count($measurements))*array_sum($measurements)/1000 ; //estimate (if #measur.<52) of total energy cons. in kWh
+
+  $output .= t("The following chart shows how your yearly consumption compares to the !officially recommended !ranges.", array(
+    "!officially" => l(t("officially"), "http://www.die-stromsparinitiative.de/beratung/stromcheck/index.html"), 
+    "!ranges" => l(t("ranges"), "http://www.vz-nrw.de/mediabig/218084A.pdf"))) . "<div>" .
+
+    t("Color code") . ": <span style='color:black;font-weight:normal'><span style='background-color:#33DD00'> '" .
+    t("very good") . "</span>, <span style='background-color:#EEFF00'>" .
+    t("good") . "</span>, <span style='background-color:#FF9900'>" .
+    t("tolerable") . "</span>, <span style='background-color:#FF0000'> " .
+    t("high") . "</span></span></div><br><br>" .
+
+    "<div id='flot-placeholder2' style='width:610px;height:300px;margin:0 auto'></div>";
+
+  drupal_add_js('jQuery(document).ready( function() {createConsumptionIndicator(' .
+    "$consumption, $xticklabels, $xaxislabel, $yaxislabel, $consMark" . ');} );', 
+    array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT, 'weight' => 300));
 
   return $output;
 }
@@ -1063,7 +1165,7 @@ function logger_add_base_load_gauge($device, $count) {
     var g = new JustGage({
       id: 'gauge_base_load$device->device',
       title: '" . ($count > 1 ? "$device->serial - " : '') . t('Base Load (W)') . "',
-      value: '" . round($device->statistics['base_load']) . "',
+      value: '" . round(empty($device->statistics['base_load']) ? 0 : $device->statistics['base_load']) . "',
       label: '" . (empty($device->statistics['base_load']) ? t('Undetermined') : '') . "',
       min: 33,
       max: 236,
@@ -1077,7 +1179,7 @@ function logger_add_average_gauge($device, $count) {
     var g = new JustGage({
       id: 'gauge_avg_consumpt$device->device',
       title: '" . ($count > 1 ? "$device->serial - " : '') . t('Mean Load (W)') . "',
-      value: '" . round($device->statistics['avg_consumpt']) . "',
+      value: '" . round(empty($device->statistics['avg_consumpt']) ? 0 : $device->statistics['avg_consumpt']) . "',
       label: '" . (empty($device->statistics['avg_consumpt']) ? t('Undetermined') : '') . "',
       min: 215,
       max: 897,
@@ -1813,6 +1915,7 @@ function logger_get_energy_chart_data(&$chart) {
     $total = 0;
     $series = array();
     $data_labels = array();
+    $since = logger_get_earliest_start_time($series_sensors);
 
     $from = $chart->xaxis[0];
     $to = $chart->xaxis[1] - $sub_time_window;
@@ -1829,23 +1932,28 @@ function logger_get_energy_chart_data(&$chart) {
       }
 
       $period = array('start' => $start, 'end' => $end);
-      $resolution = logger_rrd_get_lowest_resolution($period);
-      $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $resolution, $chart->prices);
-
       $title = logger_format_series_period($chart->interval, $period);
 
-      if (!$min || ($value < $min && $time < $to)) {
-        $min = $value;
-        $min_time = $title;
-      }
+      if ($end > $since) {
 
-      if (!$max || $value > $max) {
-        $max = $value;
-        $max_time = $title;
-      }
+        $resolution = logger_rrd_get_lowest_resolution($period);
+        $value = logger_rrd_query_total_energy($series_sensors, $chart->unit, $period, $resolution, $chart->prices);
+        $sum += $value;
+        $total++;
 
-      $sum += $value;
-      $total++;
+        if (!$min || ($value < $min && $time < $to)) {
+          $min = $value;
+          $min_time = $title;
+        }
+
+        if (!$max || $value > $max) {
+          $max = $value;
+          $max_time = $title;
+        }
+      }
+      else {
+        $value = 0;
+      }
 
       $series[$title] = $value;
       $data_labels[$title] = $value;
@@ -2451,7 +2559,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude'))
+    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'))
     ->isNotNull('m.function');
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
@@ -2571,6 +2679,17 @@ function logger_get_subscribed_sensors($types, $context) {
   }
 
   return $selected_sensors;
+}
+
+function logger_get_earliest_start_time($series_sensors) {
+
+  $start = NULL;
+  foreach ($series_sensors as $sensor) {
+    if (empty($start) || $sensor->created < $start) {
+      $start = $sensor->created;
+    }
+  }
+  return empty($start) ? 0 : $start;
 }
 
 function logger_compare_sensors($sensor1, $sensor2) {
@@ -4838,6 +4957,17 @@ function logger_update_pvcast_models() {
   if ($now - $last >= DAY) {
     $sensors = logger_get_sensors(array(ENERGY_PRODUCTION_SENSOR_TYPE), NULL, FALSE, TRUE);
     $period = logger_get_period('day', $now - 4 * WEEK, $now, FALSE);
+    $max_plants = variable_get('logger_max_pvcast_plants', 10000);
+
+    if ($max_plants - count($sensors) < 20) {
+
+      jobqueue_send_email('msg-support@itwm.fhg.de', t('PVCast credits'), t(
+        'Dear PVCast administrator,' . '<br><br>' .
+        'mySmartGrid is running out of credits. Please, raise the limit as soon as possible.' . '<br><br>' .
+        'Best regards' . '<br>' .
+        'mySmartGrid System'
+      ));
+    }
 
     foreach ($sensors as $sensor) {
       $measurements = logger_rrd_query_sensor($sensor, 'W', $period, HOUR);
@@ -4999,7 +5129,7 @@ function logger_authenticate_hmac_sha1($auth, $message) {
 
   $hash = hash_hmac('sha1', $auth['timestamp'] . ':' . logger_serialise($message) . ':' . $auth['key'], $auth['key']);
 
-  if ($auth['signature'] == $hash && $auth['timestamp'] > REQUEST_TIME - 300) {
+  if ($auth['signature'] == $hash) {
     return TRUE;
   }
   else {

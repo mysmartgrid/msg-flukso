@@ -343,7 +343,7 @@ function msgcommons_install() {
       'symbol' => '_hsbs',
       'factor' => 1,
       'string_id' => '_hsbs',
-      'type_id' => 9
+      'type_id' => 7 
     ))
     ->execute();
 
@@ -1015,7 +1015,7 @@ function msgcommons_update_7030() {
       'symbol' => '_hsbs',
       'factor' => 1,
       'string_id' => '_hsbs',
-      'type_id' => 9
+      'type_id' => 7 
     ))
     ->execute();
 

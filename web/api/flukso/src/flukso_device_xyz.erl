@@ -238,10 +238,19 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         end
     end,
 
-    case mysql:get_result_rows(Result) of
+    {Response, ErrorCode} = case mysql:get_result_rows(Result) of
 
       %Device exists
       [[Key, Resets, CurrentFirmwareId, CurrentDescription]] ->
+
+        %Retrieve Network configuration if it exists
+        {data, NResult} = mysql:execute(pool, device_network_props, [Device]),
+        OldNetwork = case mysql:get_result_rows(NResult) of
+          [[1, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiEssid, _WifiEnc, _WifiPsk, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway]] ->
+            {1, _LanEnabled, _LanProtocol, _LanIp, _LanNetmask, _LanGateway, _WifiEnabled, _WifiEssid, _WifiEnc, _WifiPsk, _WifiProtocol, _WifiIp, _WifiNetmask, _WifiGateway};
+          _ ->
+             undefined
+        end,
 
         %Decide which key to use
         {NewKey, NewResets} = case  proplists:is_defined(<<"key">>, JsonData) of
@@ -280,12 +289,26 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
             end
         end,
 
-        Description = get_optional_value(<<"description">>, JsonData, CurrentDescription),
+        DescriptionCheck = case CurrentDescription of
+          undefined -> {undefined, true};
+          _ -> check_printable_chars(get_optional_value(<<"description">>, JsonData, CurrentDescription))
+        end,
 
-        mysql:execute(pool, device_update,
-          [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
+        case DescriptionCheck of
+          {Description, true} ->
+            mysql:execute(pool, device_update, [Timestamp, Version, NewResets, Uptime, Memtotal, Memfree, Memcached, Membuffers, NewKey, FirmwareId, Description, Device]),
 
-        mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]);
+            Network = process_network(OldNetwork, Device, JsonData),
+            case Network of
+              ?HTTP_BAD_ARGUMENT -> {"Invalid Network Configuration", ?HTTP_BAD_ARGUMENT};
+              _ ->
+                mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]),
+                {"ok", ?HTTP_OK}
+            end;
+          _ ->
+            Network = undefined,
+            {"Invalid Characters", ?HTTP_INVALID_CHARS}
+        end;
 
       %New Device Message - 1st invocation
       _ ->
@@ -295,14 +318,95 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         Key = proplists:get_value(<<"key">>, JsonData),
         Description = get_optional_value(<<"description">>, JsonData, "Flukso Device"),
 
-        mysql:execute(pool, device_insert,
-          [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId])
+        case check_printable_chars(Description)  of
+          {Description, true} ->
+             mysql:execute(pool, device_insert, [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId]),
+             Network = process_network(undefined, Device, JsonData),
+             case Network of
+               ?HTTP_BAD_ARGUMENT -> {"Invalid Network Configuration", ?HTTP_BAD_ARGUMENT};
+               _ -> {"ok", ?HTTP_OK}
+             end;
+          _ ->
+            Network = undefined,
+            {"Invalid Characters", ?HTTP_INVALID_CHARS}
+        end
     end,
 
-    Support = compose_support_tag(Device),
-    Answer = lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support),
+    case ErrorCode of
+      ?HTTP_OK ->
+        Support = compose_support_tag(Device),
+        Config = compose_config_tag(Network, Device),
 
-    digest_response(Key, Answer, ReqData, State).
+        Answer = lists:append(lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support), Config),
+        digest_response(Key, Answer, ReqData, State);
+      _ ->
+        JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(Response)}]}),
+        {{halt, ErrorCode}, wrq:set_resp_body(JsonResponse, ReqData), State}
+    end. 
+
+
+process_network(OldNetwork, Device, JsonData) ->
+
+  case proplists:is_defined(<<"network">>, JsonData) of
+    true ->
+      {struct, Network} = proplists:get_value(<<"network">>, JsonData),
+
+      %Current network configuration
+      {OldPending, OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} =
+        case OldNetwork of
+          undefined -> {0, 0, undefined, undefined, undefined, undefined, 0, undefined, undefined, undefined, undefined, undefined, undefined, undefined};
+          _ -> OldNetwork
+        end,
+
+      %If LAN properties are defined
+      {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway} = case proplists:is_defined(<<"lan">>, Network) of
+        true ->
+          {struct, Lan} = proplists:get_value(<<"lan">>, Network),
+          {proplists:get_value(<<"enabled">>, Lan),
+          proplists:get_value(<<"protocol">>, Lan),
+          proplists:get_value(<<"ip">>, Lan),
+          proplists:get_value(<<"netmask">>, Lan),
+          proplists:get_value(<<"gateway">>, Lan)};
+        _ -> {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway}
+      end,
+
+      %If WIFI properties are defined
+      {WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} = case proplists:is_defined(<<"wifi">>, Network) of
+        true ->
+          {struct, Wifi} = proplists:get_value(<<"wifi">>, Network),
+          {proplists:get_value(<<"enabled">>, Wifi),
+          proplists:get_value(<<"essid">>, Wifi),
+          proplists:get_value(<<"enc">>, Wifi),
+          proplists:get_value(<<"psk">>, Wifi),
+          proplists:get_value(<<"protocol">>, Wifi),
+          proplists:get_value(<<"ip">>, Wifi),
+          proplists:get_value(<<"netmask">>, Wifi),
+          proplists:get_value(<<"gateway">>, Wifi)};
+        _ -> {OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway}
+      end,
+
+
+      %FIXME: validate parameters. if invalid, return ?HTTP_BAD_ARGUMENT
+
+      Pending = case OldNetwork of
+
+        %If network record does not exist
+        undefined ->
+          mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
+          0;
+
+        %Network record does exist
+        _ ->
+          Different = case {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} of
+            {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} -> 0; %Equal
+            _ -> 1 %Still different
+          end,
+          mysql:execute(pool, device_network_update, [Different]),
+          Different
+      end,
+      {Pending, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
+    _ -> OldNetwork
+  end.
 
 
 compose_support_tag(Device) ->
@@ -343,6 +447,45 @@ compose_support_tag(Device) ->
     end.
 
 
+compose_config_tag(Network, Device) ->
+
+  case Network of
+    %If pending
+    {1, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} ->
+
+      LanConfig = {struct, [
+          {<<"enabled">>, LanEnabled},
+          {<<"protocol">>, LanProtocol},
+          {<<"ip">>, LanIp},
+          {<<"netmask">>, LanNetmask},
+          {<<"gateway">>, LanGateway}
+        ]},
+
+      WifiConfig = {struct, [
+          {<<"enabled">>, WifiEnabled},
+          {<<"essid">>, WifiEssid},
+          {<<"enc">>, WifiEnc},
+          {<<"psk">>, WifiPsk},
+          {<<"protocol">>, WifiProtocol},
+          {<<"ip">>, WifiIp},
+          {<<"netmask">>, WifiNetmask},
+          {<<"gateway">>, WifiGateway}
+        ]},
+
+     NetworkTag = {<<"network">>, {struct, [
+       {<<"lan">>, LanConfig},
+       {<<"wifi">>, WifiConfig}
+     ]}},
+
+     {data, Result} = mysql:execute(pool, device_active_sensors, [Device]),
+     SensorsTag = {<<"sensors">>, [Meter || [Meter] <- mysql:get_result_rows(Result)]},
+
+     [{<<"config">>, {struct, [NetworkTag, SensorsTag]}}];
+
+    _ -> []
+  end.
+
+
 delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State) ->
 
     {data, _Result} = mysql:execute(pool, device_sensors, [Device]),
@@ -353,6 +496,7 @@ delete_resource(ReqData, #state{device = Device, digest = ClientDigest} = State)
     mysql:execute(pool, event_delete, [Device]),
     mysql:execute(pool, notification_delete, [Device]),
     mysql:execute(pool, support_slot_release, [Device]),
+    mysql:execute(pool, device_network_delete, [Device]),
     mysql:execute(pool, device_delete, [Device]),
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary([])}]}),
@@ -364,6 +508,7 @@ delete_device_sensor(Sensor) ->
   mysql:execute(pool, msgdump_delete, [Sensor]),
   mysql:execute(pool, sensor_agg_delete, [Sensor]),
   mysql:execute(pool, token_delete, [Sensor]),
+  mysql:execute(pool, energy_sensor_delete, [Sensor]),
   mysql:execute(pool, sensor_delete, [Sensor]),
 
   file:delete(string:concat(?BASE_PATH, string:concat(binary_to_list(Sensor), ".rrd"))).
