@@ -300,7 +300,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
 
             Network = process_network(OldNetwork, Device, JsonData),
             case Network of
-              ?HTTP_BAD_ARGUMENT -> {"Invalid Network Configuration", ?HTTP_BAD_ARGUMENT};
+              ?HTTP_INVALID_NETWORK -> {"Invalid Network Configuration", ?HTTP_INVALID_NETWORK};
               _ ->
                 mysql:execute(pool, event_insert, [Device, ?HEARTBEAT_RECEIVED_EVENT_ID, Timestamp]),
                 {"ok", ?HTTP_OK}
@@ -323,7 +323,7 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
              mysql:execute(pool, device_insert, [Device, Serial, 0, Key, Timestamp, InformedFirmwareId, Reset, Uptime, Memtotal, Memfree, Memcached, Membuffers, "DE", Description, TypeId]),
              Network = process_network(undefined, Device, JsonData),
              case Network of
-               ?HTTP_BAD_ARGUMENT -> {"Invalid Network Configuration", ?HTTP_BAD_ARGUMENT};
+               ?HTTP_INVALID_NETWORK -> {"Invalid Network Configuration", ?HTTP_INVALID_NETWORK};
                _ -> {"ok", ?HTTP_OK}
              end;
           _ ->
@@ -332,13 +332,18 @@ process_post(ReqData, #state{device = Device, typeId = TypeId} = State) ->
         end
     end,
 
+    Config = compose_config_tag(Network, Device),
+
     case ErrorCode of
       ?HTTP_OK ->
         Support = compose_support_tag(Device),
-        Config = compose_config_tag(Network, Device),
-
         Answer = lists:append(lists:append([{<<"upgrade">>, Upgrade}, {<<"timestamp">>, Timestamp}], Support), Config),
         digest_response(Key, Answer, ReqData, State);
+
+      ?HTTP_INVALID_NETWORK ->
+        Answer = lists:append({<<"response">>, list_to_binary(Response)}, Config),
+        digest_response(Key, Answer, ReqData, State);
+ 
       _ ->
         JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(Response)}]}),
         {{halt, ErrorCode}, wrq:set_resp_body(JsonResponse, ReqData), State}
