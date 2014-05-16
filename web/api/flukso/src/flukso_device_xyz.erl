@@ -385,26 +385,40 @@ process_network(OldNetwork, Device, JsonData) ->
         _ -> {OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway}
       end,
 
+      %Validates network configuration
+      case {
+          check_ip(WifiProtocol, WifiIp),
+          check_ip(WifiProtocol, WifiNetmask),
+          check_ip(WifiProtocol, WifiGateway),
+          check_printable_chars(WifiEssid),
+          check_wifi_psk(WifiEnc, WifiPsk),
+          check_ip(LanProtocol, LanIp),
+          check_ip(LanProtocol, LanNetmask),
+          check_ip(LanProtocol, LanGateway)
+        } of
 
-      %FIXME: validate parameters. if invalid, return ?HTTP_BAD_ARGUMENT
+        {{WifiProtocol, WifiIp, true}, {WifiProtocol, WifiNetmask, true}, {WifiProtocol, WifiGateway, true}, {WifiEssid, true}, {WifiEnc, WifiPsk, true},
+         {LanProtocol, LanIp, true}, {LanProtocol, LanNetmask, true}, {LanProtocol, LanGateway, true}} -> 
 
-      Pending = case OldNetwork of
+          Pending = case OldNetwork of
 
-        %If network record does not exist
-        undefined ->
-          mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
-          0;
+            %If network record does not exist
+            undefined ->
+              mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
+              0;
 
-        %Network record does exist
-        _ ->
-          Different = case {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} of
-            {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} -> 0; %Equal
-            _ -> 1 %Still different
+            %Network record does exist
+            _ ->
+              Different = case {LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway} of
+                {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} -> 0; %Equal
+                _ -> 1 %Still different
+              end,
+              mysql:execute(pool, device_network_update, [Different]),
+              Different
           end,
-          mysql:execute(pool, device_network_update, [Different]),
-          Different
-      end,
-      {Pending, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
+          {Pending, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
+        _ -> ?HTTP_INVALID_NETWORK
+      end;
     _ -> OldNetwork
   end.
 
