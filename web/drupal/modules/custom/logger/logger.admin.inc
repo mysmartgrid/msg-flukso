@@ -1169,7 +1169,8 @@ function logger_device_form_submit($form, &$form_state) {
 
   db_update('logger_devices')
     ->fields(array(
-      'description' => $form_state['values']['description']
+      'description' => $form_state['values']['description'],
+      'pending_config' => 1
     ))
     ->condition('device', $form_state['values']['device'])
     ->execute();
@@ -1184,7 +1185,6 @@ function logger_device_form_submit($form, &$form_state) {
     db_insert('logger_device_network')
       ->fields(array(
         'device' => $form_state['values']['device'],
-        'pending' => 1,
         'lan_enabled' => $form_state['values']['lan_enabled'],
         'lan_protocol' => $form_state['values']['lan_protocol'],
         'lan_ip' => $form_state['values']['lan_ip'],
@@ -1219,6 +1219,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   $function = $form_state['values']['function'];
   $type = $form_state['values']['type'];
   $price = isset($form_state['values']['price']) ? $form_state['values']['price'] : 0;
+  $device = $form_state['values']['device'];
 
   //If edition
   if (isset($form_state['values']['meter'])) {
@@ -1242,12 +1243,18 @@ function logger_sensor_form_submit($form, &$form_state) {
       ->fields($fields)
       ->condition('meter', $meter)
       ->execute();
+
+    db_update('logger_devices')
+      ->fields(array(
+        'pending_config' => 1
+      ))
+      ->condition('device', $device)
+      ->execute();
   }
   //If creation
   else {
     $meter = md5(uniqid(rand(), TRUE));
     $token = md5(uniqid(rand(), TRUE));
-    $device = $form_state['values']['device'];
     $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
     $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
     $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
@@ -1275,7 +1282,6 @@ function logger_sensor_form_submit($form, &$form_state) {
       pvcast_update_plant($meter, $latitude, $longitude);
     }
   }
-
   $form_state['redirect'] = "sensor/mylist";
 }
 
@@ -1476,7 +1482,7 @@ function logger_device_remove($device) {
 
   $sensors = db_select('logger_meters', 'm')
     ->fields('m')
-    ->condition('m.device', $device, '=')
+    ->condition('m.device', $device)
     ->execute();
 
   foreach ($sensors as $sensor) {

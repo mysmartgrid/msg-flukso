@@ -151,6 +151,12 @@ function logger_schema() {
         'not null' => TRUE,
         'unasigned' => TRUE,
       ),
+      'pending_config' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
     ),
     'primary key' => array('device'),
   );
@@ -162,11 +168,6 @@ function logger_schema() {
         'type' => 'varchar',
         'length' => '32',
         'not null' => TRUE,
-      ),
-      'pending' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'unasigned' => TRUE,
       ),
       'lan_enabled' => array(
         'type' => 'int',
@@ -2502,3 +2503,19 @@ function logger_update_7127() {
   return st("The table logger_device_network has been recreated.");
 }
 
+/**
+ * Create field pending_config on table logger_devices.
+ */
+function logger_update_7128() {
+
+  db_drop_field('logger_device_network', 'pending');
+
+  db_add_field('logger_devices', 'pending_config', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  return st("The field pending_config has been created on table logger_devices."); 
+}
