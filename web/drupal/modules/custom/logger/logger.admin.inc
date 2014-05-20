@@ -319,6 +319,21 @@ function logger_device_edition_page($id) {
     ->fields('d', array('device', 'serial', 'description'))
     ->condition('d.device', $id);
 
+  $query->leftJoin('logger_device_network', 'n', 'd.device = n.device');
+  $query->addField('n', 'lan_enabled');
+  $query->addField('n', 'lan_protocol');
+  $query->addField('n', 'lan_ip');
+  $query->addField('n', 'lan_netmask');
+  $query->addField('n', 'lan_gateway');
+  $query->addField('n', 'wifi_enabled');
+  $query->addField('n', 'wifi_essid');
+  $query->addField('n', 'wifi_enc');
+  $query->addField('n', 'wifi_psk');
+  $query->addField('n', 'wifi_protocol');
+  $query->addField('n', 'wifi_ip');
+  $query->addField('n', 'wifi_netmask');
+  $query->addField('n', 'wifi_gateway');
+
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');
 
@@ -440,6 +455,117 @@ function logger_device_form($form, &$form_state, $device) {
     '#size' => 60,
     '#required' => TRUE,
     '#default_value' => $device->description
+  );
+
+  $space = str_repeat('&nbsp;', 53);
+  $form['lan_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('LAN enabled'),
+    '#description' => t('Please inform whether the LAN network interface is enabled on the device.'),
+    '#default_value' => $device->lan_enabled,
+    '#return_value' => 1,
+    '#attributes' => array('onclick' => "javascript: showDeviceLANDiv();"), //In IE, onchange does not work
+  );
+
+  $form['lan_protocol'] = array(
+    '#type' => 'select',
+    '#title' => t('LAN Configuration'),
+    '#description' => t('Please inform how the LAN interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
+    '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'static',
+    '#options' => array('static' => t('Static'), 'dhcp' => 'Dynamic (DHCP)'),
+    '#prefix' => "<div id='lan-fields-div' " . (!isset($device->lan_enabled) || $device->lan_enabled == 0 ? "style='display: none'" : '') . ">"
+  );
+
+  $form['lan_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN IP address'),
+    '#default_value' => $device->lan_ip,
+    '#maxlength' => 14,
+    '#description' => t('Enter the IP address used by the LAN interface (for example: 192.168.1.1).'),
+  );
+
+  $form['lan_gateway'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN Gateway IP address'),
+    '#default_value' => $device->lan_gateway,
+    '#maxlength' => 14,
+    '#description' => t('Enter the IP address of the gateway used by the LAN interface (for example: 192.168.1.254).'),
+  );
+
+  $form['lan_netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN Network mask'),
+    '#default_value' => $device->lan_netmask,
+    '#maxlength' => 14,
+    '#description' => t('Enter the network mask used by the LAN interface (for example: 255.255.255.0).'),
+    '#suffix' => '</div>'
+  );
+
+  $form['wifi_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('WIFI enabled'),
+    '#description' => t('Please inform whether the WIFI network interface is enabled on the device.'),
+    '#default_value' => $device->wifi_enabled,
+    '#return_value' => 1,
+    '#attributes' => array('onclick' => "javascript: showDeviceWIFIDiv();"), //In IE, onchange does not work
+  );
+
+  $form['wifi_protocol'] = array(
+    '#type' => 'select',
+    '#title' => t('WIFI Configuration'),
+    '#description' => t('Please inform how the WIFI interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
+    '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'wifi',
+    '#options' => $form['lan_protocol']['#options'],
+    '#prefix' => "<div id='wifi-fields-div' " . (!isset($device->wifi_enabled) || $device->wifi_enabled == 0 ? "style='display: none'" : '') . ">"
+  );
+
+  $form['wifi_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI IP address'),
+    '#default_value' => $device->wifi_ip,
+    '#maxlength' => 14,
+    '#description' => t('Enter the IP address used by the WIFI interface (for example: 192.168.1.1).'),
+  );
+
+  $form['wifi_gateway'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI Gateway IP address'),
+    '#default_value' => $device->wifi_gateway,
+    '#maxlength' => 14,
+    '#description' => t('Enter the IP address of the gateway used by the WIFI interface (for example: 192.168.1.254).'),
+  );
+
+  $form['wifi_netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI Network mask'),
+    '#default_value' => $device->wifi_netmask,
+    '#maxlength' => 14,
+    '#description' => t('Enter the network mask used by the WIFI interface (for example: 255.255.255.0).'),
+  );
+
+  $form['wifi_essid'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI SSID'),
+    '#default_value' => $device->wifi_essid,
+    '#maxlength' => 60,
+    '#description' => t('Enter the WIFI network name (for example: WLAN-183729).'),
+  );
+
+  $form['wifi_enc'] = array(
+    '#type' => 'select',
+    '#title' => t('WIFI Encoding'),
+    '#description' => t('Please inform which protocol the WIFI network interface uses for encoding the communication.'),
+    '#default_value' => $device->wifi_enc,
+    '#options' => array('open' => t('No encryption'), 'wep' => 'WEP', 'wpa' => 'WPA', 'wpa2' => 'WPA2'),
+  );
+
+  $form['wifi_psk'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI key or passphrase'),
+    '#description' => t('Enter the WIFI encryption key or passphrase (for example: 1A648C9FE2).'),
+    '#default_value' => $device->wifi_psk,
+    '#maxlength' => 60,
+    '#suffix' => '</div>'
   );
 
   $form['submit'] = array(
@@ -1033,6 +1159,12 @@ function logger_get_device_firmware($id) {
     ->fetchObject();
 }
 
+function logger_device_form_validate($form, &$form_state) {
+
+  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask');
+  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask');
+}
+
 function logger_device_form_submit($form, &$form_state) {
 
   db_update('logger_devices')
@@ -1041,6 +1173,34 @@ function logger_device_form_submit($form, &$form_state) {
     ))
     ->condition('device', $form_state['values']['device'])
     ->execute();
+
+  db_delete('logger_device_network')
+    ->condition('device', $form_state['values']['device'])
+    ->execute();
+
+  if (isset($form_state['values']['lan_enabled']) && $form_state['values']['lan_enabled'] == 1 ||
+      isset($form_state['values']['wifi_enabled']) && $form_state['values']['wifi_enabled'] == 1) {
+
+    db_insert('logger_device_network')
+      ->fields(array(
+        'device' => $form_state['values']['device'],
+        'pending' => 1,
+        'lan_enabled' => $form_state['values']['lan_enabled'],
+        'lan_protocol' => $form_state['values']['lan_protocol'],
+        'lan_ip' => $form_state['values']['lan_ip'],
+        'lan_netmask' => $form_state['values']['lan_netmask'],
+        'lan_gateway' => $form_state['values']['lan_gateway'],
+        'wifi_enabled' => $form_state['values']['wifi_enabled'],
+        'wifi_essid' => $form_state['values']['wifi_essid'],
+        'wifi_enc' => $form_state['values']['wifi_enc'],
+        'wifi_psk' => $form_state['values']['wifi_psk'],
+        'wifi_protocol' => $form_state['values']['wifi_protocol'],
+        'wifi_ip' => $form_state['values']['wifi_ip'],
+        'wifi_netmask' => $form_state['values']['wifi_netmask'],
+        'wifi_gateway' => $form_state['values']['wifi_gateway']
+      ))
+      ->execute();
+  }
 
   $form_state['redirect'] = 'device/mylist';
 }
@@ -1177,9 +1337,6 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
   //If edition
   if (isset($form_state['values']['id'])) {
 
-    //FIXME
-    system("echo 1 >> /oo.txt");
-
     db_update('logger_device_firmware')
       ->fields(array(
         'device_type_id' => $form_state['values']['device_type_id'],
@@ -1196,9 +1353,6 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
   //If creation
   else {
 
-    //FIXME
-    system("echo 2 >> /oo.txt");
-
     db_insert('logger_device_firmware')
       ->fields(array(
         'device_type_id' => $form_state['values']['device_type_id'],
@@ -1211,9 +1365,6 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
       ))
       ->execute();
   }
-
-  //FIXME
-  system("echo 3 >> /oo.txt");
 
   $form_state['redirect'] = "firmware/list";
 }

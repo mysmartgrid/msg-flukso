@@ -477,30 +477,8 @@ function emos_cancelation_form($form, &$form_state, $image_id, $cancelation_capt
 
 function emos_image_form_validate($form, &$form_state) {
 
-  $device_ip = $form_state['values']['device_ip'];
-  $gateway_ip = $form_state['values']['gateway_ip'];
-  $netmask = $form_state['values']['netmask'];
-
-  if (!validate_subnet_mask($netmask)) {
-
-    form_set_error('netmask', t('Please enter a valid Network mask.'));
-  }
-  elseif (!validate_host_ip($device_ip, $netmask)) {
-
-    form_set_error('device_ip', t('Please enter a valid IP address.'));
-  }
-  elseif (!validate_host_ip($gateway_ip, $netmask) || $device_ip == $gateway_ip) {
-
-    form_set_error('gateway_ip', t('Please enter a valid Gateway IP address.'));
-  }
-  else {
-    $device_network = get_network_ip($device_ip, $netmask);
-    $gateway_network = get_network_ip($gateway_ip, $netmask);
-
-    if ($device_network && $gateway_network && $device_network != $gateway_network) {
-      form_set_error('gateway_ip', t('The Gateway IP and the device IP must be on the same network.'));
-    }
-  }
+  $form_state['values']['enabled'] = TRUE;
+  validate_network_fields($form_state['values'], 'enabled', 'device_ip', 'gateway_ip', 'netmask');
 }
 
 function emos_image_form_submit($form, &$form_state) {

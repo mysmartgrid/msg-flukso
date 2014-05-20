@@ -201,37 +201,30 @@ function logger_schema() {
       'wifi_essid' => array(
         'type' => 'varchar',
         'length' => 60,
-        'not null' => TRUE
       ),
       'wifi_enc' => array(
         'type' => 'varchar',
         'length' => 5,
-        'not null' => TRUE
       ),
       'wifi_psk' => array(
         'type' => 'varchar',
         'length' => 60,
-        'not null' => TRUE
       ),
       'wifi_protocol' => array(
         'type' => 'varchar',
         'length' => '6',
-        'not null' => TRUE,
       ),
       'wifi_ip' => array(
         'type' => 'varchar',
         'length' => 14,
-        'not null' => FALSE
       ),
       'wifi_netmask' => array(
         'type' => 'varchar',
         'length' => 14,
-        'not null' => FALSE 
       ),
       'wifi_gateway' => array(
         'type' => 'varchar',
         'length' => 14,
-        'not null' => FALSE
       ),
     ),
     'primary key' => array('device')
@@ -2496,3 +2489,16 @@ function logger_update_7126() {
   }
   return st("PVCast plants have been updated.");
 }
+
+/**
+ * Recreates table logger_device_network.
+ */
+function logger_update_7127() {
+
+  db_drop_table('logger_device_network');
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been recreated.");
+}
+

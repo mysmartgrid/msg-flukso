@@ -740,6 +740,46 @@ function get_network_ip($ip, $netmask) {
 }
 
 /**
+ * Validates network form fields.
+ * 
+ * @param $values        The form fields' values array (field_name => field_value).
+ * @param $enabled_field The name of the field that informs whether the interface is enabled.
+ * @param $ip_field      The IP field name.
+ * @param $gateway_field The Gateway IP field name.
+ * @param $netmask_field The Netmask field name. 
+ */
+function validate_network_fields($values, $enabled_field, $ip_field, $gateway_field, $netmask_field) {
+
+  if (isset($values[$enabled_field]) && $values[$enabled_field] == 1) {
+
+    $ip = $values[$ip_field];
+    $gateway = $values[$gateway_field];
+    $netmask = $values[$netmask_field];
+
+    if (!validate_subnet_mask($netmask)) {
+
+      form_set_error($netmask_field, t('Please enter a valid Network mask.'));
+    }
+    elseif (!validate_host_ip($ip, $netmask)) {
+
+      form_set_error($ip_field, t('Please enter a valid IP address.'));
+    }
+    elseif (!validate_host_ip($gateway, $netmask) || $ip == $gateway) {
+
+      form_set_error($gateway_field, t('Please enter a valid Gateway IP address.'));
+    }
+    else {
+      $device_network = get_network_ip($ip, $netmask);
+      $gateway_network = get_network_ip($gateway, $netmask);
+
+      if ($device_network && $gateway_network && $device_network != $gateway_network) {
+        form_set_error($gateway_field, t('The Gateway IP and the device IP must be on the same network.'));
+      }
+    }
+  }
+}
+
+/**
  * Convert a SelectQueryInterface object to a SQL string statement.
  *
  * @param $query The object to be converted.

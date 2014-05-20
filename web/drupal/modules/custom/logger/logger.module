@@ -828,7 +828,7 @@ function logger_device_assign_page() {
   $callback = isset($_REQUEST['callback']) ? urldecode($_REQUEST['callback']) : '';
   $code = isset($_REQUEST['code']) ? $_REQUEST['code'] : '';
 
-  if (empty($code) || !valid_url($callback)) {
+  if (count($callback) > 10 || !valid_url($callback)) {
     return t("The wizard can not continue. Please contact our support team.");
   }
   else {
@@ -909,10 +909,22 @@ function logger_deviceassign_form($form, &$form_state, $code, $callback) {
     '#suffix' => '</div>'
   );
 
-  $form['code'] = array(
-    '#type' => 'hidden',
-    '#default_value' => $code,
-  );
+  if (empty($code)) {
+    $form['code'] = array(
+      '#title' => t('Activation Code'),
+      '#type' => 'textfield',
+      '#description' => t('Please, inform the activation code of the device to be assigned to your account. This code is found in the device installation guide.'),
+      '#size' => 10,
+      '#maxlength' => 10,
+      '#required' => TRUE,
+    );
+  }
+  else {
+    $form['code'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $code,
+    );
+  }
 
   $form['callback'] = array(
     '#type' => 'hidden',  
