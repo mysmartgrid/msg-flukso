@@ -409,7 +409,7 @@ process_network(OldNetwork, Device, JsonData) ->
 
             %If network record does not exist
             undefined ->
-              mysql:execute(pool, device_network_insert, [Device, 0, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
+              mysql:execute(pool, device_network_insert, [Device, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway]),
               0;
 
             %Network record does exist
@@ -418,7 +418,7 @@ process_network(OldNetwork, Device, JsonData) ->
                 {OldLanEnabled, OldLanProtocol, OldLanIp, OldLanNetmask, OldLanGateway, OldWifiEnabled, OldWifiEssid, OldWifiEnc, OldWifiPsk, OldWifiProtocol, OldWifiIp, OldWifiNetmask, OldWifiGateway} -> 0; %Equal
                 _ -> 1 %Still different
               end,
-              mysql:execute(pool, device_network_update, [Different]),
+              mysql:execute(pool, device_config_update, [Different]),
               Different
           end,
           {Pending, LanEnabled, LanProtocol, LanIp, LanNetmask, LanGateway, WifiEnabled, WifiEssid, WifiEnc, WifiPsk, WifiProtocol, WifiIp, WifiNetmask, WifiGateway};
