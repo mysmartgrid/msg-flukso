@@ -157,6 +157,12 @@ thead td {
 	color: #000;
 }
 
+.field-group {
+  border: 1px solid gray;
+  padding: 10px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
 
 #vignettes, #vignettes a, #main div.context h3 {
 	color: #fff;
@@ -1862,6 +1868,17 @@ ul.con input {
 #edit-price2 {
   text-align: right;
   width:4em;
+}
+.edit-class-name {
+  width:6em;
+}
+.edit-voltage {
+  text-align: right;
+  width:6em;
+}
+.edit-constant {
+  text-align: right;
+  width:6em;
 }
 
 div.tabs {

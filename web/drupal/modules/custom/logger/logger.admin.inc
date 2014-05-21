@@ -333,6 +333,8 @@ function logger_sensor_edition_page($meter = NULL) {
       ->fields('m', array('device', 'meter', 'external_id', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter);
 
+    $query->addField('m', 'type', 'type_id');//%FIXME: remove field type above
+
     $query->join('logger_devices', 'd', 'd.device = m.device');
     $query->addField('d', 'type_id', 'device_type_id');
 
@@ -362,6 +364,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->meter = NULL;
     $sensor->external_id = NULL;
     $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
+    $sensor->type_id = ENERGY_CONSUMPTION_SENSOR_TYPE;//%FIXME: remove field type above
     $sensor->function = '';
     $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
@@ -449,6 +452,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->lan_enabled,
     '#return_value' => 1,
     '#attributes' => array('onclick' => "javascript: showDeviceLANDiv('$form_id');"), //In IE, onchange does not work
+    '#prefix' => "<div class='field-group'>",
   );
 
   $form['lan_protocol'] = array(
@@ -482,7 +486,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->lan_netmask,
     '#maxlength' => 14,
     '#description' => t('Enter the network mask used by the LAN interface (for example: 255.255.255.0).'),
-    '#suffix' => '</div>'
+    '#suffix' => '</div></div>'
   );
 
   $form['wifi_enabled'] = array(
@@ -492,6 +496,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->wifi_enabled,
     '#return_value' => 1,
     '#attributes' => array('onclick' => "javascript: showDeviceWIFIDiv('$form_id');"), //In IE, onchange does not work
+    '#prefix' => "<div class='field-group'>"
   );
 
   $form['wifi_protocol'] = array(
@@ -549,7 +554,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t('Enter the WIFI encryption key or passphrase (for example: 1A648C9FE2).'),
     '#default_value' => $device->wifi_psk,
     '#maxlength' => 60,
-    '#suffix' => '</div>'
+    '#suffix' => '</div></div>'
   );
 
   $form['submit'] = array(
@@ -679,60 +684,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#attributes' => array('readonly' => 'readonly')
   );
 
-  $is_dynamic_config = $sensor->device_type_id == FLUKSO2_DEVICE_TYPE_ID && ($sensor->type == ENERGY_CONSUMPTION_SENSOR_TYPE || $sensor->type == ENERGY_PRODUCTION_SENSOR_TYPE);
-
-  $form['class_id'] = array(
-    '#type' => 'hidden',
-    '#required' => TRUE,
-    '#default_value' => $sensor->class_id,
-    '#access' => $is_dynamic_config && isset($sensor->class_id)
-  );
-
-  $form['class_name'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Class'),
-    '#description' => t('The sensor class (either Pulse or Analog).'),
-    '#maxlength' => 30,
-    '#size' => 10,
-    '#default_value' => $sensor->class_name,
-    '#attributes' => array('readonly' => 'readonly'),
-    '#access' => $is_dynamic_config && isset($sensor->class_id)
-  );
-
-  $form['voltage'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Voltage'),
-    '#description' => t("The sensor voltage in Volts."),
-    '#maxlength' => 6,
-    '#size' => 6,
-    '#required' => TRUE,
-    '#default_value' => $sensor->voltage,
-    '#field_suffix' => ' V',
-    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
-  );
-
-  $form['current'] = array(
-    '#type' => 'select',
-    '#title' => t('Electric Current'),
-    '#description' => t("The sensor electric current in Amperes. The current is determined by the size of the clamp."),
-    '#options' => array(50 => 50, 100 => 100, 250 => 250, 500 => 500),
-    '#required' => TRUE,
-    '#default_value' => $sensor->current,
-    '#field_suffix' => ' A',
-    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
-  );
-
-  $form['constant'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Constant'),
-    '#description' => t("The sensor constant."),
-    '#maxlength' => 10,
-    '#size' => 10,
-    '#required' => TRUE,
-    '#default_value' => $sensor->constant,
-    '#field_suffix' => ' pulses/kWh',
-    '#access' => $is_dynamic_config && $sensor->class_id == PULSE_SENSOR_CLASS_ID
-  );
+  logger_create_energy_sensor_fields($form, $sensor);
 
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {

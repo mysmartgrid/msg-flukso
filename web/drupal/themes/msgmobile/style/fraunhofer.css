@@ -1823,6 +1823,17 @@ div.form-part {
   text-align: right;
   width:4em;
 }
+.edit-class-name {
+  width:6em;
+}
+.edit-voltage {
+  text-align: right;
+  width:6em;
+}
+.edit-constant {
+  text-align: right;
+  width:6em;
+}
 #edit-title {
   width:11em;
 }

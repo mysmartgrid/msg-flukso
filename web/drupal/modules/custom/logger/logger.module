@@ -964,44 +964,113 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
   module_load_include('inc', 'logger', 'logger.admin');  
 
   $device = logger_get_device($device_id);
+  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
+  $form_id = "logger-deviceconfig-form";
 
-  $form = logger_device_form($form, $form_state, $device, "logger-deviceconfig-form");
-  $form['submit']['#value'] = t('Next');
+  $form = logger_device_form($form, $form_state, $device, $form_id);
+  unset($form['submit']);
   unset($form['type']);
   unset($form['firmware']);
   unset($form['serial']);
   unset($form['description']);
-  /*
-  //FIXME
-  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id);
-
-  $header = array(
-    'meter' => t('Meter'),
-    'function' => t('Name')
-  );
-
-  $options = array();
 
   foreach($sensors as $sensor) {
-    $options[$sensor->meter] = array(
-      'meter' => $sensor->meter,
-      'function' => array(
-        'data' => array(
-          '#type' => 'textfield',
-          '#maxlength' => 32,
-          '#size' => 15,
-          '#default_value' => $sensor->function
-    )));
-  }
 
-  $form["functions"] = array(
-    '#type' => 'tableselect',
-    '#header' => $header,
-    '#options' => $options,
-    '#empty' => t('No sensors available for this device.'),
+    if (isset($sensor->class_id)) {
+      $div_id = "sensor$sensor->meter-fields-div";
+
+      $enabled = !empty($sensor->function);
+      $form['enabled' . $sensor->meter] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Sensor enabled'),
+        '#description' => t('Please inform whether the sensor @meter should be enabled on the device.', array('@meter' => $sensor->meter)),
+        '#default_value' => $enabled,
+        '#field_suffix' => $sensor->meter,
+        '#return_value' => 1,
+        '#attributes' => array('onclick' => "javascript: showSensorDiv('$form_id', '$sensor->meter');"), //In IE, onchange does not work
+        '#prefix' => "<div class='field-group'>",
+        '#suffix' => "<div id='$div_id' " . ($enabled ? '' : "style='display: none'") . ">"
+      );
+
+      logger_create_energy_sensor_fields($form, $sensor, $sensor->meter);
+
+      $form['function' . $sensor->meter] = array(
+        '#type' => 'textfield',
+        '#title' => t('Name'),
+        '#description' => t("Enter the sensor's name."),
+        '#default_value' => $sensor->function,
+        '#maxlength' => 32,
+        '#size' => 15,
+        '#required' => TRUE,
+        '#suffix' => '</div></div>'
+      );
+    }
+  }
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save')
   );
-  */
   return $form;
+}
+
+function logger_create_energy_sensor_fields(&$form, $sensor, $field_id_suffix = '') {
+
+  $is_dynamic_config = $sensor->device_type_id == FLUKSO2_DEVICE_TYPE_ID && ($sensor->type_id == ENERGY_CONSUMPTION_SENSOR_TYPE || $sensor->type_id == ENERGY_PRODUCTION_SENSOR_TYPE);
+
+  $form["class_id$field_id_suffix"] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $sensor->class_id,
+    '#access' => $is_dynamic_config && isset($sensor->class_id)
+  );
+
+  $form["class_name$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Class'),
+    '#description' => t('The sensor class (either Pulse or Analog).'),
+    '#maxlength' => 30,
+    '#size' => 10,
+    '#default_value' => $sensor->class_name,
+    '#attributes' => array('readonly' => 'readonly', 'class' => array('edit-class-name')),
+    '#access' => $is_dynamic_config && isset($sensor->class_id)
+  );
+
+  $form["voltage$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Voltage'),
+    '#description' => t("The sensor voltage in Volts."),
+    '#maxlength' => 6,
+    '#size' => 6,
+    '#required' => TRUE,
+    '#default_value' => $sensor->voltage,
+    '#field_suffix' => ' V',
+    '#attributes' => array('class' => array('edit-voltage')),
+    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
+  );
+
+  $form["current$field_id_suffix"] = array(
+    '#type' => 'select',
+    '#title' => t('Electric Current'),
+    '#description' => t("The sensor electric current in Amperes. The current is determined by the size of the clamp."),
+    '#options' => array(50 => 50, 100 => 100, 250 => 250, 500 => 500),
+    '#required' => TRUE,
+    '#default_value' => $sensor->current,
+    '#field_suffix' => ' A',
+    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
+  );
+
+  $form["constant$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Constant'),
+    '#description' => t("The sensor constant."),
+    '#maxlength' => 10,
+    '#size' => 10,
+    '#required' => TRUE,
+    '#default_value' => $sensor->constant,
+    '#field_suffix' => ' pulses/kWh',
+    '#attributes' => array('class' => array('edit-constant')),
+    '#access' => $is_dynamic_config && $sensor->class_id == PULSE_SENSOR_CLASS_ID
+  );
 }
 
 function logger_deviceassign_form_validate($form, &$form_state) {
@@ -1158,9 +1227,34 @@ function logger_deviceassign_form_submit($form, &$form_state) {
 
 function logger_deviceconfig_form_submit($form, &$form_state) {
 
-  $form_state['values']['description'] = '';
-  logger_device_form_submit($form, &$form_state); 
+  foreach($form_state['values'] as $key => $value) {
 
+    if (strpos($key, "function") === 0) {
+      $meter = substr($key, 8);
+      $function = $form_state['values']["function$meter"];
+
+      if (!empty($function)) {
+
+        db_update('logger_energy_meter')
+          ->fields(array(
+            'voltage' => (isset($form_state['values']["voltage$meter"]) ? $form_state['values']["voltage$meter"] : NULL),
+            'current' => (isset($form_state['values']["current$meter"]) ? $form_state['values']["current$meter"] : NULL),
+            'constant' => (isset($form_state['values']["constant$meter"]) ? $form_state['values']["constant$meter"] : NULL)
+          ))
+          ->condition('meter', $meter)
+          ->execute();
+
+        db_update('logger_meters')
+          ->fields(array(
+            'function' => $function
+          ))
+          ->condition('meter', $meter)
+          ->execute();
+      }
+    }
+  }
+  $form_state['values']['description'] = '';
+  logger_device_form_submit($form, &$form_state);
   $form_state['redirect'] = 'sensor/mylist';
 }
 
@@ -2707,10 +2801,11 @@ function logger_get_device_firmware($id) {
  *                           (format: array('latitude' => array(min, max), 'longitude' => array(min, max))).
  * @param $device_types      The types of devices whose sensors are to be returned (default: all).
  * @param $only_active       Whether only active sensors are included (default: false).
- * @param $device            The id of a specific device where the sensors are (defaul: NULL)
+ * @param $device            The id of a specific device where the sensors are (defaul: NULL).
+ * @param $extra_properties  Whether properties that are specific to the sensor type must be included (default: FALSE).
  * @return the array of sensors.
  */
-function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE, $include_visitors = TRUE, $area = array(), $device_types = NULL, $only_active = TRUE, $device = NULL) {
+function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_virtual = FALSE, $only_forecast = FALSE, $include_visitors = TRUE, $area = array(), $device_types = NULL, $only_active = TRUE, $device = NULL, $extra_properties = FALSE) {
 
   global $user;
 
@@ -2728,6 +2823,17 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   $query->join('logger_devices', 'd', 'd.device = m.device');
   $query->addField('d', 'uid');
   $query->addField('d', 'type_id', 'device_type_id');
+
+  if ($extra_properties) {
+    $query->leftJoin('logger_energy_meter', 'em', 'em.meter = m.meter');
+    $query->addField('em', 'voltage');
+    $query->addField('em', 'current');
+    $query->addField('em', 'constant');
+
+    $query->leftJoin('logger_energy_meter_class', 'mc', 'mc.id = em.class_id');
+    $query->addField('mc', 'id', 'class_id');
+    $query->addField('mc', 'name', 'class_name');
+  }
 
   if (user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');

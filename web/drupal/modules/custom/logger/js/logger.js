@@ -75,14 +75,21 @@ function toggleDeviceAssignFields() {
   div.style.display = (form.new_account[1].checked ? 'none' : '');
 }
 
-function showDeviceLANDiv() {
-  var form = document.getElementById('logger-device-form');
+function showDeviceLANDiv(formId) {
+  var form = document.getElementById(formId);
   var div = document.getElementById('lan-fields-div');
   div.style.display = (form.lan_enabled.checked ? '' : 'none');
 }
 
-function showDeviceWIFIDiv() {
-  var form = document.getElementById('logger-device-form');
+function showDeviceWIFIDiv(formId) {
+  var form = document.getElementById(formId);
   var div = document.getElementById('wifi-fields-div');
   div.style.display = (form.wifi_enabled.checked ? '' : 'none');
+}
+
+function showSensorDiv(formId, meter) {
+  var form = document.getElementById(formId);
+  var div = document.getElementById('sensor' + meter + '-fields-div');
+  var enabled = document.getElementById('edit-enabled' + meter);
+  div.style.display = (enabled.checked ? '' : 'none');
 }
