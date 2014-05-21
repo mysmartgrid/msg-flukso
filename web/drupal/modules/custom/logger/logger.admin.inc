@@ -696,7 +696,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#size' => 10,
     '#default_value' => $sensor->class_name,
     '#attributes' => array('readonly' => 'readonly'),
-    '#access' => $is_dynamici_config && isset($sensor->class_id)
+    '#access' => $is_dynamic_config && isset($sensor->class_id)
   );
 
   $form['voltage'] = array(
