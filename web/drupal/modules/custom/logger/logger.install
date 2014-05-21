@@ -426,10 +426,6 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 62
       ),
-     'domains' => array(
-        'type' => 'text',
-        'not null' => FALSE,
-      ),
     ),
     'primary key' => array('token')
   );
@@ -2519,3 +2515,14 @@ function logger_update_7128() {
 
   return st("The field pending_config has been created on table logger_devices."); 
 }
+
+/**
+ * Drop field domains from table logger_tokens.
+ */
+function logger_update_7129() {
+
+  db_drop_field('logger_tokens', 'domains');
+
+  return st("The field domains has been dropped from table logger_tokens.");
+}
+
