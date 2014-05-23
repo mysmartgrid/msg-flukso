@@ -2536,3 +2536,16 @@ function logger_update_7130() {
 
   return st("Unused fields have been dropped from table logger_devices.");
 }
+
+/**
+ * Update field access in table logger_meters.
+ */
+function logger_update_7132() {
+
+  db_update('logger_meters')
+    ->expression('access', 'created')
+    ->condition('access', 0)
+    ->execute();
+
+  return st("Field access in table logger_meters has been updated.");
+}
