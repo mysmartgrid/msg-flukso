@@ -270,7 +270,6 @@ function logger_firmwareupgrade_page() {
   drupal_set_title(t('Device Firmware Upgrade'));
 
   $form = drupal_get_form('logger_firmwareupgradefilter_form');
-
   return drupal_render($form);
 }
 
@@ -372,7 +371,6 @@ function logger_device_config_page($id, $page) {
     $output .= drupal_render($form);
   }
   else {
-
     if ($device->pending_config) {
 
       $output .= logger_step(3, 'The configuration below is being sent to the device. ' .
@@ -575,7 +573,6 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t("The device description."),
     '#maxlength' => 60,
     '#size' => 60,
-    '#required' => TRUE,
     '#default_value' => $device->description
   );
 
@@ -596,7 +593,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t('Please inform how the LAN interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
     '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'static',
     '#options' => logger_get_config_protocol_options(),
-    '#prefix' => "<div id='lan-fields-div' " . (!isset($device->lan_enabled) || $device->lan_enabled == 0 ? "style='display: none'" : '') . ">"
+    '#prefix' => "<div id='lan-fields-div' style='display: none'>"
   );
 
   $form['lan_ip'] = array(
@@ -640,7 +637,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t('Please inform how the WIFI interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
     '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'wifi',
     '#options' => logger_get_config_protocol_options(),
-    '#prefix' => "<div id='wifi-fields-div' " . (!isset($device->wifi_enabled) || $device->wifi_enabled == 0 ? "style='display: none'" : '') . ">"
+    '#prefix' => "<div id='wifi-fields-div' style='display: none'>"
   );
 
   $form['wifi_ip'] = array(
@@ -696,6 +693,9 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'submit',
     '#value' => t('Save'),
   );
+
+  drupal_add_js("jQuery(document).ready( function() { showDeviceLANDiv('$form_id'); showDeviceWIFIDiv('$form_id'); } );", array('type' => 'inline', 'scope' => 'footer'));
+
   return $form;
 }
 
@@ -1528,8 +1528,7 @@ function logger_deviceassign_form_validate($form, &$form_state) {
 
 function logger_deviceconfig_form_validate($form, &$form_state) {
 
-  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask');
-  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask');
+  logger_device_form_validate($form, &$form_state);
 }
 
 function logger_sensor_form_validate($form, &$form_state) {
@@ -1615,8 +1614,22 @@ function logger_firmwareedition_form_validate($form, &$form_state) {
 
 function logger_device_form_validate($form, &$form_state) {
 
-  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask');
-  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask');
+  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask', 'lan_protocol');
+  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask', 'wifi_protocol');
+
+  if ($form_state['values']['wifi_enabled']) {
+    if (empty($form_state['values']['wifi_essid'])) {
+      form_set_error('wifi_essid', t('The WIFI network name must be informed.'));
+    }
+    if ($form_state['values']['wifi_enc'] == 'open') {
+      if (empty($form_state['values']['wifi_psk'])) {
+        form_set_error('wifi_psk', t('The WIFI encryption key or passphrase must be informed.'));
+      }
+      else {
+        form_set_error('wifi_psk', t('The WIFI encryption key or passphrase is used only by encrypted communication.'));
+      }
+    }
+  }
 }
 
 function logger_device_form_submit($form, &$form_state) {
@@ -1625,26 +1638,36 @@ function logger_device_form_submit($form, &$form_state) {
     ->condition('device', $form_state['values']['device'])
     ->execute();
 
-  if (isset($form_state['values']['lan_enabled']) && $form_state['values']['lan_enabled'] == 1 ||
-      isset($form_state['values']['wifi_enabled']) && $form_state['values']['wifi_enabled'] == 1) {
+  $lan_enabled = isset($form_state['values']['lan_enabled']) && $form_state['values']['lan_enabled'] == 1 ? 1 : 0;
+  $wifi_enabled = isset($form_state['values']['wifi_enabled']) && $form_state['values']['wifi_enabled'] == 1 ? 1 : 0;
+
+  if ($lan_enabled || $wifi_enabled) {
+
+    $fields = array(
+      'device' => $form_state['values']['device'],
+      'lan_enabled' => $lan_enabled,
+      'wifi_enabled' => $wifi_enabled
+    );
+
+    if ($lan_enabled) {
+      $fields['lan_protocol'] = $form_state['values']['lan_protocol'];
+      $fields['lan_ip'] = $form_state['values']['lan_ip']; 
+      $fields['lan_netmask'] = $form_state['values']['lan_netmask'];
+      $fields['lan_gateway'] = $form_state['values']['lan_gateway'];
+    }
+
+    if ($wifi_enabled) {
+      $fields['wifi_protocol'] = $form_state['values']['wifi_protocol'];
+      $fields['wifi_ip'] = $form_state['values']['wifi_ip'];
+      $fields['wifi_netmask'] = $form_state['values']['wifi_netmask'];
+      $fields['wifi_gateway'] = $form_state['values']['wifi_gateway'];
+      $fields['wifi_essid'] = $form_state['values']['wifi_essid'];
+      $fields['wifi_enc'] = $form_state['values']['wifi_enc'];
+      $fields['wifi_psk'] = $form_state['values']['wifi_psk'];
+    }
 
     db_insert('logger_device_network')
-      ->fields(array(
-        'device' => $form_state['values']['device'],
-        'lan_enabled' => $form_state['values']['lan_enabled'],
-        'lan_protocol' => $form_state['values']['lan_protocol'],
-        'lan_ip' => $form_state['values']['lan_ip'],
-        'lan_netmask' => $form_state['values']['lan_netmask'],
-        'lan_gateway' => $form_state['values']['lan_gateway'],
-        'wifi_enabled' => $form_state['values']['wifi_enabled'],
-        'wifi_essid' => $form_state['values']['wifi_essid'],
-        'wifi_enc' => $form_state['values']['wifi_enc'],
-        'wifi_psk' => $form_state['values']['wifi_psk'],
-        'wifi_protocol' => $form_state['values']['wifi_protocol'],
-        'wifi_ip' => $form_state['values']['wifi_ip'],
-        'wifi_netmask' => $form_state['values']['wifi_netmask'],
-        'wifi_gateway' => $form_state['values']['wifi_gateway']
-      ))
+      ->fields($fields)
       ->execute();
   }
 
