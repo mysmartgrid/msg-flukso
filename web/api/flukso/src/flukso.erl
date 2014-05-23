@@ -64,7 +64,7 @@ mysql_prepare() ->
     mysql:prepare(sensor_agg_update, <<"UPDATE logger_aggregated_meters SET meter = ? WHERE meter = ?">>),
     mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
     mysql:prepare(sensor_storage_update, <<"UPDATE logger_meter_storage SET meter = ? WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
 
     mysql:prepare(energy_sensor_update, <<"UPDATE logger_energy_meter SET class_id = ?, voltage = ?, current = ?, constant = ? WHERE meter = ?">>),
     mysql:prepare(energy_sensor_insert, <<"INSERT INTO logger_energy_meter(meter, class_id, voltage, current, constant) VALUES(?, ?, ?, ?, ?)">>),

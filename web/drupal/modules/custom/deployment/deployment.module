@@ -644,12 +644,6 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
   $query->addExpression($state_id_field, 'state_id');
   $query->addExpression($latest_field, 'latest');
 
-  //FIXME: pager is still not working
-  if ($page_limit > 1) {
-    $query->extend('PagerDefault')
-      ->limit($page_limit);
-  }
-
   if ($header) {
     $query->extend('TableSort')->orderByHeader($header);
   }
