@@ -461,8 +461,9 @@ function logger_menu() {
     'file' => 'logger.admin.inc'
   );
 
+  $device_config_title = 'Device Configuration';
   $items['device/assign'] = array(
-    'title' => 'Device Activation',
+    'title' => $device_config_title,
     'page callback' => 'logger_device_assign_page',
     'access arguments' => array('assign devices'),
     'type' => MENU_CALLBACK,
@@ -470,9 +471,9 @@ function logger_menu() {
   );
 
   $items['device/config'] = array(
-    'title' => 'Device Configuration',
+    'title' => $device_config_title,
     'page callback' => 'logger_device_config_page',
-    'page arguments' => array(2),
+    'page arguments' => array(2, 3),
     'access callback' => 'logger_device_access',
     'access arguments' => array('edit devices', 2),
     'type' => MENU_CALLBACK,
@@ -2321,7 +2322,7 @@ function logger_format_legend_record($value, $record_time, $interval, $complemen
 function logger_get_device($id) {
 
   $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'description'))
+    ->fields('d', array('device', 'serial', 'description', 'access', 'created', 'pending_config'))
     ->condition('d.device', $id);
 
   $query->leftJoin('logger_device_network', 'n', 'd.device = n.device');

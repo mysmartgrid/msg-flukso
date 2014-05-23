@@ -20,7 +20,7 @@
 
 function showSensorForecastFields() {
 
-  var sensorTypeField = document.getElementById('edit-type');
+  var sensorTypeField = document.getElementById('edit-type-id');
   var forecastDiv = document.getElementById('forecast-options');
 
   //If page contains forecast options div

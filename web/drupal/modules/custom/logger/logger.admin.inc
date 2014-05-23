@@ -78,7 +78,6 @@ function logger_userdevices_page() {
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
     $row[] = $links;
-
     $rows[] = $row;
   }
  
@@ -303,7 +302,6 @@ function logger_firmware_edition_page($id) {
   }
 
   $form = drupal_get_form('logger_firmwareedition_form', $release);
-
   return drupal_render($form);
 }
 
@@ -328,26 +326,133 @@ function logger_device_assign_page() {
 
   $callback = isset($_REQUEST['callback']) ? urldecode($_REQUEST['callback']) : '';
   $code = isset($_REQUEST['code']) ? $_REQUEST['code'] : '';
+  $output = '';
 
   if (count($code) > 10 || !(empty($callback) || valid_url($callback))) {
-    return t("The wizard can not continue. Please contact our support team.");
+    $output = t("The wizard can not continue. Please contact our support team.");
   }
   else {
+    $output = empty($code) ? logger_step(1, 'Welcome to mySmartGrid! You are about to configure a device. ' . 
+        'Please inform your user account and the device activation code in the fields below.') : '';
+
     $form = drupal_get_form('logger_deviceassign_form', $code, $callback);
-    return drupal_render($form);
+    $output .= drupal_render($form);
   }
+  return $output;
 }
 
 /**
  * Builds the device configuration page.
  *
- * @param $device The device id.
+ * @param $id    The device id.
+ * @param $page  The configuration wizard page number.
  * @return the device configuration page.
  */
-function logger_device_config_page($device) {
+function logger_device_config_page($id, $page) {
 
-  $form = drupal_get_form('logger_deviceconfig_form', $device);
-  return drupal_render($form);
+  $device = logger_get_device($id);
+
+  $header = array(
+    array('style' => 'background-color: white; border: 0;', 'width' => '200px'),
+    array('style' => 'background-color: white; border: 0;')
+  );
+  $rows = array(
+    array(t('Device Id'), $device->device),
+    array(t('Type'), $device->type_name),
+    array(t('Firmware Version'), $device->firmware_version)
+  );
+
+  $output = theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+    'caption' => '<b>' . t('Device') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) . '<br>';
+
+  if ($page == 1) {
+    $output .= logger_step(2, 'Please, inform which network interfaces and sensors must be enabled on the device.') . '<br>';
+
+    $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
+    $output .= drupal_render($form);
+  }
+  else {
+
+    if ($device->pending_config) {
+
+      $output .= logger_step(3, 'The configuration below is being sent to the device. ' .
+        'Please make sure that the device is turned on and connected to the network during the next 10 minutes.') .
+        '<br><div id="progressbar"></div><br><br>';
+
+      $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (10 * MINUTE)) * 100;
+      $progress = $progress < 95 ? $progress : 95;
+
+      $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
+      drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
+      drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
+        array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
+
+      drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
+        'http-equiv' => 'refresh', 'content' => "10;URL=/device/config/$id/2")), 'device_config');
+    }
+    else {
+      $output .= logger_step(4, 'Congratulations! The new configuration has been successfully applied to the device. ' .
+        'Click !here to see the list of active sensors.', array('!here' => l(t('here'), 'sensor/mylist'))) .
+        '<div align="center"><img src="/misc/message-24-ok.png" align="center">' . t('Configuration applied.') . '</div><br><br>';
+    }
+
+    $config_protocol_options = logger_get_config_protocol_options();
+
+    if ($device->lan_enabled) {
+      $rows = array(array(t('Configuration Protocol'), $config_protocol_options[$device->lan_protocol]));
+      if ($device->lan_protocol == 'static') {
+        $rows[] = array(t('IP address'), $device->lan_ip);
+        $rows[] = array(t('Gateway IP address'), $device->lan_gateway);
+        $rows[] = array(t('Network mask'), $device->lan_netmask);
+      }
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+          'caption' => '<b>' . t('LAN Interface') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+
+    if ($device->wifi_enabled) {
+      $rows = array(array(t('Configuration Protocol'), $config_protocol_options[$device->wifi_protocol]));
+      if ($device->wifi_protocol == 'static') {
+        $rows[] = array(t('IP address'), $device->wifi_ip);
+        $rows[] = array(t('Gateway IP address'), $device->wifi_gateway);
+        $rows[] = array(t('Network mask'), $device->wifi_netmask);
+      }
+      $rows[] = array(t('SSID'), $device->wifi_essid);
+      $encoding_protocol_options = logger_get_encoding_protocol_options();
+      $rows[] = array(t('Encoding'), $encoding_protocol_options[$device->wifi_enc]);
+      $rows[] = array(t('Key or passphrase'), $device->wifi_psk);
+
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+        'caption' => '<b>' . t('WIFI Interface') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+
+    $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, TRUE, $id, TRUE);
+    if (!empty($sensors)) {
+
+      $header = array(t('Sensor'), t('Function'), t('Class'), t('Voltage'), t('Current'), t('Constant'));
+      $rows = array();
+
+      foreach($sensors as $sensor) {
+        $rows[] = array(
+          wordwrap($sensor->meter, 16, ' ', TRUE),
+          $sensor->function,
+          $sensor->class_name,
+          ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->voltage . ' V' : '-'),
+          ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->current . ' A' : '-'),
+          ($sensor->class_id == PULSE_SENSOR_CLASS_ID ? $sensor->constant . ' ' . t('pulses/kWh') : '-')
+        );
+      }
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+          'caption' => '<b>' . t('Active Sensors') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+  }
+  return $output;
+}
+
+function logger_step($number, $message, $args = array()) {
+
+  return '<p><b>' . t('Step') . " $number - </b> " . t($message, $args) . '</p>';
 }
 
 /**
@@ -361,10 +466,10 @@ function logger_sensor_edition_page($meter = NULL) {
   if ($meter) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'external_id', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
+      ->fields('m', array('device', 'meter', 'external_id', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter);
 
-    $query->addField('m', 'type', 'type_id');//%FIXME: remove field type above
+    $query->addField('m', 'type', 'type_id');
 
     $query->join('logger_devices', 'd', 'd.device = m.device');
     $query->addField('d', 'type_id', 'device_type_id');
@@ -394,8 +499,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->device = NULL;
     $sensor->meter = NULL;
     $sensor->external_id = NULL;
-    $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
-    $sensor->type_id = ENERGY_CONSUMPTION_SENSOR_TYPE;//%FIXME: remove field type above
+    $sensor->type_id = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
     $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
@@ -491,7 +595,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#title' => t('LAN Configuration'),
     '#description' => t('Please inform how the LAN interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
     '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'static',
-    '#options' => array('static' => t('Static'), 'dhcp' => 'Dynamic (DHCP)'),
+    '#options' => logger_get_config_protocol_options(),
     '#prefix' => "<div id='lan-fields-div' " . (!isset($device->lan_enabled) || $device->lan_enabled == 0 ? "style='display: none'" : '') . ">"
   );
 
@@ -535,7 +639,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#title' => t('WIFI Configuration'),
     '#description' => t('Please inform how the WIFI interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
     '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'wifi',
-    '#options' => $form['lan_protocol']['#options'],
+    '#options' => logger_get_config_protocol_options(),
     '#prefix' => "<div id='wifi-fields-div' " . (!isset($device->wifi_enabled) || $device->wifi_enabled == 0 ? "style='display: none'" : '') . ">"
   );
 
@@ -576,7 +680,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#title' => t('WIFI Encoding'),
     '#description' => t('Please inform which protocol the WIFI network interface uses for encoding the communication.'),
     '#default_value' => $device->wifi_enc,
-    '#options' => array('open' => t('No encryption'), 'wep' => 'WEP', 'wpa' => 'WPA', 'wpa2' => 'WPA2'),
+    '#options' => logger_get_encoding_protocol_options(),
   );
 
   $form['wifi_psk'] = array(
@@ -593,6 +697,14 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#value' => t('Save'),
   );
   return $form;
+}
+
+function logger_get_config_protocol_options() {
+  return array('static' => t('Static'), 'dhcp' => 'Dynamic (DHCP)');
+}
+
+function logger_get_encoding_protocol_options() {
+  return array('open' => t('No encryption'), 'wep' => 'WEP', 'wpa' => 'WPA', 'wpa2' => 'WPA2');
 }
 
 function logger_deviceactivation_form($form, &$form_state) {
@@ -768,7 +880,7 @@ function logger_create_energy_sensor_fields(&$form, $sensor, $field_id_suffix = 
     '#size' => 10,
     '#required' => TRUE,
     '#default_value' => $sensor->constant,
-    '#field_suffix' => ' pulses/kWh',
+    '#field_suffix' => ' ' . t('pulses/kWh'),
     '#attributes' => array('class' => array('edit-constant')),
     '#access' => $is_dynamic_config && $sensor->class_id == PULSE_SENSOR_CLASS_ID
   );
@@ -781,6 +893,7 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
   $form_id = "logger-deviceconfig-form";
 
   $form = logger_device_form($form, $form_state, $device, $form_id);
+  $form['device']['#type'] = 'hidden';
   unset($form['submit']);
   unset($form['type']);
   unset($form['firmware']);
@@ -877,16 +990,17 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#size' => 64,
       '#required' => TRUE,
       '#default_value' => $sensor->external_id,
-      '#attributes' => array('readonly' => 'readonly')
+      '#attributes' => array('readonly' => 'readonly'),
+      '#access' => ($sensor->device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID)
     );
   }
 
-  $form['type'] = array(
+  $form['type_id'] = array(
     '#type' => 'select',
     '#title' => t('Type'),
     '#description' => t('The sensor type.'),
     '#options' => logger_get_sensor_types_options(NULL, $sensor->unit_type_id),
-    '#default_value' => $sensor->type,
+    '#default_value' => $sensor->type_id,
     '#required' => TRUE,
     '#attributes' => array(
       'readonly' => 'readonly',
@@ -1565,7 +1679,7 @@ function logger_deviceassign_form_submit($form, &$form_state) {
       ->execute()
       ->fetchField();
 
-    $form_state['redirect'] = "device/config/$device";
+    $form_state['redirect'] = "device/config/$device/1";
   }
   else {
     $form_state['redirect'] = array($form_state['values']['callback'], array('external' => TRUE));
@@ -1602,7 +1716,7 @@ function logger_deviceconfig_form_submit($form, &$form_state) {
   }
   $form_state['values']['description'] = '';
   logger_device_form_submit($form, &$form_state);
-  $form_state['redirect'] = 'sensor/mylist';
+  $form_state['redirect'] = 'device/config/' . $form_state['values']['device'] . '/2';
 }
 
 function logger_sensor_form_submit($form, &$form_state) {
@@ -1612,7 +1726,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   global $user;
 
   $function = $form_state['values']['function'];
-  $type = $form_state['values']['type'];
+  $type_id = $form_state['values']['type_id'];
   $price = isset($form_state['values']['price']) ? $form_state['values']['price'] : 0;
   $device = $form_state['values']['device'];
 
@@ -1620,7 +1734,7 @@ function logger_sensor_form_submit($form, &$form_state) {
   if (isset($form_state['values']['meter'])) {
 
     $meter = $form_state['values']['meter'];
-    $fields = array('function' => $function, 'type' => $type);
+    $fields = array('function' => $function, 'type' => $type_id);
 
     if ($price > 0) {
       $fields['price'] = $price;
@@ -1667,7 +1781,7 @@ function logger_sensor_form_submit($form, &$form_state) {
     $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
     $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
-    logger_sensor_add($meter, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
+    logger_sensor_add($meter, $device, time(), $token, 62, $function, $type_id, 1, $forecast, $latitude, $longitude, $price);
   }
 
   if (isset($form_state['values']['aggregated_meters'])) {
@@ -1910,7 +2024,7 @@ function logger_device_remove($device) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $sensors = db_select('logger_meters', 'm')
-    ->fields('m')
+    ->fields('m', array('meter'))
     ->condition('m.device', $device)
     ->execute();
 
@@ -2089,6 +2203,10 @@ function logger_sensor_remove($meter) {
     ->execute();
 
   db_delete('logger_meter_storage_period')
+    ->condition('meter', $meter)
+    ->execute();
+
+  db_delete('logger_energy_meter')
     ->condition('meter', $meter)
     ->execute();
 

@@ -2526,3 +2526,13 @@ function logger_update_7129() {
   return st("The field domains has been dropped from table logger_tokens.");
 }
 
+/**
+ * Drop fields from table logger_devices.
+ */
+function logger_update_7130() {
+
+  db_drop_field('logger_devices', 'sensor');
+  db_drop_field('logger_devices', 'comment');
+
+  return st("Unused fields have been dropped from table logger_devices.");
+}
