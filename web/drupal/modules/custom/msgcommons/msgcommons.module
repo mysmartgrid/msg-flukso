@@ -695,7 +695,7 @@ function validate_host_ip($ip, $netmask = NULL) {
   }
 
   return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_RES_RANGE) &&
-    strpos($ip, '255') === FALSE && $valid_cidr;
+    substr($ip, -3) != '255' && $valid_cidr;
 }
 
 /**

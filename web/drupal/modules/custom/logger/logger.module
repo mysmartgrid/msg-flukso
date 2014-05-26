@@ -1117,7 +1117,6 @@ function logger_overview_page($interval, $popup = FALSE) {
 
       $sql = "SELECT COUNT(*) FROM {users} u WHERE EXISTS(
         SELECT 1 FROM {logger_devices} d WHERE d.uid = u.uid)";
-
       $usercounter = db_query($sql)->fetchField();
 
       $introduction .= theme('logger_overview_topic', array('title' => t('Total Consumption of All Participants'), 'body' =>
@@ -2833,7 +2832,6 @@ function theme_logger_line_chart_area($variables) {
 
     $output .= logger_create_dygraph($chart, FALSE, $slider_properties, TRUE);
   }
-
   $output .= logger_create_chart_legend($chart);
 
   return $output;
@@ -2960,7 +2958,6 @@ function logger_create_dygraph($chart, $create_labels, $properties = array(), $s
       }
     }
   }
-
   $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => TRUE);
 
   //If IE

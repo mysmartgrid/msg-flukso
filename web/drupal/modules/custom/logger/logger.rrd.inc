@@ -453,7 +453,7 @@ function logger_rrd_sensor_def($series_id, $sensor, $unit, $price = NULL) {
 
   global $user;
 
-  if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid) {
+  if (isset($sensor->private) && $sensor->private > 0 && $sensor->uid != $user->uid && $user->uid != 0) {
     return NULL;
   }
 
@@ -567,9 +567,6 @@ function logger_rrd_export($def, $exported_cdef, $latest, $include_nan, $period,
     save_file($script_path, "#!/bin/bash\n" . $command);
     $command = "/bin/sh $script_path";
   }
-
-  //DEBUG
-  //append_file("/tmp/rrd.command." . $user->uid . '.' . REQUEST_TIME . '.txt', "\n" . $command);
 
   $lines = array();
   $error = 0;

@@ -600,7 +600,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('LAN IP address'),
     '#default_value' => $device->lan_ip,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the IP address used by the LAN interface (for example: 192.168.1.1).'),
   );
 
@@ -608,7 +608,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('LAN Gateway IP address'),
     '#default_value' => $device->lan_gateway,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the IP address of the gateway used by the LAN interface (for example: 192.168.1.254).'),
   );
 
@@ -616,7 +616,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('LAN Network mask'),
     '#default_value' => $device->lan_netmask,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the network mask used by the LAN interface (for example: 255.255.255.0).'),
     '#suffix' => '</div></div>'
   );
@@ -644,7 +644,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('WIFI IP address'),
     '#default_value' => $device->wifi_ip,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the IP address used by the WIFI interface (for example: 192.168.1.1).'),
   );
 
@@ -652,7 +652,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('WIFI Gateway IP address'),
     '#default_value' => $device->wifi_gateway,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the IP address of the gateway used by the WIFI interface (for example: 192.168.1.254).'),
   );
 
@@ -660,7 +660,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'textfield',
     '#title' => t('WIFI Network mask'),
     '#default_value' => $device->wifi_netmask,
-    '#maxlength' => 14,
+    '#maxlength' => 15,
     '#description' => t('Enter the network mask used by the WIFI interface (for example: 255.255.255.0).'),
   );
 

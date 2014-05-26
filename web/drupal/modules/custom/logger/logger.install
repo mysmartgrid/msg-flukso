@@ -181,17 +181,17 @@ function logger_schema() {
       ),
       'lan_ip' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'lan_netmask' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'lan_gateway' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'wifi_enabled' => array(
@@ -217,15 +217,15 @@ function logger_schema() {
       ),
       'wifi_ip' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
       ),
       'wifi_netmask' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
       ),
       'wifi_gateway' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
       ),
     ),
     'primary key' => array('device')
@@ -2548,4 +2548,16 @@ function logger_update_7132() {
     ->execute();
 
   return st("Field access in table logger_meters has been updated.");
+}
+
+/**
+ * Recreates table logger_device_network.
+ */
+function logger_update_7133() {
+
+  db_drop_table('logger_device_network');
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been recreated.");
 }
