@@ -2349,6 +2349,26 @@ function logger_get_device($id) {
 }
 
 /**
+ * Gets the devices of a user.
+ *
+ * @param $uid The user id.
+ * @returns an instance of DatabaseStatementInterface, which can be iterated in foreach loops.
+ */
+function logger_get_devices($uid) {
+
+  $query = db_select('logger_devices', 'd')
+    ->fields('d', array('device', 'serial'))
+    ->condition('d.uid', $uid);
+
+  $query->join('logger_device_type', 't', 'd.type_id = t.id');
+  $query->addField('t', 'name', 'type_name');
+  $query->orderBy('t.name');
+  $query->orderBy('d.serial');
+
+  return $query->execute();
+}
+
+/**
  * Returns the firmware id of the informed device.
  * 
  * @param $id The device id.
@@ -2657,17 +2677,16 @@ function logger_get_devices_options() {
 
   global $user;
 
-  $devices = array();
+  $options = array();
   if ($user->uid) {
 
-    $sql = "SELECT serial, device FROM {logger_devices} WHERE uid = :uid ORDER BY serial";
-    $result = db_query($sql, array(':uid' => $user->uid));
-
-    foreach ($result as $row) {
-      $devices[$row->device] = $row->serial;
+    $devices = logger_get_devices($user->uid);
+    
+    foreach ($devices as $device) {
+      $options[$device->device] = $device->type_name . ' - ' . $device->serial;
     }
   }
-  return $devices;
+  return $options;
 }
 
 function logger_theme() {
@@ -3833,13 +3852,14 @@ function logger_get_device_types_options() {
  *
  * @param $types    The sensor types.
  * @param $virtual  Whether virtual sensors should be returned.
+ * @param $device   The sensor device (default NULL);
  * @return an array of meters.
  */
-function logger_get_meters_options($types, $virtual = FALSE) {
+function logger_get_meters_options($types, $virtual = FALSE, $device = NULL) {
 
   global $user;
 
-  $sensors = logger_get_sensors($types, array($user->uid), $virtual);
+  $sensors = logger_get_sensors($types, array($user->uid), $virtual, FALSE, FALSE, array(), NULL, TRUE, $device);
   $options = array();
   foreach ($sensors as $sensor) {
     $options[$sensor->meter] = $sensor->function;
