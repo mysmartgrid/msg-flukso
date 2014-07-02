@@ -4373,8 +4373,35 @@ function logger_cron() {
     logger_update_support_authorized_keys();
   }
 
+  $rest = REQUEST_TIME % DAY;
+
+  if ($rest < HOUR) {
+    logger_export_statictics_input_data();
+  }
+
   //Runs only once a day
   logger_update_pvcast_models();
+}
+
+function logger_export_statictics_input_data() {
+
+  $query = db_select('logger_meters', 'm')
+    ->fields('m', array('meter', 'function', 'virtual', 'type'));
+
+  $query->join('logger_devices', 'd', 'd.device = m.device');
+  $query->addField('d', 'type_id', 'device_type_id');
+  $query->addField('d', 'device');
+  $query->addField('d', 'uid');
+
+  $result = $query->execute();
+
+  $output = "";
+  foreach ($result as $sensor) {
+    $type = $sensor->type == NULL ? "\N" : $sensor->type;
+    $function = $sensor->function == NULL ? "\N" : $sensor->function;
+    $output .= "$sensor->uid   $sensor->device   $sensor->meter   $type   $sensor->virtual   $function   $sensor->device_type_id\n";
+  }
+  save_file(LOGGER_PATH . "/json/sensors.txt", $output);
 }
 
 /**
