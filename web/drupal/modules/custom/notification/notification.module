@@ -704,12 +704,21 @@ function notification_edition_form($form, &$form_state, $notification) {
   );
 
   $meter_options = logger_get_meters_options(NULL, FALSE, $notification->device);
+  $notification_meters = array();
+  $result = db_select('notification_meter', 'nm')
+    ->fields('nm', array('meter'))
+    ->condition('nm.notification_id', $notification->id)
+    ->execute();
+  foreach($result as $selected_sensor) {
+    $notification_meters[] = $selected_sensor->meter;
+  }
+
   $form['selected_meters'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Sensors'),
     '#description' => t('Select which sensors of the device will be monitored for the event notifications.'),
     '#options' => $meter_options,
-    '#default_value' => array_keys($meter_options),
+    '#default_value' => $notification_meters,
     '#required' => TRUE,
   );
 
@@ -1103,6 +1112,30 @@ function notification_edit_event($values) {
   $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
   $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
 
+  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
+
+  if ($notification) {
+    if ($old_limit_up != $limit_up || $old_unit_id != $unit_id) {
+      notification_delete($device, $event_id, $limit_up, $unit_id);
+    }
+    else {
+      db_delete('notification_meter')
+        ->condition('notification_id', $notification->id)
+        ->execute();
+    }
+
+    foreach ($values['selected_meters'] as $meter => $selected_meter) {
+      if ($selected_meter) {
+        db_insert('notification_meter')
+          ->fields(array(
+            'notification_id' => $notification->id,
+            'meter' => $meter
+          ))
+         ->execute();
+      }
+    }
+  }
+
   $values = array(
     'limit_up' => $limit_up,
     'unit_id' => $unit_id,
@@ -1110,11 +1143,6 @@ function notification_edit_event($values) {
     'min_interval' => $values['min_interval'],
     'base_time' => DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp()
   );
-
-  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
-  if ($notification && ($old_limit_up != $limit_up || $old_unit_id != $unit_id)) {
-    notification_delete($device, $event_id, $limit_up, $unit_id);
-  }
   notification_update($device, $event_id, $old_limit_up, $old_unit_id, $values);
 }
 

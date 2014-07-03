@@ -916,7 +916,7 @@ function logger_statistics_page() {
     "!officially" => l(t("officially"), "http://www.die-stromsparinitiative.de/beratung/stromcheck/index.html"), 
     "!ranges" => l(t("ranges"), "http://www.vz-nrw.de/mediabig/218084A.pdf"))) . "<div>" .
 
-    t("Color code") . ": <span style='color:black;font-weight:normal'><span style='background-color:#33DD00'> '" .
+    t("Color code") . ": <span style='color:black;font-weight:normal'><span style='background-color:#33DD00'> " .
     t("very good") . "</span>, <span style='background-color:#EEFF00'>" .
     t("good") . "</span>, <span style='background-color:#FF9900'>" .
     t("tolerable") . "</span>, <span style='background-color:#FF0000'> " .
@@ -4374,7 +4374,7 @@ function logger_cron() {
   }
 
   $rest = REQUEST_TIME % DAY;
-
+ 
   if ($rest < HOUR) {
     logger_export_statictics_input_data();
   }
