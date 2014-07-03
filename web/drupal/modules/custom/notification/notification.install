@@ -739,7 +739,7 @@ function notification_update_7014() {
 /**
  * Create table notification_meter.
  */
-function notification_update_7017() {
+function notification_update_7020() {
 
   db_create_table('notification_meter', drupal_get_schema_unprocessed('notification', 'notification_meter'));
 
