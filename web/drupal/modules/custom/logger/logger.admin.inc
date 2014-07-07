@@ -1614,6 +1614,10 @@ function logger_firmwareedition_form_validate($form, &$form_state) {
 
 function logger_device_form_validate($form, &$form_state) {
 
+  if (isset($form_state['values']['description']) && !preg_match('/^[\x20-\x7e\xc2a1-\xc3bf€]*$/', $form_state['values']['description'])) {
+    form_set_error('description', t('The device description contains non-printable characters.'));
+  }
+
   validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask', 'lan_protocol');
   validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask', 'wifi_protocol');
 
