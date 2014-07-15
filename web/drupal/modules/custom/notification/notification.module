@@ -425,7 +425,7 @@ function notification_eventlog_clear_old() {
 
     db_delete('event_log')
       ->condition('device', $log->device)
-      ->condition('time', $log->last_time - 3 * DAY, '<')
+      ->condition('time', $log->last_time - 2 * DAY, '<')
       ->execute();
   }
 }
@@ -1413,7 +1413,7 @@ function notification_cron() {
 function notification_compose_base_query($event_id) {
   
   $query = db_select('notification', 'n')
-    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id'))
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id', 'id'))
     ->condition('n.event_id', $event_id)
     ->where('n.last_sent + n.min_interval < :now', array(':now' => REQUEST_TIME))
     ->groupBy('n.device')
