@@ -131,7 +131,9 @@ class MSGCommonsTestCase extends DrupalWebTestCase {
     $this->assertTrue(validate_host_ip('192.168.0.1'));
     $this->assertTrue(validate_host_ip('192.168.1.1'));
     $this->assertFalse(validate_host_ip('a.a.a.a'));
-    $this->assertFalse(validate_host_ip('192.255.1.1'));
+    $this->assertTrue(validate_host_ip('192.255.1.1'));
+    $this->assertTrue(validate_host_ip('192.168.255.1'));
+    $this->assertFalse(validate_host_ip('192.168.1.255'));
     $this->assertFalse(validate_host_ip('192.0.0.255'));
     $this->assertFalse(validate_host_ip('192.168.1'));
     $this->assertFalse(validate_host_ip('192.168.1.1.1'));

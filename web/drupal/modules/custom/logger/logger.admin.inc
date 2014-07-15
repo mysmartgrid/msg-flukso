@@ -78,7 +78,6 @@ function logger_userdevices_page() {
     $row[] = unixtime_to_localtime($device->access);
     $row[] = seconds_to_dayshours($device->uptime);
     $row[] = $links;
-
     $rows[] = $row;
   }
  
@@ -271,7 +270,6 @@ function logger_firmwareupgrade_page() {
   drupal_set_title(t('Device Firmware Upgrade'));
 
   $form = drupal_get_form('logger_firmwareupgradefilter_form');
-
   return drupal_render($form);
 }
 
@@ -303,7 +301,6 @@ function logger_firmware_edition_page($id) {
   }
 
   $form = drupal_get_form('logger_firmwareedition_form', $release);
-
   return drupal_render($form);
 }
 
@@ -315,21 +312,145 @@ function logger_firmware_edition_page($id) {
  */
 function logger_device_edition_page($id) {
 
-  $query = db_select('logger_devices', 'd')
-    ->fields('d', array('device', 'serial', 'description'))
-    ->condition('d.device', $id);
-
-  $query->join('logger_device_type', 't', 'd.type_id = t.id');
-  $query->addField('t', 'name', 'type_name');
-
-  $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
-  $query->addField('f', 'version', 'firmware_version');
-
-  $device = $query->execute()->fetchObject();
-
-  $form = drupal_get_form('logger_device_form', $device);
-
+  $form = drupal_get_form('logger_device_form', logger_get_device($id));
   return drupal_render($form);
+}
+
+/**
+ * Builds the device assignment page.
+ *
+ * @return the device assignment page.
+ */
+function logger_device_assign_page() {
+
+  $callback = isset($_REQUEST['callback']) ? urldecode($_REQUEST['callback']) : '';
+  $code = isset($_REQUEST['code']) ? $_REQUEST['code'] : '';
+  $output = '';
+
+  if (count($code) > 10 || !(empty($callback) || valid_url($callback))) {
+    $output = t("The wizard can not continue. Please contact our support team.");
+  }
+  else {
+    $output = empty($code) ? logger_step(1, 'Welcome to mySmartGrid! You are about to configure a device. ' . 
+        'Please inform your user account and the device activation code in the fields below.') : '';
+
+    $form = drupal_get_form('logger_deviceassign_form', $code, $callback);
+    $output .= drupal_render($form);
+  }
+  return $output;
+}
+
+/**
+ * Builds the device configuration page.
+ *
+ * @param $id    The device id.
+ * @param $page  The configuration wizard page number.
+ * @return the device configuration page.
+ */
+function logger_device_config_page($id, $page) {
+
+  $device = logger_get_device($id);
+
+  $header = array(
+    array('style' => 'background-color: white; border: 0;', 'width' => '200px'),
+    array('style' => 'background-color: white; border: 0;')
+  );
+  $rows = array(
+    array(t('Device Id'), $device->device),
+    array(t('Type'), $device->type_name),
+    array(t('Firmware Version'), $device->firmware_version)
+  );
+
+  $output = theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+    'caption' => '<b>' . t('Device') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => '')) . '<br>';
+
+  if ($page == 1) {
+    $output .= logger_step(2, 'Please, inform which network interfaces and sensors must be enabled on the device.') . '<br>';
+
+    $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
+    $output .= drupal_render($form);
+  }
+  else {
+    if ($device->pending_config) {
+
+      $output .= logger_step(3, 'The configuration below is being sent to the device. ' .
+        'Please make sure that the device is turned on and connected to the network during the next 10 minutes.') .
+        '<br><div id="progressbar"></div><br><br>';
+
+      $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (10 * MINUTE)) * 100;
+      $progress = $progress < 95 ? $progress : 95;
+
+      $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
+      drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
+      drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
+      drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
+        array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
+
+      drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
+        'http-equiv' => 'refresh', 'content' => "10;URL=/device/config/$id/2")), 'device_config');
+    }
+    else {
+      $output .= logger_step(4, 'Congratulations! The new configuration has been successfully applied to the device. ' .
+        'Click !here to see the list of active sensors.', array('!here' => l(t('here'), 'sensor/mylist'))) .
+        '<div align="center"><img src="/misc/message-24-ok.png" align="center">' . t('Configuration applied.') . '</div><br><br>';
+    }
+
+    $config_protocol_options = logger_get_config_protocol_options();
+
+    if ($device->lan_enabled) {
+      $rows = array(array(t('Configuration Protocol'), $config_protocol_options[$device->lan_protocol]));
+      if ($device->lan_protocol == 'static') {
+        $rows[] = array(t('IP address'), $device->lan_ip);
+        $rows[] = array(t('Gateway IP address'), $device->lan_gateway);
+        $rows[] = array(t('Network mask'), $device->lan_netmask);
+      }
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+          'caption' => '<b>' . t('LAN Interface') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+
+    if ($device->wifi_enabled) {
+      $rows = array(array(t('Configuration Protocol'), $config_protocol_options[$device->wifi_protocol]));
+      if ($device->wifi_protocol == 'static') {
+        $rows[] = array(t('IP address'), $device->wifi_ip);
+        $rows[] = array(t('Gateway IP address'), $device->wifi_gateway);
+        $rows[] = array(t('Network mask'), $device->wifi_netmask);
+      }
+      $rows[] = array(t('SSID'), $device->wifi_essid);
+      $encoding_protocol_options = logger_get_encoding_protocol_options();
+      $rows[] = array(t('Encoding'), $encoding_protocol_options[$device->wifi_enc]);
+      $rows[] = array(t('Key or passphrase'), $device->wifi_psk);
+
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+        'caption' => '<b>' . t('WIFI Interface') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+
+    $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, TRUE, $id, TRUE);
+    if (!empty($sensors)) {
+
+      $header = array(t('Sensor'), t('Function'), t('Class'), t('Voltage'), t('Current'), t('Constant'));
+      $rows = array();
+
+      foreach($sensors as $sensor) {
+        $rows[] = array(
+          wordwrap($sensor->meter, 16, ' ', TRUE),
+          $sensor->function,
+          $sensor->class_name,
+          ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->voltage . ' V' : '-'),
+          ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->current . ' A' : '-'),
+          ($sensor->class_id == PULSE_SENSOR_CLASS_ID ? $sensor->constant . ' ' . t('pulses/kWh') : '-')
+        );
+      }
+      $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
+          'caption' => '<b>' . t('Active Sensors') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+    }
+  }
+  return $output;
+}
+
+function logger_step($number, $message, $args = array()) {
+
+  return '<p><b>' . t('Step') . " $number - </b> " . t($message, $args) . '</p>';
 }
 
 /**
@@ -343,8 +464,10 @@ function logger_sensor_edition_page($meter = NULL) {
   if ($meter) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'external_id', 'type', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
+      ->fields('m', array('device', 'meter', 'external_id', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
       ->condition('m.meter', $meter);
+
+    $query->addField('m', 'type', 'type_id');
 
     $query->join('logger_devices', 'd', 'd.device = m.device');
     $query->addField('d', 'type_id', 'device_type_id');
@@ -356,8 +479,16 @@ function logger_sensor_edition_page($meter = NULL) {
 
     $query->join('logger_tokens', 'k', 'k.meter = m.meter');
     $query->addField('k', 'token', 'token');
-    $query->addField('k', 'domains', 'domains');
 
+    $query->leftJoin('logger_energy_meter', 'em', 'em.meter = m.meter');
+    $query->addField('em', 'voltage');
+    $query->addField('em', 'current');
+    $query->addField('em', 'constant');
+
+    $query->leftJoin('logger_energy_meter_class', 'mc', 'mc.id = em.class_id');   
+    $query->addField('mc', 'id', 'class_id');
+    $query->addField('mc', 'name', 'class_name');
+ 
     $sensor = $query->execute()
       ->fetchObject();
   }
@@ -366,7 +497,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->device = NULL;
     $sensor->meter = NULL;
     $sensor->external_id = NULL;
-    $sensor->type = ENERGY_CONSUMPTION_SENSOR_TYPE;
+    $sensor->type_id = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
     $sensor->forecast = 1;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
@@ -378,7 +509,11 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
     $sensor->device_type_id = FLUKSO2_DEVICE_TYPE_ID;
     $sensor->token = md5(uniqid(rand(), TRUE));
-    $sensor->domains = '';
+    $class->class_id = NULL;
+    $sensor->class_name = NULL;
+    $sensor->voltage = NULL;
+    $sensor->current = NULL;
+    $sensor->constant = NULL;
   }
 
   $form = drupal_get_form('logger_sensor_form', $sensor);
@@ -386,7 +521,7 @@ function logger_sensor_edition_page($meter = NULL) {
   return drupal_render($form);
 }
 
-function logger_device_form($form, &$form_state, $device) {
+function logger_device_form($form, &$form_state, $device, $form_id = "logger-device-form") {
 
   $form['type'] = array(
     '#type' => 'textfield',
@@ -438,15 +573,138 @@ function logger_device_form($form, &$form_state, $device) {
     '#description' => t("The device description."),
     '#maxlength' => 60,
     '#size' => 60,
-    '#required' => TRUE,
     '#default_value' => $device->description
+  );
+
+  $space = str_repeat('&nbsp;', 53);
+  $form['lan_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('LAN enabled'),
+    '#description' => t('Please inform whether the LAN network interface is enabled on the device.'),
+    '#default_value' => $device->lan_enabled,
+    '#return_value' => 1,
+    '#attributes' => array('onclick' => "javascript: showDeviceLANDiv('$form_id');"), //In IE, onchange does not work
+    '#prefix' => "<div class='field-group'>",
+  );
+
+  $form['lan_protocol'] = array(
+    '#type' => 'select',
+    '#title' => t('LAN Configuration'),
+    '#description' => t('Please inform how the LAN interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
+    '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'static',
+    '#options' => logger_get_config_protocol_options(),
+    '#prefix' => "<div id='lan-fields-div' style='display: none'>"
+  );
+
+  $form['lan_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN IP address'),
+    '#default_value' => $device->lan_ip,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address used by the LAN interface (for example: 192.168.1.1).'),
+  );
+
+  $form['lan_gateway'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN Gateway IP address'),
+    '#default_value' => $device->lan_gateway,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address of the gateway used by the LAN interface (for example: 192.168.1.254).'),
+  );
+
+  $form['lan_netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN Network mask'),
+    '#default_value' => $device->lan_netmask,
+    '#maxlength' => 15,
+    '#description' => t('Enter the network mask used by the LAN interface (for example: 255.255.255.0).'),
+    '#suffix' => '</div></div>'
+  );
+
+  $form['wifi_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('WIFI enabled'),
+    '#description' => t('Please inform whether the WIFI network interface is enabled on the device.'),
+    '#default_value' => $device->wifi_enabled,
+    '#return_value' => 1,
+    '#attributes' => array('onclick' => "javascript: showDeviceWIFIDiv('$form_id');"), //In IE, onchange does not work
+    '#prefix' => "<div class='field-group'>"
+  );
+
+  $form['wifi_protocol'] = array(
+    '#type' => 'select',
+    '#title' => t('WIFI Configuration'),
+    '#description' => t('Please inform how the WIFI interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
+    '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'wifi',
+    '#options' => logger_get_config_protocol_options(),
+    '#prefix' => "<div id='wifi-fields-div' style='display: none'>"
+  );
+
+  $form['wifi_ip'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI IP address'),
+    '#default_value' => $device->wifi_ip,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address used by the WIFI interface (for example: 192.168.1.1).'),
+  );
+
+  $form['wifi_gateway'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI Gateway IP address'),
+    '#default_value' => $device->wifi_gateway,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address of the gateway used by the WIFI interface (for example: 192.168.1.254).'),
+  );
+
+  $form['wifi_netmask'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI Network mask'),
+    '#default_value' => $device->wifi_netmask,
+    '#maxlength' => 15,
+    '#description' => t('Enter the network mask used by the WIFI interface (for example: 255.255.255.0).'),
+  );
+
+  $form['wifi_essid'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI SSID'),
+    '#default_value' => $device->wifi_essid,
+    '#maxlength' => 60,
+    '#description' => t('Enter the WIFI network name (for example: WLAN-183729).'),
+  );
+
+  $form['wifi_enc'] = array(
+    '#type' => 'select',
+    '#title' => t('WIFI Encoding'),
+    '#description' => t('Please inform which protocol the WIFI network interface uses for encoding the communication.'),
+    '#default_value' => $device->wifi_enc,
+    '#options' => logger_get_encoding_protocol_options(),
+  );
+
+  $form['wifi_psk'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI key or passphrase'),
+    '#description' => t('Enter the WIFI encryption key or passphrase (for example: 1A648C9FE2).'),
+    '#default_value' => $device->wifi_psk,
+    '#maxlength' => 60,
+    '#suffix' => '</div></div>'
   );
 
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
   );
+
+  drupal_add_js("jQuery(document).ready( function() { showDeviceLANDiv('$form_id'); showDeviceWIFIDiv('$form_id'); } );", array('type' => 'inline', 'scope' => 'footer'));
+
   return $form;
+}
+
+function logger_get_config_protocol_options() {
+  return array('static' => t('Static'), 'dhcp' => 'Dynamic (DHCP)');
+}
+
+function logger_get_encoding_protocol_options() {
+  return array('open' => t('No encryption'), 'wep' => 'WEP', 'wpa' => 'WPA', 'wpa2' => 'WPA2');
 }
 
 function logger_deviceactivation_form($form, &$form_state) {
@@ -463,6 +721,220 @@ function logger_deviceactivation_form($form, &$form_state) {
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Add device'),
+  );
+  return $form;
+}
+
+function logger_deviceassign_form($form, &$form_state, $code, $callback) {
+
+  $space = str_repeat('&nbsp;', 53);
+  $form['new_account'] = array(
+    '#type' => 'radios',
+    '#title' => t('mySmartGrid account'),
+    '#description' => t('Please inform whether you already have a mySmartGrid user account, or want to create one now.'),
+    '#options' => array(
+        0 => $space . t('I already have a mySmartGrid user account.'),
+        1 => $space . t('I want to create a mySmartGrid account now.')),
+    '#default_value' => 0,
+    '#attributes' => array('onchange' => "javascript: toggleDeviceAssignFields();"),
+    '#required' => TRUE
+  );
+
+  $div_style = !isset($_POST['new_account']) || $_POST['new_account'] == 0 ? '' : "style='display: none'";
+
+  $form['user_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User Name'),
+    '#description' => t("Enter your mySmartGrid user name."),
+    '#maxlength' => 60,
+    '#size' => 20,
+    '#prefix' => "<div id='user-fields-div' $div_style>"
+  );
+
+  $form['password'] = array(
+    '#type' => 'password',
+    '#title' => t('Password'),
+    '#description' => t("Enter your password."),
+    '#maxlength' => 128,
+    '#size' => 20,
+    '#suffix' => '</div>'
+  );
+
+  $div_style = isset($_POST['new_account']) && $_POST['new_account'] == 1 ? '' : "style='display: none'";
+
+  $form['new_user_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User Name'),
+    '#description' => t("Enter a name for your mySmartGrid user. Spaces are allowed; punctuation is not allowed except for periods, hyphens, apostrophes, and underscores."),
+    '#maxlength' => 60,
+    '#size' => 20,
+    '#prefix' => "<div id='new-user-fields-div' $div_style>"
+  );
+
+  $form['new_user_password'] = array(
+    '#type' => 'password',
+    '#title' => t('Password'),
+    '#description' => t('Enter a password for your user account. Please, do not use birth dates, dictionary words, number sequences. ' .
+      'A good password is mix of letters, numbers, and special characters, and contains at least 8 characters.'),
+    '#maxlength' => 128,
+    '#size' => 20
+  );
+
+  $form['new_user_password2'] = array(
+    '#type' => 'password',
+    '#title' => t('Retype Password'),
+    '#description' => t("Please, retype your password."),
+    '#maxlength' => 128,
+    '#size' => 20
+  );
+
+  $form['email'] = array(
+    '#type' => 'textfield',
+    '#title' => t('E-mail Address'),
+    '#description' => t("Enter your e-mail address."),
+    '#maxlength' => 60,
+    '#size' => 60,
+    '#suffix' => '</div>'
+  );
+
+  if (empty($code)) {
+    $form['code'] = array(
+      '#title' => t('Activation Code'),
+      '#type' => 'textfield',
+      '#description' => t('Please, inform the activation code of the device to be assigned to your account. This code is found in the device installation guide.'),
+      '#size' => 10,
+      '#maxlength' => 10,
+      '#required' => TRUE,
+    );
+  }
+  else {
+    $form['code'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $code,
+    );
+  }
+
+  $form['callback'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $callback,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Next')
+  );
+  return $form;
+}
+
+function logger_create_energy_sensor_fields(&$form, $sensor, $field_id_suffix = '') {
+
+  $is_dynamic_config = $sensor->device_type_id == FLUKSO2_DEVICE_TYPE_ID && ($sensor->type_id == ENERGY_CONSUMPTION_SENSOR_TYPE || $sensor->type_id == ENERGY_PRODUCTION_SENSOR_TYPE);
+
+  $form["class_id$field_id_suffix"] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $sensor->class_id,
+    '#access' => $is_dynamic_config && isset($sensor->class_id)
+  );
+
+  $form["class_name$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Class'),
+    '#description' => t('The sensor class (either Pulse or Analog).'),
+    '#maxlength' => 30,
+    '#size' => 10,
+    '#default_value' => $sensor->class_name,
+    '#attributes' => array('readonly' => 'readonly', 'class' => array('edit-class-name')),
+    '#access' => $is_dynamic_config && isset($sensor->class_id)
+  );
+
+  $form["voltage$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Voltage'),
+    '#description' => t("The sensor voltage in Volts."),
+    '#maxlength' => 6,
+    '#size' => 6,
+    '#required' => TRUE,
+    '#default_value' => $sensor->voltage,
+    '#field_suffix' => ' V',
+    '#attributes' => array('class' => array('edit-voltage')),
+    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
+  );
+
+  $form["current$field_id_suffix"] = array(
+    '#type' => 'select',
+    '#title' => t('Electric Current'),
+    '#description' => t("The sensor electric current in Amperes. The current is determined by the size of the clamp."),
+    '#options' => array(50 => 50, 100 => 100, 250 => 250, 500 => 500),
+    '#required' => TRUE,
+    '#default_value' => $sensor->current,
+    '#field_suffix' => ' A',
+    '#access' => $is_dynamic_config && $sensor->class_id == ANALOG_SENSOR_CLASS_ID
+  );
+
+  $form["constant$field_id_suffix"] = array(
+    '#type' => 'textfield',
+    '#title' => t('Constant'),
+    '#description' => t("The sensor constant."),
+    '#maxlength' => 10,
+    '#size' => 10,
+    '#required' => TRUE,
+    '#default_value' => $sensor->constant,
+    '#field_suffix' => ' ' . t('pulses/kWh'),
+    '#attributes' => array('class' => array('edit-constant')),
+    '#access' => $is_dynamic_config && $sensor->class_id == PULSE_SENSOR_CLASS_ID
+  );
+}
+
+function logger_deviceconfig_form($form, &$form_state, $device_id) {
+
+  $device = logger_get_device($device_id);
+  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
+  $form_id = "logger-deviceconfig-form";
+
+  $form = logger_device_form($form, $form_state, $device, $form_id);
+  $form['device']['#type'] = 'hidden';
+  unset($form['submit']);
+  unset($form['type']);
+  unset($form['firmware']);
+  unset($form['serial']);
+  unset($form['description']);
+
+  foreach($sensors as $sensor) {
+
+    if (isset($sensor->class_id)) {
+      $div_id = "sensor$sensor->meter-fields-div";
+
+      $enabled = !empty($sensor->function);
+      $form['enabled' . $sensor->meter] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Sensor enabled'),
+        '#description' => t('Please inform whether the sensor @meter should be enabled on the device.', array('@meter' => $sensor->meter)),
+        '#default_value' => $enabled,
+        '#field_suffix' => $sensor->meter,
+        '#return_value' => 1,
+        '#attributes' => array('onclick' => "javascript: showSensorDiv('$form_id', '$sensor->meter');"), //In IE, onchange does not work
+        '#prefix' => "<div class='field-group'>",
+        '#suffix' => "<div id='$div_id' " . ($enabled ? '' : "style='display: none'") . ">"
+      );
+
+      logger_create_energy_sensor_fields($form, $sensor, $sensor->meter);
+
+      $form['function' . $sensor->meter] = array(
+        '#type' => 'textfield',
+        '#title' => t('Name'),
+        '#description' => t("Enter the sensor's name."),
+        '#default_value' => $sensor->function,
+        '#maxlength' => 32,
+        '#size' => 15,
+        '#required' => TRUE,
+        '#suffix' => '</div></div>'
+      );
+    }
+  }
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save')
   );
   return $form;
 }
@@ -507,21 +979,6 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#default_value' => 0,
       '#weight' => 101
     );
-
-    $form['domains'] = array(
-      '#type' => 'textarea',
-      '#title' => t('Authorized Web Domains'),
-      '#description' => t("If you want to allow other websites to query the measurements of this sensor, " . 
-        "please inform their domains above (for example: www.yourcompany.com). " . 
-        "The domains must be specified either in multiple lines or separated by space. Click !here for more information.", array(
-          '!here' => l(t('here'), 'http://developer.mysmartgrid.de/doku.php?id=jsonpinterface'))),
-      '#rows' => 3,
-      '#resizable' => FALSE,
-      '#default_value' => $sensor->domains,
-      '#element_validate' => array('logger_token_domains_validate'),
-      '#weight' => 102,
-      '#access' => user_has_role('Expert')
-    );
   }
 
   if ($sensor->device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID) {
@@ -533,16 +990,17 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#size' => 64,
       '#required' => TRUE,
       '#default_value' => $sensor->external_id,
-      '#attributes' => array('readonly' => 'readonly')
+      '#attributes' => array('readonly' => 'readonly'),
+      '#access' => ($sensor->device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID)
     );
   }
 
-  $form['type'] = array(
+  $form['type_id'] = array(
     '#type' => 'select',
     '#title' => t('Type'),
     '#description' => t('The sensor type.'),
     '#options' => logger_get_sensor_types_options(NULL, $sensor->unit_type_id),
-    '#default_value' => $sensor->type,
+    '#default_value' => $sensor->type_id,
     '#required' => TRUE,
     '#attributes' => array(
       'readonly' => 'readonly',
@@ -583,6 +1041,8 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
     '#default_value' => $sensor->unit_name . ' (' . $sensor->unit_symbol . ')',
     '#attributes' => array('readonly' => 'readonly')
   );
+
+  logger_create_energy_sensor_fields($form, $sensor);
 
   //If creating or editing a virtual sensor
   if ($sensor->virtual) {
@@ -958,6 +1418,119 @@ function logger_deviceactivation_form_validate($form, &$form_state) {
   }
 }
 
+function logger_deviceassign_form_validate($form, &$form_state) {
+
+  //TODO: simplify this function
+
+  //User already has an account
+  if ($form_state['values']['new_account'] == 0) {
+
+    if (empty($form_state['values']['user_name'])) {
+      form_set_error('user_name', t('Please, inform your user name.'));
+    }
+    elseif (empty($form_state['values']['password'])) {
+      form_set_error('password', t('Please, type the password.'));
+    }
+    else {
+      $form_state['values']['uid'] = logger_authenticate_user($form_state['values']['user_name'], $form_state['values']['password']);
+
+      if ($form_state['values']['uid']) {
+        $account = user_load($form_state['values']['uid']);
+      }
+      else {
+        form_set_error('password', t('User authentication failed.'));
+      }
+    }
+  }
+  else {
+    //New user
+    if (empty($form_state['values']['new_user_name'])) {
+      form_set_error('new_user_name', t('Please inform a user name.'));
+    }
+    elseif (user_load_by_name($form_state['values']['new_user_name'])) {
+      form_set_error('new_user_name', t('This user name is taken. Please inform another one.'));
+    }
+    elseif (empty($form_state['values']['email'])) {
+      form_set_error('email', t('Please, inform the e-mail address.'));
+    }
+    elseif (user_validate_mail($form_state['values']['email'])) {//TRUE when invalid
+      form_set_error('email', t('Please, inform a valid email.'));
+    }
+    elseif (empty($form_state['values']['new_user_password'])) {
+      form_set_error('new_user_password', t('Please, type the password.'));
+    }
+    elseif (strlen($form_state['values']['new_user_password']) < 6) {
+      form_set_error('new_user_password', t('The password must contain at least 6 characters.'));
+    }
+    elseif (empty($form_state['values']['new_user_password2'])) {
+      form_set_error('new_user_password2', t('Please, retype the password.'));
+    }
+    elseif ($form_state['values']['new_user_password2'] != $form_state['values']['new_user_password']) {
+      form_set_error('new_user_password2', t('The password has not been retyped correctly.'));
+    }
+    else {
+      $account = new stdClass();
+      $account->is_new = TRUE;
+      $account->name = $form_state['values']['new_user_name'];
+      $account->pass = $form_state['values']['new_user_password'];
+      $account->mail = $form_state['values']['email'];
+      $account->status = 1;
+      $account->timezone = date_default_timezone_get();
+
+      if (user_save($account)) {
+        $account = user_load_by_name($account->name);
+        user_save($account, array('pass' => $account->pass));
+
+        $form_state['values']['uid'] = logger_authenticate_user($form_state['values']['new_user_name'], $form_state['values']['new_user_password']);
+        if (!$form_state['values']['uid']) {
+          form_set_error('new_user_password', t('User authentication failed.'));
+        }
+      }
+      if (!isset($form_state['values']['uid']) || !$form_state['values']['uid']) {
+        form_set_error('User could not be created. Please, try again later.');
+      }
+    }
+  }
+
+  if ($form_state['values']['uid']) {
+
+    $uid = $form_state['values']['uid'];
+    $code = $form_state['values']['code'];
+    $device = db_select('logger_devices', 'd')
+      ->fields('d', array('type_id'))
+      ->condition('d.device', "$code%", 'LIKE')
+      ->condition('d.uid', array(0, $uid), 'IN')
+      ->execute()
+      ->fetchObject();
+
+    if (!$device) {
+      form_set_error('code', t('The device can not be linked to your user account. Please make sure it is not already linked to another account.'));
+    }
+    elseif ($device->type_id == RASPBERRY_PI_DEVICE_TYPE_ID) {
+
+      //FIXME: get rid of the role 'EMOS'
+      $rid = get_role_id('EMOS');
+
+      db_delete('users_roles')
+        ->condition('uid', $uid)
+        ->condition('rid', $rid)
+        ->execute();
+
+      db_insert('users_roles')
+        ->fields(array(
+          'uid' => $uid,
+          'rid' => $rid
+        ))
+        ->execute();
+    }
+  }
+}
+
+function logger_deviceconfig_form_validate($form, &$form_state) {
+
+  logger_device_form_validate($form, &$form_state);
+}
+
 function logger_sensor_form_validate($form, &$form_state) {
 
   $in_edition = isset($form_state['values']['meter']);
@@ -986,9 +1559,24 @@ function logger_sensor_form_validate($form, &$form_state) {
 
   if ($in_edition) {
 
-    $domains = $form_state['values']['domains'];
     $token = isset($form_state['values']['reset_token']) && $form_state['values']['reset_token'] ? NULL : $form_state['values']['token'];
-    logger_token_save($meter, $token, $form_state['values']['domains']);
+    logger_token_save($meter, $token);
+
+    if (isset($form_state['values']['class_id'])) {
+      $class_id = $form_state['values']['class_id'];
+
+      if ($class_id == ANALOG_SENSOR_CLASS_ID) {
+        if ($form_state['values']['voltage'] < 100 || $form_state['values']['voltage'] > 1000) {
+          form_set_error('voltage', t('Invalid voltage.'));
+        }
+        if (!in_array($form_state['values']['current'], array(50, 100, 250, 500))) {
+          form_set_error('voltage', t('Invalid electric current.'));
+        }
+      }
+      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] < 0 || $form_state['values']['constant'] > 1000)) {
+        form_set_error('voltage', t('Invalid sensor constant.'));
+      }
+    }
   }
   else {
     $aggregated_meters = get_selected_combobox_options($form_state['values']['aggregated_meters']);
@@ -1024,20 +1612,73 @@ function logger_firmwareedition_form_validate($form, &$form_state) {
   }
 }
 
-function logger_get_device_firmware($id) {
+function logger_device_form_validate($form, &$form_state) {
 
-  return db_select('logger_device_firmware', 'f')
-    ->fields('f', array('id', 'version', 'upgradable', 'device_type_id'))
-    ->condition('f.id', $id)
-    ->execute()
-    ->fetchObject();
+  if (isset($form_state['values']['description']) && !preg_match('/^[\x20-\x7e\xc2a1-\xc3bf€]*$/', $form_state['values']['description'])) {
+    form_set_error('description', t('The device description contains non-printable characters.'));
+  }
+
+  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask', 'lan_protocol');
+  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask', 'wifi_protocol');
+
+  if ($form_state['values']['wifi_enabled']) {
+    if (empty($form_state['values']['wifi_essid'])) {
+      form_set_error('wifi_essid', t('The WIFI network name must be informed.'));
+    }
+    if ($form_state['values']['wifi_enc'] == 'open') {
+      if (empty($form_state['values']['wifi_psk'])) {
+        form_set_error('wifi_psk', t('The WIFI encryption key or passphrase must be informed.'));
+      }
+      else {
+        form_set_error('wifi_psk', t('The WIFI encryption key or passphrase is used only by encrypted communication.'));
+      }
+    }
+  }
 }
 
 function logger_device_form_submit($form, &$form_state) {
 
+  db_delete('logger_device_network')
+    ->condition('device', $form_state['values']['device'])
+    ->execute();
+
+  $lan_enabled = isset($form_state['values']['lan_enabled']) && $form_state['values']['lan_enabled'] == 1 ? 1 : 0;
+  $wifi_enabled = isset($form_state['values']['wifi_enabled']) && $form_state['values']['wifi_enabled'] == 1 ? 1 : 0;
+
+  if ($lan_enabled || $wifi_enabled) {
+
+    $fields = array(
+      'device' => $form_state['values']['device'],
+      'lan_enabled' => $lan_enabled,
+      'wifi_enabled' => $wifi_enabled
+    );
+
+    if ($lan_enabled) {
+      $fields['lan_protocol'] = $form_state['values']['lan_protocol'];
+      $fields['lan_ip'] = $form_state['values']['lan_ip']; 
+      $fields['lan_netmask'] = $form_state['values']['lan_netmask'];
+      $fields['lan_gateway'] = $form_state['values']['lan_gateway'];
+    }
+
+    if ($wifi_enabled) {
+      $fields['wifi_protocol'] = $form_state['values']['wifi_protocol'];
+      $fields['wifi_ip'] = $form_state['values']['wifi_ip'];
+      $fields['wifi_netmask'] = $form_state['values']['wifi_netmask'];
+      $fields['wifi_gateway'] = $form_state['values']['wifi_gateway'];
+      $fields['wifi_essid'] = $form_state['values']['wifi_essid'];
+      $fields['wifi_enc'] = $form_state['values']['wifi_enc'];
+      $fields['wifi_psk'] = $form_state['values']['wifi_psk'];
+    }
+
+    db_insert('logger_device_network')
+      ->fields($fields)
+      ->execute();
+  }
+
   db_update('logger_devices')
     ->fields(array(
-      'description' => $form_state['values']['description']
+      'description' => $form_state['values']['description'],
+      'pending_config' => 1
     ))
     ->condition('device', $form_state['values']['device'])
     ->execute();
@@ -1050,6 +1691,61 @@ function logger_deviceactivation_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'device/activate/' . $form_state['values']['code'];
 }
 
+function logger_deviceassign_form_submit($form, &$form_state) {
+
+  module_load_include('inc', 'logger', 'logger.admin');
+
+  $code = $form_state['values']['code'];
+  logger_device_assign($code);
+
+  if (empty($form_state['values']['callback'])) {
+
+    $device = db_select('logger_devices', 'd')
+      ->fields('d', array('device'))
+      ->condition('d.device', "$code%", 'LIKE')
+      ->execute()
+      ->fetchField();
+
+    $form_state['redirect'] = "device/config/$device/1";
+  }
+  else {
+    $form_state['redirect'] = array($form_state['values']['callback'], array('external' => TRUE));
+  }
+}
+
+function logger_deviceconfig_form_submit($form, &$form_state) {
+
+  foreach($form_state['values'] as $key => $value) {
+
+    if (strpos($key, "function") === 0) {
+      $meter = substr($key, 8);
+      $function = $form_state['values']["function$meter"];
+
+      if (!empty($function)) {
+
+        db_update('logger_energy_meter')
+          ->fields(array(
+            'voltage' => (isset($form_state['values']["voltage$meter"]) ? $form_state['values']["voltage$meter"] : NULL),
+            'current' => (isset($form_state['values']["current$meter"]) ? $form_state['values']["current$meter"] : NULL),
+            'constant' => (isset($form_state['values']["constant$meter"]) ? $form_state['values']["constant$meter"] : NULL)
+          ))
+          ->condition('meter', $meter)
+          ->execute();
+
+        db_update('logger_meters')
+          ->fields(array(
+            'function' => $function
+          ))
+          ->condition('meter', $meter)
+          ->execute();
+      }
+    }
+  }
+  $form_state['values']['description'] = '';
+  logger_device_form_submit($form, &$form_state);
+  $form_state['redirect'] = 'device/config/' . $form_state['values']['device'] . '/2';
+}
+
 function logger_sensor_form_submit($form, &$form_state) {
 
   //TODO: refactor this function
@@ -1057,14 +1753,15 @@ function logger_sensor_form_submit($form, &$form_state) {
   global $user;
 
   $function = $form_state['values']['function'];
-  $type = $form_state['values']['type'];
+  $type_id = $form_state['values']['type_id'];
   $price = isset($form_state['values']['price']) ? $form_state['values']['price'] : 0;
+  $device = $form_state['values']['device'];
 
   //If edition
   if (isset($form_state['values']['meter'])) {
 
     $meter = $form_state['values']['meter'];
-    $fields = array('function' => $function, 'type' => $type);
+    $fields = array('function' => $function, 'type' => $type_id);
 
     if ($price > 0) {
       $fields['price'] = $price;
@@ -1082,17 +1779,36 @@ function logger_sensor_form_submit($form, &$form_state) {
       ->fields($fields)
       ->condition('meter', $meter)
       ->execute();
+
+    if (isset($form_state['values']['voltage'])) {
+
+      db_update('logger_energy_meter')
+        ->fields(array(
+          'meter' => $meter,
+          'voltage' => $form_state['values']['voltage'],
+          'current' => $form_state['values']['current'],
+          'constant' => $form_state['values']['constant']
+        ))
+        ->condition('meter', $meter)
+        ->execute();
+    }
+
+    db_update('logger_devices')
+      ->fields(array(
+        'pending_config' => 1
+      ))
+      ->condition('device', $device)
+      ->execute();
   }
   //If creation
   else {
     $meter = md5(uniqid(rand(), TRUE));
     $token = md5(uniqid(rand(), TRUE));
-    $device = $form_state['values']['device'];
     $forecast = isset($form_state['values']['forecast']) ? $form_state['values']['forecast'][1] : 0;
     $latitude = isset($_REQUEST['coordinates_latitude']) ? $_REQUEST['coordinates_latitude'] : 0;
     $longitude = isset($_REQUEST['coordinates_longitude']) ? $_REQUEST['coordinates_longitude'] : 0;
 
-    logger_sensor_add($meter, $device, time(), $token, 62, $function, $type, 1, $forecast, $latitude, $longitude, $price);
+    logger_sensor_add($meter, $device, time(), $token, 62, $function, $type_id, 1, $forecast, $latitude, $longitude, $price);
   }
 
   if (isset($form_state['values']['aggregated_meters'])) {
@@ -1115,7 +1831,6 @@ function logger_sensor_form_submit($form, &$form_state) {
       pvcast_update_plant($meter, $latitude, $longitude);
     }
   }
-
   $form_state['redirect'] = "sensor/mylist";
 }
 
@@ -1177,9 +1892,6 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
   //If edition
   if (isset($form_state['values']['id'])) {
 
-    //FIXME
-    system("echo 1 >> /oo.txt");
-
     db_update('logger_device_firmware')
       ->fields(array(
         'device_type_id' => $form_state['values']['device_type_id'],
@@ -1196,9 +1908,6 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
   //If creation
   else {
 
-    //FIXME
-    system("echo 2 >> /oo.txt");
-
     db_insert('logger_device_firmware')
       ->fields(array(
         'device_type_id' => $form_state['values']['device_type_id'],
@@ -1212,10 +1921,28 @@ function logger_firmwareedition_form_submit($form, &$form_state) {
       ->execute();
   }
 
-  //FIXME
-  system("echo 3 >> /oo.txt");
-
   $form_state['redirect'] = "firmware/list";
+}
+
+/**
+ * Authenticates a user.
+ *
+ * @param $login    The user login name.
+ * @param $password The user password.
+ * @return the user id.
+ */
+function logger_authenticate_user($login, $password) {
+
+  $uid = user_authenticate($login, $password);
+
+  if ($uid) {
+    $account = user_load_by_name($login);
+    user_save($account, array('pass' => $password));
+
+    $fields = array('uid' => $uid);
+    user_login_submit(array(), $fields);
+  }
+  return $uid;
 }
 
 /**
@@ -1324,8 +2051,8 @@ function logger_device_remove($device) {
   module_load_include('inc', 'logger', 'logger.rrd');
 
   $sensors = db_select('logger_meters', 'm')
-    ->fields('m')
-    ->condition('m.device', $device, '=')
+    ->fields('m', array('meter'))
+    ->condition('m.device', $device)
     ->execute();
 
   foreach ($sensors as $sensor) {
@@ -1506,6 +2233,10 @@ function logger_sensor_remove($meter) {
     ->condition('meter', $meter)
     ->execute();
 
+  db_delete('logger_energy_meter')
+    ->condition('meter', $meter)
+    ->execute();
+
   db_delete('logger_meters')
     ->condition('meter', $meter)
     ->execute();
@@ -1575,7 +2306,7 @@ function logger_sensor_add($meter, $device, $created, $token, $permissions, $fun
 /**
  * Saves a sensor token.
  */
-function logger_token_save($meter, $token = NULL, $domains = '') {
+function logger_token_save($meter, $token = NULL) {
 
   if (!$token) {
     $token = md5(uniqid(rand(), TRUE));
@@ -1583,7 +2314,6 @@ function logger_token_save($meter, $token = NULL, $domains = '') {
 
   db_update('logger_tokens')
     ->fields(array(
-      'domains' => $domains,
       'token' => $token
     ))
     ->condition('meter', $meter)
@@ -1662,11 +2392,4 @@ function logger_firmware_upgrade_disapprove($device) {
   drupal_set_message('The firmware upgrade has been rejected.', 'warning');
 
   drupal_goto("energy");
-}
-
-function logger_token_domains_validate($field, $form_state) {
-
-  if (isset($form_state['values']['domains']) && !empty($form_state['values']['domains']) && !validate_domains($form_state['values']['domains'])) {
-    form_error($field, t('Invalid web domains.'));
-  }
 }

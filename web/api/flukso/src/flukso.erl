@@ -64,7 +64,7 @@ mysql_prepare() ->
     mysql:prepare(sensor_agg_update, <<"UPDATE logger_aggregated_meters SET meter = ? WHERE meter = ?">>),
     mysql:prepare(sensor_storage_delete, <<"DELETE FROM logger_meter_storage WHERE meter = ?">>),
     mysql:prepare(sensor_storage_update, <<"UPDATE logger_meter_storage SET meter = ? WHERE meter = ?">>),
-    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, 0, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
+    mysql:prepare(sensor_insert, <<"INSERT INTO logger_meters (meter, device, created, access, type, external_id, function, description, phase, value, factor, unit_id, price, latitude, longitude) SELECT ?, device, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, 0.18, 49.444710, 7.769031 FROM logger_devices WHERE device = ?">>),
 
     mysql:prepare(energy_sensor_update, <<"UPDATE logger_energy_meter SET class_id = ?, voltage = ?, current = ?, constant = ? WHERE meter = ?">>),
     mysql:prepare(energy_sensor_insert, <<"INSERT INTO logger_energy_meter(meter, class_id, voltage, current, constant) VALUES(?, ?, ?, ?, ?)">>),
@@ -80,10 +80,10 @@ mysql_prepare() ->
     mysql:prepare(device_insert, <<"INSERT INTO logger_devices (device, serial, uid, sha, created, firmware_id, resets, uptime, memtotal, memfree, memcached, membuffers, country, description, type_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_delete, <<"DELETE FROM logger_devices WHERE device = ?">>),
 
-    mysql:prepare(device_network_insert, <<"INSERT INTO logger_device_network (device, pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
-    mysql:prepare(device_network_update, <<"UPDATE logger_device_network set pending = ? WHERE device = ?">>),
+    mysql:prepare(device_network_insert, <<"INSERT INTO logger_device_network (device, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
+    mysql:prepare(device_config_update, <<"UPDATE logger_devices set pending_config = ? WHERE device = ?">>),
     mysql:prepare(device_network_delete, <<"DELETE FROM logger_device_network WHERE device = ?">>),
-    mysql:prepare(device_network_props, <<"SELECT pending, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway FROM logger_device_network WHERE device = ?">>),
+    mysql:prepare(device_network_props, <<"SELECT d.pending_config, n.lan_enabled, n.lan_protocol, n.lan_ip, n.lan_netmask, n.lan_gateway, n.wifi_enabled, n.wifi_essid, n.wifi_enc, n.wifi_psk, n.wifi_protocol, n.wifi_ip, n.wifi_netmask, n.wifi_gateway FROM logger_devices d, logger_device_network n WHERE d.device = n.device AND d.device = ?">>),
 
     mysql:prepare(firmware_props, <<"SELECT id, release_time, build, tag, upgradable FROM logger_device_firmware WHERE version = ? AND device_type_id = ?">>),
     mysql:prepare(firmware_upgrade_delete, <<"DELETE FROM logger_firmware_upgrade_request WHERE device = ?">>),

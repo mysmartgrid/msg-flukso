@@ -86,3 +86,8 @@ function showDeviceIssueEvents(show) {
     hideDetailsLink.style.display = "none";
   }
 }
+
+function refreshNotificationForm() {
+  var deviceField = document.getElementById("edit-device");
+  window.location = "/notification/register?device=" + deviceField.options[deviceField.selectedIndex].value;
+}

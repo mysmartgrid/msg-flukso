@@ -119,6 +119,26 @@ function notification_schema() {
     ))
   );
 
+  $schema['notification_meter'] = array(
+    'description' => 'Stores sensors considered by the notification',
+    'fields' => array(
+      'notification_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE
+      ),
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE
+      )
+    ),
+    'primary key' => array(
+      'notification_id',
+      'meter'
+    )
+  );
+
   $schema['event_log'] = array(
     'description' => 'Stores device events',
     'fields' => array(
@@ -714,4 +734,63 @@ function notification_update_7014() {
   ));
 
   return st("Field limit_up has been resized.");
+}
+
+/**
+ * Create table notification_meter.
+ */
+function notification_update_7020() {
+
+  db_create_table('notification_meter', drupal_get_schema_unprocessed('notification', 'notification_meter'));
+
+  $notifications = db_select('notification', 'n')
+    ->fields('n', array('id', 'device', 'event_id'))
+    ->execute();
+
+  foreach ($notifications as $notification) {
+
+    $query = notification_meter_create_query_aux($notification);
+
+    if ($notification->event_id == SUMMARY_REPORT_EVENT_ID ||
+        $notification->event_id == ANY_DEVICE_ISSUE_EVENT_ID ||
+        $notification->event_id == FORECAST_REPORT_EVENT_ID ||
+        $notification->event_id == MEASUREMENT_ANOMALY_EVENT_ID) {
+
+      $sensors = $query->condition('m.type', ENERGY_PRODUCTION_SENSOR_TYPE)->execute();
+      notification_meter_insert_aux($sensors, $notification);
+    }
+
+    if ($notification->event_id == SUMMARY_REPORT_EVENT_ID ||
+        $notification->event_id == ANY_DEVICE_ISSUE_EVENT_ID ||
+        $notification->event_id == PEAK_CONSUMPTION_EVENT_ID ||
+        $notification->event_id == LOW_CONSUMPTION_EVENT_ID ||
+        $notification->event_id == MEASUREMENT_RECEIVED_EVENT_ID) {
+
+      $sensors = $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE)->execute();
+      notification_meter_insert_aux($sensors, $notification);
+    }
+  }
+  return st("The table notification_meter has been created.");
+}
+
+function notification_meter_create_query_aux($notification) {
+
+  $query = db_select('logger_meters', 'm')
+    ->fields('m', array('meter'))
+    ->condition('m.device', $notification->device)
+    ->isNotNull('m.function');
+  return $query;
+}
+
+function notification_meter_insert_aux($sensors, $notification) {
+
+  foreach ($sensors as $sensor) {
+
+    db_insert('notification_meter')
+      ->fields(array(
+        'notification_id' => $notification->id,
+        'meter' => $sensor->meter
+      ))
+      ->execute();
+  }
 }

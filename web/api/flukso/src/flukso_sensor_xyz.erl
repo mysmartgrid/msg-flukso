@@ -477,7 +477,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
                         [[DeviceType]] = mysql:get_result_rows(Res),
                         RrdFactor = case DeviceType of ?FLUKSO2_DEVICE_TYPE_ID -> 1000; _ -> 1 end,
 
-                        mysql:execute(pool, sensor_insert, [Sensor, Timestamp, SensorType, ExternalId, Function, Description, RrdFactor, UnitId, Device]),
+                        mysql:execute(pool, sensor_insert, [Sensor, Timestamp, Timestamp, SensorType, ExternalId, Function, Description, RrdFactor, UnitId, Device]),
                         mysql:execute(pool, token_insert, [Token, Sensor, 62]),
                         process_energy_sensor(Params, false, Sensor);
 

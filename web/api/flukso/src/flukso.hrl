@@ -67,6 +67,7 @@
 -define(HTTP_NON_UPGRADABLE_FIRMWARE, 478).
 -define(HTTP_INVALID_EXTERNAL_ID,     479).
 -define(HTTP_INVALID_CHARS,           480).
+-define(HTTP_INVALID_NETWORK,         481).
 -define(HTTP_INTERNAL_SERVER_ERROR,   500).
 -define(HTTP_NOT_IMPLEMENTED,         501).
 
@@ -211,6 +212,31 @@ check_printable_chars(String) ->
         {match, _} -> true;
         _ -> false
     end}.
+
+
+check_ip(Protocol, Ip) ->
+  {Ip, Valid} = case {Protocol, Ip} of
+    {<<"dhcp">>, undefined} -> {undefined, true};
+    {<<"static">>, Ip} -> check_ip(Ip);
+    _ -> {Ip, false}
+  end,
+  {Protocol, Ip, Valid}.
+
+check_ip(Ip) ->
+  {Ip, case re:run(Ip, "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+*$") of
+      {match, _} -> true;
+      _ -> false
+  end}.
+
+check_wifi_psk(Enc, Psk) ->
+  {Psk, Valid} = case {Enc, Psk} of
+    {<<"open">>, undefined} -> {undefined, true};
+    {<<"wpa">>, Psk} -> check_printable_chars(Psk);
+    {<<"wpa2">>, Psk} -> check_printable_chars(Psk);
+    _ -> {Psk, false}
+  end,
+  {Enc, Psk, Valid}.
+
 
 check_time(undefined, undefined, _End, _Resolution) ->
     {false, false, false, false};

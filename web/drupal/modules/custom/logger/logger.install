@@ -151,6 +151,12 @@ function logger_schema() {
         'not null' => TRUE,
         'unasigned' => TRUE,
       ),
+      'pending_config' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
     ),
     'primary key' => array('device'),
   );
@@ -162,11 +168,6 @@ function logger_schema() {
         'type' => 'varchar',
         'length' => '32',
         'not null' => TRUE,
-      ),
-      'pending' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'unasigned' => TRUE,
       ),
       'lan_enabled' => array(
         'type' => 'int',
@@ -180,17 +181,17 @@ function logger_schema() {
       ),
       'lan_ip' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'lan_netmask' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'lan_gateway' => array(
         'type' => 'varchar',
-        'length' => 14,
+        'length' => 15,
         'not null' => FALSE
       ),
       'wifi_enabled' => array(
@@ -201,37 +202,30 @@ function logger_schema() {
       'wifi_essid' => array(
         'type' => 'varchar',
         'length' => 60,
-        'not null' => TRUE
       ),
       'wifi_enc' => array(
         'type' => 'varchar',
         'length' => 5,
-        'not null' => TRUE
       ),
       'wifi_psk' => array(
         'type' => 'varchar',
         'length' => 60,
-        'not null' => TRUE
       ),
       'wifi_protocol' => array(
         'type' => 'varchar',
         'length' => '6',
-        'not null' => TRUE,
       ),
       'wifi_ip' => array(
         'type' => 'varchar',
-        'length' => 14,
-        'not null' => FALSE
+        'length' => 15,
       ),
       'wifi_netmask' => array(
         'type' => 'varchar',
-        'length' => 14,
-        'not null' => FALSE 
+        'length' => 15,
       ),
       'wifi_gateway' => array(
         'type' => 'varchar',
-        'length' => 14,
-        'not null' => FALSE
+        'length' => 15,
       ),
     ),
     'primary key' => array('device')
@@ -431,10 +425,6 @@ function logger_schema() {
         'size' => 'tiny',
         'not null' => TRUE,
         'default' => 62
-      ),
-     'domains' => array(
-        'type' => 'text',
-        'not null' => FALSE,
       ),
     ),
     'primary key' => array('token')
@@ -2495,4 +2485,100 @@ function logger_update_7126() {
     }
   }
   return st("PVCast plants have been updated.");
+}
+
+/**
+ * Inserts the Flukso firmware version 2.1.0-3.
+ */
+function logger_update_7127() {
+
+  db_insert('logger_device_firmware')
+    ->fields(array(
+      'id' => 26,
+      'version' => '2.1.0-3',
+      'release_time' => '20140127_1649',
+      'build' => 'c5a213262b882c595ccc9b2f3dcc3de5ddedee6e',
+      'tag' => 'flukso-2.1.0-3',
+      'device_type_id' => 2,
+      'upgradable' => 1,
+      'description' => 'Flukso Version 2.1.0-3'
+    ))
+    ->execute();
+
+  return st('Flukso firmware version 2.1.0-3 has been created.');
+}
+
+/**
+ * Recreates table logger_device_network.
+ */
+function logger_update_7128() {
+
+  db_drop_table('logger_device_network');
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been recreated.");
+}
+
+/**
+ * Create field pending_config on table logger_devices.
+ */
+function logger_update_7129() {
+
+  db_drop_field('logger_device_network', 'pending');
+
+  db_add_field('logger_devices', 'pending_config', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  return st("The field pending_config has been created on table logger_devices."); 
+}
+
+/**
+ * Drop field domains from table logger_tokens.
+ */
+function logger_update_7130() {
+
+  db_drop_field('logger_tokens', 'domains');
+
+  return st("The field domains has been dropped from table logger_tokens.");
+}
+
+/**
+ * Drop fields from table logger_devices.
+ */
+function logger_update_7131() {
+
+  db_drop_field('logger_devices', 'sensor');
+  db_drop_field('logger_devices', 'comment');
+
+  return st("Unused fields have been dropped from table logger_devices.");
+}
+
+/**
+ * Update field access in table logger_meters.
+ */
+function logger_update_7133() {
+
+  db_update('logger_meters')
+    ->expression('access', 'created')
+    ->condition('access', 0)
+    ->execute();
+
+  return st("Field access in table logger_meters has been updated.");
+}
+
+/**
+ * Recreates table logger_device_network.
+ */
+function logger_update_7134() {
+
+  db_drop_table('logger_device_network');
+
+  db_create_table('logger_device_network', drupal_get_schema_unprocessed('logger', 'logger_device_network'));
+
+  return st("The table logger_device_network has been recreated.");
 }

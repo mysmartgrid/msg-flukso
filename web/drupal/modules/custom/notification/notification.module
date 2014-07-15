@@ -227,6 +227,8 @@ function notification_edition_page($device, $event_id, $limit_up, $unit_id) {
   $query->join('event', 'e', 'e.id = n.event_id');
   $query->join('logger_devices', 'd', 'd.device = n.device');
   $query->addField('e', 'name', 'event_name');
+  $query->join('logger_device_type', 't', 'd.type_id = t.id');
+  $query->addField('t', 'name', 'type_name');
 
   $notification = $query
     ->fields('n', array('id', 'device', 'event_id', 'limit_up', 'unit_id', 'emails', 'min_interval', 'base_time'))
@@ -423,7 +425,7 @@ function notification_eventlog_clear_old() {
 
     db_delete('event_log')
       ->condition('device', $log->device)
-      ->condition('time', $log->last_time - 3 * DAY, '<')
+      ->condition('time', $log->last_time - 2 * DAY, '<')
       ->execute();
   }
 }
@@ -475,11 +477,33 @@ function notification_registration_form($form, &$form_state) {
 
   global $user;
 
+  $device_options = logger_get_devices_options();
+  if (isset($_REQUEST['device'])) {
+    $device = $_REQUEST['device'];
+  }
+  else {
+    $devices = array_keys($device_options);
+    $device = $devices[0];
+  }
+
   $form['device'] = array(
     '#type' => 'select',
-    '#title' => t('Serial Number'),
-    '#description' => t('Select the serial number of the monitored device.'),
-    '#options' => logger_get_devices_options(),
+    '#title' => t('Device'),
+    '#description' => t('For which device should the notification be configured? ' . 
+      'Please, select the device to be monitored. Each element in the list informs the type and serial number of a device.'),
+    '#options' => $device_options,
+    '#default_value' => $device,
+    '#attributes' => array('onchange' => 'refreshNotificationForm()'), //FIXME: In IE, onchange does not work 
+  );
+
+  $meter_options = logger_get_meters_options(NULL, FALSE, $device);
+  $form['selected_meters'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Sensors'),
+    '#description' => t('Select which sensors of the device will be monitored for the event notifications.'),
+    '#options' => $meter_options,
+    '#default_value' => array_keys($meter_options),
+    '#required' => TRUE,
   );
 
   $form['emails'] = array(
@@ -663,12 +687,39 @@ function notification_edition_form($form, &$form_state, $notification) {
     '#attributes' => array('readOnly' => 'true'),
   );
 
+  $form['type'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Device Type'),
+    '#required' => TRUE,
+    '#default_value' => $notification->type_name,
+    '#attributes' => array('readOnly' => 'true'),
+  );
+
   $form['serial'] = array(
     '#type' => 'textfield',
-    '#title' => t('Serial Number'),
+    '#title' => t('Device Serial Number'),
     '#required' => TRUE,
     '#default_value' => $notification->serial,
     '#attributes' => array('readOnly' => 'true'),
+  );
+
+  $meter_options = logger_get_meters_options(NULL, FALSE, $notification->device);
+  $notification_meters = array();
+  $result = db_select('notification_meter', 'nm')
+    ->fields('nm', array('meter'))
+    ->condition('nm.notification_id', $notification->id)
+    ->execute();
+  foreach($result as $selected_sensor) {
+    $notification_meters[] = $selected_sensor->meter;
+  }
+
+  $form['selected_meters'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Sensors'),
+    '#description' => t('Select which sensors of the device will be monitored for the event notifications.'),
+    '#options' => $meter_options,
+    '#default_value' => $notification_meters,
+    '#required' => TRUE,
   );
 
   $form['emails'] = array(
@@ -974,7 +1025,7 @@ function notification_newsletter_form_submit($form, &$form_state) {
  * @param $values     the array of field values describing the event notification.
  * @param $event_id   the event id.
  * @param $parent_id  the parent notification, if any (optional).
- * @return the notification id if the notification was registered; NULL otherwise.
+ * @return the notification id if the notification was registered; NULL otherwise.%FIXME: improve this line.
  */
 function notification_register_event($values, $event_id, $parent_id = NULL) {
 
@@ -982,10 +1033,10 @@ function notification_register_event($values, $event_id, $parent_id = NULL) {
 
   if ($selected) {
 
+    $id = NULL;
     $device = $values['device'];
     $limit_up = isset($values["limit_up$event_id"]) ? $values["limit_up$event_id"] : 0;
     $unit_id = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
-
     $emails = $values['emails'];
     $min_interval = $values['min_interval'];
     $base_time = DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp();
@@ -995,18 +1046,33 @@ function notification_register_event($values, $event_id, $parent_id = NULL) {
     if ($notification) {
       $values = array('emails' => $emails, 'min_interval' => $min_interval, 'parent_id' => $parent_id, 'base_time' => $base_time);
       notification_update($device, $event_id, $limit_up, $unit_id, $values);
-      return $notification->id;
+      $id = $notification->id;
+
+      db_delete('notification_meter')
+        ->condition('notification_id', $id)
+        ->execute();
     }
     else {
       notification_insert($device, $event_id, $emails, $min_interval, $limit_up, $unit_id, $parent_id, $base_time);
+      $notification = notification_get($device, $event_id, $limit_up, $unit_id);
 
       if ($event_id == ANY_DEVICE_ISSUE_EVENT_ID) {
-        $notification = notification_get($device, $event_id, $limit_up, $unit_id);
-        return $notification->id;
+        $id = $notification->id;
+      }
+    }
+
+    foreach ($values['selected_meters'] as $meter => $selected_meter) {
+      if ($selected_meter) {
+        db_insert('notification_meter')
+          ->fields(array(
+            'notification_id' => $notification->id,
+            'meter' => $meter
+          ))
+         ->execute();
       }
     }
   }
-  return NULL;
+  return $id;
 }
 
 /**
@@ -1046,6 +1112,30 @@ function notification_edit_event($values) {
   $limit_up = isset($values["limit_up"]) ? $values["limit_up"] : 0;
   $unit_id = isset($values["unit_id"]) ? $values["unit_id"] : 0;
 
+  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
+
+  if ($notification) {
+    if ($old_limit_up != $limit_up || $old_unit_id != $unit_id) {
+      notification_delete($device, $event_id, $limit_up, $unit_id);
+    }
+    else {
+      db_delete('notification_meter')
+        ->condition('notification_id', $notification->id)
+        ->execute();
+    }
+
+    foreach ($values['selected_meters'] as $meter => $selected_meter) {
+      if ($selected_meter) {
+        db_insert('notification_meter')
+          ->fields(array(
+            'notification_id' => $notification->id,
+            'meter' => $meter
+          ))
+         ->execute();
+      }
+    }
+  }
+
   $values = array(
     'limit_up' => $limit_up,
     'unit_id' => $unit_id,
@@ -1053,11 +1143,6 @@ function notification_edit_event($values) {
     'min_interval' => $values['min_interval'],
     'base_time' => DateTime::createFromFormat(NOTIFICATION_TIMESTAMP_FORMAT, $values['startdate'] . ' ' . $values['starttime'])->getTimestamp()
   );
-
-  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
-  if ($notification && ($old_limit_up != $limit_up || $old_unit_id != $unit_id)) {
-    notification_delete($device, $event_id, $limit_up, $unit_id);
-  }
   notification_update($device, $event_id, $old_limit_up, $old_unit_id, $values);
 }
 
@@ -1147,18 +1232,33 @@ function notification_delete($device, $event_id, $limit_up, $unit_id) {
     }
   }
 
-  db_delete('notification')
-    ->condition('device', $device)
-    ->condition('event_id', $event_id)
-    ->condition('limit_up', $limit_up)
-    ->condition('unit_id', $unit_id)
-    ->execute();
+  $notification = notification_get($device, $event_id, $limit_up, $unit_id);
+
+  if ($notification) {
+    notification_delete_by_id($notification->id);
+  }
 }
 
 function notification_delete_children($parent_id) {
 
-  db_delete('notification')
+  $children = db_select('notification', 'p')
+    ->fields('p', array('id'))
     ->condition('parent_id', $parent_id)
+    ->execute();
+
+  foreach ($children as $child) {
+    notification_delete_by_id($child->id);
+  }
+}
+
+function notification_delete_by_id($id) {
+
+  db_delete('notification_meter')
+    ->condition('notification_id', $id)
+    ->execute();
+
+  db_delete('notification')
+    ->condition('id', $id)
     ->execute();
 }
 
@@ -1313,7 +1413,7 @@ function notification_cron() {
 function notification_compose_base_query($event_id) {
   
   $query = db_select('notification', 'n')
-    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id'))
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id', 'id'))
     ->condition('n.event_id', $event_id)
     ->where('n.last_sent + n.min_interval < :now', array(':now' => REQUEST_TIME))
     ->groupBy('n.device')
@@ -1357,9 +1457,8 @@ function notification_send_no_communication_emails() {
       ->havingCondition('max_time', REQUEST_TIME - $notifiable['limit_up'] * $notifiable['factor'], '<');
 
     $max_time = $log_query->execute()->fetchField();
-    
-    if ($max_time) {
 
+    if ($max_time) {
       $notifiable['since_time'] = $max_time;
       $notifiable['event_time'] = REQUEST_TIME;
       $notifiables[] = $notifiable;
@@ -1459,6 +1558,7 @@ function notification_send_measurement_anomaly_emails() {
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->fields('m', array('meter', 'price', 'function', 'latitude', 'longitude'));
   $query->condition('m.type', ENERGY_PRODUCTION_SENSOR_TYPE);
+  $query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
 
   $result = $query->execute();
 
@@ -1526,6 +1626,7 @@ function notification_send_limit_consumption_emails($event_id) {
   $query->join('logger_meters', 'm', 'm.device = d.device');
   $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE);
   $query->condition('m.virtual', 0);
+  $query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
 
   $result = $query->execute();
   
@@ -1617,6 +1718,7 @@ function notification_send_summary_report_emails() {
       ->condition('m.virtual', 0);
     $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
+    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
 
     $sensors = $sensors_query->execute();
     
@@ -1705,6 +1807,7 @@ function notification_send_forecast_report_emails() {
   $query->condition('m.virtual', 0);
   $query->addField('m', 'meter');
   $query->addField('m', 'function');
+  $query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
 
   $since_time = ":now - (:now % :day) + :day";
   $until_time = "$since_time + n.limit_up * un.factor";
