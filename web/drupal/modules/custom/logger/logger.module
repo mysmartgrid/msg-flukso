@@ -4399,7 +4399,7 @@ function logger_export_statictics_input_data() {
   foreach ($result as $sensor) {
     $type = $sensor->type == NULL ? "\N" : $sensor->type;
     $function = $sensor->function == NULL ? "\N" : $sensor->function;
-    $output .= "$sensor->uid   $sensor->device   $sensor->meter   $type   $sensor->virtual   $function   $sensor->device_type_id\n";
+    $output .= "$sensor->uid\t$sensor->device\t$sensor->meter\t$type\t$sensor->virtual\t$function\t$sensor->device_type_id\n";
   }
   save_file(LOGGER_PATH . "/json/sensors.txt", $output);
 }
