@@ -181,6 +181,12 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
     {data, _Result} = mysql:execute(pool, device_sensors, [Device]),
     _Sensors = mysql:get_result_rows(_Result),
 
+    {data, Res} = mysql:execute(pool, device_type, [Device]),
+    [[TypeId]] = mysql:get_result_rows(Res),
+
+    {data, _Res} = mysql:execute(pool, device_type_props, [TypeId]),
+    [[TypeName, TypeStringId]] = mysql:get_result_rows(_Res),
+
     Sensors = [{struct, [
         {<<"meter">>, Meter},
         {<<"externalid">>, ExternalId},
@@ -189,6 +195,7 @@ to_json(ReqData, #state{device = Device, jsonpCallback = JsonpCallback} = State)
         {<<"unit">>, Unit}]} || [Meter, ExternalId, Function, SensorDescription, Unit] <- _Sensors],
 
     Encoded = mochijson2:encode({struct, [
+              {<<"type">>, TypeStringId},
               {<<"description">>, DeviceDescription},
               {<<"sensors">>, Sensors}]}),
 

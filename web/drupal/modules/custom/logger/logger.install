@@ -20,6 +20,11 @@ function logger_schema() {
         'length' => '30',
         'not null' => TRUE,
       ),
+      'string_id' => array(
+        'type' => 'varchar',
+        'length' => '20',
+        'not null' => TRUE,
+      ),
       'remote_support' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -621,6 +626,7 @@ function logger_install() {
     ->fields(array(
       'id' => 0,
       'name' => 'Unknown',
+      'string_id' => 'unknown',
       'remote_support' => 0
     ))
     ->execute();
@@ -629,6 +635,7 @@ function logger_install() {
     ->fields(array(
       'id' => 1,
       'name' => 'Flukso 1.0',
+      'string_id' => 'flukso1',
       'remote_support' => 0
     ))
     ->execute();
@@ -637,6 +644,7 @@ function logger_install() {
     ->fields(array(
       'id' => 2,
       'name' => 'Flukso 2.0',
+      'string_id' => 'flukso2',
       'remote_support' => 1
     ))
     ->execute();
@@ -645,6 +653,7 @@ function logger_install() {
     ->fields(array(
       'id' => 3,
       'name' => 'VZLogger',
+      'string_id' => 'vzlogger',
       'remote_support' => 0
     ))
     ->execute();
@@ -653,6 +662,7 @@ function logger_install() {
     ->fields(array(
       'id' => 4,
       'name' => 'LibKlio Store',
+      'string_id' => 'libklio',
       'remote_support' => 0
     ))
     ->execute();
@@ -661,6 +671,7 @@ function logger_install() {
     ->fields(array(
       'id' => 5,
       'name' => 'Cloned Device',
+      'string_id' => 'cloned',
       'remote_support' => 0
     ))
     ->execute();
@@ -669,6 +680,7 @@ function logger_install() {
     ->fields(array(
       'id' => 6,
       'name' => 'RaspBerry Pi',
+      'string_id' => 'raspberrypi',
       'remote_support' => 1
     ))
     ->execute();
@@ -2582,3 +2594,26 @@ function logger_update_7134() {
 
   return st("The table logger_device_network has been recreated.");
 }
+
+/**
+ * Add field string_id to table logger_device_type.
+ */
+function logger_update_7135() {
+
+  db_add_field('logger_device_type', 'string_id', array(
+    'type' => 'varchar',
+    'length' => 20,
+    'not null' => TRUE,
+    'default' => 'unknown'
+  ));
+
+  db_query("UPDATE logger_device_type SET string_id = 'flukso1' WHERE id = 1");
+  db_query("UPDATE logger_device_type SET string_id = 'flukso2' WHERE id = 2");
+  db_query("UPDATE logger_device_type SET string_id = 'vzlogger' WHERE id = 3");
+  db_query("UPDATE logger_device_type SET string_id = 'libklio' WHERE id = 4");
+  db_query("UPDATE logger_device_type SET string_id = 'cloned' WHERE id = 5");
+  db_query("UPDATE logger_device_type SET string_id = 'raspberrypi' WHERE id = 6");
+
+  return st('Field string_id has been successfully added to table logger_device_type.');
+}
+
