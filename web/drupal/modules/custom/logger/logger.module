@@ -4310,15 +4310,17 @@ function logger_sensor_type_access($permission, $sensor_type, $forecast = FALSE)
  */
 function logger_jsonp_sensor_access($meter) {
 
+  if (isset($_REQUEST['token'])) {
+
     $token = db_select('logger_tokens', 't')
       ->fields('t', array('token'))
       ->condition('t.meter', $meter)
       ->execute()
       ->fetchObject();
 
-  if (isset($_REQUEST['token'])) {
-
-    return $token->token == $_REQUEST['token'];
+    if (isset($token->token)) {
+      return $token->token == $_REQUEST['token'];
+    }
   }
   return FALSE;
 }
