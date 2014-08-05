@@ -4310,15 +4310,17 @@ function logger_sensor_type_access($permission, $sensor_type, $forecast = FALSE)
  */
 function logger_jsonp_sensor_access($meter) {
 
+  if (isset($_REQUEST['token'])) {
+
     $token = db_select('logger_tokens', 't')
       ->fields('t', array('token'))
       ->condition('t.meter', $meter)
       ->execute()
       ->fetchObject();
 
-  if (isset($_REQUEST['token'])) {
-
-    return $token->token == $_REQUEST['token'];
+    if (isset($token->token)) {
+      return $token->token == $_REQUEST['token'];
+    }
   }
   return FALSE;
 }
@@ -4368,14 +4370,14 @@ function logger_cron() {
   }
 
   //Second quarter of an hour
-  if ($rest < 45 * MINUTE && $rest >= 30 * MINUTE) {
+  if ($rest < 45 * MINUTE && $rest >= 0 * MINUTE) {
     logger_bind_support_ports();
     logger_update_support_authorized_keys();
   }
 
   $rest = REQUEST_TIME % DAY;
- 
-  if ($rest < HOUR) {
+
+  if ($rest < 1 * HOUR) {
     logger_export_statictics_input_data();
   }
 
@@ -4386,7 +4388,8 @@ function logger_cron() {
 function logger_export_statictics_input_data() {
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'function', 'virtual', 'type'));
+    ->fields('m', array('meter', 'function', 'virtual', 'type'))
+    ->condition('m.access', REQUEST_TIME - WEEK, '>=');
 
   $query->join('logger_devices', 'd', 'd.device = m.device');
   $query->addField('d', 'type_id', 'device_type_id');
@@ -4399,7 +4402,7 @@ function logger_export_statictics_input_data() {
   foreach ($result as $sensor) {
     $type = $sensor->type == NULL ? "\N" : $sensor->type;
     $function = $sensor->function == NULL ? "\N" : $sensor->function;
-    $output .= "$sensor->uid   $sensor->device   $sensor->meter   $type   $sensor->virtual   $function   $sensor->device_type_id\n";
+    $output .= "$sensor->uid\t$sensor->device\t$sensor->meter\t$type\t$sensor->virtual\t$function\t$sensor->device_type_id\n";
   }
   save_file(LOGGER_PATH . "/json/sensors.txt", $output);
 }

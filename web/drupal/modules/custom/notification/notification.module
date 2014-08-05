@@ -1030,10 +1030,10 @@ function notification_newsletter_form_submit($form, &$form_state) {
 function notification_register_event($values, $event_id, $parent_id = NULL) {
 
   $selected = notification_get_selected_event($values, $event_id);
+  $id = NULL;
 
   if ($selected) {
 
-    $id = NULL;
     $device = $values['device'];
     $limit_up = isset($values["limit_up$event_id"]) ? $values["limit_up$event_id"] : 0;
     $unit_id = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
@@ -1718,7 +1718,7 @@ function notification_send_summary_report_emails() {
       ->condition('m.virtual', 0);
     $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
-    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
+    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = ' . $notifiable['id']);
 
     $sensors = $sensors_query->execute();
     
