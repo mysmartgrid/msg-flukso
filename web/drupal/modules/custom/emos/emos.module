@@ -209,7 +209,7 @@ function emos_dummy_data() {
 /**
  * Send an email to the mySmartGrid ticket system informing of the new EMOS participant registration.
  */
-function emos_send_registration_email($data) {
+function emos_send_registration_email() {
 
   global $user;
   global $base_url;
