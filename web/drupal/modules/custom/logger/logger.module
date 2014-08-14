@@ -4389,7 +4389,8 @@ function logger_export_statictics_input_data() {
 
   $query = db_select('logger_meters', 'm')
     ->fields('m', array('meter', 'function', 'virtual', 'type'))
-    ->condition('m.access', REQUEST_TIME - WEEK, '>=');
+    ->condition('m.access', REQUEST_TIME - WEEK, '>=')
+    ->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE);
 
   $query->join('logger_devices', 'd', 'd.device = m.device');
   $query->addField('d', 'type_id', 'device_type_id');
