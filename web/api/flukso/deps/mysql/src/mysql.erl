@@ -490,6 +490,7 @@ connect(PoolId, Host, undefined, User, Password, Database, Reconnect) ->
 %% gen_server callbacks
 
 init([PoolId, Host, Port, User, Password, Database, LogFun, Encoding]) ->
+
     LogFun1 = if LogFun == undefined -> fun log/4; true -> LogFun end,
     case mysql_conn:start(Host, Port, User, Password, Database, LogFun1,
 			  Encoding, PoolId) of
