@@ -182,7 +182,7 @@ function logger_schema() {
       'lan_protocol' => array(
         'type' => 'varchar',
         'length' => '6',
-        'not null' => TRUE,
+        'not null' => FALSE,
       ),
       'lan_ip' => array(
         'type' => 'varchar',
