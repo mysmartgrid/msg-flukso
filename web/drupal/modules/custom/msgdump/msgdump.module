@@ -1,0 +1,328 @@
+<?php
+
+/**
+ * @file
+ * This module dumps data from Flukso devices in high resolution
+ * to a sqlite database and provides the possibility to download this data.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
+define('MSGDUMP_DB_REL_PATH', drupal_get_path('module', 'msgdump') . '/db');
+define('MSGDUMP_DB_PATH', DRUPAL_ROOT . '/' . MSGDUMP_DB_REL_PATH);
+define('MSGDUMP_BIN_PATH', DRUPAL_ROOT . '/' . drupal_get_path('module', 'msgdump') . '/flukso4r/bin');
+
+
+function msgdump_permission() {
+  return array(
+    'data dump' => array(
+      'title' => t('data dump'),
+      'description' => t('Request device high resolution data dump.')
+    )
+  );
+}
+
+function msgdump_menu() {
+
+  $items['dump/setup'] = array(
+    'title' => "Dump values",
+    'page callback' => 'msgdump_setup_page',
+    'access arguments' => array('data dump'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['dump/remove'] = array(
+    'title' => $items['dump/setup']['title'],
+    'page callback' => 'msgdump_remove',
+    'page arguments' => array(2),
+    'access arguments' => array('data dump'),
+    'type' => MENU_CALLBACK
+  );
+  return $items;
+}
+
+/**
+ * Builds the dump setup page.
+ */
+function msgdump_setup_page() {
+
+  global $user;
+
+  $query = db_select('msgdump', 'p');
+  $query->join('logger_meters', 'm', 'm.meter = p.meter');
+  $query->join('logger_devices', 'd', 'm.device = d.device');
+  $query->addField('m', 'function');
+
+  $dumps = $query->fields('p', array('start', 'stop', 'file'))
+    ->fields('d', array('serial'))
+    ->condition('d.uid', $user->uid)
+    ->execute();
+
+  $rows = array();
+  foreach ($dumps as $dump) {
+
+    $row = array();
+    $row[] = $dump->serial;
+    $row[] = $dump->function;
+    $row[] = date('d-m-Y', $dump->start);
+    $row[] = date('d-m-Y', $dump->stop);
+    $row[] = l(t('Download'), MSGDUMP_DB_REL_PATH . '/' . $dump->file . '.sqlite') . '<br>' .
+             l(t('Remove'), 'dump/remove/' . $dump->file);
+
+    $rows[] = $row;
+  }
+
+  $headers = array(t('Device'), t('Sensor'), t('Startdate'), t('Stopdate'), t('Operations'));
+
+  $form = drupal_get_form('msgdump_setup_form');
+
+  return drupal_render($form) .
+
+    theme_table(array('header' => $headers, 'rows' => $rows, 'attributes' => array(),
+      'caption' => '', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
+}
+
+function msgdump_setup_form($form, &$form_state) {
+
+  global $user;
+
+  $newdate = new DateTime('now');
+  $newdate->setTime(0, 0);
+  $newdate->modify('+1 week');
+
+  $query = db_select('logger_meters', 'm');
+  $query->join('logger_devices', 'd', 'm.device = d.device');
+  $result = $query
+    ->fields('d', array('serial'))
+    ->fields('m', array('meter', 'function'))
+    ->condition('d.uid', $user->uid)
+    ->condition('m.virtual', 0)
+    ->isNotNull('m.function')
+    ->execute();
+
+  $sensors = array();
+  foreach ($result as $sensor) {
+    $sensors[$sensor->meter] = $sensor->serial . ' - ' . $sensor->function;
+  }
+
+  $form['meter'] = array(
+    '#type' => 'select',
+    '#options' => $sensors,
+    '#title' => t('Sensor'),
+    '#description' => t('Sensor to use for recording')
+  );
+
+  $form['from'] = array(
+    '#type' => 'date',
+    '#title' => t("From"),
+    '#after_build' => array('msgdump_limit_year'),
+    '#description' => t('The date dumping should start on')
+  );
+
+  $form['to'] = array(
+    '#type' => 'date',
+    '#title' => t("Until"),
+    '#after_build' => array('msgdump_limit_year'),
+    '#description' => t('The date dumping should stop on'),
+    '#default_value' => array(
+      'year' => $newdate->format("Y"),
+      'month' => $newdate->format("n"),
+      'day' => $newdate->format("d")
+    )
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t("Submit")
+  );
+  return $form;
+}
+
+function msgdump_limit_year($form_element, $form_values) {
+
+  $now = date('Y');
+  $form_element['year']['#options'] = drupal_map_assoc(range($now, 2037));
+
+  return $form_element;
+}
+
+function msgdump_setup_form_validate($form, &$form_state) {
+
+  $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+  $to = strtotime(implode('-', $form_state['values']['to']) . ' 23:59');
+
+  $now = new DateTime("now");
+  $now->setTime(0, 0);
+  $now = $now->format("U");
+
+  if ($now > $from) {
+    form_set_error('from', t('Can\'t record values in the past.'));
+  }
+  if ($from > $to) {
+    form_set_error('to', t('Time to stop has to be after time to start.'));
+  }
+  if (!$from) {
+    form_set_error('from', t('Invalid date.'));
+  }
+  if (!$to) {
+    form_set_error('to', t('Invalid date.'));
+  }
+}
+
+function msgdump_setup_form_submit($form, &$form_state) {
+
+  global $user;
+
+  $from = strtotime(implode('-', $form_state['values']['from']) . ' 00:00');
+  $to = strtotime(implode('-', $form_state['values']['to']) . '23:59');
+  $file = md5(uniqid(rand(), TRUE));
+  $meter = $form_state['values']['meter'];
+
+  db_insert('msgdump')
+    ->fields(array(
+      'meter' => $meter,
+      'uid' => $user->uid,
+      'start' => $from,
+      'stop' => $to,
+      'file' => $file
+    ))
+    ->execute();
+
+  msgdump_register($file, $meter);
+}
+
+/**
+ * Registers a data dump request.
+ * 
+ * @param $file   The dump file name.
+ * @param $meter  The sensor id.
+ */
+function msgdump_register($file, $meter) {
+
+  $url = variable_get('logger_msg_service_url');
+
+  $query = db_select('logger_meters', 'm');
+  $query->join('logger_tokens', 't', 't.meter = m.meter');
+  
+  $sensor = $query
+    ->fields('m', array('meter'))
+    ->fields('t', array('token'))
+    ->condition('m.meter', $meter)
+    ->execute()
+    ->fetchObject();
+
+  $config =
+    'DB_FILE: "' . MSGDUMP_DB_PATH . "/$file.sqlite" . '"' . PHP_EOL .
+    'DB_TABLE_NAME: "' . 'UTCReadings' . '"' . PHP_EOL .
+    'ACCESS_TOKEN: "' . $sensor->token . '"' . PHP_EOL .
+    'SENSOR_ID: "' . $sensor->meter . '"' . PHP_EOL .
+    'BASE_URL: "' . "$url/sensor" . '"' . PHP_EOL;
+
+  save_file(MSGDUMP_DB_PATH . "/$file.flukso4rrc", $config);
+
+  exec(MSGDUMP_BIN_PATH . '/flukso_create_db -c ' . MSGDUMP_DB_PATH . "/$file.flukso4rrc");
+}
+
+/**
+ * Removes a dump request.
+ *
+ * @param $file The dump file name.
+ */
+function msgdump_remove($file) {
+
+  db_delete('msgdump')
+    ->condition('file', $file, '=')
+    ->execute();
+
+  rmfiles(MSGDUMP_DB_PATH . '/' . $file . '.*');
+
+  drupal_goto('dump/setup');
+}
+
+/**
+ * Removes dump requests associated with a sensor.
+ * FIXME: use a hook
+ *
+ * @param $meter The sensor id.
+ */
+function msgdump_remove_by_sensor($meter) {
+
+  db_delete('msgdump')
+    ->condition('meter', $meter)
+    ->execute();
+}
+
+function msgdump_cron() {
+
+  $now = REQUEST_TIME;
+  $time_limit = WEEK;
+
+  //delete old dumps
+  db_delete('msgdump')
+    ->condition('stop', $now - $time_limit, '<')
+    ->execute();
+
+  rmoldfiles(MSGDUMP_DB_PATH, $time_limit);
+
+  //Count active dumps
+  $total = db_select('msgdump')
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+
+  if ($total > 0) {
+    //Assumes that cron runs 4 times an hour
+    $chunk = ceil($total / 4);
+
+    //DEBUG
+    watchdog('msgdump.cron', "Processing %chunk MSG Dumps.", array('%chunk' => $chunk));
+
+    //Get a chunk of dumps
+    $dumps = db_select('msgdump', 'd')
+      ->fields('d', array('file'))
+      ->condition('d.start', $now, '<=')
+      ->condition('d.stop', $now, '>')
+      ->condition('d.updated', $now - ($now % DAY), '<')
+      ->orderBy('d.updated')
+      ->range(0, $chunk)
+      ->execute();
+
+    //Update each dump once a day
+    foreach ($dumps as $dump) {
+
+        $code = 0;
+        $output = array();
+        exec(MSGDUMP_BIN_PATH . '/flukso_archive_watts -c ' . MSGDUMP_DB_PATH . '/' . $dump->file . '.flukso4rrc', $output, $code);
+
+        db_update('msgdump')
+          ->fields(array(
+            'updated' => $now
+          ))
+          ->condition('file', $dump->file)
+          ->execute();
+
+        if ($code != 0) {
+          watchdog('msgdump.cron', "MSG Dump to file %file has failed. return code: %code, output: %output",
+             array('%file' => $dump->file, '%code' => $code, '%output' => implode(' ', $output)), WATCHDOG_CRITICAL);
+        }
+    }
+  }
+}

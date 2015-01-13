@@ -1,0 +1,1023 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the msgcommon module.
+ */
+
+function msgcommons_schema() {
+
+  $schema['unit_type'] = array(
+    'description' => 'Stores the unit types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '15',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
+  $schema['unit'] = array(
+    'description' => 'Stores units.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '20',
+        'not null' => TRUE,
+      ),
+      'symbol' => array(
+        'type' => 'varchar',
+        'length' => '10',
+        'not null' => TRUE,
+      ),
+      'factor' => array(
+        'type' => 'float',
+        'size' => 'normal',
+        'not null' => TRUE,
+      ),
+      'string_id' => array(
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => TRUE
+      ),
+      'type_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}
+
+function msgcommons_install() {
+
+  //unit types
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Energy',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Power',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Time',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 7,
+      'name' => '_hsbs',
+    ))
+    ->execute();
+
+  //units
+  db_insert('unit')
+    ->fields(array(
+      'id' => 0,
+      'name' => 'none',
+      'symbol' => 'none',
+      'factor' => 1,
+      'string_id' => 'none',
+      'type_id' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Minute',
+      'symbol' => 'min',
+      'factor' => 60,
+      'string_id' => 'min',
+      'type_id' => 4
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Hour',
+      'symbol' => 'h',
+      'factor' => 3600,
+      'string_id' => 'hour',
+      'type_id' => 4
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Watt',
+      'symbol' => 'W',
+      'factor' => 3.6,
+      'string_id' => 'watt',
+      'type_id' => 2
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Kilowatt',
+      'symbol' => 'kW',
+      'factor' => (3.6 / 1000),
+      'string_id' => 'kw',
+      'type_id' => 2
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Day',
+      'symbol' => 'day',
+      'factor' => DAY,
+      'string_id' => 'day',
+      'type_id' => 4
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Week',
+      'symbol' => 'week',
+      'factor' => WEEK,
+      'string_id' => 'week',
+      'type_id' => 4
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 7,
+      'name' => 'Month',
+      'symbol' => 'month',
+      'factor' => MONTH,
+      'string_id' => 'month',
+      'type_id' => 4
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 8,
+      'name' => 'Euro',
+      'symbol' => '€',
+      'factor' => 0.00000018, // € 0.18 / kWh
+      'string_id' => 'euro',
+      'type_id' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Watt-second',
+      'symbol' => 'Ws',
+      'factor' => 1,
+      'string_id' => 'ws',
+      'type_id' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 10,
+      'name' => 'Watt-hour',
+      'symbol' => 'Wh',
+      'factor' => 0.001,
+      'string_id' => 'wh',
+      'type_id' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Kilowatt-hour',
+      'symbol' => 'kWh',
+      'factor' => 0.000001,
+      'string_id' => 'kwh',
+      'type_id' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 12,
+      'name' => 'Kilowatt / year',
+      'symbol' => 'kWh/year',
+      'factor' => (3.6 / 1000) * 24 * 365,
+      'string_id' => 'kwhperyear',
+      'type_id' => 2
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 13,
+      'name' => 'Euro / year',
+      'symbol' => '€/year',
+      'factor' => (3.6 / 1000) * 24 * 365 * 0.18, //€ 0.18 / kWh
+      'string_id' => 'europeryear',
+      'type_id' => 2
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 14,
+      'name' => 'Celsius',
+      'symbol' => '°C',
+      'factor' => 0.0001,
+      'string_id' => 'degc',
+      'type_id' => 3
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 15,
+      'name' => 'pascal',
+      'symbol' => 'Pa',
+      'factor' => 1,
+      'string_id' => 'pa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 16,
+      'name' => 'kilopascal',
+      'symbol' => 'kPa',
+      'factor' => 0.001,
+      'string_id' => 'kpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 17,
+      'name' => 'megapascal',
+      'symbol' => 'MPa',
+      'factor' => 0.000001,
+      'string_id' => 'mpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 18,
+      'name' => 'Relative Humidity',
+      'symbol' => '%r.h.',
+      'factor' => 1,
+      'string_id' => 'rh',
+      'type_id' => 6
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 19,
+      'name' => 'hectopascal',
+      'symbol' => 'hPa',
+      'factor' => 0.01,
+      'string_id' => 'hpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 20,
+      'name' => '_hsbs',
+      'symbol' => '_hsbs',
+      'factor' => 1,
+      'string_id' => '_hsbs',
+      'type_id' => 7 
+    ))
+    ->execute();
+
+  $dir = drupal_get_path('module', 'msgcommons');
+  mkdir("$dir/tmp", 0777, TRUE);
+}
+
+function msgcommons_uninstall() {
+
+  $dir = drupal_get_path('module', 'msgcommons');
+  rmdir("$dir/tmp");
+}
+
+function msgcommons_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Makes a directory for storing forecasts.
+ */
+function msgcommons_update_7001() {
+
+  $dir = drupal_get_path('module', 'msgcommons');
+  mkdir("$dir/tmp", 0777, TRUE);
+
+  return st('Directory successfully created.');
+}
+
+/**
+ * Creates new units.
+ */
+function msgcommons_update_7002() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 8,
+      'name' => 'Euro',
+      'symbol' => '€',
+      'factor' => 0.00018
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Watt-second',
+      'symbol' => 'Ws',
+      'factor' => 1000
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 10,
+      'name' => 'Watt-hour',
+      'symbol' => 'Wh',
+      'factor' => 1
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Kilowatt-hour',
+      'symbol' => 'kWh',
+      'factor' => 0.001
+    ))
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Watt',
+      'symbol' => 'W',
+      'factor' => 3600
+    ))
+    ->condition('id', 3)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Kilowatt',
+      'symbol' => 'kW',
+      'factor' => 3600 * 1000
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  return st('New units have been created.');
+}
+
+/**
+ * Creates new units.
+ */
+function msgcommons_update_7003() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 12,
+      'name' => 'Kilowatt / year',
+      'symbol' => 'kWh/year',
+      'factor' => (3600 / 1000) * 24 * 365
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 13,
+      'name' => 'Euro / year',
+      'symbol' => 'Euro/year',
+      'factor' => (3600 / 1000) * 24 * 365 * 0.00018
+    ))
+    ->execute();
+
+  return st('New units have been created.');
+}
+
+/**
+ * Creates field 'string_id' in table unit.
+ */
+function msgcommons_update_7005() {
+
+  db_add_field('unit', 'string_id', array(
+    'type' => 'varchar',
+    'length' => '16',
+    'not null' => FALSE 
+  ));
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'none'
+    ))
+    ->condition('id', 0)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Minute',
+      'string_id' => 'min'
+    ))
+    ->condition('id', 1)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Hour',
+      'string_id' => 'hour'
+    ))
+    ->condition('id', 2)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Watt',
+      'string_id' => 'watt'
+    ))
+    ->condition('id', 3)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Kilowatt',
+      'string_id' => 'kw'
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Day',
+      'string_id' => 'day'
+    ))
+    ->condition('id', 5)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Week',
+      'string_id' => 'week'
+    ))
+    ->condition('id', 6)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Month',
+      'string_id' => 'month'
+    ))
+    ->condition('id', 7)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'name' => 'Euro',
+      'string_id' => 'euro'
+    ))
+    ->condition('id', 8)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'ws'
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'wh'
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'kwh'
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'kwhperyear'
+    ))
+    ->condition('id', 12)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'string_id' => 'europeryear'
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  db_change_field('unit', 'string_id', 'string_id', array(
+      'type' => 'varchar',
+      'length' => '16',
+      'not null' => TRUE
+    ),
+    array(
+      'unique keys' => array('string_id' => array('string_id'))
+  ));
+
+  return st('Field unit.string_id has been updated.');
+}
+
+/**
+ * Updates unit factors.
+ */
+function msgcommons_update_7007() {
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 3.6
+    ))
+    ->condition('id', 3)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 3600
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 0.00000018
+    ))
+    ->condition('id', 8)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 1
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 1000
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => 0.000001
+    ))
+    ->condition('id', 11)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000) * 24 * 365
+    ))
+    ->condition('id', 12)
+    ->execute();
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000) * 24 * 365 * 0.18 //€ 0.18 / kWh
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  return st('Unit factors have been updated.');
+}
+
+/**
+ * Creates table unit_type.
+ */
+function msgcommons_update_7008() {
+
+  db_create_table('unit_type', drupal_get_schema_unprocessed('msgcommons', 'unit_type'));
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Energy',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Power',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Temperature',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Time',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  return st('Table unit_type has been created.');
+}
+
+/**
+ * Creates field unit.type_id.
+ */
+function msgcommons_update_7009() {
+
+  db_add_field('unit', 'type_id', array(
+    'type' => 'int',
+    'not null' => FALSE,
+    'unasigned' => TRUE,
+  ));
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 0)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 1)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 2)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 3)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 4)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 5)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 6)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 4
+  ))
+  ->condition('id', 7)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 8)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 9)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 10)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 1
+  ))
+  ->condition('id', 11)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 12)
+  ->execute();
+
+  db_update('unit')
+  ->fields(array(
+    'type_id' => 2
+  ))
+  ->condition('id', 13)
+  ->execute();
+
+  db_change_field('unit', 'type_id', 'type_id', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+  ));
+
+  return st('Table unit_type has been created.');
+}
+
+/**
+ * Updates symbol of unit €/year.
+ */
+function msgcommons_update_7010() {
+
+  db_update('unit')
+    ->fields(array(
+      'symbol' => "€/year"
+    ))
+    ->condition('id', 13)
+    ->execute();
+
+  return st("Unit €/year symbol has been updated.");
+}
+
+/**
+ * Fix factor or unit watt-hour.
+ */
+function msgcommons_update_7011() {
+
+    db_update('unit')
+      ->fields(array(
+        'factor' => 0.001
+      ))
+      ->condition('id', 10)
+      ->execute();
+
+  return st("Factor of unit watt-hour has been fixed.");
+}
+
+/**
+ * Creates the unit Celsius.
+ */
+function msgcommons_update_7013() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 14,
+      'name' => 'Celsius',
+      'symbol' => '°C',
+      'factor' => 0.0001,
+      'string_id' => 'c',
+      'type_id' => 3
+    ))
+    ->execute();
+
+  return st("The unit Celsius has been created.");
+}
+
+/**
+ * Creates new units.
+ */
+function msgcommons_update_7023() {
+
+  db_change_field('unit', 'name', 'name', array(
+    'type' => 'varchar',
+    'length' => '20',
+    'not null' => TRUE,
+  ));
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Pressure',
+    ))
+    ->execute();
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Humidity',
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 15,
+      'name' => 'pascal',
+      'symbol' => 'Pa',
+      'factor' => 1,
+      'string_id' => 'pa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 16,
+      'name' => 'kilopascal',
+      'symbol' => 'kPa',
+      'factor' => 0.001,
+      'string_id' => 'kpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 17,
+      'name' => 'megapascal',
+      'symbol' => 'MPa',
+      'factor' => 0.000001,
+      'string_id' => 'mpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 18,
+      'name' => 'Relative Humidity',
+      'symbol' => '%r.h.',
+      'factor' => 1,
+      'string_id' => 'rh',
+      'type_id' => 6
+    ))
+    ->execute();
+
+  return st("New units have been created.");
+}
+
+/**
+ * Change the string id of unit °C.
+ */
+function msgcommons_update_7024() { 
+
+  db_update('unit')
+  ->fields(array(
+    'string_id' => 'degc'
+  ))
+  ->condition('string_id', 'c')
+  ->execute();
+
+  return st('String id of unit °C has been changed.');
+}
+
+/**
+ * Create unit hectopascal.
+ */
+function msgcommons_update_7025() {
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 19,
+      'name' => 'hectopascal',
+      'symbol' => 'hPa',
+      'factor' => 0.01,
+      'string_id' => 'hpa',
+      'type_id' => 5
+    ))
+    ->execute();
+
+  return st('Create unit hectopascal.');
+}
+
+/**
+ * Update the kilowatt factor.
+ */
+function msgcommons_update_7026() {
+
+  db_update('unit')
+    ->fields(array(
+      'factor' => (3.6 / 1000)
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  return st('Update the kilowatt factor.');
+}
+
+/**
+ * Create unit: _hsbs
+ */
+function msgcommons_update_7030() {
+
+  db_insert('unit_type')
+    ->fields(array(
+      'id' => 7,
+      'name' => '_hsbs',
+    ))
+    ->execute();
+
+  db_insert('unit')
+    ->fields(array(
+      'id' => 20,
+      'name' => '_hsbs',
+      'symbol' => '_hsbs',
+      'factor' => 1,
+      'string_id' => '_hsbs',
+      'type_id' => 7 
+    ))
+    ->execute();
+
+  return st('Create unit: _hsbs.');
+}

@@ -1,0 +1,114 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the chumby module.
+ */
+
+function chumby_schema() {
+
+  $schema['chumby_widget'] = array(
+    'description' => 'Stores the chumby widgets.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => '200',
+        'not null' => TRUE,
+      ),
+      'directory' => array(
+        'type' => 'varchar',
+        'length' => '20',
+        'not null' => TRUE,
+      ),
+      'movie' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      )
+    ),
+    'primary key' => array(
+      'id',
+    )
+  );
+  return $schema;
+}
+
+function chumby_install() {
+
+  drupal_set_message(st('Created chumby module tables.'));
+
+  db_insert('chumby_widget')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Current Power',
+      'description' => 'Shows the current power consumption as text.',
+      'directory' => 'currentpower',
+      'movie' => 'currentpower'
+    ))
+    ->execute();
+
+  db_insert('chumby_widget')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Power Meter',
+      'description' => 'Shows the current power consumption in a power meter.',
+      'directory' => 'last_reading',
+      'movie' => 'energietacho'
+    ))
+    ->execute();
+
+  db_insert('chumby_widget')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Light Bulb',
+      'description' => 'Shows the current power consumption in a light bulb.',
+      'directory' => 'last_reading',
+      'movie' => 'Gluehlampe'
+    ))
+    ->execute();
+
+  db_insert('chumby_widget')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Power Graph',
+      'description' => 'Shows the current power consumption in an area chart.',
+      'directory' => 'last_reading',
+      'movie' => 'EnergyGraph'
+    ))
+    ->execute();
+
+  $file_path = drupal_get_path('module', 'chumby') . '/files';
+  mkdir($file_path);
+
+  $file_path = drupal_get_path('module', 'chumby') . '/tmp';
+  mkdir($file_path);
+}
+
+function chumby_uninstall() {
+  drupal_set_message(st('Removed chumby module tables.'));
+
+  $file_path = drupal_get_path('module', 'chumby') . '/files';
+  rrmdir($file_path);
+
+  $file_path = drupal_get_path('module', 'chumby') . '/tmp';
+  rrmdir($file_path);
+}
+
+function chumby_update_7001() {
+  db_update('chumby_widget')
+    ->fields(array(
+    'description' =>  'Shows the current power consumption in an area chart.',
+  ))
+  ->condition('id', 4)
+  ->execute();
+}

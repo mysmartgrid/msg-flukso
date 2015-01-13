@@ -1,0 +1,9 @@
+; $Id$
+name = Chumby Image
+description = Provides personalized images to update the chumby.
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+php = 5.3
+
+dependencies[] = msgcommons

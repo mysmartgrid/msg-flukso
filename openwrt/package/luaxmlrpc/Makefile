@@ -9,8 +9,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luaxmlrpc
-PKG_VERSION:=1.0x
-PKG_RELEASE:=1
+PKG_VERSION:=1.1.0
+PKG_RELEASE:=2
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
@@ -20,7 +20,7 @@ define Package/liblua-xmlrpc
   SECTION:=lang
   SUBMENU:=LUA
   CATEGORY:=Languages
-  DEPENDS:=+liblua-expat +liblua-socket
+  DEPENDS:=+luaexpat +luasocket
   URL:=http://luaforge.net/projects/luaxmlrpc/
   TITLE:=XML-RPC library for LUA programming language
 endef

@@ -1,0 +1,42 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Demo Chart</title>
+
+  <script type="text/javascript" src="https://www.mysmartgrid.de/sites/all/modules/logger/js/dygraph/dygraph-min.js"></script>
+  <script type="text/javascript" src="https://www.mysmartgrid.de/sites/all/modules/logger/js/dygraph/dygraph-canvas-min.js"></script>
+  <script type="text/javascript" src="https://www.mysmartgrid.de/sites/all/modules/logger/js/dygraph/rgbcolor-min.js"></script>
+
+  <script type="text/javascript" src="https://www.mysmartgrid.de/jsonp/sensor/5715a57b0c8ec958727ab3bb206d8b6e?interval=hour&unit=watt&token=d3a16238d92456bb0f6727743275dce0&data_function=getDemoData"></script>
+</head>
+<body>
+  <p>This is a demo chart.</p>
+
+  <div id="chartDiv" style="width:400px; height:200px;"></div>
+
+  <script type="text/javascript">
+
+    new Dygraph(
+
+      // chart div
+      document.getElementById("chartDiv"),
+
+      // demo sensor measurements
+      getDemoData(),
+
+      // chart format
+      {
+        fillGraph: true,
+        fillAlpha: 0.15,
+        xAxisLabelWidth: 100,
+        xAxisLabelFormatter: function(ms) { return (new Date(ms * 1000)).toLocaleTimeString(); },
+        xValueFormatter: function(ms) { return (new Date(ms * 1000)).toLocaleTimeString(); },
+        xTicker: Dygraph.dateTicker,
+        xPixelsPerLabel: 100
+      }
+    );
+  </script>
+</body>
+</html>
+

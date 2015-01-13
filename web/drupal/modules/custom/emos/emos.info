@@ -1,0 +1,11 @@
+; $Id$
+name = EMOS Image
+description = Provides personalized EMOS images.
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+php = 5.3
+
+dependencies[] = recaptcha
+dependencies[] = msgcommons
+dependencies[] = jobqueue

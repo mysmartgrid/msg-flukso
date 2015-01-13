@@ -1,0 +1,796 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the notification module.
+ */
+
+function notification_schema() {
+
+  $schema['event'] = array(
+    'description' => 'Stores Flukso events',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '50',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'id',
+    ),
+  );
+
+  $schema['event_unit'] = array(
+    'description' => 'Stores units associated with Flukso events',
+    'fields' => array(
+      'event_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'unit_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+    ),
+    'primary key' => array(
+      'event_id',
+      'unit_id',
+    ),
+  );
+
+  $schema['notification'] = array(
+    'description' => 'Stores event notifications',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'parent_id' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'unasigned' => TRUE,
+      ),
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'event_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'emails' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'min_interval' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'base_time' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'limit_up' => array(
+        'type' => 'float',
+        'size' => 'big',
+        'precision' => 24,
+        'scale' => 15,
+        'not null' => TRUE,
+      ),
+      'unit_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'last_sent' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'id',
+    ),
+    'unique keys' => array(
+      'uk_device_event_limit_unit' => array('device', 'event_id, limit_up, unit_id'),
+    ),
+    'foreign keys' => array('fk_parent_notification_id' => array(
+      'table' => 'notification',
+      'columns' => array('parent_id' => 'id')
+    ))
+  );
+
+  $schema['notification_meter'] = array(
+    'description' => 'Stores sensors considered by the notification',
+    'fields' => array(
+      'notification_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE
+      ),
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE
+      )
+    ),
+    'primary key' => array(
+      'notification_id',
+      'meter'
+    )
+  );
+
+  $schema['event_log'] = array(
+    'description' => 'Stores device events',
+    'fields' => array(
+      'device' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'event_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'time' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'device',
+      'event_id, time',
+    ),
+  );
+
+  return $schema;
+}
+
+function notification_install() {
+
+  global $user;
+
+  drupal_set_message(st('Created notification module tables.'));
+ 
+  //event
+  db_insert('event')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'No Communication',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'Communication Restored',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Peak Consumption',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Low Consumption',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Any Device Issue'
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 10,
+      'name' => 'Summary Report',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Energy Production Forecast Report',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 101,
+      'name' => 'Heartbeat Received',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 102,
+      'name' => 'Measurement Received',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 104,
+      'name' => 'Brownout',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 105,
+      'name' => 'Firmware Upgraded',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 106,
+      'name' => 'Failed Firmware Upgrade',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 200,
+      'name' => 'Measurement Anomaly'
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 201,
+      'name' => 'Corrupted Message',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Invalid Timestamp'
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 999,
+      'name' => 'System Error',
+    ))
+    ->execute();
+
+  //event_unit
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 1,
+      'unit_id' => 1,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 1,
+      'unit_id' => 2,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 3,
+      'unit_id' => 1,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 3,
+      'unit_id' => 2,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 4,
+      'unit_id' => 3,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 4,
+      'unit_id' => 4,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 3,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 4,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 9,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 5,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 6,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 7,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 11,
+      'unit_id' => 5,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 101,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 102,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 104,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 200,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 201,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  $dir_path = drupal_get_path('module', 'notification') . '/tmp';
+  mkdir($dir_path, 0777, TRUE);
+}
+
+function notification_uninstall() {
+
+  $dir_path = drupal_get_path('module', 'notification') . '/tmp';
+  rrmdir($dir_path);
+
+  drupal_set_message(st('Deleted notification module tables. Removed notification/tmp directory.'));
+}
+
+function notification_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Adds the event 'Forecast Report. Makes directory notification/tmp.'.
+ */
+function notification_update_7001() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Energy Production Forecast Report',
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 11,
+      'unit_id' => 5,
+    ))
+    ->execute();
+
+  $dir_path = drupal_get_path('module', 'notification') . '/tmp';
+  mkdir($dir_path, 0777, TRUE);
+
+  return st("The event 'Forecast Report' has been added. Directory notification/tmp has been created.");
+}
+
+/**
+ * Adds the events 'Firmware Upgraded' and 'Failed Firmware Upgrade'.
+ */
+function notification_update_7002() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 105,
+      'name' => 'Firmware Upgraded',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 106,
+      'name' => 'Failed Firmware Upgrade',
+    ))
+    ->execute();
+
+  return st("The events 'Firmware Upgraded' and 'Failed Firmware Upgrade' have been added.");
+}
+
+/**
+ * Adds the event 'Power Production Anomaly'.
+ */
+function notification_update_7003() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Power Production Anomaly',
+    ))
+    ->execute();
+
+  return st("The event 'Power Production Anomaly' has been added.");
+}
+
+/**
+ * Rename event 'Corrupted Message Received' to 'Corrupted Measurement Anomaly'.
+ */
+function notification_update_7004() {
+
+  db_update('event_log')
+    ->fields(array(
+      'event_id' => 201
+    ))
+    ->condition('event_id', 103)
+    ->execute();
+
+  db_update('notification')
+    ->fields(array(
+      'event_id' => 201
+    ))
+    ->condition('event_id', 103)
+    ->execute();
+
+  db_update('event')
+    ->fields(array(
+      'id' => 201,
+      'name' => 'Corrupted Measurement Anomaly'
+    ))
+    ->condition('id', 103)
+    ->execute();
+
+  return st("The event 'Corrupted Message Received' has been renamed.");
+}
+
+/**
+ * Rename event 'Power Production Anomaly' to 'Measurement Anomaly'.
+ */
+function notification_update_7005() {
+
+  db_delete('event_log')
+    ->condition('event_id', 202)
+    ->execute();
+
+  db_delete('notification')
+    ->condition('event_id', 202)
+    ->execute();
+
+  db_update('event')
+    ->fields(array(
+      'id' => 200,
+      'name' => 'Measurement Anomaly'
+    ))
+    ->condition('id', 202)
+    ->execute();
+
+  return st("The event 'Power Production Anomaly' has been renamed.");
+}
+
+/**
+ * Adds missing records to table 'event_unit'.
+ */
+function notification_update_7006() {
+
+  db_delete('event_unit')
+    ->condition('unit_id', 0)
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 101,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 102,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 104,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 200,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 201,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  return st("Missing records have been added to table 'event_unit'.");
+}
+
+/**
+ * Create event 'Invalid Timestamp'.
+ */
+function notification_update_7007() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 202,
+      'name' => 'Invalid Timestamp'
+    ))
+    ->execute();
+
+  return st("The event 'Invalid Timestamp' has been created.");
+}
+
+/**
+ * Update event 'Corrupted Message'.
+ */
+function notification_update_7008() {
+
+  db_update('event')
+    ->fields(array(
+      'name' => 'Corrupted Message'
+    ))
+    ->condition('id', 201)
+    ->execute();
+
+  return st("The event 'Corrupted Message' has been updated.");
+}
+
+/**
+ * Create event 'Any Device Issue'.
+ */
+function notification_update_7009() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Any Device Issue'
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 9,
+      'unit_id' => 0,
+    ))
+    ->execute();
+
+  return st("The event 'Any Device Issue' has been created.");
+}
+
+/**
+ * Add fields id and parent_id to table notification.
+ */
+function notification_update_7010() {
+
+  db_drop_primary_key('notification');
+
+  db_add_field('notification', 'id', array(
+    'type' => 'serial',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+  ),
+  array(
+    'primary key' => array('id'),
+  ));
+
+  db_add_field('notification', 'parent_id', array(
+    'type' => 'int',
+    'not null' => FALSE,
+    'unasigned' => TRUE,
+  ));
+
+  db_add_unique_key('notification', 'uk_device_event_limit_unit', array('device', 'event_id', 'limit_up', 'unit_id'));
+
+  return st("Fields id and parent_id have been successfully added to table notification.");
+}
+
+/**
+ * Create event 'Low Consumption'.
+ */
+function notification_update_7012() {
+
+  db_insert('event')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Low Consumption'
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 3,
+    ))
+    ->execute();
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 5,
+      'unit_id' => 4,
+    ))
+    ->execute();
+
+  return st("The event 'Low Consumption' has been created.");
+}
+
+/**
+ * Summary report now works with the unit 'month'.
+ */
+function notification_update_7013() {
+
+  db_insert('event_unit')
+    ->fields(array(
+      'event_id' => 10,
+      'unit_id' => 7,
+    ))
+    ->execute();
+
+  return st("Unit 'month' has been added to event 'summary report'.");
+}
+
+/**
+ * Resize field limit_up of table notification.
+ */
+function notification_update_7014() {
+
+  db_change_field('notification', 'limit_up', 'limit_up', array(
+      'type' => 'float',
+      'size' => 'big',
+      'precision' => 24,
+      'scale' => 15,
+      'not null' => TRUE,
+  ));
+
+  return st("Field limit_up has been resized.");
+}
+
+/**
+ * Create table notification_meter.
+ */
+function notification_update_7020() {
+
+  db_create_table('notification_meter', drupal_get_schema_unprocessed('notification', 'notification_meter'));
+
+  $notifications = db_select('notification', 'n')
+    ->fields('n', array('id', 'device', 'event_id'))
+    ->execute();
+
+  foreach ($notifications as $notification) {
+
+    $query = notification_meter_create_query_aux($notification);
+
+    if ($notification->event_id == SUMMARY_REPORT_EVENT_ID ||
+        $notification->event_id == ANY_DEVICE_ISSUE_EVENT_ID ||
+        $notification->event_id == FORECAST_REPORT_EVENT_ID ||
+        $notification->event_id == MEASUREMENT_ANOMALY_EVENT_ID) {
+
+      $sensors = $query->condition('m.type', ENERGY_PRODUCTION_SENSOR_TYPE)->execute();
+      notification_meter_insert_aux($sensors, $notification);
+    }
+
+    if ($notification->event_id == SUMMARY_REPORT_EVENT_ID ||
+        $notification->event_id == ANY_DEVICE_ISSUE_EVENT_ID ||
+        $notification->event_id == PEAK_CONSUMPTION_EVENT_ID ||
+        $notification->event_id == LOW_CONSUMPTION_EVENT_ID ||
+        $notification->event_id == MEASUREMENT_RECEIVED_EVENT_ID) {
+
+      $sensors = $query->condition('m.type', ENERGY_CONSUMPTION_SENSOR_TYPE)->execute();
+      notification_meter_insert_aux($sensors, $notification);
+    }
+  }
+  return st("The table notification_meter has been created.");
+}
+
+function notification_meter_create_query_aux($notification) {
+
+  $query = db_select('logger_meters', 'm')
+    ->fields('m', array('meter'))
+    ->condition('m.device', $notification->device)
+    ->isNotNull('m.function');
+  return $query;
+}
+
+function notification_meter_insert_aux($sensors, $notification) {
+
+  foreach ($sensors as $sensor) {
+
+    db_insert('notification_meter')
+      ->fields(array(
+        'notification_id' => $notification->id,
+        'meter' => $sensor->meter
+      ))
+      ->execute();
+  }
+}

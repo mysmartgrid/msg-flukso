@@ -1,0 +1,64 @@
+<profile>
+  <widget_instances>
+  <widget_instance id="1">
+    <name>Current Power</name>
+    <widget id="1">
+      <name>Current Power</name>
+      <description>Zeigt den aktuellen Verbrauch als Zahl an.</description>
+      <version>1.0</version>
+      <mode mode="default" time="30"/>
+      <access sendable="false" deleteable="false" access="private" virtualable="false"/>
+      <user username=""/>
+      <thumbnail href="file:////mnt/storage/usr/widgets/currentpower/currentpower.png" contenttype="image/png"/>
+      <movie href="file:////mnt/storage/usr/widgets/currentpower/currentpower.swf" contenttype="application/x-shockwave-flash"/>
+    </widget>
+    <access access="private"/>
+    <mode mode="default" time="30"/>
+  </widget_instance>
+  <widget_instance id="2">
+    <name>Energietacho</name>
+    <widget id="2">
+      <name>Energietacho</name>
+      <description>Zeigt den aktuellen Verbrauch als Tachonadel an.</description>
+      <version>1.0</version>
+      <mode mode="default" time="30"/>
+      <access sendable="false" deleteable="false" access="private" virtualable="false"/>
+      <user username=""/>
+      <thumbnail href="file:////mnt/storage/usr/widgets/last_reading/energietacho.png" contenttype="image/png"/>
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/energietacho.swf" contenttype="application/x-shockwave-flash"/>
+    </widget>
+    <access access="private"/>
+    <mode mode="default" time="30"/>
+  </widget_instance>
+  <widget_instance id="3">
+    <name>Gluehlampe</name>
+    <widget id="3">
+      <name>Glühlampe</name>
+      <description>Zeigt eine Glühlampe, die heller leuchtet, wenn mehr Strom verbraucht wird.</description>
+      <version>1.0</version>
+      <mode mode="default" time="30"/>
+      <access sendable="false" deleteable="false" access="private" virtualable="false"/>
+      <user username=""/>
+      <thumbnail href="file:////mnt/storage/usr/widgets/last_reading/Gluehlampe.png" contenttype="image/png"/>
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/Gluehlampe.swf" contenttype="application/x-shockwave-flash"/>
+    </widget>
+    <access access="private"/>
+    <mode mode="default" time="30"/>
+  </widget_instance>
+  <widget_instance id="4">
+    <name>Energie Graph</name>
+    <widget id="4">
+      <name>Energie Graph</name>
+      <description>Zeigt den Verbrauch der letzten Stunde als Graph an.</description>
+      <version>1.0</version>
+      <mode mode="default" time="30"/>
+      <access sendable="false" deleteable="false" access="private" virtualable="false"/>
+      <user username=""/>
+      <thumbnail href="file:////mnt/storage/usr/widgets/last_reading/EnergyGraph.png" contenttype="image/png"/>
+      <movie href="file:////mnt/storage/usr/widgets/last_reading/EnergyGraph.swf" contenttype="application/x-shockwave-flash"/>
+    </widget>
+    <access access="private"/>
+    <mode mode="default" time="30"/>
+  </widget_instance>
+  </widget_instances>
+</profile>

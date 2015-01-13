@@ -1,0 +1,15 @@
+; $Id$
+name = Logger
+description = Logs metering values reported through XML-RPC in an RRD database and renders them in different charts.
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+php = 5.3
+
+dependencies[] = mobile_tools
+dependencies[] = pvcast
+dependencies[] = msgcommons
+dependencies[] = jobqueue
+dependencies[] = notification
+
+files[] = logger.test

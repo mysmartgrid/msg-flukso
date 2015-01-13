@@ -1,0 +1,811 @@
+<?php
+
+/**
+ * @file
+ * This module provides common functions shared by other MSG modules.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
+define('SECOND',  1);
+define('MINUTE', 60);
+define('HOUR',   60 * MINUTE);
+define('DAY',    24 * HOUR);
+define('WEEK',    7 * DAY);
+define('MONTH',  30 * DAY);
+define('YEAR',   52 * WEEK);
+
+define('HOUR_UNIT_ID',   2);
+define('WATT_UNIT_ID',   3);
+define('WEEK_UNIT_ID',   6);
+define('DAY_UNIT_ID',    5);
+define('MONTH_UNIT_ID',  7);
+define('WH_UNIT_ID',    10);
+
+define('ENERGY_UNIT_TYPE_ID',      1);
+define('POWER_UNIT_TYPE_ID',       2);
+define('TEMPERATURE_UNIT_TYPE_ID', 3);
+define('TIME_UNIT_TYPE_ID',        4);
+define('PRESSURE_UNIT_TYPE_ID',    5);
+define('HUMIDITY_UNIT_TYPE_ID',    6);
+
+define('MSGCOMMONS_PATH', drupal_get_path('module', 'msgcommons'));
+
+
+/**
+ * Returns an array of units of a certain type.
+ *
+ * @return the array of units.
+ */
+function msgcommons_get_units_options($type_id) {
+
+  $result = db_select('unit', 'u')
+    ->fields('u', array('symbol', 'name'))
+    ->condition('u.type_id', $type_id)
+    ->execute();
+
+  $options = array();
+  foreach ($result as $unit) {
+    $options[$unit->symbol] = t($unit->name);
+  }
+  return $options;
+}
+
+/**
+ * Returns an array of units which have the type of the informed unit.
+ *
+ * @param $symbol  The symbol of the unit.
+ * @return the array of same type units.
+ */
+function msgcommons_get_same_type_units_options($symbol) {
+
+  $type_id = db_select('unit', 'u')
+    ->fields('u', array('type_id'))
+    ->condition('u.symbol', $symbol)
+    ->execute()
+    ->fetchField();
+
+  return msgcommons_get_units_options($type_id);
+}
+
+/**
+ * Stores data in the persistent cache.
+ * If it fails, store it in a temporary file.
+ *
+ * @param $cid       The cache id of the data to store.
+ * @param $data      The data to store in the cache.
+ * @param $lifetime  When the data expires and can be removed from the cache.
+ */
+function safe_cache_set($cid, $data, $lifetime) {
+
+  cache_set($cid, $data, 'cache_page', REQUEST_TIME + $lifetime);
+  $cache = cache_get($cid, 'cache_page');
+
+  if (!$cache) {
+    watchdog('msg.cache', "Object %cid too big for caching.", array('%cid' => $cid), WATCHDOG_NOTICE);
+    $saved = file_put_contents(MSGCOMMONS_PATH . "/tmp/$cid", serialize($data));
+    if ($saved === FALSE) {
+      watchdog('msg.cache', "Object %cid could not be saved to a cache file.", array('%cid' => $cid), WATCHDOG_ERROR);
+    }
+  }
+}
+
+/**
+ * Returns data from the persistent cache. If not found, looks for a temporary file and returns its content.
+ * 
+ * @param $cid  The cache id of the data to retrieve.
+ * @return the cached object.
+ */
+function safe_cache_get($cid) {
+
+  $cache = cache_get($cid, 'cache_page');
+  if (!$cache) {
+
+    $file = MSGCOMMONS_PATH . "/tmp/$cid";
+    if (file_exists($file)) {
+
+      $cache = new stdClass();
+      $cache->data = unserialize(file_get_contents($file));
+    }
+  }
+  return $cache;
+}
+
+/**
+ * Converts a string containing a list of tokens into an array.
+ *
+ * @param $str  The string containing the tokens.
+ * @param $sep  The token separators. Default: space, new line char, or tab char.
+ * @return an array of tokens.
+ */
+function tokenize_string($str, $sep = " \n\r") {
+
+  $token = strtok($str, $sep);
+
+  $tokens = array();
+  while ($token !== FALSE) {
+    $tokens[] = trim($token, $sep);
+    $token = strtok($sep);
+  }
+  return $tokens;
+}
+
+/**
+ * Wraps a string to a given number of characters, respecting multi-byte characters.
+ *
+ * @param $str   The input string.
+ * @param $width The number of characters at which the string will be wrapped.
+ * @param $break The line is broken using the optional break parameter.
+ * @param $cut   If the cut is set to TRUE, the string is always wrapped at or before the specified width.
+ *               So if you have a word that is larger than the given width, it is broken apart.
+ * @return the given string wrapped at the specified length. 
+ */
+function mb_wordwrap($str, $width = 75, $break = "\n", $cut = FALSE, $charset = NULL) {
+
+  if ($charset === NULL) {
+    $charset = mb_internal_encoding();
+  }
+
+  $pieces = explode($break, $str);
+  $result = array();
+
+  foreach ($pieces as $piece) {
+    $current = $piece;
+
+    while ($cut && mb_strlen($current) > $width) {
+      $result[] = mb_substr($current, 0, $width, $charset);
+      $current = mb_substr($current, $width, 2048, $charset);
+    }
+    $result[] = $current;
+  }
+  return implode($break, $result);
+}
+
+/**
+ * Downloads a chart data file.
+ */
+function download_chart_data_file($file_name, $header, $lines) {
+
+  drupal_add_http_header('Pragma', 'public');
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-Disposition', "attachment; filename=$file_name");
+  drupal_add_http_header('Cache-Control', 'public');
+
+  print $header . PHP_EOL . $lines;
+  exit(0);
+}
+
+/**
+ * Copies a file or directory recursively.
+ *
+ * @param  $source       The source path
+ * @param  $destination  The destination path
+ * @return TRUE on success, FALSE on failure.
+ */
+function rcopy($source, $destination) {
+
+  if (is_link($source)) {
+    return symlink(readlink($source), $destination);
+  }
+  if (is_file($source)) {
+    return copy($source, $destination);
+  }
+  if (!is_dir($destination)) {
+    mkdir($destination);
+  }
+
+  $dir = dir($source);
+  while (false !== $entry = $dir->read()) {
+    if ($entry == '.' || $entry == '..') {
+      continue;
+    }
+    rcopy("$source/$entry", "$destination/$entry");
+  }
+  $dir->close();
+  return TRUE;
+}
+
+/**
+ * Removes a directory recursively.
+ *
+ * @param $dir The directory to be removed.
+ */
+function rrmdir($dir) {
+
+  if (is_dir($dir)) {
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype("$dir/$object") == "dir") {
+          rrmdir("$dir/$object");
+        }
+        else {
+          unlink("$dir/$object");
+        }
+      }
+    }
+    reset($objects);
+    rmdir($dir);
+  }
+}
+
+/**
+ * Removes files in a directory which are older than a certain age.
+ *
+ * @param $dir      The directory where the files are.
+ * @param $max_age  The maximum file age.
+ */
+function rmoldfiles($dir, $max_age) {
+
+  if (is_dir($dir)) {
+    $now = time();
+
+    $objects = scandir($dir);
+    foreach ($objects as $object) {
+
+      if ($object != "." && $object != "..") {
+        if (filetype("$dir/$object") == "file") {
+          $file = "$dir/$object";
+          if (($now - filectime($file)) > $max_age) {
+            unlink($file);
+          }
+        }
+      }
+    }
+    reset($objects);
+  }
+}
+
+/**
+ * Removes the content of a directory.
+ *
+ * @param $path The directory to be cleared.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function cleardir($path) {
+  rmfiles("$path/*");
+}
+
+/**
+ * Removes files that match the informed pattern.
+ *
+ * @param $path The directory where the files are.
+ * @return TRUE if successful, FALSE on failure.
+ */
+function rmfiles($path) {
+  array_map("unlink", glob($path));
+}
+
+/**
+ * Compresses files and directories into a zip file recursively.
+ *
+ * @param $source       The files to be compressed.
+ * @param $destination  The zip file location.
+ * @return TRUE on success, FALSE on failure.
+ */
+function rzip($source, $destination) {
+
+  if (!extension_loaded('zip') || !file_exists($source)) {
+    return FALSE;
+  }
+
+  $zip = new ZipArchive();
+  if (!$zip->open($destination, ZIPARCHIVE::CREATE)) {
+    return FALSE;
+  }
+
+  $source = str_replace('\\', '/', realpath($source));
+
+  if (is_dir($source) === TRUE) {
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
+
+    foreach ($files as $file) {
+        $file = str_replace('\\', '/', realpath($file));
+
+        if (is_dir($file) === TRUE) {
+          $dir = str_replace($source . '/', '', $file . '/');
+
+          //FIXME: remove this test
+          if (strpos($dir, '/') > 0) {
+            $zip->addEmptyDir($dir);
+          }
+        }
+        elseif (is_file($file) === TRUE) {
+          $zip->addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
+        }
+    }
+  }
+  elseif (is_file($source) === TRUE) {
+    $zip->addFromString(basename($source), file_get_contents($source));
+  }
+  return $zip->close();
+}
+
+/**
+ * Saves a file.
+ *
+ * @param $file_path The file path.
+ * @param $content   The file content.
+ */
+function save_file($file_path, $content, $mode = 'w') {
+  $fh = fopen($file_path, $mode);
+  fwrite($fh, $content);
+  fclose($fh);
+}
+
+/**
+ * Appends a string to a file.
+ *
+ * @param $file_path The file path.
+ * @param $content   The file content.
+ */
+function append_file($file_path, $content) {
+  save_file($file_path, $content, 'a');
+}
+
+/**
+ * Reads the content of a JSON file.
+ *
+ * @param $path The file path.
+ * @return the JSON data as an array.
+ */
+function read_json_file($path) {
+
+  if (file_exists($path)) {
+    $fh = fopen($path, 'r');
+    $data = fgets($fh);
+    fclose($fh);
+
+    return json_decode($data, TRUE);
+  }
+  else {
+    return array();
+  }
+}
+
+/**
+ * Returns the timezone offset.
+ *
+ * @param $name The timezone name.
+ * @return the timezone offset.
+ */
+function get_timezone_offset($name = NULL) {
+
+  global $user;
+
+  if (!isset($name)) {
+    if (isset($user) && isset($user->timezone)) {
+      $name = $user->timezone;
+    }
+    else {
+      $name = date_default_timezone_get();
+    }
+  }
+
+  $tz = new DateTimeZone($name);
+  return $tz->getOffset(new DateTime);
+}
+
+/**
+ * Converts unix timestamp to user local time.
+ * 
+ * @param $unix The unix timestamp.
+ * @return the converted time.
+ */
+function unixtime_to_localtime($unixtime) {
+
+  $offset = get_timezone_offset();
+  $localtime = gmdate('r', $unixtime + $offset);
+  return substr($localtime, 0, strlen($localtime) - 6);
+}
+
+/**
+ * Formats timestamp as a readable string informing days and hours.
+ * 
+ * @param $seconds The timestamp in seconds.
+ * @return the converted string.
+ */
+function seconds_to_dayshours($seconds) {
+  $days = intval($seconds / DAY);
+  $hours = intval(($seconds % DAY) / HOUR);
+  return sprintf('%d days %d hours', $days, $hours);
+}
+
+/**
+ * Finds a role by name, and returns its id.
+ * 
+ * @param $name  The role name.
+ * @return the role id.
+ */
+function get_role_id($name) {
+  return db_select('role', 'r')
+    ->fields('r', array('rid'))
+    ->condition('r.name', $name, '=')
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Returns the array of selected options in a combobox field.
+ *
+ * @param $field_values  The form field values array, containing zeros to indicate non-selected options.
+ * @return the array of selected options. 
+ */
+function get_selected_combobox_options($field_values) {
+  $selected = array();
+  foreach ($field_values as $option) {
+    if ($option) {
+      $selected[] = $option;
+    }
+  }
+  return $selected;
+}
+
+/**
+ * Converts HTML code into plain text.
+ *
+ * @param $html  The HTML code.
+ * @return the plain text.
+ */
+function html2txt($html) {
+
+  $html = html_entity_decode($html, ENT_COMPAT, 'UTF-8');
+
+  //remove style tags. m = PCRE_MULTILINE, s = PCRE_DOTALL
+  $text = preg_replace("/<style.*?<\/style>/ms", "", $html);
+
+  //find link tags ..
+  $text = preg_replace_callback("/(<a.*?>.*?<\/a.*?>)/",
+    //.. and replace them with the actual link
+    create_function('$treffer',
+      'preg_match("/href=\'(.*?)[\'\s]/", $treffer[1], $link);
+       preg_match("/(<a.*?>(.*?)<\/a.*?>)/", $treffer[1], $txt);
+       return $txt[1] . " \'" . $link[1] . "\'";'
+    ),
+    $text);
+
+  //replace <br> and </p> with linebreaks
+  $text = preg_replace("/<br.*?>/", "\n", $text);
+  $text = preg_replace("/<\/p>/", "\n\n", $text);
+
+  //replace list items with *
+  $text = preg_replace("/<li.*?>/", "* ", $text);
+
+  $text = preg_replace("/th>/", "td>", $text);
+  $text = preg_replace_callback("/(<td>.*?<\/td>)/",
+    create_function('$treffer',
+       'preg_match("/<td>(.*?)<\/td>/", $treffer[1], $matches);
+       $len = mb_strlen($matches[1]);
+       return mb_substr("........................." . $matches[1], $len, 25);'
+    ),
+    $text);
+
+  $text = preg_replace("/<\/tr>/", "\n", $text);
+
+  //remove all other tags
+  return preg_replace("/<.*?>/", "", $text);
+}
+
+/**
+ * Checks if the browser is supported.
+ */
+function check_browser_support() {
+
+  $agent = isset($_SERVER['HTTP_USER_AGENT']) ? ' ' . $_SERVER['HTTP_USER_AGENT'] : NULL;
+
+  //If called by Drush
+  if (empty($agent)) {
+    return TRUE;
+  }
+
+  $supported = TRUE;
+  $unsupported_browsers = array(
+    'Android 4.0',
+  );
+
+  foreach ($unsupported_browsers as $browser) {
+    $pos = strpos($agent, $browser);
+    if ($pos > 0) {
+      $supported = FALSE;
+      break;
+    }
+  }
+  
+  if ($supported) {
+
+    $supported = FALSE;
+    $supported_browsers = array(
+      array('name' => 'Firefox',  'version' => 3),
+      array('name' => 'MSIE',     'version' => 8),
+      array('name' => 'Chrome',   'version' => 1),
+      array('name' => 'Chromium', 'version' => 1),
+      array('name' => 'Safari',   'version' => 4),
+      array('name' => 'Webkit',   'version' => 5),
+      array('name' => 'Mozilla',  'version' => 5),
+    );
+
+    foreach ($supported_browsers as $browser) {
+      $pos = strpos($agent, $browser['name']);
+      if ($pos > 0) {
+        $version = substr($agent, $pos + strlen($browser['name']) + 1, 2);
+        $version = str_replace('.', '', $version);
+        $supported = $version >= $browser['version'];
+        break;
+      }
+    }
+  }
+
+  if (!$supported) {
+    drupal_set_message(t('Warning: you are using an outdated browser. ' . 
+      'Some parts of mysmartgrid.de may not work properly. Please install one of the following browsers: ' . 
+      'Internet Explorer 8, Firefox 3, Safari 4, Chrome 15, Chromium 15, Opera Mobile 11, Android 2.3.4, Android 4.1 (or a later version).'),
+      'error', FALSE);
+  }
+}
+
+/**
+ * Checks if the user has a role.
+ * 
+ * @param $role_name The role name.
+ * @return TRUE if it does, FALSE otherwise.
+ */
+function user_has_role($role_name) {
+
+  global $user;
+
+  $rid = get_role_id($role_name);
+  return !empty($user->roles[$rid]);
+}
+
+/**
+ * Executes a database query and returns rows as an array of objects.
+ *
+ * @param $query The database query.
+ * @return an array of objects.
+ */
+function db_query_objects($query) {
+  
+  $result = $query->execute();
+  $objects = array();
+
+  foreach ($result as $object) {
+    $objects[] = $object;
+  }
+  return $objects;
+}
+
+/**
+ * Calculates the median of an array of numbers.
+ *
+ * @param $values  The array of numbers.
+ * @return the median.
+ */
+function median($values) {
+  sort($values, SORT_NUMERIC);
+  return (count($values) % 2) ?
+    $values[floor(count($values)/2)] :
+    ($values[floor(count($values)/2)] + $values[floor(count($values)/2) - 1]) / 2;
+}
+
+/**
+ * Calculates the median deviation of an array of numbers.
+ *
+ * @param $values The array of numbers.
+ * @param $median The median value, if known already (optional).
+ * @return the median deviation.
+ */
+function median_deviation($values, $median = NULL) {
+  $median = $median == NULL ? median($values) : $median;
+  $deviations = array();
+  foreach ($values as $timestamp => $value) {
+    if (isset($value)) {
+      $deviations[] = abs($median - $value);
+    }
+  }
+  return median($deviations);
+}
+
+/**
+ * Calculates the arithmetic mean of an array of numbers.
+ *
+ * @param $values  The array of numbers.
+ * @return the mean.
+ */
+function mean($values) {
+  return array_sum($values) / count($values);
+}
+
+/**
+ * Calculates the standard deviation of an array of numbers.
+ *
+ * @param $values The array of numbers.
+ * @param $median The mean value, if known already (optional).
+ * @return the standard deviation.
+ */
+function standard_deviation($values, $mean = NULL) {
+
+  $mean = $mean == NULL ? mean($values)  : $mean;
+  $devs = array();
+  foreach ($values as $value) {
+    $devs[] = pow($value - $mean, 2);
+  }
+  return sqrt(mean($devs));
+}
+
+function msgcommons_cron() {
+
+  $rest = REQUEST_TIME % HOUR;
+
+  //First quarter of an hour
+  if ($rest >= 45 * MINUTE) {
+    rmoldfiles(MSGCOMMONS_PATH . '/tmp', HOUR);
+  }
+}
+
+/**
+ * Verifies if a list of domains contains valid names.
+ * 
+ * @param $domains A comma-separated list of domains.
+ * @return TRUE if all domain names are valid. FALSE otherwise.
+ */
+function validate_domains($domains) {
+
+  return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9\-\_\.\\s]+[a-zA-Z0-9]$/', $domains);
+}
+
+/**
+ * Verifies if a host IP is valid.
+ *
+ * @param $ip      The host IP to be validated.
+ * @param $netmask The subnet mask. Required if the CIDR prefix is informed.
+ * @return TRUE if the host IP is valid. FALSE otherwise. 
+ */
+function validate_host_ip($ip, $netmask = NULL) {
+
+  $valid_cidr = TRUE;
+  $cidr_pos = strpos($ip, '/');
+
+  if ($cidr_pos > 0) {
+    $prefix = substr($ip, $cidr_pos + 1);
+    $ip = substr($ip, 0, $cidr_pos);
+
+    $valid_cidr = 
+      ((string)(int)$prefix == $prefix) && $prefix > 0 && $prefix < 33 &&
+      $netmask && substr_count(decbin(ip2long($netmask)), '1') == $prefix;
+  }
+
+  return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_RES_RANGE) &&
+    substr($ip, -3) != '255' && $valid_cidr;
+}
+
+/**
+ * Verifies if a subnet mask is valid.
+ *
+ * @param $netmask The subnet mask to be validated.
+ * @return TRUE if the subnet mask is valid. FALSE otherwise.
+ */
+function validate_subnet_mask($netmask) {
+
+  $valid = FALSE;
+  if (filter_var($netmask, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+
+    $bin = decbin(ip2long($netmask));
+    $valid = strlen($bin) == 32 && strpos($bin, '1') !== FALSE && strpos($bin, '01') === FALSE;
+  }
+  return $valid;
+}
+
+/**
+ * Returns the network address of a host IP address.
+ *
+ * @param $ip      The host IP.
+ * @param $netmask The subnet mask.
+ * @return the network IP address if the arguments are valid. NULL otherwise.
+ */
+function get_network_ip($ip, $netmask) {
+
+  $network_ip = NULL;
+
+  if (validate_host_ip($ip, $netmask)) {
+
+    $ip_octets = explode('.', $ip);
+    $network_ip = '';
+
+    foreach (explode('.', $netmask) as $i => $octet) {
+      $network_ip .= '.' . ($octet == 0 ? '0' : $ip_octets[$i]);
+    }
+    $network_ip = substr($network_ip, 1);
+  }
+  return $network_ip;
+}
+
+/**
+ * Validates network form fields.
+ * 
+ * @param $values                The form fields' values array (field_name => field_value).
+ * @param $enabled_field         The name of the field that informs whether the interface is enabled.
+ * @param $ip_field              The IP field name.
+ * @param $gateway_field         The Gateway IP field name.
+ * @param $netmask_field         The Netmask field name. 
+ * @param $config_procotol_field The network configuration protocol field name (default: NULL).
+ */
+function validate_network_fields($values, $enabled_field, $ip_field, $gateway_field, $netmask_field, $config_procotol_field = NULL) {
+
+  if (isset($values[$enabled_field]) && $values[$enabled_field] == 1) {
+
+    $ip = isset($values[$ip_field]) ? $values[$ip_field] : '';
+    $gateway = isset($values[$gateway_field]) ? $values[$gateway_field] : '';
+    $netmask = isset($values[$netmask_field]) ? $values[$netmask_field] : '';
+    $config_protocol = $config_procotol_field && isset($values[$config_procotol_field]) ? $values[$config_procotol_field] : 'static';
+
+    if ($config_protocol == 'dhcp') {
+
+      if (!(empty($ip) && empty($gateway) && empty($netmask))) {
+        form_set_error($config_procotol_field, t('The network configuration cannot be dynamic if other properties are statically defined.'));
+      }
+    }
+    elseif (!validate_subnet_mask($netmask)) {
+
+      form_set_error($netmask_field, t('Please enter a valid Network mask.'));
+    }
+    elseif (!validate_host_ip($ip, $netmask)) {
+
+      form_set_error($ip_field, t('Please enter a valid IP address.'));
+    }
+    elseif (!validate_host_ip($gateway, $netmask) || $ip == $gateway) {
+
+      form_set_error($gateway_field, t('Please enter a valid Gateway IP address.'));
+    }
+    else {
+      $device_network = get_network_ip($ip, $netmask);
+      $gateway_network = get_network_ip($gateway, $netmask);
+
+      if ($device_network && $gateway_network && $device_network != $gateway_network) {
+        form_set_error($gateway_field, t('The Gateway IP and the device IP must be on the same network.'));
+      }
+    }
+  }
+}
+
+/**
+ * Convert a SelectQueryInterface object to a SQL string statement.
+ *
+ * @param $query The object to be converted.
+ * @return the SQL string statement.
+ */
+function get_query_string(SelectQueryInterface $query) {
+
+  $string = (string) $query;
+  $arguments = $query->arguments();
+
+  if (!empty($arguments) && is_array($arguments)) {
+    foreach ($arguments as $placeholder => &$value) {
+      if (is_string($value)) {
+        $value = "'$value'";
+      }
+    }
+
+    $string = strtr($string, $arguments);
+  }
+  return $string;
+}

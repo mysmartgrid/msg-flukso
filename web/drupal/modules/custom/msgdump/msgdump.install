@@ -1,0 +1,155 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the msgdump module.
+ */
+
+function msgdump_schema() {
+
+  $schema['msgdump'] = array(
+    'description' => 'Stores the dumps.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ),
+      'meter' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'disp-width' => '10',
+      ),
+      'start' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'disp-width' => '10',
+      ),
+      'stop' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'disp-width' => '10',
+      ),
+      'updated' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10'
+      ),
+      'file' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => TRUE,
+        'default' => '0',
+      ),
+    ),
+    'primary key' => array(
+      'id'
+    )
+  );
+  return $schema;
+}
+
+function msgdump_install() {
+  drupal_set_message(st('Created msgdump module table.'));
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/db';
+  mkdir($file_path);
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/flukso4r';
+  mkdir($file_path);
+
+  drupal_set_message(check_plain(st('Please install flukso4r on:') . " $file_path."));
+}
+
+function msgdump_uninstall() {
+  drupal_set_message(st('Deleted msgdump module table.'));
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/db';
+  rrmdir($file_path);
+
+  $file_path = drupal_get_path('module', 'msgdump') . '/flukso4r';
+  rrmdir($file_path);
+}
+
+function msgdump_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Changes field msgdump.meter to store sensor ids and not serial numbers. Removes field msgdump.type.
+ */
+function msgdump_update_7001() {
+
+  db_add_field('msgdump', 'new_meter', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => FALSE 
+  ));
+
+  $query = db_select('msgdump', 'p');
+  $query->join('logger_devices', 'd', 'p.meter = d.serial');
+  $query->join('logger_meters', 'm', 'm.device = d.device');
+  $dumps = $query
+    ->fields('d', array('serial'))
+    ->fields('m', array('meter'))
+    ->condition('m.type', 1, '=')
+    ->isNotNull('m.function')
+    ->execute();
+
+  $output = '';
+  foreach ($dumps as $dump) {
+
+    db_update('msgdump')
+      ->fields(array(
+      'new_meter' =>  $dump->meter
+    ))
+    ->condition('meter', $dump->serial, '=')
+    ->execute();
+
+    $output .= 'Dump request for meter ' . $dump->meter . ' successfully converted. ';
+  }
+ 
+  db_drop_field('msgdump', 'meter');
+  db_drop_field('msgdump', 'type');
+
+  db_change_field('msgdump', 'new_meter', 'meter',
+    array(
+      'type' => 'varchar',
+      'length' => '32',
+      'not null' => TRUE
+  )); 
+
+  $output .= 'Field msgdump.meter has been successfully updated.';
+
+  return $output;
+}
+
+/**
+ * Adds field 'updated' to table msgdump.
+ */
+function msgdump_update_7002() {
+
+  db_add_field('msgdump', 'updated', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+    'disp-width' => '10'
+  ));
+
+  return st("Field 'updated' has been added to table msgdump.");
+}

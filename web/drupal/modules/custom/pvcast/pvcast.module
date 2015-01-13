@@ -1,0 +1,188 @@
+<?php
+
+/**
+ * @file
+ * This module provides an interface with the PVCast Service.
+ *
+ * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//DEBUG
+//error_reporting(E_ALL);
+//ini_set('display_errors', TRUE);
+//ini_set('display_startup_errors', TRUE);
+
+
+/**
+ * Gets a PV plant forecast.
+ *
+ * @param $alias      The PV plant alias.
+ * @param $start_time The forecast period start time (optional).
+ * @param $end_time   The forecast period end time (optional).
+ * @return the PV plant forecast as a bidimensional array (type => (timestamp => value)), where type may be: 'power', 'precipitation', and 'temperature'.
+ */
+function pvcast_get_forecast($alias, $start_time = NULL, $end_time = NULL) {
+
+  //TODO: start_time and end_time should be URL parameters
+  $response = pvcast_request('GET', "/plants/alias/$alias/forecast");
+
+  $data = isset($response->data) ? json_decode($response->data, TRUE) : array();
+  $forecast = array(
+    'power' => array(),
+    'temperature' => array(),
+    'precipitation' => array()
+  );
+
+  if (isset($start_time) && isset($end_time) && !empty($data)) {
+    foreach ($data as $time => $values) {
+
+      if ($time >= $start_time && $time <= $end_time) {
+        foreach ($values as $type => $value) {
+
+          if (isset($forecast[$type])) {
+            $forecast[$type][$time] = $data[$time][$type];
+          }
+        }
+      }
+    }
+  }
+  return $forecast;
+}
+
+/**
+ * Gets a PV plant.
+ *
+ * @param $alias      The PV plant alias.
+ * @return the PV plant as an array of properties (id, uuid, alias, latitude, longitude, notes).
+ */
+function pvcast_get_plant($alias) {
+
+  $response = pvcast_request('GET', "/plants/alias/$alias");
+
+  return isset($response->data) ? json_decode($response->data, TRUE) : NULL;
+}
+
+/**
+ * Creates a PV plant.
+ * 
+ * @param $alias      The plant alias.
+ * @param $latitude   The plant latitude.
+ * @param $longitude  The plant longitude.
+ * @return the HTTP response code.
+ */
+function pvcast_create_plant($alias, $latitude, $longitude) {
+
+  $response = pvcast_request('POST', '/plants',
+    '{"plant":{"alias":"' . $alias . '","latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
+
+  return $response->code;
+}
+
+/**
+ * Deletes a PV plant.
+ * 
+ * @param $alias      The plant alias.
+ * @return the HTTP response code.
+*/
+function pvcast_delete_plant($alias) {
+
+  $response = pvcast_request('DELETE', "/plants/alias/$alias");
+
+  return $response->code;
+}
+
+/**
+ * Updates the properties of a PV plant.
+ * 
+ * @param $alias      The plant alias.
+ * @param $latitude   The plant latitude.
+ * @param $longitude  The plant longitude.
+ * @return the HTTP response code.
+ */
+function pvcast_update_plant($alias, $latitude, $longitude) {
+
+  $response = pvcast_request('PUT', "/plants/alias/$alias",
+    '{"plant":{"latitude":"' . $latitude . '","longitude":"' . $longitude . '"}}');
+
+  return $response->code;
+}
+
+/**
+ * Submits historical measurements of a PV plant to the PVCast service.
+ * This method must be invoked at least once a day, so the service is able to make more accurate forecasts.
+ *
+ * @param $alias         The plant alias.
+ * @param $measurements  The plant measurements (timestamp => value).
+ * @return the HTTP response code.
+ */
+function pvcast_update_model($alias, $measurements) {
+
+  $pairs = "";
+  foreach ($measurements as $time => $value) {
+    $pairs .= (empty($pairs) ? '' : ',') . "\"$time\":{\"power\":$value}";
+  }
+
+  $response = pvcast_request('POST', "/plants/alias/$alias/measurements",
+    '{"measurements":{' . $pairs . '}}');
+
+  return $response->code;
+}
+
+/**
+ * Sends a request to the PVCast service.
+ *
+ * @param $method  The HTTP method.
+ * @param $path    The URL path.
+ * @param $body    The request body (optional).
+ * @return the Drupal HTTP response object.
+ */
+function pvcast_request($method, $path, $body = NULL) {
+
+  $url = variable_get('pvcast_forecast_service_url') . "$path.json";
+  $key = variable_get('pvcast_key');
+
+  $headers = array('X-API-KEY' => $key);
+  if ($body) {
+    $headers['Content-type'] = 'application/json';
+  }
+
+  $response = drupal_http_request($url, array(
+    'method' => $method,
+    'data' => $body,
+    'headers' => $headers
+  ));
+
+  //If error
+  if ($response->code >= 300 || $response->code < 200) {
+    watchdog('pvcast.request', 'Request: %method %url -
+      HTTP response code: %code -
+      message: "%message" -
+      status: "%status" -
+      data: "%data" -
+      body: "%body"',
+      array(
+        '%method' => $method,
+        '%url' => $url,
+        '%code' => $response->code,
+        '%message' => isset($response->error) ? $response->error : '',
+        '%status' => isset($response->status_message) ? $response->status_message : '',
+        '%data' => isset($response->data) ? $response->data : '',
+        '%body' => isset($body) ? $body : '',
+        WATCHDOG_ERROR
+    ));
+  }
+  return $response;
+}

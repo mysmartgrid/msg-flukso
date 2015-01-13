@@ -1,0 +1,12 @@
+; $Id$
+name = Event Notification
+description = Manages Flukso devices' event notifications.
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+php = 5.3
+
+dependencies[] = msgcommons
+dependencies[] = jobqueue
+dependencies[] = logger
+dependencies[] = pchart

@@ -1,0 +1,332 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the deployment module.
+ */
+
+function deployment_schema() {
+
+  $schema['deployment_state'] = array(
+    'description' => 'Stores the device states.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '30',
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => '200',
+        'not null' => TRUE,
+      ),
+    ),
+    'flow_order' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
+    'primary key' => array(
+      'id',
+    ),
+  );
+
+  $schema['deployment_summary'] = array(
+    'description' => 'Stores deployment summaries.',
+    'fields' => array(
+      'time' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'state_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+      ),
+      'total' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+    ),
+    'primary key' => array(
+      'time',
+      'state_id',
+    ),
+  );
+  return $schema;
+}
+
+function deployment_install() {
+
+  drupal_set_message(st('Created deployment module tables.'));
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 1,
+      'name' => 'Uninstalled',
+      'description' => "The device has not yet been registered (activated) by any user, neither has it sent any heartbeat during the past 3 days.",
+      'flow_order' => 1,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 2,
+      'name' => 'Unregistered',
+      'description' => "The device has sent a heartbeat during the past 3 days, although it is still unregistered.",
+      'flow_order' => 2,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'No Communication',
+      'description' => "The device is registered, but has not sent any message during the past 2 hours.",
+      'flow_order' => 3,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 4,
+      'name' => 'Corrupted Message',
+      'description' => "The device is registered, but its latest measurements contained non-numeric values.",
+      'flow_order' => 4,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 5,
+      'name' => 'Working',
+      'description' => "The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.",
+      'flow_order' => 5,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 6,
+      'name' => 'Offline',
+      'description' => "The device is registered, but has not sent any message during the past 24 hours.",
+      'flow_order' => 7,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 7,
+      'name' => 'No Measurement',
+      'description' => "The device is registered, but has not sent any measurement during the past 24 hours.",
+      'flow_order' => 7,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 8,
+      'name' => 'No Heartbeat',
+      'description' => "The device is registered, but has not sent any heartbeat during the past 24 hours.",
+      'flow_order' => 8,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Invalid Timestamp',
+      'description' => "The device is registered, but its latest measurements contained invalid timestamps.",
+      'flow_order' => 9,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 10,
+      'name' => 'Missing Sensors',
+      'description' => "The device is installed, but the associated list of sensors is empty.",
+      'flow_order' => 0,
+    ))
+    ->execute();
+
+  //FIXME: PDF generation libraries
+
+  $file_path = drupal_get_path('module', 'deployment') . '/pdf';
+  mkdir($file_path);
+
+  deployment_create_summary();
+}
+
+function deployment_uninstall() {
+  drupal_set_message(t('Deleted deployment module tables.'));
+
+  $file_path = drupal_get_path('module', 'deployment') . '/pdf';
+  rrmdir($file_path);
+}
+
+function deployment_update_7000() {
+  // update_sql has been removed. Use the database API for any schema or data changes.
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+}
+
+/**
+ * Create deployment state 'Invalid Timestamp'.
+ */
+function deployment_update_7001() {
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 9,
+      'name' => 'Invalid Timestamp',
+      'description' => "This device has sent a measurement with an invalid time.",
+    ))
+    ->execute();
+
+  return st("The deployment state 'Invalid Timestamp' has been created.");
+}
+
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7002() {
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but the latest measurement received from it contained non numeric values.",
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but has sent a measurement with an invalid time.",
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
+}
+
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7003() {
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but its latest measurements contained non-numeric values.",
+    ))
+    ->condition('id', 4)
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, but its latest measurements contained invalid timestamps.",
+    ))
+    ->condition('id', 9)
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
+}
+
+/**
+ * Create deployment state: 'Missing Sensors'.
+ */
+function deployment_update_7004() {
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 10,
+      'name' => 'Missing Sensors',
+      'description' => "The device is registered, but contains an empty list of sensors.",
+    ))
+    ->execute();
+
+  return st("The deployment state 'Missing Sensors' has been created.");
+}
+
+/**
+ * Create field flow_order in table deployment_state.
+ */
+function deployment_update_7005() {
+
+  db_add_field('deployment_state', 'flow_order',  array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0
+  ));
+
+  db_update('deployment_state')
+    ->expression('flow_order', 'id')
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'flow_order' => 0
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  return st("Field flow_order has been created in table deployment_state.");
+}
+
+/**
+ * Add entries in table deployment_summary for state  'Missing Sensors'.
+ */
+function deployment_update_7008() {
+
+    $result = db_select('deployment_summary', 's')
+      ->fields('s', array('time'))
+      ->distinct()
+      ->execute();
+
+    foreach ($result as $summary) {
+
+      db_insert('deployment_summary')
+        ->fields(array(
+          'time' => $summary->time,
+          'state_id' => 10,
+          'total' => 0
+        ))
+        ->execute();
+    }
+    return st("Entries have been added to table deployment_summary.");
+}
+
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7010() {
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is registered, its latest heartbeat and measurements contained valid data, and was sent during the past 2 hs.",
+    ))
+    ->condition('id', 5)
+    ->execute();
+
+  db_update('deployment_state')
+    ->fields(array(
+      'description' => "The device is installed, but the associated list of sensors is empty.",
+    ))
+    ->condition('id', 10)
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
+}

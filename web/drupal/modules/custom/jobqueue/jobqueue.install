@@ -1,0 +1,25 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the jobqueue module.
+ */
+
+function jobqueue_install() {
+  variable_set('jobqueue_msg_worker1', 'msg-worker1');
+}
+
+function jobqueue_uninstall() {
+  variable_del('jobqueue_msg_worker1');
+}
+
+/**
+ * Updates the JobQueue MSG worker1 variable.
+ */
+function jobqueue_update_7001() {
+
+  variable_set('jobqueue_msg_worker1', 'msg-worker1');
+
+  return st("Variable 'jobqueue_msg_worker1' has been updated.");
+}
+

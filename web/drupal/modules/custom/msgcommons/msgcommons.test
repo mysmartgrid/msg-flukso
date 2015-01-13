@@ -1,0 +1,179 @@
+<?php
+
+/**
+ * @file
+ * Tests for module MSG Commons.
+ */
+
+class MSGCommonsTestCase extends DrupalWebTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => 'MSG Commons functionality',
+      'description' => 'Test mySmartGrid common functions.',
+      'group' => 'mySmartGrid'
+    );
+  }
+
+  /**
+   * Tests function tokenize_string.
+   */
+  function testTokenizeString() {
+
+    $string = "token1 token2 token3";
+    $tokens = tokenize_string($string);
+
+    $this->assertEqual(3, sizeof($tokens));
+    $this->assertEqual("token1", $tokens[0]);
+    $this->assertEqual("token2", $tokens[1]);
+    $this->assertEqual("token3", $tokens[2]);
+    $this->assertEqual("token1 token2 token3", $string);
+
+
+    $string = " token1\n\ntoken2 token3\rtoken4 ";
+    $tokens = tokenize_string($string);
+
+    $this->assertEqual(4, sizeof($tokens));
+    $this->assertEqual("token1", $tokens[0]);
+    $this->assertEqual("token2", $tokens[1]);
+    $this->assertEqual("token3", $tokens[2]);
+    $this->assertEqual("token4", $tokens[3]);
+
+
+    $string = "token1 token2 token3";
+
+    $tokens = tokenize_string($string, "k");
+    $this->assertEqual(4, sizeof($tokens));
+    $this->assertEqual("to", $tokens[0]);
+    $this->assertEqual("en1 to", $tokens[1]);
+    $this->assertEqual("en2 to", $tokens[2]);
+    $this->assertEqual("en3", $tokens[3]);
+
+
+    $tokens = tokenize_string($string, "m");
+
+    $this->assertEqual(1, sizeof($tokens));
+    $this->assertEqual($string, $tokens[0]);
+  }
+
+  /**
+   * Tests function get_timezone_offset.
+   */
+  function testGetTimezoneOffset() {
+    
+    $offset1 = get_timezone_offset('Europe/Berlin');
+    $this->assertTrue($offset1 == HOUR || $offset1 == 2 * HOUR);
+
+    $offset2 = get_timezone_offset('Europe/Lisbon');
+    $this->assertFalse($offset1 == $offset2);
+
+    $offset3 = get_timezone_offset();
+    $this->assertEqual(0, $offset3 % HOUR);
+  }
+
+  /**
+   * Tests function get_role_id.
+   */
+  function testGetRoleId() {
+
+    $rid1 = get_role_id('Fluksonian');
+    $rid2 = get_role_id('Visitor');
+    $rid3 = get_role_id('IDontExist');    
+
+    $this->assertEqual($rid1, $rid2);
+    $this->assertFalse($rid3 > 0);
+  }
+
+  /**
+   * Tests function rcopy.
+   */
+  function testRCopy() {
+
+    $source = "/tmp/srcdir";
+    mkdir($source);
+    mkdir("$source/subdir");
+
+    save_file("$source/subdir/file.txt", "123");
+    
+    $destination = "/tmp/destdir";
+    rcopy($source, $destination);
+   
+    $this->assertTrue(file_exists("$destination/subdir/file.txt"));
+
+    rrmdir($source);
+    rrmdir($destination);
+  }
+
+  function testRRmDir() {
+
+    $dir = "/tmp/dir";
+    $subsubdir = "$dir/subdir1/subsubdir";
+    mkdir($subsubdir, 0777, TRUE);
+    mkdir("$dir/subdir2/abc/def", 0777, TRUE);
+
+    save_file("$subsubdir/file.txt", "123");
+
+    rrmdir($dir);
+
+    $this->assertFalse(file_exists($dir));
+  }
+
+  function testValidateDomains() {
+
+    $this->assertTrue(validate_domains('www.host.com'));
+    $this->assertTrue(validate_domains('www.host.com domain.com'));
+    $this->assertFalse(validate_domains('kai@www.host.com'));
+    $this->assertFalse(validate_domains(''));
+  }
+
+  function testValidateHostIP() {
+
+    $this->assertTrue(validate_host_ip('192.168.0.1'));
+    $this->assertTrue(validate_host_ip('192.168.1.1'));
+    $this->assertFalse(validate_host_ip('a.a.a.a'));
+    $this->assertTrue(validate_host_ip('192.255.1.1'));
+    $this->assertTrue(validate_host_ip('192.168.255.1'));
+    $this->assertFalse(validate_host_ip('192.168.1.255'));
+    $this->assertFalse(validate_host_ip('192.0.0.255'));
+    $this->assertFalse(validate_host_ip('192.168.1'));
+    $this->assertFalse(validate_host_ip('192.168.1.1.1'));
+    $this->assertFalse(validate_host_ip(''));
+    $this->assertFalse(validate_host_ip('192.x.168.1'));
+    $this->assertFalse(validate_host_ip('0.0.0.0'));
+    $this->assertFalse(validate_host_ip('256.1.1.1'));
+    $this->assertFalse(validate_host_ip('192. 168.1.1'));
+    $this->assertFalse(validate_host_ip('192.168..1.1'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/0'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/33'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32/24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/32.24'));
+    $this->assertFalse(validate_host_ip('192.168.1.1/a'));
+
+    $this->assertTrue(validate_host_ip('192.168.1.1/32', '255.255.255.255'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
+
+    $this->assertFalse(validate_host_ip('192.168.1.1/24', '255.0.0.0'));
+    $this->assertTrue(validate_host_ip('192.168.1.1/24', '255.255.255.0'));
+  }
+
+  function testValidateSubnetMask() {
+
+    $this->assertTrue(validate_subnet_mask('255.255.255.0'));
+    $this->assertTrue(validate_subnet_mask('255.255.254.0'));
+    $this->assertFalse(validate_subnet_mask('192.168.1.1'));
+    $this->assertFalse(validate_subnet_mask('255.255.0.255'));
+    $this->assertFalse(validate_subnet_mask('255.254.0.255'));
+    $this->assertFalse(validate_subnet_mask('255.254.254.255'));
+    $this->assertFalse(validate_subnet_mask('0.255.255.0'));
+    $this->assertFalse(validate_subnet_mask('0.255.255.255'));
+  }
+
+  function testGetNetworkIp() {
+
+    $this->assertEqual('168.192.1.0', get_network_ip('168.192.1.1', '255.255.255.0'));
+    $this->assertEqual('168.192.0.0', get_network_ip('168.192.1.1', '255.255.0.0'));
+    $this->assertEqual('168.192.1.0', get_network_ip('168.192.1.1', '255.255.254.0'));
+  }
+}

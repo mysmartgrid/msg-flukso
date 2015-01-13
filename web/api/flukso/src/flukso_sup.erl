@@ -1,12 +1,29 @@
-%% @author author <author@example.com>
-%% @copyright YYYY author.
-
-%% @doc Supervisor for the flukso application.
+%%
+%% Supervisor for the flukso application.
+%%
+%% Copyright (c) 2008-2010 flukso.net
+%%               2011 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+%%
+%% This program is free software; you can redistribute it and/or
+%% modify it under the terms of the GNU General Public License
+%% as published by the Free Software Foundation; either version 2
+%% of the License, or (at your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful,
+%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%% GNU General Public License for more details.
+%%
+%% You should have received a copy of the GNU General Public License
+%% along with this program; if not, write to the Free Software
+%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+%%
 
 -module(flukso_sup).
--author('author <author@example.com>').
+-author('Bart Van Der Meerssche <bart.vandermeerssche@flukso.net>').
 
 -behaviour(supervisor).
+
 
 %% External exports
 -export([start_link/0, upgrade/0]).
@@ -14,10 +31,12 @@
 %% supervisor callbacks
 -export([init/1]).
 
+
 %% @spec start_link() -> ServerRet
 %% @doc API for starting the supervisor.
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
 
 %% @spec upgrade() -> ok
 %% @doc Add processes if necessary.
@@ -38,20 +57,22 @@ upgrade() ->
     [supervisor:start_child(?MODULE, Spec) || Spec <- Specs],
     ok.
 
+
 %% @spec init([]) -> SupervisorTree
 %% @doc supervisor callback.
 init([]) ->
-    Ip = case os:getenv("WEBMACHINE_IP") of false -> "127.0.0.1"; Any -> Any end,
+    Ip = case os:getenv("WEBMACHINE_IP") of false -> "0.0.0.0"; Any -> Any end,
     {ok, Dispatch} = file:consult(filename:join(
                          [filename:dirname(code:which(?MODULE)),
                           "..", "priv", "dispatch.conf"])),
     WebConfig = [
 		 {ip, Ip},
 		 {port, 9999},
-                 {log_dir, "var/log"},
+                 {log_dir, "var/log/erlang/flukso-api"},
 		 {dispatch, Dispatch}],
     Web = {webmachine_mochiweb,
 	   {webmachine_mochiweb, start, [WebConfig]},
 	   permanent, 5000, worker, dynamic},
     Processes = [Web],
     {ok, {{one_for_one, 10, 10}, Processes}}.
+

@@ -1,0 +1,8 @@
+; $Id$
+name = Job Queue System
+description = Interface with the Job Queue System
+package = mySmartGrid
+core = 7.x
+version = 7.x-0.1
+
+dependencies[] = msgcommons

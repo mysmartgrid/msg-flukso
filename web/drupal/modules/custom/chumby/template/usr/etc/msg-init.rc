@@ -1,0 +1,54 @@
+#!/bin/sh
+# init script for the chumby demo mode - no integration in chumby runtime.
+BASEPATH=/mnt/storage/usr
+DAEMON_BIN=$BASEPATH/bin/chumbydaemon.lua
+DAEMON_CONFIG=$BASEPATH/etc/daemonconfig.lua
+FLUKSO_BIN=$BASEPATH/bin/findFlukso
+FLASHPLAYER_BIN=/usr/bin/chumbyflashplayer.x
+WIDGET_SWF=$BASEPATH/widgets/currentpower.swf
+
+if [ -e $DAEMON_BIN ]; then
+	if [ -e $DAEMON_CONFIG ]; then
+		echo "Starting msg-chumby-daemon"
+		if [ ! -d /tmp/flukso ]; then
+			mkdir -p /tmp/flukso
+		fi
+		if [ -e $FLUKSO_BIN ] && [ $(ps | grep -c $FLUKSO_BIN) == 1 ]; then
+			FLUKSO_VERSION=$(cat $DAEMON_CONFIG | grep '.*VERSION.*' | grep -o '".*"'| sed -e 's%"%%g')
+			if [ $FLUKSO_VERSION -lt 2 ]; then
+				FLUKSO_SERVICE='_flukso-realtime._tcp'
+			else
+				FLUKSO_SERVICE='_flukso._tcp'
+			fi
+			$FLUKSO_BIN $FLUKSO_SERVICE /tmp/flukso/ip &
+		else    
+			echo "Autoconfiguration disabled."
+		fi
+		if [ $(ps | grep -c $DAEMON_BIN) == 1 ]; then
+			$BASEPATH/bin/lua $DAEMON_BIN $DAEMON_CONFIG &
+		fi
+		sleep 1
+		/usr/sbin/httpd -p 3000 -h /tmp/flukso
+	else
+		echo "Daemon config not found - aborting."
+		exit
+	fi
+else
+	echo "Daemon executable not found - aborting."
+	exit
+fi
+
+#if [ -x $FLASHPLAYER_BIN ]; then
+#	if [ -e $WIDGET_SWF ]; then
+#		echo "Starting flashplayer with widget"
+#		$FLASHPLAYER_BIN -i $WIDGET_SWF &
+#	else
+#		echo "Widget not found - aborting."
+#		exit
+#	fi
+#else
+#	echo "flashplayer executable not found - aborting."
+#	exit
+#fi
+
+echo "msg-init.rc finished."

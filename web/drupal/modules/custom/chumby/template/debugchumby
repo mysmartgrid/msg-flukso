@@ -1,0 +1,70 @@
+#!/bin/sh
+
+VERSION=20120202 			#current version
+COPYUSR=0				#copy /mnt/storage/usr
+
+SRC_PATH=/mnt/usb
+DEST_PATH=/mnt/storage
+
+if [[ -x /psp/rfs1/userhook1 ]];
+then
+	echo "userhook1 found"
+	#if [[ $(grep -c "$DEST_PATH/usr/etc/environment.sh" /psp/rfs1/userhook1) == 0 ]]; then
+	#	echo "execute $DEST_PATH/usr/etc/environment.sh in /psp/rfs1/userhook1"
+	#	echo ". $DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
+	#fi
+	if [[ $(grep -c "$DEST_PATH/usr/etc/msg-init.rc" /psp/rfs1/userhook1) == 0 ]]; then
+		echo "execute $DEST_PATH/usr/etc/msg-init.rc in /psp/rfs1/userhook1"
+		echo "if [[ ! -f /tmp/flukso/last_reading ]]; then" >> /psp/rfs1/userhook1
+		echo "$DEST_PATH/usr/etc/msg-init.rc" >> /psp/rfs1/userhook1
+		echo "fi" >> /psp/rfs1/userhook1
+	fi
+	if [[ $(grep -c "mkdir /tmp/www" /psp/rfs1/userhook1) == 0 ]]; then
+		echo "create /tmp/www in /psp/rfs1/userhook1"
+		echo "mkdir /tmp/www" >> /psp/rfs1/userhook1
+	fi
+else
+	echo "userhook1 not found"
+	if [[ ! -d /psp/rfs1/ ]]; then
+		mkdir -p /psp/rfs1
+	fi
+	#echo "$DEST_PATH/usr/etc/environment.sh" >> /psp/rfs1/userhook1
+	echo "if [[ ! -f /tmp/flukso/last_reading ]]; then" >> /psp/rfs1/userhook1
+	echo "	$DEST_PATH/usr/etc/msg-init.rc" >> /psp/rfs1/userhook1
+	echo "fi" >> /psp/rfs1/userhook1
+	echo "mkdir /tmp/www" >> /psp/rfs1/userhook1
+	chmod u+x /psp/rfs1/userhook1
+fi
+
+if [[ -f $DEST_PATH/usr/version ]]; then
+	if [[ $(grep -c CURVERSION $DEST_PATH/usr/version) -gt 0 ]]; then
+		. $DEST_PATH/usr/version
+	else
+		CURVERSION=$(cat $DEST_PATH/usr/version)
+	fi
+	echo $CURVERSION
+	if [[ $CURVERSION -lt $VERSION ]]; then
+		COPYUSR=1
+	else
+		echo "currently installed version newer then the actual version"
+	fi
+else
+	COPYUSR=1
+fi
+
+echo $COPYUSR
+if [[ $COPYUSR -gt 0 ]]; then
+	echo "updating $DEST_PATH/usr"
+	cp -R $SRC_PATH/usr $DEST_PATH/
+	echo "CURVERSION="$VERSION > $DEST_PATH/usr/version
+fi
+
+if [[ -f $DEST_PATH/usr/etc/daemonconfig.lua ]]; then
+	echo "config file found"
+	cp $SRC_PATH/daemonconfig.lua $DEST_PATH/usr/etc/
+else
+	echo "no config file found"
+	cp $SRC_PATH/daemonconfig.lua $DEST_PATH/usr/etc/
+fi
+
+/psp/rfs1/userhook1
