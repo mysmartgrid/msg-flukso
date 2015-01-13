@@ -207,12 +207,25 @@ check_hex(String, Length) ->
         _ -> {false, false}
     end.
 
+check_printable_chars(Enable, String) ->
+  case Enable of
+    1 -> check_printable_chars(String);
+    0 -> true;
+    _ -> false
+  end.
+
 check_printable_chars(String) ->
     {String, case re:run(String, "^[\\x20-\\x7e\\xc2a1-\\xc3bf€]*$") of
         {match, _} -> true;
         _ -> false
     end}.
 
+check_ip(Enabled, Protocol, Ip) ->
+  case Enabled of
+    1 -> check_ip(Protocol, Ip);
+    0 -> {Protocol, Ip, true};
+    _ -> {Protocol, Ip, false}
+  end.
 
 check_ip(Protocol, Ip) ->
   {Ip, Valid} = case {Protocol, Ip} of
@@ -228,9 +241,17 @@ check_ip(Ip) ->
       _ -> false
   end}.
 
+check_wifi_psk(Enabled, Enc, Psk) ->
+  case Enabled of
+    1 -> check_wifi_psk(Enc, Psk);
+    0 -> {Enc, Psk, true};
+    _ -> {Enc, Psk, false}
+  end.
+
 check_wifi_psk(Enc, Psk) ->
   {Psk, Valid} = case {Enc, Psk} of
     {<<"open">>, undefined} -> {undefined, true};
+    {<<"wep">>, Psk} -> check_printable_chars(Psk);
     {<<"wpa">>, Psk} -> check_printable_chars(Psk);
     {<<"wpa2">>, Psk} -> check_printable_chars(Psk);
     _ -> {Psk, false}
