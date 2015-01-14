@@ -1296,7 +1296,7 @@ function logger_bar_chart_page($interval, $context, $title, $sensors, $types, $d
 
   //FIXME: refactor this
   if ($interval == 'year') {
-    $start = mktime(0, 0, 0, date('n') - 11, 1);
+    $start = mktime(0, 0, 0, date('n') - 12, 1);
     $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
   }
   else {
