@@ -34,7 +34,7 @@ body {}
 
 #doc, #header .wrapper, #footer .wrapper {
 	margin: 0 auto;
-	max-width: 74.615em;
+	max-width: 94.615em;
 	min-width: 59.769em;
 	position: relative;
 }
@@ -860,7 +860,7 @@ form #main h3.search {
 	float: right;
 	margin-right: 1.154em;
 	position: relative;
-	width: 51.00em;
+	width: 71.00em;
 }
 #start #main {
 	margin-top: 2.75em;
