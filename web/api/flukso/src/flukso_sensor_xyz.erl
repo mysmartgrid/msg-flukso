@@ -108,7 +108,7 @@ malformed_GET(ReqData, _State) ->
           {RrdSensor, true} ->
 
             case check_authentication(ReqData) of
-              {Digest, Token, Authenticated} ->
+              {Digest, Token, true} ->
 
                 Interval = wrq:get_qs_value("interval", ReqData),
                 Start = wrq:get_qs_value("start", ReqData),

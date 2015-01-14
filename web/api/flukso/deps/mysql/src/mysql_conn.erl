@@ -317,6 +317,7 @@ send_msg(Pid, Msg, From, Timeout) ->
 %% Returns : void() | does not return
 %%--------------------------------------------------------------------
 init(Host, Port, User, Password, Database, LogFun, Encoding, PoolId, Parent) ->
+
     case mysql_recv:start_link(Host, Port, LogFun, self()) of
 	{ok, RecvPid, Sock} ->
 	    case mysql_init(Sock, RecvPid, User, Password, LogFun) of
