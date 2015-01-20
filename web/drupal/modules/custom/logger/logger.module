@@ -2330,6 +2330,7 @@ function logger_get_device($id) {
   $query->addField('n', 'lan_ip');
   $query->addField('n', 'lan_netmask');
   $query->addField('n', 'lan_gateway');
+  $query->addField('n', 'lan_nameserver');
   $query->addField('n', 'wifi_enabled');
   $query->addField('n', 'wifi_essid');
   $query->addField('n', 'wifi_enc');
@@ -2338,6 +2339,7 @@ function logger_get_device($id) {
   $query->addField('n', 'wifi_ip');
   $query->addField('n', 'wifi_netmask');
   $query->addField('n', 'wifi_gateway');
+  $query->addField('n', 'wifi_nameserver');
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');

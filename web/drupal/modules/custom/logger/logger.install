@@ -199,6 +199,11 @@ function logger_schema() {
         'length' => 15,
         'not null' => FALSE
       ),
+      'lan_nameserver' => array(
+        'type' => 'varchar',
+        'length' => 15,
+        'not null' => FALSE
+      ),
       'wifi_enabled' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -231,6 +236,11 @@ function logger_schema() {
       'wifi_gateway' => array(
         'type' => 'varchar',
         'length' => 15,
+      ),
+      'wifi_nameserver' => array(
+        'type' => 'varchar',
+        'length' => 15,
+        'not null' => FALSE
       ),
     ),
     'primary key' => array('device')
@@ -2617,3 +2627,22 @@ function logger_update_7135() {
   return st('Field string_id has been successfully added to table logger_device_type.');
 }
 
+/**
+ * Add fields lan_nameserver and wifi_nameserver to table logger_device_network
+ */
+function logger_update_7136() {
+
+  db_add_field('logger_device_network', 'lan_nameserver', array(
+    'type' => 'varchar',
+    'length' => 15,
+    'not null' => FALSE,
+  ));
+
+  db_add_field('logger_device_network', 'wifi_nameserver', array(
+    'type' => 'varchar',
+    'length' => 15,
+    'not null' => FALSE,
+  ));
+
+  return st('Fields lan_nameserver and wifi_nameserver have been successfully added to table logger_device_network.');
+}

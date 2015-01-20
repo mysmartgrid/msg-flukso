@@ -78,13 +78,61 @@ function toggleDeviceAssignFields() {
 function showDeviceLANDiv(formId) {
   var form = document.getElementById(formId);
   var div = document.getElementById('lan-fields-div');
-  div.style.display = (form.lan_enabled.checked ? '' : 'none');
+  if (form.lan_enabled.checked) {
+    div.style.display = '';
+  } else {
+    div.style.display = 'none';
+    // clear static network configuration
+    jQuery(function($){ $('#lan-fields-div input').val(""); });
+  }
+}
+
+function showDeviceLANIPDiv(formId) {
+  var form = document.getElementById(formId);
+  var div = document.getElementById('lan-ip-fields-div');
+  if (form.lan_protocol.value === 'static') {
+    div.style.display = '';
+  } else {
+    div.style.display = 'none';
+    // clear static network configuration
+    jQuery(function($){ $('#lan-ip-fields-div input').val(""); });
+  }
 }
 
 function showDeviceWIFIDiv(formId) {
   var form = document.getElementById(formId);
   var div = document.getElementById('wifi-fields-div');
-  div.style.display = (form.wifi_enabled.checked ? '' : 'none');
+  if (form.wifi_enabled.checked) {
+    div.style.display = '';
+  } else {
+    div.style.display = 'none';
+    // clear static network configuration
+    jQuery(function($){ $('#wifi-fields-div input').val(""); });
+  }
+}
+
+function showDeviceWIFIIPDiv(formId) {
+  var form = document.getElementById(formId);
+  var div = document.getElementById('wifi-ip-fields-div');
+  if (form.wifi_protocol.value === 'static') {
+    div.style.display = '';
+  } else {
+    div.style.display = 'none';
+    // clear static network configuration
+    jQuery(function($){ $('#wifi-ip-fields-div input').val(""); });
+  }
+}
+
+function showDeviceWIFIEncDiv(formId) {
+  var form = document.getElementById(formId);
+  var div = document.getElementById('wifi-psk-fields-div');
+  if (form.wifi_enc.value === 'open') {
+    div.style.display = 'none';
+    // clear static network configuration
+    jQuery(function($){ $('#edit-wifi-psk').val(""); });
+  } else {
+    div.style.display = '';
+  }
 }
 
 function showSensorDiv(formId, meter) {

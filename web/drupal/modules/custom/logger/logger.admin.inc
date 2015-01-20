@@ -404,6 +404,7 @@ function logger_device_config_page($id, $page) {
         $rows[] = array(t('IP address'), $device->lan_ip);
         $rows[] = array(t('Gateway IP address'), $device->lan_gateway);
         $rows[] = array(t('Network mask'), $device->lan_netmask);
+        $rows[] = array(t('Nameserver IP address'), $device->lan_nameserver);
       }
       $output .= '<br>' . theme_table(array('header' => $header, 'rows' => $rows, 'attributes' => array(),
           'caption' => '<b>' . t('LAN Interface') . '</b>', 'colgroups' => array(), 'sticky' => FALSE, 'empty' => ''));
@@ -415,6 +416,7 @@ function logger_device_config_page($id, $page) {
         $rows[] = array(t('IP address'), $device->wifi_ip);
         $rows[] = array(t('Gateway IP address'), $device->wifi_gateway);
         $rows[] = array(t('Network mask'), $device->wifi_netmask);
+        $rows[] = array(t('Nameserver IP address'), $device->wifi_nameserver);
       }
       $rows[] = array(t('SSID'), $device->wifi_essid);
       $encoding_protocol_options = logger_get_encoding_protocol_options();
@@ -577,6 +579,17 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
   );
 
   $space = str_repeat('&nbsp;', 53);
+
+  $form['config_header'] = array(
+    '#type' => 'item',
+    '#title' => t('Network Configuration'),
+  );
+
+  $form['applied_message']['config_applied'] = array(
+    '#type' => 'item',
+    '#markup' => t('<div class="messages ' . ($device->pending_config ? 'warning' : 'status') . '">The following configuration is' . ($device->pending_config ? " not yet " : " ") . 'applied to your device.</div>'),
+  );
+
   $form['lan_enabled'] = array(
     '#type' => 'checkbox',
     '#title' => t('LAN enabled'),
@@ -591,8 +604,9 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'select',
     '#title' => t('LAN Configuration'),
     '#description' => t('Please inform how the LAN interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
-    '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'static',
+    '#default_value' => isset($device->lan_protocol) ? $device->lan_protocol : 'dhcp',
     '#options' => logger_get_config_protocol_options(),
+    '#attributes' => array('onchange' => "javascript: showDeviceLANIPDiv('$form_id');"),
     '#prefix' => "<div id='lan-fields-div' style='display: none'>"
   );
 
@@ -602,6 +616,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->lan_ip,
     '#maxlength' => 15,
     '#description' => t('Enter the IP address used by the LAN interface (for example: 192.168.1.1).'),
+    '#prefix' => "<div id='lan-ip-fields-div' style='display: none'>"
   );
 
   $form['lan_gateway'] = array(
@@ -618,7 +633,15 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->lan_netmask,
     '#maxlength' => 15,
     '#description' => t('Enter the network mask used by the LAN interface (for example: 255.255.255.0).'),
-    '#suffix' => '</div></div>'
+  );
+
+  $form['lan_nameserver'] = array(
+    '#type' => 'textfield',
+    '#title' => t('LAN Namserver IP address'),
+    '#default_value' => $device->lan_nameserver,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address of the nameserver used by the LAN interface (for example: 62.141.38.230).'),
+    '#suffix' => '</div></div></div>'
   );
 
   $form['wifi_enabled'] = array(
@@ -635,8 +658,9 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'select',
     '#title' => t('WIFI Configuration'),
     '#description' => t('Please inform how the WIFI interface is configured. Dynamic means that all the configuration is obtained automatically via the DHCP protocol. Static means that the configuration is manually informed.'),
-    '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'wifi',
+    '#default_value' => isset($device->wifi_protocol) ? $device->wifi_protocol : 'dhcp',
     '#options' => logger_get_config_protocol_options(),
+    '#attributes' => array('onchange' => "javascript: showDeviceWIFIIPDiv('$form_id');"),
     '#prefix' => "<div id='wifi-fields-div' style='display: none'>"
   );
 
@@ -646,6 +670,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#default_value' => $device->wifi_ip,
     '#maxlength' => 15,
     '#description' => t('Enter the IP address used by the WIFI interface (for example: 192.168.1.1).'),
+    '#prefix' => "<div id='wifi-ip-fields-div' style='display: none'>"
   );
 
   $form['wifi_gateway'] = array(
@@ -664,6 +689,15 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t('Enter the network mask used by the WIFI interface (for example: 255.255.255.0).'),
   );
 
+  $form['wifi_nameserver'] = array(
+    '#type' => 'textfield',
+    '#title' => t('WIFI Namserver IP address'),
+    '#default_value' => $device->wifi_nameserver,
+    '#maxlength' => 15,
+    '#description' => t('Enter the IP address of the nameserver used by the WIFI interface (for example: 62.141.38.230).'),
+    '#suffix' => '</div>'
+  );
+
   $form['wifi_essid'] = array(
     '#type' => 'textfield',
     '#title' => t('WIFI SSID'),
@@ -676,8 +710,9 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#type' => 'select',
     '#title' => t('WIFI Encoding'),
     '#description' => t('Please inform which protocol the WIFI network interface uses for encoding the communication.'),
-    '#default_value' => $device->wifi_enc,
+    '#default_value' => isset($device->wifi_enc) ? $device->wifi_enc : 'wpa2',
     '#options' => logger_get_encoding_protocol_options(),
+    '#attributes' => array('onchange' => "javascript: showDeviceWIFIEncDiv('$form_id');"),
   );
 
   $form['wifi_psk'] = array(
@@ -686,7 +721,8 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#description' => t('Enter the WIFI encryption key or passphrase (for example: 1A648C9FE2).'),
     '#default_value' => $device->wifi_psk,
     '#maxlength' => 60,
-    '#suffix' => '</div></div>'
+    '#prefix' => "<div id='wifi-psk-fields-div' style='display: none'>",
+    '#suffix' => '</div></div></div>'
   );
 
   $form['submit'] = array(
@@ -694,7 +730,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
     '#value' => t('Save'),
   );
 
-  drupal_add_js("jQuery(document).ready( function() { showDeviceLANDiv('$form_id'); showDeviceWIFIDiv('$form_id'); } );", array('type' => 'inline', 'scope' => 'footer'));
+  drupal_add_js("jQuery(document).ready( function() { showDeviceLANDiv('$form_id'); showDeviceWIFIDiv('$form_id'); showDeviceLANIPDiv('$form_id'); showDeviceWIFIIPDiv('$form_id'); showDeviceWIFIEncDiv('$form_id');} );", array('type' => 'inline', 'scope' => 'footer'));
 
   return $form;
 }
@@ -1618,19 +1654,16 @@ function logger_device_form_validate($form, &$form_state) {
     form_set_error('description', t('The device description contains non-printable characters.'));
   }
 
-  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask', 'lan_protocol');
-  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask', 'wifi_protocol');
+  validate_network_fields($form_state['values'], 'lan_enabled', 'lan_ip', 'lan_gateway', 'lan_netmask', 'lan_nameserver', 'lan_protocol');
+  validate_network_fields($form_state['values'], 'wifi_enabled', 'wifi_ip', 'wifi_gateway', 'wifi_netmask', 'wifi_nameserver', 'wifi_protocol');
 
   if ($form_state['values']['wifi_enabled']) {
     if (empty($form_state['values']['wifi_essid'])) {
       form_set_error('wifi_essid', t('The WIFI network name must be informed.'));
     }
-    if ($form_state['values']['wifi_enc'] == 'open') {
+    if ($form_state['values']['wifi_enc'] != 'open') {
       if (empty($form_state['values']['wifi_psk'])) {
         form_set_error('wifi_psk', t('The WIFI encryption key or passphrase must be informed.'));
-      }
-      else {
-        form_set_error('wifi_psk', t('The WIFI encryption key or passphrase is used only by encrypted communication.'));
       }
     }
   }
@@ -1655,19 +1688,27 @@ function logger_device_form_submit($form, &$form_state) {
 
     if ($lan_enabled) {
       $fields['lan_protocol'] = $form_state['values']['lan_protocol'];
-      $fields['lan_ip'] = $form_state['values']['lan_ip']; 
-      $fields['lan_netmask'] = $form_state['values']['lan_netmask'];
-      $fields['lan_gateway'] = $form_state['values']['lan_gateway'];
+      if ($form_state['values']['lan_protocol'] == 'static') {
+        $fields['lan_ip'] = $form_state['values']['lan_ip']; 
+        $fields['lan_netmask'] = $form_state['values']['lan_netmask'];
+        $fields['lan_gateway'] = $form_state['values']['lan_gateway'];
+        $fields['lan_nameserver'] = $form_state['values']['lan_nameserver'];
+      }
     }
 
     if ($wifi_enabled) {
       $fields['wifi_protocol'] = $form_state['values']['wifi_protocol'];
-      $fields['wifi_ip'] = $form_state['values']['wifi_ip'];
-      $fields['wifi_netmask'] = $form_state['values']['wifi_netmask'];
-      $fields['wifi_gateway'] = $form_state['values']['wifi_gateway'];
+      if ($form_state['values']['wifi_protocol'] == 'static') {
+        $fields['wifi_ip'] = $form_state['values']['wifi_ip'];
+        $fields['wifi_netmask'] = $form_state['values']['wifi_netmask'];
+        $fields['wifi_gateway'] = $form_state['values']['wifi_gateway'];
+        $fields['wifi_nameserver'] = $form_state['values']['wifi_nameserver'];
+      }
       $fields['wifi_essid'] = $form_state['values']['wifi_essid'];
       $fields['wifi_enc'] = $form_state['values']['wifi_enc'];
-      $fields['wifi_psk'] = $form_state['values']['wifi_psk'];
+      if ($form_state['values']['wifi_enc'] != 'open') {
+        $fields['wifi_psk'] = $form_state['values']['wifi_psk'];
+      }
     }
 
     db_insert('logger_device_network')
