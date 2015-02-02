@@ -33,9 +33,20 @@ function showSensorForecastFields() {
     } else {
       forecastDiv.style.display = 'none';
       var forecastField = document.getElementById('edit-forecast-1');
-      forecastField.checked = true;
+      forecastField.checked = false;
     }
   }
+}
+
+function permissionSensorForecastFields(message) {
+  var r = alert(message);
+  var forecastField = document.getElementById('edit-forecast-1');
+
+  //If page contains forecast options div
+  if (forecastField) {
+      forecastField.checked = false;
+  }
+  return 0;
 }
 
 function isMobile() {
