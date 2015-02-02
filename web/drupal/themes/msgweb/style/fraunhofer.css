@@ -2806,7 +2806,11 @@ ol#footnotes li { list-style-type: decimal; margin-left: 1.9em; }
 
 .clearfix {
   clear: none;
-  overflow: hidden;
+  overflow: hidden; 
+}
+
+.block-system {
+  overflow-x: auto;
 }
 
 dt {
