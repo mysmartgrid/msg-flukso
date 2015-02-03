@@ -8,7 +8,7 @@
     </div>
   </div>
   <div id="doc">
-    <img src="<?php print $theme_url; ?>/images/doc-bg.jpg" id="doc-bg" width="997" height="400"/>
+    <img src="<?php print $theme_url; ?>/images/doc-bg.jpg" id="doc-bg" width="1100" height="400"/>
     <div id="main" role="main">
       <div id="breadcrumb"><?php print $breadcrumb; ?></div>
       <div role="section">
