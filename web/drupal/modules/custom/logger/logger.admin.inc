@@ -1823,16 +1823,19 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   if (isset($form_state['values']['prev_forecast'])) {
 
-    $prev_forecast = $form_state['values']['prev_forecast'];
+    if(user_has_role('PVSpy')) {
+      $prev_forecast = $form_state['values']['prev_forecast'];
 
-    if ($prev_forecast == 1 && $forecast == 0) {
-      pvcast_delete_plant($meter);
-    }
-    elseif ($prev_forecast == 0 && $forecast == 1) {
-      pvcast_create_plant($meter, $latitude, $longitude);
-    }
-    elseif ($prev_forecast == 1 && $forecast == 1) {
-      pvcast_update_plant($meter, $latitude, $longitude);
+      if ($prev_forecast == 1 && $forecast == 0) {
+        pvcast_delete_plant($meter);
+      }
+      elseif ($prev_forecast == 0 && $forecast == 1) {
+        pvcast_create_plant($meter, $latitude, $longitude);
+      }
+      elseif ($prev_forecast == 1 && $forecast == 1) {
+        pvcast_update_plant($meter, $latitude, $longitude);
+      }
+    } else {
     }
   }
   $form_state['redirect'] = "sensor/mylist";
