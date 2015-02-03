@@ -1095,7 +1095,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#default_value' => ($sensor->forecast ? array(1 => 1) : array()),
       '#suffix' => '</div>'
     );
-    if(!user_has_role('PVSpy')) {
+    if(!user_has_role('PVSpy') && 0) {
       $form['forecast']['#attributes']= array('onclick' => "javascript: return permissionSensorForecastFields('". t('This feature cost. Please ask the MySmartGrid for the appropriated rights') ."');");
     }
 
@@ -1823,7 +1823,7 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   if (isset($form_state['values']['prev_forecast'])) {
 
-    if(user_has_role('PVSpy')) {
+    if(user_has_role('PVSpy') || 1) {
       $prev_forecast = $form_state['values']['prev_forecast'];
 
       if ($prev_forecast == 1 && $forecast == 0) {
@@ -2153,7 +2153,7 @@ function logger_device_clone($device_id) {
       ))
       ->execute();
 
-    if ($sensor->forecast == 1 && user_has_role('PVSpy')) {
+    if ($sensor->forecast == 1 && (user_has_role('PVSpy')||1)) {
       pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
     }
 
