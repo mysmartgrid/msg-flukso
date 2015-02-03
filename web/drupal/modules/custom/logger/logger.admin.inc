@@ -499,7 +499,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->external_id = NULL;
     $sensor->type_id = ENERGY_CONSUMPTION_SENSOR_TYPE;
     $sensor->function = '';
-    $sensor->forecast = 1;
+    $sensor->forecast = 0;
     $sensor->latitude = LOGGER_DEFAULT_LATITUDE;
     $sensor->longitude = LOGGER_DEFAULT_LONGITUDE;
     $sensor->virtual = TRUE;
@@ -1092,9 +1092,13 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#options' => array(
         '1' => t('Activate'),
       ),
-      '#default_value' => array($sensor->forecast),
+      '#default_value' => ($sensor->forecast ? array(1 => 1) : array()),
       '#suffix' => '</div>'
     );
+    if(!user_has_role('PVSpy') && 0) {
+      $form['forecast']['#attributes']= array('onclick' => "javascript: return permissionSensorForecastFields('". t('This feature cost. Please ask the MySmartGrid for the appropriated rights') ."');");
+    }
+
 
     $form['coordinates'] = array(
       '#type' => 'textfield',
@@ -1819,16 +1823,19 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   if (isset($form_state['values']['prev_forecast'])) {
 
-    $prev_forecast = $form_state['values']['prev_forecast'];
+    if(user_has_role('PVSpy') || 1) {
+      $prev_forecast = $form_state['values']['prev_forecast'];
 
-    if ($prev_forecast == 1 && $forecast == 0) {
-      pvcast_delete_plant($meter);
-    }
-    elseif ($prev_forecast == 0 && $forecast == 1) {
-      pvcast_create_plant($meter, $latitude, $longitude);
-    }
-    elseif ($prev_forecast == 1 && $forecast == 1) {
-      pvcast_update_plant($meter, $latitude, $longitude);
+      if ($prev_forecast == 1 && $forecast == 0) {
+        pvcast_delete_plant($meter);
+      }
+      elseif ($prev_forecast == 0 && $forecast == 1) {
+        pvcast_create_plant($meter, $latitude, $longitude);
+      }
+      elseif ($prev_forecast == 1 && $forecast == 1) {
+        pvcast_update_plant($meter, $latitude, $longitude);
+      }
+    } else {
     }
   }
   $form_state['redirect'] = "sensor/mylist";
@@ -2146,7 +2153,7 @@ function logger_device_clone($device_id) {
       ))
       ->execute();
 
-    if ($sensor->forecast == 1) {
+    if ($sensor->forecast == 1 && (user_has_role('PVSpy')||1)) {
       pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
     }
 
