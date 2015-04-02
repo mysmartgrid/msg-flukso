@@ -1131,7 +1131,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#default_value' => ($sensor->forecast ? array(1 => 1) : array()),
       '#suffix' => '</div>'
     );
-    if(!user_has_role('PVSpy')) {
+    if(!msgcommons_user_has_role('PVSpy')) {
       $form['forecast']['#attributes']= array('onclick' => "javascript: return permissionSensorForecastFields('". t('This feature cost. Please ask the MySmartGrid for the appropriated rights') ."');");
     }
 
@@ -2008,7 +2008,7 @@ function logger_device_assign($code) {
 
   // check whether the user is already a true fluksonian
   // if not, generate the proper entries in {users_roles} and {logger_users}
-  if (!user_has_role('fluksonian')) {
+  if (!msgcommons_user_has_role('fluksonian')) {
 
     db_insert('users_roles')
       ->fields(array(
@@ -2191,7 +2191,7 @@ function logger_device_clone($device_id) {
       ))
       ->execute();
 
-    if ($sensor->forecast == 1 && user_has_role('PVSpy')) {
+    if ($sensor->forecast == 1 && msgcommons_user_has_role('PVSpy')) {
       pvcast_create_plant($new_meter, $sensor->latitude, $sensor->longitude);
     }
 

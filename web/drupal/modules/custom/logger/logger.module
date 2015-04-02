@@ -702,7 +702,7 @@ function logger_js_alter(&$scripts) {
  */
 function logger_user_edit_access($account) {
 
-  return !user_has_role('Visitor') && user_edit_access($account);
+  return !msgcommons_user_has_role('Visitor') && user_edit_access($account);
 }
 
 /**
@@ -1969,7 +1969,7 @@ function logger_get_line_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = array();
   $i = 0;
 
@@ -2090,7 +2090,7 @@ function logger_get_forecast_chart_data($chart) {
   
   global $user;
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
   $data['legend'] = array();
   $i = 0;
@@ -2151,7 +2151,7 @@ function logger_get_anomaly_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.anomaly');
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
   $data['legend'] = array();
   $i = 0;
@@ -2431,7 +2431,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
     $query->addField('mc', 'name', 'class_name');
   }
 
-  if (user_has_role('Techniker')) {
+  if (msgcommons_user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');
   }
   else {
@@ -3032,7 +3032,7 @@ function logger_create_interval_menu($chart) {
         l(t('3 Days'),  "$path/72hours"),
         l(t('Week'),    "$path/week"));
 
-      if (user_has_role('Techniker')) {
+      if (msgcommons_user_has_role('Techniker')) {
         $items[] = l(t('Month'),   "$path/month");
       }
       break;
@@ -3236,7 +3236,7 @@ function logger_mail_alter(&$message) {
 
 function logger_create_chart_form($form, $submit_js, $chart) {
 
-  $show_price = user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
+  $show_price = msgcommons_user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
   $units = msgcommons_get_same_type_units_options($chart->unit);
@@ -4037,7 +4037,7 @@ function logger_get_users_options() {
   global $user;
 
   $options = array(0 => '');
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
 
   $query = db_select('users', 'u')
     ->fields('u', array('uid', 'name'))
@@ -4144,7 +4144,7 @@ function logger_get_variable($id, $default_value) {
   if (isset($user->uid)) {
 
     //Visitors must use cookies
-    if (user_has_role('Visitor')) {
+    if (msgcommons_user_has_role('Visitor')) {
       return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
     }
     else {
@@ -4177,7 +4177,7 @@ function logger_set_variable($id, $value) {
   if ($user->uid) {
 
     //Visitors must use cookies
-    if (user_has_role('Visitor')) {
+    if (msgcommons_user_has_role('Visitor')) {
       $_SESSION[$id] = $value;
     }
     else {
@@ -4202,7 +4202,7 @@ function logger_get_appliances($cache_id) {
 
   drupal_add_http_header('Content-Type', 'application/json;');
 
-  if (user_has_role('Expert')) {
+  if (msgcommons_user_has_role('Expert')) {
 
     $cache = cache_get($cache_id, 'cache_page');
 
