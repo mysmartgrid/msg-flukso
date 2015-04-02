@@ -561,7 +561,7 @@ function notification_registration_form($form, &$form_state) {
   $form['events'] += notification_create_event_fields(SUMMARY_REPORT_EVENT_ID, 1, WEEK_UNIT_ID,
     'Here you can set the period of time in which you want to receive summary reports.');
 
-  if(user_has_role('PVSpy')) {
+  if(msgcommons_user_has_role('PVSpy')) {
     $form['events'] += notification_create_event_fields(FORECAST_REPORT_EVENT_ID, 1, DAY_UNIT_ID,
       'Here you can set the period of time in which you want to receive energy production forecast reports. ' . 
       'The reports are sent only if the sensor has the "Forecast" option activated at the sensor edition page.');

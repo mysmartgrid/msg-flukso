@@ -569,7 +569,7 @@ function check_browser_support() {
  * @param $role_name The role name.
  * @return TRUE if it does, FALSE otherwise.
  */
-function user_has_role($role_name) {
+function msgcommons_user_has_role($role_name) {
 
   global $user;
 
