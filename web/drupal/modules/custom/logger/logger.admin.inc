@@ -1838,11 +1838,11 @@ function logger_sensor_form_submit($form, &$form_state) {
         ->execute();
     }
 
-    db_update('logger_devices')
+    db_update('logger_meters')
       ->fields(array(
         'pending_config' => 1
       ))
-      ->condition('device', $device)
+      ->condition('meter', $meter)
       ->execute();
   }
   //If creation
@@ -2249,6 +2249,7 @@ function logger_sensor_deactivate($meter) {
     ->fields(array(
       'function' =>  NULL,
       'type' =>  NULL,
+      'pending_config' => 1,
     ))
     ->condition('meter', $meter)
     ->execute();
