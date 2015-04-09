@@ -2406,7 +2406,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
+    ->fields('m', array('meter', 'external_id', 'function', 'port', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
   $query->addField('un', 'name', 'unit');

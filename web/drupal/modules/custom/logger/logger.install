@@ -369,6 +369,11 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'port' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
+      ),
     ),
     'primary key' => array('meter')
   );
@@ -2675,5 +2680,19 @@ function logger_update_7138() {
     ->execute();
 
   return st('logger_energy_meter_class names updated and new class uart added');
+}
+
+/*
+ * Introduce column port to logger_meters
+ */
+function logger_update_7139() {
+
+  db_add_field('logger_meters', 'port', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => FALSE,
+  ));
+
+  return st('Column port added to logger_meters');
 }
 

@@ -107,7 +107,7 @@ function logger_usersensors_page() {
 
   drupal_set_title(t('My Sensors'));
 
-  $header = array(t('Sensor'), t('Function'), t('Type'), t('Status'), t('Token'), t('Operation'));
+  $header = array(t('Sensor'), t('Function'), t('Type'), t('Status'), t('Port'), t('Token'), t('Operation'));
   $options = array('type' => 'inline', 'scope' => 'header');
   $output = '<p>' . l(t('Add Virtual Sensor'), 'sensor/register') . '<br></p>';
 
@@ -134,7 +134,7 @@ function logger_usersensors_page() {
     $query->addField('st', 'name', 'type');
 
     $sensors = $query
-      ->fields('lm', array('meter', 'function', 'virtual'))
+      ->fields('lm', array('meter', 'function', 'virtual', 'port'))
       ->fields('lt', array('token', 'permissions'))
       ->condition('lm.device', $device->device)
       ->orderBy('lm.function', 'DESC')
@@ -169,6 +169,7 @@ function logger_usersensors_page() {
           l(t('Deactivate'), 'sensor/deactivate/' . $sensor->meter,
             array('attributes' => array('onclick' => "javascript: return confirm('" . t('This sensor is going to be deactivated. Do you want to proceed?') . "');")))) . '<br>';
       }
+      $row[] = $sensor->port;
       $row[] = wordwrap($sensor->token, 16, "\n", TRUE);
       $row[] = $operations;
       $rows[] = $row;
@@ -430,7 +431,7 @@ function logger_device_config_page($id, $page) {
     $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, TRUE, $id, TRUE);
     if (!empty($sensors)) {
 
-      $header = array(t('Sensor'), t('Function'), t('Class'), t('Voltage'), t('Current'), t('Constant'));
+      $header = array(t('Sensor'), t('Function'), t('Class'), t('Port'), t('Voltage'), t('Current'), t('Constant'));
       $rows = array();
 
       foreach($sensors as $sensor) {
@@ -438,6 +439,7 @@ function logger_device_config_page($id, $page) {
           wordwrap($sensor->meter, 16, ' ', TRUE),
           $sensor->function,
           $sensor->class_name,
+          $sensor->port,
           ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->voltage . ' V' : '-'),
           ($sensor->class_id == ANALOG_SENSOR_CLASS_ID ? $sensor->current . ' A' : '-'),
           ($sensor->class_id == PULSE_SENSOR_CLASS_ID ? $sensor->constant . ' ' . t('pulses/kWh') : '-')
@@ -466,7 +468,7 @@ function logger_sensor_edition_page($meter = NULL) {
   if ($meter) {
     //TODO: use logger_get_sensors
     $query = db_select('logger_meters', 'm')
-      ->fields('m', array('device', 'meter', 'external_id', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price'))
+      ->fields('m', array('device', 'meter', 'external_id', 'function', 'forecast', 'latitude', 'longitude', 'virtual', 'price', 'port'))
       ->condition('m.meter', $meter);
 
     $query->addField('m', 'type', 'type_id');
@@ -511,6 +513,7 @@ function logger_sensor_edition_page($meter = NULL) {
     $sensor->unit_type_id = ENERGY_UNIT_TYPE_ID;
     $sensor->device_type_id = FLUKSO2_DEVICE_TYPE_ID;
     $sensor->token = md5(uniqid(rand(), TRUE));
+    $sensor->port = NULL;
     $sensor->class_id = NULL;
     $sensor->class_name = NULL;
     $sensor->voltage = NULL;
@@ -1028,6 +1031,18 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#default_value' => $sensor->external_id,
       '#attributes' => array('readonly' => 'readonly'),
       '#access' => ($sensor->device_type_id == RASPBERRY_PI_DEVICE_TYPE_ID || $sensor->device_type_id == LIBKLIO_DEVICE_TYPE_ID)
+    );
+  }
+
+  if ($sensor->port) {
+    $form['port'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Port'),
+      '#description' => t("The sensor's physical port"),
+      '#default_value' => $sensor->port,
+      '#attributes' => array(
+        'readonly' => 'readonly'
+      )
     );
   }
 
