@@ -1,7 +1,7 @@
 /**
  * Javascript functions used by module logger.
  *
- * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ * Copyright (c) 2010-2015 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -86,69 +86,29 @@ function toggleDeviceAssignFields() {
   div.style.display = (form.new_account[1].checked ? 'none' : '');
 }
 
-function showDeviceLANDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('lan-fields-div');
-  if (form.lan_enabled.checked) {
-    div.style.display = '';
+function toggleFormDiv(formId,inputId,divId) {
+  var inputElement=jQuery("form#"+formId+" #"+inputId);
+  var divElement=jQuery("form#"+formId+" div#"+divId);
+  if ( inputElement.is(":checkbox") ) {
+    if ( inputElement.is(":checked") ) {
+      divElement.slideDown()
+    } else {
+      divElement.slideUp()
+    }
   } else {
-    div.style.display = 'none';
-    // clear static network configuration
-    jQuery(function($){ $('#lan-fields-div input').val(""); });
+    if ( inputElement.val() == "dhcp"
+           ||inputElement.val()=="open" ) {
+      divElement.slideUp()
+    } else {
+      divElement.slideDown()
+    }
   }
 }
 
-function showDeviceLANIPDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('lan-ip-fields-div');
-  if (form.lan_protocol.value === 'static') {
-    div.style.display = '';
-  } else {
-    div.style.display = 'none';
-    // clear static network configuration
-    jQuery(function($){ $('#lan-ip-fields-div input').val(""); });
-  }
+function cleanHiddenFields(formId) {
+  jQuery('form#' + formId + ' .field-group :hidden').val("");
 }
 
-function showDeviceWIFIDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('wifi-fields-div');
-  if (form.wifi_enabled.checked) {
-    div.style.display = '';
-  } else {
-    div.style.display = 'none';
-    // clear static network configuration
-    jQuery(function($){ $('#wifi-fields-div input').val(""); });
-  }
-}
-
-function showDeviceWIFIIPDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('wifi-ip-fields-div');
-  if (form.wifi_protocol.value === 'static') {
-    div.style.display = '';
-  } else {
-    div.style.display = 'none';
-    // clear static network configuration
-    jQuery(function($){ $('#wifi-ip-fields-div input').val(""); });
-  }
-}
-
-function showDeviceWIFIEncDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('wifi-psk-fields-div');
-  if (form.wifi_enc.value === 'open') {
-    div.style.display = 'none';
-    // clear static network configuration
-    jQuery(function($){ $('#edit-wifi-psk').val(""); });
-  } else {
-    div.style.display = '';
-  }
-}
-
-function showSensorDiv(formId, meter) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('sensor' + meter + '-fields-div');
-  var enabled = document.getElementById('edit-enabled' + meter);
-  div.style.display = (enabled.checked ? '' : 'none');
+function updateConfigApplied(formId) {
+  jQuery('form#' + formId + ' #edit-config-applied').fadeOut();
 }

@@ -2343,6 +2343,7 @@ function logger_get_device($id) {
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');
+  $query->addField('t', 'string_id', 'type_string');
 
   $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
   $query->addField('f', 'version', 'firmware_version');
