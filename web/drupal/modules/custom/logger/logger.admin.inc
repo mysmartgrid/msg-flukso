@@ -2132,6 +2132,8 @@ function logger_device_remove($device) {
 
   logger_remove_firmware_upgrade_request($device);
 
+  logger_free_support_slot($device);
+
   $flukso = db_select('logger_devices', 'd')
     ->fields('d', array('uid'))
     ->condition('d.device', $device)
