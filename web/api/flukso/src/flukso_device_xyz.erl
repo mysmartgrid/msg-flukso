@@ -547,10 +547,6 @@ compose_config_tag(Network, Device) ->
 
   {data, Result} = mysql:execute(pool, device_pending_sensors, [Device]),
   SensorsTag = {<<"sensors">>, [Meter || [Meter] <- mysql:get_result_rows(Result)]},
-<<<<<<< HEAD
-
-  case Network of
-=======
   ConfigTags = case element(2, SensorsTag) of
     [] ->
       [];
@@ -559,7 +555,6 @@ compose_config_tag(Network, Device) ->
   end,
 
   NetworkTag = case Network of
->>>>>>> f44d327d86030874f5aab5410f50f46dc4f45501
     %If pending
     [1 | NetworkConfig] ->
 
@@ -589,27 +584,17 @@ compose_config_tag(Network, Device) ->
      {<<"network">>, {struct, [
        {<<"lan">>, LanConfig},
        {<<"wifi">>, WifiConfig}
-<<<<<<< HEAD
-     ]}},
-
-=======
      ]}};
->>>>>>> f44d327d86030874f5aab5410f50f46dc4f45501
 
     _ ->
      []
   end,
 
-<<<<<<< HEAD
-    _ ->
-     [{<<"config">>, {struct, [SensorsTag]}}]
-=======
   case NetworkTag of
     [] ->
       [{<<"config">>, {struct, ConfigTags}}];
     _ ->
       [{<<"config">>, {struct, ConfigTags ++ [NetworkTag]}}]
->>>>>>> f44d327d86030874f5aab5410f50f46dc4f45501
   end.
 
 
