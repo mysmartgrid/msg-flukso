@@ -199,6 +199,11 @@ function logger_schema() {
         'length' => 15,
         'not null' => FALSE
       ),
+      'lan_nameserver' => array(
+        'type' => 'varchar',
+        'length' => 15,
+        'not null' => FALSE
+      ),
       'wifi_enabled' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -231,6 +236,11 @@ function logger_schema() {
       'wifi_gateway' => array(
         'type' => 'varchar',
         'length' => 15,
+      ),
+      'wifi_nameserver' => array(
+        'type' => 'varchar',
+        'length' => 15,
+        'not null' => FALSE
       ),
     ),
     'primary key' => array('device')
@@ -358,6 +368,11 @@ function logger_schema() {
         'size' => 'normal',
         'not null' => TRUE,
         'default' => 0,
+      ),
+      'port' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
       ),
     ),
     'primary key' => array('meter')
@@ -723,14 +738,21 @@ function logger_install() {
   db_insert('logger_energy_meter_class')
     ->fields(array(
       'id' => 1,
-      'name' => 'Analog'
+      'name' => 'analog'
     ))
     ->execute();
 
   db_insert('logger_energy_meter_class')
     ->fields(array(
       'id' => 2,
-      'name' => 'Pulse',
+      'name' => 'pulse',
+    ))
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array(
+      'id' => 3,
+      'name' => 'uart',
     ))
     ->execute();
 
@@ -2615,5 +2637,62 @@ function logger_update_7135() {
   db_query("UPDATE logger_device_type SET string_id = 'raspberrypi' WHERE id = 6");
 
   return st('Field string_id has been successfully added to table logger_device_type.');
+}
+
+/**
+ * Add fields lan_nameserver and wifi_nameserver to table logger_device_network
+ */
+function logger_update_7136() {
+
+  db_add_field('logger_device_network', 'lan_nameserver', array(
+    'type' => 'varchar',
+    'length' => 15,
+    'not null' => FALSE,
+  ));
+
+  db_add_field('logger_device_network', 'wifi_nameserver', array(
+    'type' => 'varchar',
+    'length' => 15,
+    'not null' => FALSE,
+  ));
+
+  return st('Fields lan_nameserver and wifi_nameserver have been successfully added to table logger_device_network.');
+}
+
+/*
+ * Update energy_meter_class names to match the API documentation and add class uart
+ */
+function logger_update_7138() {
+
+  db_update('logger_energy_meter_class')
+    ->fields(array('name' => 'analog'))
+    ->condition('id', 1)
+    ->execute();
+
+  db_update('logger_energy_meter_class')
+    ->fields(array('name' => 'pulse'))
+    ->condition('id', 2)
+    ->execute();
+
+  db_insert('logger_energy_meter_class')
+    ->fields(array('name' => 'uart',
+	'id' => 3))
+    ->execute();
+
+  return st('logger_energy_meter_class names updated and new class uart added');
+}
+
+/*
+ * Introduce column port to logger_meters
+ */
+function logger_update_7139() {
+
+  db_add_field('logger_meters', 'port', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'not null' => FALSE,
+  ));
+
+  return st('Column port added to logger_meters');
 }
 

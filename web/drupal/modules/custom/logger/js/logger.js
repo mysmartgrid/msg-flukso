@@ -1,7 +1,7 @@
 /**
  * Javascript functions used by module logger.
  *
- * Copyright (c) 2010 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
+ * Copyright (c) 2010-2015 Fraunhofer Institut ITWM (www.itwm.fraunhofer.de)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -33,9 +33,20 @@ function showSensorForecastFields() {
     } else {
       forecastDiv.style.display = 'none';
       var forecastField = document.getElementById('edit-forecast-1');
-      forecastField.checked = true;
+      forecastField.checked = false;
     }
   }
+}
+
+function permissionSensorForecastFields(message) {
+  var r = alert(message);
+  var forecastField = document.getElementById('edit-forecast-1');
+
+  //If page contains forecast options div
+  if (forecastField) {
+      forecastField.checked = false;
+  }
+  return 0;
 }
 
 function isMobile() {
@@ -75,21 +86,29 @@ function toggleDeviceAssignFields() {
   div.style.display = (form.new_account[1].checked ? 'none' : '');
 }
 
-function showDeviceLANDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('lan-fields-div');
-  div.style.display = (form.lan_enabled.checked ? '' : 'none');
+function toggleFormDiv(formId,inputId,divId) {
+  var inputElement=jQuery("form#"+formId+" #"+inputId);
+  var divElement=jQuery("form#"+formId+" div#"+divId);
+  if ( inputElement.is(":checkbox") ) {
+    if ( inputElement.is(":checked") ) {
+      divElement.slideDown()
+    } else {
+      divElement.slideUp()
+    }
+  } else {
+    if ( inputElement.val() == "dhcp"
+           ||inputElement.val()=="open" ) {
+      divElement.slideUp()
+    } else {
+      divElement.slideDown()
+    }
+  }
 }
 
-function showDeviceWIFIDiv(formId) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('wifi-fields-div');
-  div.style.display = (form.wifi_enabled.checked ? '' : 'none');
+function cleanHiddenFields(formId) {
+  jQuery('form#' + formId + ' .field-group :hidden').val("");
 }
 
-function showSensorDiv(formId, meter) {
-  var form = document.getElementById(formId);
-  var div = document.getElementById('sensor' + meter + '-fields-div');
-  var enabled = document.getElementById('edit-enabled' + meter);
-  div.style.display = (enabled.checked ? '' : 'none');
+function updateConfigApplied(formId) {
+  jQuery('form#' + formId + ' #edit-config-applied').fadeOut();
 }

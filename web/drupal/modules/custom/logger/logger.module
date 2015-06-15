@@ -702,7 +702,7 @@ function logger_js_alter(&$scripts) {
  */
 function logger_user_edit_access($account) {
 
-  return !user_has_role('Visitor') && user_edit_access($account);
+  return !msgcommons_user_has_role('Visitor') && user_edit_access($account);
 }
 
 /**
@@ -1296,7 +1296,7 @@ function logger_bar_chart_page($interval, $context, $title, $sensors, $types, $d
 
   //FIXME: refactor this
   if ($interval == 'year') {
-    $start = mktime(0, 0, 0, date('n') - 11, 1);
+    $start = mktime(0, 0, 0, date('n') - 12, 1);
     $end   = mktime(0, 0, 0, date('n') +  1, 1) - 1;
   }
   else {
@@ -1969,7 +1969,7 @@ function logger_get_line_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.rrd');
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = array();
   $i = 0;
 
@@ -2090,7 +2090,7 @@ function logger_get_forecast_chart_data($chart) {
   
   global $user;
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
   $data['legend'] = array();
   $i = 0;
@@ -2151,7 +2151,7 @@ function logger_get_anomaly_chart_data($chart) {
 
   module_load_include('inc', 'logger', 'logger.anomaly');
 
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
   $data = logger_get_power_chart_data($chart);
   $data['legend'] = array();
   $i = 0;
@@ -2330,6 +2330,7 @@ function logger_get_device($id) {
   $query->addField('n', 'lan_ip');
   $query->addField('n', 'lan_netmask');
   $query->addField('n', 'lan_gateway');
+  $query->addField('n', 'lan_nameserver');
   $query->addField('n', 'wifi_enabled');
   $query->addField('n', 'wifi_essid');
   $query->addField('n', 'wifi_enc');
@@ -2338,9 +2339,11 @@ function logger_get_device($id) {
   $query->addField('n', 'wifi_ip');
   $query->addField('n', 'wifi_netmask');
   $query->addField('n', 'wifi_gateway');
+  $query->addField('n', 'wifi_nameserver');
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');
+  $query->addField('t', 'string_id', 'type_string');
 
   $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
   $query->addField('f', 'version', 'firmware_version');
@@ -2404,7 +2407,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
+    ->fields('m', array('meter', 'external_id', 'function', 'port', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
   $query->addField('un', 'name', 'unit');
@@ -2429,7 +2432,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
     $query->addField('mc', 'name', 'class_name');
   }
 
-  if (user_has_role('Techniker')) {
+  if (msgcommons_user_has_role('Techniker')) {
     $query->addExpression('FALSE', 'private');
   }
   else {
@@ -3030,7 +3033,7 @@ function logger_create_interval_menu($chart) {
         l(t('3 Days'),  "$path/72hours"),
         l(t('Week'),    "$path/week"));
 
-      if (user_has_role('Techniker')) {
+      if (msgcommons_user_has_role('Techniker')) {
         $items[] = l(t('Month'),   "$path/month");
       }
       break;
@@ -3234,7 +3237,7 @@ function logger_mail_alter(&$message) {
 
 function logger_create_chart_form($form, $submit_js, $chart) {
 
-  $show_price = user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
+  $show_price = msgcommons_user_has_role('Expert') && strpos(" $chart->unit", '€') > 0;
   $use_sensor_prices = logger_get_variable('use_sensor_prices', 1);
 
   $units = msgcommons_get_same_type_units_options($chart->unit);
@@ -4035,7 +4038,7 @@ function logger_get_users_options() {
   global $user;
 
   $options = array(0 => '');
-  $is_visitor = user_has_role('Visitor');
+  $is_visitor = msgcommons_user_has_role('Visitor');
 
   $query = db_select('users', 'u')
     ->fields('u', array('uid', 'name'))
@@ -4142,7 +4145,7 @@ function logger_get_variable($id, $default_value) {
   if (isset($user->uid)) {
 
     //Visitors must use cookies
-    if (user_has_role('Visitor')) {
+    if (msgcommons_user_has_role('Visitor')) {
       return isset($_SESSION[$id]) ? $_SESSION[$id] : $default_value;
     }
     else {
@@ -4175,7 +4178,7 @@ function logger_set_variable($id, $value) {
   if ($user->uid) {
 
     //Visitors must use cookies
-    if (user_has_role('Visitor')) {
+    if (msgcommons_user_has_role('Visitor')) {
       $_SESSION[$id] = $value;
     }
     else {
@@ -4200,7 +4203,7 @@ function logger_get_appliances($cache_id) {
 
   drupal_add_http_header('Content-Type', 'application/json;');
 
-  if (user_has_role('Expert')) {
+  if (msgcommons_user_has_role('Expert')) {
 
     $cache = cache_get($cache_id, 'cache_page');
 
