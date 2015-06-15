@@ -2330,6 +2330,7 @@ function logger_get_device($id) {
   $query->addField('n', 'lan_ip');
   $query->addField('n', 'lan_netmask');
   $query->addField('n', 'lan_gateway');
+  $query->addField('n', 'lan_nameserver');
   $query->addField('n', 'wifi_enabled');
   $query->addField('n', 'wifi_essid');
   $query->addField('n', 'wifi_enc');
@@ -2338,9 +2339,11 @@ function logger_get_device($id) {
   $query->addField('n', 'wifi_ip');
   $query->addField('n', 'wifi_netmask');
   $query->addField('n', 'wifi_gateway');
+  $query->addField('n', 'wifi_nameserver');
 
   $query->join('logger_device_type', 't', 'd.type_id = t.id');
   $query->addField('t', 'name', 'type_name');
+  $query->addField('t', 'string_id', 'type_string');
 
   $query->join('logger_device_firmware', 'f', 'd.firmware_id = f.id');
   $query->addField('f', 'version', 'firmware_version');
@@ -2404,7 +2407,7 @@ function logger_get_sensors($sensor_types = NULL, $user_ids = NULL, $include_vir
   global $user;
 
   $query = db_select('logger_meters', 'm')
-    ->fields('m', array('meter', 'external_id', 'function', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
+    ->fields('m', array('meter', 'external_id', 'function', 'port', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
 
   $query->join('unit', 'un', 'm.unit_id = un.id');
   $query->addField('un', 'name', 'unit');

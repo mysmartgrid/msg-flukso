@@ -425,7 +425,7 @@ function notification_eventlog_clear_old() {
 
     db_delete('event_log')
       ->condition('device', $log->device)
-      ->condition('time', $log->last_time - 2 * DAY, '<')
+      ->condition('time', $log->last_time - 3 * DAY, '<')
       ->execute();
   }
 }
@@ -1032,10 +1032,10 @@ function notification_newsletter_form_submit($form, &$form_state) {
 function notification_register_event($values, $event_id, $parent_id = NULL) {
 
   $selected = notification_get_selected_event($values, $event_id);
-  $id = NULL;
 
   if ($selected) {
 
+    $id = NULL;
     $device = $values['device'];
     $limit_up = isset($values["limit_up$event_id"]) ? $values["limit_up$event_id"] : 0;
     $unit_id = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
@@ -1415,7 +1415,7 @@ function notification_cron() {
 function notification_compose_base_query($event_id) {
   
   $query = db_select('notification', 'n')
-    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id', 'id'))
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id'))
     ->condition('n.event_id', $event_id)
     ->where('n.last_sent + n.min_interval < :now', array(':now' => REQUEST_TIME))
     ->groupBy('n.device')
@@ -1720,7 +1720,7 @@ function notification_send_summary_report_emails() {
       ->condition('m.virtual', 0);
     $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
-    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = ' . $notifiable['id']);
+    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
 
     $sensors = $sensors_query->execute();
     

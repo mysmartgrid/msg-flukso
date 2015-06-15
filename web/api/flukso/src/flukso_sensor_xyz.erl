@@ -34,6 +34,10 @@
 -include_lib("webmachine/include/webmachine.hrl").
 -include("flukso.hrl").
 
+-ifndef(PRINT).
+-define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
+-endif.
+
 
 %init([]) -> 
 %    {ok, undefined}.
@@ -108,7 +112,7 @@ malformed_GET(ReqData, _State) ->
           {RrdSensor, true} ->
 
             case check_authentication(ReqData) of
-              {Digest, Token, Authenticated} ->
+              {Digest, Token, true} ->
 
                 Interval = wrq:get_qs_value("interval", ReqData),
                 Start = wrq:get_qs_value("start", ReqData),
@@ -276,14 +280,15 @@ to_json(ReqData, #state{rrdSensor = RrdSensor, rrdStart = RrdStart, rrdEnd = Rrd
     Unencoded = case RrdStart of
       undefined ->
         {data, Result} = mysql:execute(pool, sensor_all_props, [RrdSensor]),
-        [[Device, ExternalId, Function, Unit, Description]] = mysql:get_result_rows(Result),
+        [[Device, ExternalId, Function, Unit, Description, Port]] = mysql:get_result_rows(Result),
 
         Main = [
           {<<"device">>, Device},
           {<<"externalid">>, ExternalId},
           {<<"function">>, Function},
           {<<"unit">>, Unit},
-          {<<"description">>, Description}
+          {<<"description">>, Description},
+          {<<"port">>, Port}
         ],
 
         {data, _Result} = mysql:execute(pool, energy_sensor_props, [RrdSensor]),
@@ -394,6 +399,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
     Function = proplists:get_value(<<"function">>, Params),
     Description = get_optional_value(<<"description">>, Params, ""),
     Device = proplists:get_value(<<"device">>, Params),
+    Port = get_optional_value(<<"port">>, Params, undefined),
 
     {ExternalId, ValidExternalId} = check_printable_chars(ExternalId),
     {Description, ValidDescription} = check_printable_chars(Description),
@@ -402,7 +408,7 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
       _ -> check_printable_chars(Function)
     end,
 
-    {Response, ErrorCode} = case {ValidFunction, ValidDescription, ValidExternalId}  of
+    {Response, ErrorCode, ConfigUpToDate} = case {ValidFunction, ValidDescription, ValidExternalId}  of
 
       {true, true, true} ->
 
@@ -422,18 +428,24 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
 
               %Id and External Id point to the same Sensor
               [[Sensor, Device, UnitId, Factor]] ->
-                mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId, Sensor]),
-                process_energy_sensor(Params, true, Sensor);
+                mysql:execute(pool, sensor_config, [ExternalId, Description, UnitId, Sensor]),
+		FunctionUpToDate = process_sensor_function(Sensor, true, Function),
+                SensorUpToDate = process_energy_sensor(Params, true, Sensor),
+                process_sensor_port(Sensor, Port),
+                { "ok", ?HTTP_OK, (FunctionUpToDate and SensorUpToDate) };
 
               %External Id points to another Sensor with a different Id, which belongs to the same user
               [[Sensor2, Device2, UnitId2, Factor2]] ->
                 move_sensor_data(Sensor2, Device, Sensor),
-                mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
-                process_energy_sensor(Params, true, Sensor);
+                mysql:execute(pool, sensor_config, [ExternalId, Description, UnitId2, Sensor]),
+		FunctionUpToDate = process_sensor_function(Sensor, true, Function),
+                SensorUpToDate = process_energy_sensor(Params, true, Sensor),
+                process_sensor_port(Sensor, Port),
+                { "ok", ?HTTP_OK, (FunctionUpToDate and SensorUpToDate) };
 
               %Sensor belongs to another user
               _ ->
-                {"Invalid external id", ?HTTP_INVALID_EXTERNAL_ID}
+                {"Invalid external id", ?HTTP_INVALID_EXTERNAL_ID, false}
             end;
 
           %Sensor is not found
@@ -443,8 +455,11 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
               %External Id points to an existent sensor
               [[Sensor2, Device2, UnitId2, Factor2]] ->
                 move_sensor_data(binary_to_list(Sensor2), Device, Sensor),
-                mysql:execute(pool, sensor_config, [ExternalId, Function, Description, UnitId2, Sensor]),
-                process_energy_sensor(Params, true, Sensor);
+                mysql:execute(pool, sensor_config, [ExternalId, Description, UnitId2, Sensor]),
+		FunctionUpToDate = process_sensor_function(Sensor, true, Function),
+                SensorUpToDate = process_energy_sensor(Params, true, Sensor),
+                process_sensor_port(Sensor, Port),
+                { "ok", ?HTTP_OK, (FunctionUpToDate and SensorUpToDate) };
 
               %Neither external id nor id points to an existent sensor
               _ ->
@@ -477,22 +492,31 @@ process_config({struct, Params}, ReqData, #state{rrdSensor = Sensor} = State) ->
                         [[DeviceType]] = mysql:get_result_rows(Res),
                         RrdFactor = case DeviceType of ?FLUKSO2_DEVICE_TYPE_ID -> 1000; _ -> 1 end,
 
-                        mysql:execute(pool, sensor_insert, [Sensor, Timestamp, Timestamp, SensorType, ExternalId, Function, Description, RrdFactor, UnitId, Device]),
+                        mysql:execute(pool, sensor_insert, [Sensor, Timestamp, Timestamp, SensorType, ExternalId, Function, Description, Port, RrdFactor, UnitId, Device]),
                         mysql:execute(pool, token_insert, [Token, Sensor, 62]),
-                        process_energy_sensor(Params, false, Sensor);
+                        FunctionUpToDate = process_sensor_function(Function, false, Sensor),
+                        SensorUpToDate = process_energy_sensor(Params, false, Sensor),
+                        { "ok", ?HTTP_OK, (FunctionUpToDate and SensorUpToDate) };
 
                       % RRD file could not be created
                       {error, RrdResponse} ->
                         logger(0, <<"rrdcreate.base">>, list_to_binary(RrdResponse), ?ERROR, ReqData),
-                        {RrdResponse, ?HTTP_INTERNAL_SERVER_ERROR}
+                        {RrdResponse, ?HTTP_INTERNAL_SERVER_ERROR, false}
                     end;
 
                   %Unit is not valid
-                  _ -> {"Invalid unit", ?HTTP_INVALID_UNIT}
+                  _ -> {"Invalid unit", ?HTTP_INVALID_UNIT, false}
                 end
             end
         end;
-      _ -> {"Invalid characters", ?HTTP_INVALID_CHARS}
+      _ -> {"Invalid characters", ?HTTP_INVALID_CHARS, false}
+    end,
+
+    Dummy = case ConfigUpToDate of
+      true ->
+        mysql:execute(pool, sensor_config_update, [0, Sensor]);
+      _ ->
+        false
     end,
 
     JsonResponse = mochijson2:encode({struct, [{<<"response">>, list_to_binary(Response)}]}),
@@ -507,20 +531,69 @@ process_energy_sensor(Params, Update, Sensor) ->
 
     %TODO: return error code if type is not energy consumption of energy production
 
-    ClassId = case get_optional_value(<<"class">>, Params, undefined) of "analog" -> 1; "pulse" -> 2; _ -> undefined end,
+    ClassId = case get_optional_value(<<"class">>, Params, undefined) of <<"analog">> -> 1; <<"pulse">> -> 2; <<"uart">> -> 3; _ -> undefined end,
     case ClassId of
-      undefined -> {"ok", ?HTTP_OK};
+      undefined -> false;
+      3 -> true;
       _ ->
         Voltage = get_optional_value(<<"voltage">>, Params, "0"),
         Current = get_optional_value(<<"current">>, Params, "0"),
-        Constant = get_optional_value(<<"current">>, Params, "0"),
+        Constant = get_optional_value(<<"constant">>, Params, "0"),
+
         case Update of
-          true -> mysql:execute(pool, energy_sensor_update, [ClassId, Voltage, Current, Constant, Sensor]);
+          true ->
+            {data, TypeResult} = mysql:execute(pool, sensor_device_type, [Sensor]),
+
+            case mysql:get_result_rows(TypeResult) of
+              % Flukso V2
+              [[2]] ->
+                {data, PropResult} = mysql:execute(pool, energy_sensor_props, [Sensor]),
+
+                case mysql:get_result_rows(PropResult) of
+                  [[ClassId, Voltage, Current, Constant]] -> true;
+                  [] ->
+                    mysql:execute(pool, energy_sensor_insert, [Sensor, ClassId, Voltage, Current, Constant]),
+                    false;
+                  _ -> false
+                end;
+              _ ->
+                mysql:execute(pool, energy_sensor_update, [ClassId, Voltage, Current, Constant, Sensor])
+            end;
           _ -> mysql:execute(pool, energy_sensor_insert, [Sensor, ClassId, Voltage, Current, Constant])
         end,
-        {"ok", ?HTTP_OK}
+        true
     end.
-    
+
+% Return: given function equals database entry
+process_sensor_function(Sensor, Update, Function) ->
+    {data, Result} = mysql:execute(pool, sensor_function, [Sensor]),
+
+    case mysql:get_result_rows(Result) of
+      [[Function]] ->
+        true;
+      % Given function differs from stored function.
+      _ ->
+        % We have to distinguish between Flukso and Hexabus here.
+        {data, TypeResult} = mysql:execute(pool, sensor_device_type, [Sensor]),
+
+        case mysql:get_result_rows(TypeResult) of
+          % Flukso V2
+          [[2]] ->
+            false;
+          % Any other device type
+          _ ->
+            mysql:execute(pool, sensor_function_update, [Function, Sensor]),
+            true
+        end
+    end.
+
+process_sensor_port(Sensor, Port) ->
+  Dummy = case Port of
+    undefined ->
+      false;
+    _ ->
+      mysql:execute(pool, sensor_port_update, [Port, Sensor])
+    end.
 
 process_measurements(Measurements, ReqData, #state{rrdSensor = RrdSensor} = State) ->
 
@@ -656,7 +729,7 @@ delete_sensor(Sensor) ->
 move_sensor_data(FromSensor, ToDevice, ToSensor) ->
 
   mysql:execute(pool, msgdump_delete, [FromSensor]),
-  mysql:execute(pool, energy_sensor_delete, [FromSensor]),
+  mysql:execute(pool, energy_sensor_move, [ToSensor, FromSensor]),
   mysql:execute(pool, sensor_agg_update, [ToSensor, FromSensor]),
   mysql:execute(pool, sensor_storage_update, [ToSensor, FromSensor]),
   mysql:execute(pool, token_update, [ToSensor, FromSensor]),

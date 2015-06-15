@@ -747,21 +747,22 @@ function get_network_ip($ip, $netmask) {
  * @param $ip_field              The IP field name.
  * @param $gateway_field         The Gateway IP field name.
  * @param $netmask_field         The Netmask field name. 
- * @param $config_procotol_field The network configuration protocol field name (default: NULL).
+ * @param $config_protocol_field The network configuration protocol field name (default: NULL).
  */
-function validate_network_fields($values, $enabled_field, $ip_field, $gateway_field, $netmask_field, $config_procotol_field = NULL) {
+function validate_network_fields($values, $enabled_field, $ip_field, $gateway_field, $netmask_field, $nameserver_field = NULL, $config_protocol_field = NULL) {
 
   if (isset($values[$enabled_field]) && $values[$enabled_field] == 1) {
 
     $ip = isset($values[$ip_field]) ? $values[$ip_field] : '';
     $gateway = isset($values[$gateway_field]) ? $values[$gateway_field] : '';
     $netmask = isset($values[$netmask_field]) ? $values[$netmask_field] : '';
-    $config_protocol = $config_procotol_field && isset($values[$config_procotol_field]) ? $values[$config_procotol_field] : 'static';
+    $nameserver = isset($nameserver_field) && isset($values[$nameserver_field]) ? $values[$nameserver_field] : '';
+    $config_protocol = isset($config_protocol_field) && isset($values[$config_protocol_field]) ? $values[$config_protocol_field] : 'static';
 
     if ($config_protocol == 'dhcp') {
 
-      if (!(empty($ip) && empty($gateway) && empty($netmask))) {
-        form_set_error($config_procotol_field, t('The network configuration cannot be dynamic if other properties are statically defined.'));
+      if (!(empty($ip) && empty($gateway) && empty($netmask) && empty($nameserver))) {
+        form_set_error($config_protocol_field, t('The network configuration cannot be dynamic if other properties are statically defined.'));
       }
     }
     elseif (!validate_subnet_mask($netmask)) {
@@ -775,6 +776,9 @@ function validate_network_fields($values, $enabled_field, $ip_field, $gateway_fi
     elseif (!validate_host_ip($gateway, $netmask) || $ip == $gateway) {
 
       form_set_error($gateway_field, t('Please enter a valid Gateway IP address.'));
+    }
+    elseif (!validate_host_ip($nameserver)) {
+      form_set_error($nameserver_field, t('Please enter a valid Nameserver IP address.'));
     }
     else {
       $device_network = get_network_ip($ip, $netmask);

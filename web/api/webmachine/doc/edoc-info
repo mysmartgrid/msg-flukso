@@ -1,0 +1,7 @@
+{application,webmachine}.
+{packages,[]}.
+{modules,[webmachine,webmachine_app,webmachine_decision_core,webmachine_deps,
+          webmachine_error_handler,webmachine_logger,webmachine_mochiweb,
+          webmachine_multipart,webmachine_perf_logger,webmachine_request,
+          webmachine_request_srv,webmachine_resource,webmachine_skel,
+          webmachine_sup,webmachine_util,wmtrace_resource,wrq]}.

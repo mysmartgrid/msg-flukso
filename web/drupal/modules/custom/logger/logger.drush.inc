@@ -56,7 +56,7 @@ function logger_drush_command() {
       'meter' => 'Meter ID.',
       'type' => 'Meter type.',
       'function' => 'Meter function.',
-      'phase' => 'Meter phase.',
+      'port' => 'Meter port.',
       'constant' => 'Meter constant.',
       'unit' => 'Meter unit.',
     ),
@@ -227,11 +227,11 @@ function logger_assign_node($serial, $country, $uid) {
  * @param $meter     The sensor id.
  * @param $type      The sensor type.
  * @param $function  The sensor function name.
- * @param $phase     The sensor phase.
+ * @param $port      The sensor port.
  * @param $constant  The sensor constant.
  * @param $unit      The sensor unit.
  */
-function logger_config_meter($meter, $type, $function, $phase, $constant, $unit) {
+function logger_config_meter($meter, $type, $function, $port, $constant, $unit) {
 
   module_load_include('inc', 'logger', 'logger.admin');
 
@@ -239,7 +239,7 @@ function logger_config_meter($meter, $type, $function, $phase, $constant, $unit)
     ->fields(array(
       'type' => $type,
       'function' => $function,
-      'phase' => $phase,
+      'port' => $port,
       'constant' => $constant,
       'unit' => $unit,
     ))
