@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 if [ $# -ne 2 ]; then
   /bin/echo "Usage: gen-authorized-keys <host> <port>"
@@ -24,6 +24,11 @@ while [ $i -lt $len ]; do
 done
 
 #FIXME: Use JobQueue to deploy this file
+logger "my location is `pwd`"
+logger "my id is `id`"
+logger "/usr/bin/scp -p -i ./flukso_id -P $2 ./authorized_keys.new fluksoadm@$1:authorized_keys"
 /usr/bin/scp -p -i ./flukso_id -P $2 ./authorized_keys.new fluksoadm@$1:authorized_keys
+rc=$?
+logger "result of scp: $rc"
 
 /bin/rm -f authorized_keys.new
