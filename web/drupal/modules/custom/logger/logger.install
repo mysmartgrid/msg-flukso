@@ -369,6 +369,12 @@ function logger_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'pending_config' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unasigned' => TRUE,
+        'default' => 0
+      ),
       'port' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -2696,3 +2702,17 @@ function logger_update_7139() {
   return st('Column port added to logger_meters');
 }
 
+/*
+ * Introduce column port to logger_meters
+ */
+function logger_update_7140() {
+
+  db_add_field('logger_meters', 'pending_config', array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unasigned' => TRUE,
+    'default' => 0,
+  ));
+
+  return st('Column pending_config added to logger_meters');
+}
