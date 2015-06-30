@@ -970,7 +970,7 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
         '#default_value' => $sensor->function,
         '#maxlength' => 32,
         '#size' => 15,
-        '#required' => TRUE,
+        '#required' => FALSE,
         '#suffix' => '</div></div>'
       );
     }
@@ -1588,6 +1588,17 @@ function logger_deviceassign_form_validate($form, &$form_state) {
 function logger_deviceconfig_form_validate($form, &$form_state) {
 
   logger_device_form_validate($form, &$form_state);
+  # validate sensor
+  $device_id = $form_state['values']['device'];
+  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
+
+  foreach($sensors as $sensor) {
+    if (isset($form_state['values']['enabled' . $sensor->meter]) && $form_state['values']['enabled' . $sensor->meter]) {
+      if(!isset($form_state['values']['function' . $sensor->meter]) || empty($form_state['values']['function' . $sensor->meter])) {
+        form_set_error('function' . $sensor->meter, t('The sensor\'s name must not be empty for enabled sensors'));
+      }
+    }
+  }
 }
 
 function logger_sensor_form_validate($form, &$form_state) {
