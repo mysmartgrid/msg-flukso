@@ -950,7 +950,7 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
       $form['enabled' . $sensor->meter] = array(
         '#type' => 'checkbox',
         '#title' => t('Sensor enabled'),
-        '#description' => t('Please inform whether the sensor @meter should be enabled on the device.', array('@meter' => $sensor->meter)),
+        '#description' => t('Please inform whether the sensor @meter (Port @port) should be enabled on the device.', array('@meter' => $sensor->meter, '@port' => $sensor->port)),
         '#default_value' => $enabled,
         '#field_suffix' => $sensor->meter,
         '#return_value' => 1,
