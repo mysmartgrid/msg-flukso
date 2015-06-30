@@ -2174,6 +2174,10 @@ function logger_device_remove($device) {
     ->condition('device', $device)
     ->execute();
 
+  db_delete('logger_device_network')
+	->condition('device', $device)
+	->execute();
+
   logger_check_fluksonian($flukso->uid);
 
   return t("Device and all its data have been successfuly removed.");
