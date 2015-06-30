@@ -583,7 +583,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
 
   $space = str_repeat('&nbsp;', 53);
 
-  if (version_compare($device->firmware_version, "2.3.0", ">") && $device->type_string == 'flukso2') {
+  if (version_compare($device->firmware_version, "2.2.9", ">") && $device->type_string == 'flukso2') {
     $form['config_header'] = array(
       '#type' => 'item',
       '#title' => t('Network Configuration'),
@@ -2074,7 +2074,7 @@ function logger_device_activate($code) {
     $device = logger_get_device($device_id);
 
     drupal_set_message(t("The device is now associated with your account."));
-    if (version_compare($device->firmware_version, "2.3.0", ">") && $device->type_string == 'flukso2') {
+    if (version_compare($device->firmware_version, "2.2.9", ">") && $device->type_string == 'flukso2') {
       drupal_goto("device/config/$device_id/1");
     } else {
       drupal_goto('device/mylist');
