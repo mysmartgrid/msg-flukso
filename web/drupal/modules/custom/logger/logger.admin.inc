@@ -1809,7 +1809,8 @@ function logger_deviceconfig_form_submit($form, &$form_state) {
 
         db_update('logger_meters')
           ->fields(array(
-            'function' => $function
+            'function' => $function,
+            'pending_config' => 1
           ))
           ->condition('meter', $meter)
           ->execute();
