@@ -1032,10 +1032,10 @@ function notification_newsletter_form_submit($form, &$form_state) {
 function notification_register_event($values, $event_id, $parent_id = NULL) {
 
   $selected = notification_get_selected_event($values, $event_id);
+  $id = NULL;
 
   if ($selected) {
 
-    $id = NULL;
     $device = $values['device'];
     $limit_up = isset($values["limit_up$event_id"]) ? $values["limit_up$event_id"] : 0;
     $unit_id = isset($values["unit_id$event_id"]) ? $values["unit_id$event_id"] : 0;
@@ -1381,6 +1381,8 @@ function theme_notification_event_limit_up($variables) {
 
 function notification_cron() {
 
+  openlog("fluksoWWW", LOG_PID | LOG_PERROR, LOG_LOCAL0);
+  syslog(LOG_WARNING,"notification_cron()");
   $rest = REQUEST_TIME % HOUR;
 
   notification_send_no_communication_emails();
@@ -1410,12 +1412,13 @@ function notification_cron() {
     notification_send_summary_report_emails();
     notification_send_limit_consumption_emails(LOW_CONSUMPTION_EVENT_ID);
   }
+  closelog();
 }
 
 function notification_compose_base_query($event_id) {
   
   $query = db_select('notification', 'n')
-    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id'))
+    ->fields('n', array('device', 'event_id', 'limit_up', 'unit_id', 'emails', 'base_time', 'last_sent', 'parent_id', 'id'))
     ->condition('n.event_id', $event_id)
     ->where('n.last_sent + n.min_interval < :now', array(':now' => REQUEST_TIME))
     ->groupBy('n.device')
@@ -1663,6 +1666,8 @@ function notification_send_limit_consumption_emails($event_id) {
  */
 function notification_send_summary_report_emails() {
 
+  syslog(LOG_WARNING,"notification_send_summary_report_emails()");
+
   require_once LOGGER_PATH . "/logger.rrd.inc";
 
   $query = notification_compose_base_query(SUMMARY_REPORT_EVENT_ID);
@@ -1686,6 +1691,8 @@ function notification_send_summary_report_emails() {
   $query->addExpression(':now', 'event_time', $args);
   $query->where(":now > $until_time + :delay", $args);
 
+//  syslog(LOG_WARNING,"notification_send_summary_report_emails('". $query->getQueryString()."')");
+//  syslog(LOG_WARNING,"notification_send_summary_report_emails('". $query->__toString()."')");
   $result = $query->execute();
 
   $notifiables = array();
@@ -1720,7 +1727,8 @@ function notification_send_summary_report_emails() {
       ->condition('m.virtual', 0);
     $sensors_query->addExpression($notifiable['device_type_id'], 'device_type_id');
     $sensors_query->addField('m', 'type', 'type_id');
-    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
+    //$sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = n.id');
+    $sensors_query->join('notification_meter', 'nm', 'nm.meter = m.meter AND nm.notification_id = ' . $notifiable['id']);
 
     $sensors = $sensors_query->execute();
     
@@ -2020,6 +2028,7 @@ function notification_compose_error_email($description, $recommendation = NULL) 
 function notification_send_emails($message, $notifiables, $update_base_time = TRUE) {
 
   global $base_url;
+  syslog(LOG_WARNING,"notification_send_emails(".$message. ").");
 
   $variables = array(
     '!base_url' => $base_url,
@@ -2096,6 +2105,7 @@ function notification_send_emails($message, $notifiables, $update_base_time = TR
       "</td></tr></table></p>" .
       "</td></tr></table></body>";
 
+    syslog(LOG_WARNING,"jobqueue_send_email(".$notifiable['emails']. ", '". $subject. "').");
     jobqueue_send_email($notifiable['emails'], $subject, $body, $attachments);
 
     if (isset($notifiable['device'])) {
