@@ -1593,9 +1593,15 @@ function logger_deviceconfig_form_validate($form, &$form_state) {
   $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
 
   foreach($sensors as $sensor) {
+    # check fields that are required for enabled sensors only
     if (isset($form_state['values']['enabled' . $sensor->meter]) && $form_state['values']['enabled' . $sensor->meter]) {
       if(!isset($form_state['values']['function' . $sensor->meter]) || empty($form_state['values']['function' . $sensor->meter])) {
         form_set_error('function' . $sensor->meter, t('The sensor\'s name must not be empty for enabled sensors'));
+      }
+      if (isset($form_state['values']['class_name' . $sensor->meter]) && $form_state['values']['class_name' . $sensor->meter] === "pulse") {
+        if (!(isset($form_state['values']['constant' . $sensor->meter]) && is_numeric($form_state['values']['constant' . $sensor->meter]) && $form_state['values']['constant' . $sensor->meter]) > 0) {
+          form_set_error('constant' . $sensor->meter, t('Constant has to be an number greater 0'));
+        }
       }
     }
   }
@@ -1643,7 +1649,7 @@ function logger_sensor_form_validate($form, &$form_state) {
           form_set_error('voltage', t('Invalid electric current.'));
         }
       }
-      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] < 0 || $form_state['values']['constant'] > 1000)) {
+      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] <= 0 || $form_state['values']['constant'] > 1000)) {
         form_set_error('voltage', t('Invalid sensor constant.'));
       }
     }
