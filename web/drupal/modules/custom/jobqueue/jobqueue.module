@@ -76,7 +76,8 @@ function jobqueue_send_email($emails, $subject, $body, $attachments = array(), $
     $alternative_boundary = "email_alternative_boundary";
 
     $main_header =
-      "To: $to\n" .
+      "To: <$to>\n" .
+      "Sender: $from\n" .
       "MIME-Version: 1.0\n" .
       "Content-Type: multipart/related; boundary=\"$main_boundary\"";
 

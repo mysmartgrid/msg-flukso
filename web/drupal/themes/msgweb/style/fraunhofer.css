@@ -31,10 +31,11 @@ body {}
 
 /* Fraunhofer-Logo Lines ___________________________________________________ */
 /* #page { background: url(../images/bg-lines.gif) no-repeat center 620px; } */
+/* rigth content column */
 
 #doc, #header .wrapper, #footer .wrapper {
 	margin: 0 auto;
-	max-width: 94.615em;
+	max-width: 84.615em;
 	min-width: 59.769em;
 	position: relative;
 }
@@ -855,12 +856,13 @@ form #main h3.search {
 /****************
  * Main Content *
  ****************/
+/* data in rigth content column */
 #main {
 	clear: both;
 	float: right;
 	margin-right: 1.154em;
 	position: relative;
-	width: 71.00em;
+	width: 61.00em;
 }
 #start #main {
 	margin-top: 2.75em;

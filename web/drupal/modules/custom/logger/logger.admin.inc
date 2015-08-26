@@ -583,7 +583,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
 
   $space = str_repeat('&nbsp;', 53);
 
-  if (version_compare($device->firmware_version, "2.3.0", ">") && $device->type_string == 'flukso2') {
+  if (version_compare($device->firmware_version, "2.2.9", ">") && $device->type_string == 'flukso2') {
     $form['config_header'] = array(
       '#type' => 'item',
       '#title' => t('Network Configuration'),
@@ -950,7 +950,7 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
       $form['enabled' . $sensor->meter] = array(
         '#type' => 'checkbox',
         '#title' => t('Sensor enabled'),
-        '#description' => t('Please inform whether the sensor @meter should be enabled on the device.', array('@meter' => $sensor->meter)),
+        '#description' => t('Please inform whether the sensor @meter (Port @port) should be enabled on the device.', array('@meter' => $sensor->meter, '@port' => $sensor->port)),
         '#default_value' => $enabled,
         '#field_suffix' => $sensor->meter,
         '#return_value' => 1,
@@ -970,7 +970,7 @@ function logger_deviceconfig_form($form, &$form_state, $device_id) {
         '#default_value' => $sensor->function,
         '#maxlength' => 32,
         '#size' => 15,
-        '#required' => TRUE,
+        '#required' => FALSE,
         '#suffix' => '</div></div>'
       );
     }
@@ -1151,7 +1151,7 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
       '#suffix' => '</div>'
     );
     if(!msgcommons_user_has_role('PVSpy')) {
-      $form['forecast']['#attributes']= array('onclick' => "javascript: return permissionSensorForecastFields('". t('This feature cost. Please ask the MySmartGrid for the appropriated rights') ."');");
+      $form['forecast']['#attributes']= array('onclick' => "javascript: return permissionSensorForecastFields('". t('This feature is chargeable. Please contact the mySmartGrid team for the apropriated rights.') ."');");
     }
 
 
@@ -1588,6 +1588,23 @@ function logger_deviceassign_form_validate($form, &$form_state) {
 function logger_deviceconfig_form_validate($form, &$form_state) {
 
   logger_device_form_validate($form, &$form_state);
+  # validate sensor
+  $device_id = $form_state['values']['device'];
+  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
+
+  foreach($sensors as $sensor) {
+    # check fields that are required for enabled sensors only
+    if (isset($form_state['values']['enabled' . $sensor->meter]) && $form_state['values']['enabled' . $sensor->meter]) {
+      if(!isset($form_state['values']['function' . $sensor->meter]) || empty($form_state['values']['function' . $sensor->meter])) {
+        form_set_error('function' . $sensor->meter, t('The sensor\'s name must not be empty for enabled sensors'));
+      }
+      if (isset($form_state['values']['class_name' . $sensor->meter]) && $form_state['values']['class_name' . $sensor->meter] === "pulse") {
+        if (!(isset($form_state['values']['constant' . $sensor->meter]) && is_numeric($form_state['values']['constant' . $sensor->meter]) && $form_state['values']['constant' . $sensor->meter]) > 0) {
+          form_set_error('constant' . $sensor->meter, t('Constant has to be an number greater 0'));
+        }
+      }
+    }
+  }
 }
 
 function logger_sensor_form_validate($form, &$form_state) {
@@ -1632,7 +1649,7 @@ function logger_sensor_form_validate($form, &$form_state) {
           form_set_error('voltage', t('Invalid electric current.'));
         }
       }
-      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] < 0 || $form_state['values']['constant'] > 1000)) {
+      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] <= 0 || $form_state['values']['constant'] > 1000)) {
         form_set_error('voltage', t('Invalid sensor constant.'));
       }
     }
@@ -1798,7 +1815,8 @@ function logger_deviceconfig_form_submit($form, &$form_state) {
 
         db_update('logger_meters')
           ->fields(array(
-            'function' => $function
+            'function' => $function,
+            'pending_config' => 1
           ))
           ->condition('meter', $meter)
           ->execute();
@@ -1883,16 +1901,19 @@ function logger_sensor_form_submit($form, &$form_state) {
 
   if (isset($form_state['values']['prev_forecast'])) {
 
-    $prev_forecast = $form_state['values']['prev_forecast'];
+    if(user_has_role('PVSpy')) {
+      $prev_forecast = $form_state['values']['prev_forecast'];
 
-    if ($prev_forecast == 1 && $forecast == 0) {
-      pvcast_delete_plant($meter);
-    }
-    elseif ($prev_forecast == 0 && $forecast == 1) {
-      pvcast_create_plant($meter, $latitude, $longitude);
-    }
-    elseif ($prev_forecast == 1 && $forecast == 1) {
-      pvcast_update_plant($meter, $latitude, $longitude);
+      if ($prev_forecast == 1 && $forecast == 0) {
+        pvcast_delete_plant($meter);
+      }
+      elseif ($prev_forecast == 0 && $forecast == 1) {
+        pvcast_create_plant($meter, $latitude, $longitude);
+      }
+      elseif ($prev_forecast == 1 && $forecast == 1) {
+        pvcast_update_plant($meter, $latitude, $longitude);
+      }
+    } else {
     }
   }
   $form_state['redirect'] = "sensor/mylist";
@@ -2071,7 +2092,7 @@ function logger_device_activate($code) {
     $device = logger_get_device($device_id);
 
     drupal_set_message(t("The device is now associated with your account."));
-    if (version_compare($device->firmware_version, "2.3.0", ">") && $device->type_string == 'flukso2') {
+    if (version_compare($device->firmware_version, "2.2.9", ">") && $device->type_string == 'flukso2') {
       drupal_goto("device/config/$device_id/1");
     } else {
       drupal_goto('device/mylist');
@@ -2170,6 +2191,10 @@ function logger_device_remove($device) {
   db_delete('logger_devices')
     ->condition('device', $device)
     ->execute();
+
+  db_delete('logger_device_network')
+	->condition('device', $device)
+	->execute();
 
   logger_check_fluksonian($flukso->uid);
 
