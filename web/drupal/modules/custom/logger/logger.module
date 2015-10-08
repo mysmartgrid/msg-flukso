@@ -479,6 +479,15 @@ function logger_menu() {
     'type' => MENU_CALLBACK,
     'file' => 'logger.admin.inc'
   );
+  $items['device/config2'] = array(
+    'title' => $device_config_title,
+    'page callback' => 'logger_device_config2_page',
+    'page arguments' => array(2, 3),
+    'access callback' => 'logger_device_access',
+    'access arguments' => array('edit devices', 2),
+    'type' => MENU_CALLBACK,
+    'file' => 'logger.admin.inc'
+  );
 
   $support_title = 'Support Request';
 
