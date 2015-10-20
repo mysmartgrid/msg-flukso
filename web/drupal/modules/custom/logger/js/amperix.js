@@ -26,7 +26,8 @@
     });
 
     });
-  
+
+ 
 }).call(this);
 
 
@@ -46,9 +47,10 @@ jQuery.validator.addMethod("require_from_group", function(value, element, params
 
 /* switch to next tab */
 function switchtab(tabname) {
-  var name= "#cfgTabs a[href=\"#" + tabname + "\"]";
-  $(name).tab('show');
-  currentTab = tabname;
+	var name= "#cfgTabs a[href=\"#" + tabname + "\"]";
+	console.log("Switch to: "+name);
+	$(name).tab('show');
+	currentTab = tabname;
 }
 
 /* 
@@ -74,10 +76,10 @@ function toggleNetwork(field1, field2, field3, field4, state) {
   if( thisid == 'nw-wlan') {
     console.log("WLAN");
     
-    $('#nw-wlan-ssid').rules("add", { required: true } );
+    $('#nw-wlan-ssid').rules("add", { required: true , string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#nw-wlan-ssid').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#nw-wlan-ssid1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
-    $('#nw-wlan-key').rules("add", { required: true } );
+    $('#nw-wlan-key').rules("add", { required: true , string: true, messages: { required: "Bitte WiFi Schl&uuml;ssel eingeben.",} } );
     $('#nw-wlan-key').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#nw-wlan-key1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
@@ -100,19 +102,19 @@ function toggleHidden(field1, field2, state) {
   if(state) {
     field1.prop('hidden', false).change();
     nwip = $('#'+field2+'-ip');
-    nwip.rules("add", { required: true } );
+    nwip.rules("add", { required: true, string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#'+field2+'-ip').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#'+field2+'-ip1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
-    $('#'+field2+'-gw').rules("add", { required: true } );
+    $('#'+field2+'-gw').rules("add", { required: true, string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#'+field2+'-gw').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#'+field2+'-gw1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
-    $('#'+field2+'-mask').rules("add", { required: true } );
+    $('#'+field2+'-mask').rules("add", { required: true, string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#'+field2+'-mask').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#'+field2+'-mask1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
-    $('#'+field2+'-ns').rules("add", { required: true } );
+    $('#'+field2+'-ns').rules("add", { required: true, string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#'+field2+'-ns').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#'+field2+'-ns1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
   } else {
@@ -245,7 +247,10 @@ function createHallSensorHTML(no,y,z) {
   r = r + '      <div class="col-sm-1">';
   r = r + '        <div class="form-group">';
   r = r + '          <div class="input-group">';
-  r = r + '            <input type="checkbox" id="sensor'+no+'_checkbox" name="sensorenCheckbox[]" value="' + no + '" data-size="mini" class="sensor-group">';
+  r = r + '            <input type="hidden" id="sensor'+no+'_uuid" name="sensorenUUID[' + no + ']" value="">';
+  r = r + '            <input type="checkbox" id="sensor'+no+'_checkbox" name="sensorenCheckbox[]" value="' + no + '" ';
+  r = r + ' data-validation-required-message="S" ';
+	r = r + ' data-size="mini" class="sensor-group">';
   r = r + '          </div>';
   r = r + '        </div>';
   r = r + '      </div>';
@@ -256,7 +261,7 @@ function createHallSensorHTML(no,y,z) {
   r = r + ' name="sensorname[' + no + ']" id="sensor' + no + '-name" disabled';
   //r = r + '     data-validation-regex="/^(?![0-9])((?!admin).)*$/i"';
   // r = r + '     data-validation-regex-message="Word 'admin' is not allowed in $ ..."';
-  r = r + ' data-validation-required-message="Bitte einen gueltigen Name angeben." />';
+  r = r + ' data-validation-required-message="Bitte einen g&uuml;ltigen Name angeben." />';
   r = r + '        <span class="glyphicon form-control-feedback" id="sensor' + no + '-name1"></span>';
   r = r + '        </div>';
   r = r + '      </div>';
@@ -302,6 +307,7 @@ function createS0SensorHTML(no,y,z) {
   r = r + '      <div class="col-sm-1">';
   r = r + '        <div class="form-group">';
   r = r + '          <div class="input-group">';
+  r = r + '            <input type="hidden" id="sensor'+no+'_uuid" name="sensorenUUID[' + no + ']" value="">';
   r = r + '            <input type="checkbox" id="sensor'+no+'_checkbox" name="sensorenCheckbox[]" value="' + no + '" data-size="mini" class="sensor-group">';
   r = r + '          </div>';
   r = r + '        </div>';
@@ -352,37 +358,39 @@ function createS0Sensor(no,y,z) {
 }
 
 
-function nextPage() {
+function nextPage(cPage, nPage) {
+	console.log("Current: "+cPage);
+	console.log("Next   : "+nPage);
   var form1 = $( "#logger-deviceconfig2-form" );
   form1.validate({
     debug: true
 	});
-  var id=currentTab;
-  console.log(' current: '+id);
+  //var id=currentTab;
 
   if( form1.valid() ) {
     //var tab = $(this).attr('data-tab-destination');
-    if( id == 'sensoren' ) {
-      console.log(' Submit1...: '+id);
+    if( cPage == 'configuration' ) {
+      console.log(' Submit1...: '+cPage);
       //form1.submit();
-      console.log(' Submit2...: '+id);
+      console.log(' Submit2...: '+cPage);
       document.devicewizard.submit();
-      console.log(' Submit3...: '+id);
+      console.log(' Submit3...: '+cPage);
     } else {
       console.log(' Next tab');
-      if(id == 'network') { switchtab("sensoren"); }
+			switchtab(nPage);
     }
   } else {
     console.log(' Nicht valid');
-    if( id == 'network' ) {
+    if( cPage == 'network' ) {
       alert( "Bitte beenden Sie zunaechst die Netzwerkkonfiguration." );
     } else {
-      if( id == 'sensoren' ) {
-	alert( "Es muss mindestens 1 Sensor aktiviert werden." );
+      if( cPage == 'sensoren' ) {
+				alert( "Es muss mindestens 1 Sensor aktiviert werden." );
       } else {
-	alert( "Die Eingabe ist noch fehlerhaft bzw unvollstaedig." );
+				alert( "Die Eingabe ist noch fehlerhaft bzw unvollstaedig." );
       }
     }
+		return false;
   }
 }
 
@@ -402,7 +410,8 @@ function fillForm() {
   var txt = '<ul class="nav nav-tabs nav-justified" id="cfgTabs" role="tablist">';
   txt = txt + '<li role="presentation" class="active"><a href="#network" id="network-tab" role="tab" data-toggle="tab" aria-controls="network">Netzwerk</a></li>';
   txt = txt + '<li role="presentation"><a  href="#sensoren" id="sensoren-tab" role="tab" data-toggle="tab" aria-controls="sensoren">Sensoren</a></li>';
-  txt = txt + '<li role="presentation"><a  href="#messages" id="messages-tab" role="tab" data-toggle="tab" aria-controls="messages">Uebertragen</a></li>';
+  txt = txt + '<li role="presentation"><a  href="#configuration" id="configuration-tab" role="tab" data-toggle="tab" aria-controls="configuration">Konfiguration</a></li>';
+  txt = txt + '<li role="presentation"><a  href="#synchronisation" id="synchronisation-tab" role="tab" data-toggle="tab" aria-controls="synchronisation">Synchronisieren</a></li>';
   txt = txt + '</ul>';
 
   txt = txt + '<div class="tab-content">';
@@ -456,11 +465,10 @@ function fillForm() {
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
   txt = txt + '                      <select class="form-control" id="nw-wlan-crypto" name="nw-wlan-crypto">';
-  txt = txt + '                        <option>keine</option>';
-  txt = txt + '                        <option>WEP</option>';
-  txt = txt + '                        <option>WPA (TKIP)</option>';
-  txt = txt + '                        <option>WPA2 (CCMP)</option>';
-  txt = txt + '                        <option>WPA + WPA2</option>';
+  txt = txt + '                        <option value="open">keine</option>';
+  txt = txt + '                        <option value="wep">WEP</option>';
+  txt = txt + '                        <option value="wpa">WPA (TKIP)</option>';
+  txt = txt + '                        <option value="wpa2">WPA2 (CCMP)</option>';
   txt = txt + '                      </select>';
   txt = txt + '                  </div>';
   txt = txt + '                  </div>';
@@ -485,7 +493,7 @@ function fillForm() {
   txt = txt + '        <!-- end row network -->';
   txt = txt + '        <div class="row">';
   txt = txt + '          <div class="col-lg-12" align="right">';
-  txt = txt + '          <button type="button" class="btn btn-default" data-tab-destination="sensoren" aria-label="Left Align" id="btn-next-sensoren" onclick="nextPage();">';
+  txt = txt + '          <button type="button" class="btn btn-default" data-tab-destination="sensoren" aria-label="Left Align" id="btn-next-sensoren" onclick="nextPage(\'network\', \'sensoren\');">';
   txt = txt + '          <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>';
   txt = txt + '          </button>';
   txt = txt + '          </div>';
@@ -513,18 +521,81 @@ function fillForm() {
   txt = txt + createS0SensorHTML(5,2,3);
   txt = txt + '      </div>';
   txt = txt + '    </div>';
-  txt = txt + '        <div class="row">';
-  txt = txt + '          <div class="col-lg-12" align="right">';
-  txt = txt + '          <button type="button" class="btn btn-default" data-tab-destination="messages" aria-label="Left Align" id="next-button" onclick="nextPage();">';
+  txt = txt + '    <div class="row">';
+  txt = txt + '       <div class="col-lg-12" align="right">';
+  txt = txt + '          <button type="button" class="btn btn-default" data-tab-destination="configuration" aria-label="Left Align" id="next-button" onclick="nextPage(\'sensoren\',\'configuration\');">';
   txt = txt + '          <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>';
   txt = txt + '          </button>';
-  txt = txt + '          </div>';
-  txt = txt + '</div>';
+  txt = txt + '       </div>';
+  txt = txt + '   </div>';
   txt = txt + '</div>';
 
-  // tab 3
-  txt = txt + '<div role="tabpanel" class="tab-pane" id="messages">';
-  txt = txt + '<h3>Speichern und Uebertragen..</h3>';
+  // tab 3 - syntese
+  txt = txt + '<div role="tabpanel" class="tab-pane" id="configuration">';
+  txt = txt + '  <div class="panel panel-default">';
+  txt = txt + '    <div class="panel-heading"><center>Konfiguration</center></div>';
+  txt = txt + '    <div class="panel-body">';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Anschluss:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">ESSID:</div>';
+  txt = txt + '        <div class="col-sm-6" id="nw-wlan-ssid"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Verschl&uuml;sselung:</div>';
+  txt = txt + '        <div class="col-sm-6" id="nw-wlan-crypto"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Passwort/psk:</div>';
+  txt = txt + '        <div class="col-sm-6" id="nw-wlan-key"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Protocol:</div>';
+  txt = txt + '        <div class="col-sm-6" id="lan-dhcp2"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">IP Adresse:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Netzmaske:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Gateway:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Nameserver:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+  txt = txt + '      <div class="row">';
+  txt = txt + '        <div class="col-sm-5">Sensor 1:</div>';
+  txt = txt + '        <div class="col-sm-6"></div>';
+  txt = txt + '      </div>';
+
+
+  txt = txt + '    </div>';
+  txt = txt + '  </div>';
+  txt = txt + '  <div class="row">';
+  txt = txt + '    <div class="col-lg-12" align="right">';
+  txt = txt + '      <button type="button" class="btn btn-default" data-tab-destination="save" aria-label="Left Align" id="next-button" onclick="nextPage(\'configuration\',\'submit\');">';
+  txt = txt + '        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>';
+  txt = txt + '      </button>';
+  txt = txt + '    </div>';
+  txt = txt + '  </div>';
+  txt = txt + '</div>';
+
+  // tab 4 - synchronisation
+  txt = txt + '<div role="tabpanel" class="tab-pane" id="synchronisation">';
+  txt = txt + '  <div class="panel panel-default">';
+  //txt = txt + '    <div class="panel-heading"><center>Synchronisation</center></div>';
+  txt = txt + '    <div class="panel-body">';
+	txt = txt + '       synchronisation progress bar';      
+  txt = txt + '    </div>';
+  txt = txt + '  </div>';
   txt = txt + '</div>';
 
   // end of tab-content
@@ -605,3 +676,31 @@ function fillForm() {
   console.log('Fillform - done');
 
 }
+
+
+$(document).ready
+(
+ function() {
+	 var form = $( "#logger-deviceconfig2-form" );
+	 fillForm();
+	 //form.validate();
+	 updateValues();
+   setSensorID();
+
+	 $('a[data-toggle="tab"]').on('shown.bs.tab', function (e, data) {
+																console.log("datatoggle...");
+																currentTab=$(this).attr('aria-controls');
+																console.log("datatoggle..."+ currentTab);
+																})
+
+	 $('#cfgTabs a').click
+		 (function (e) {
+			 e.preventDefault();
+			 console.log('T switchtab validate - current: ' + currentTab);
+			 console.log("T Attr: " + $(this).attr('aria-controls'));
+			 destTab=$(this).attr('aria-controls');
+			 return nextPage(currentTab, destTab);
+		 })
+
+		 console.log('==>Ready called.');
+ });

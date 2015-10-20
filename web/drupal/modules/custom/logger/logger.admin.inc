@@ -459,11 +459,15 @@ function logger_step($number, $message, $args = array()) {
 
 function logger_deviceconfig2_form_submit($form, &$form_state) {
   printf("logger_deviceconfig2_form_submit\n");
-  $k=1/0;
+
+  form_set_error('code', t('Please specify a valid activation code.'));
+
 }
 
 function logger_deviceconfig2_form_validate($form, &$form_state) {
   printf("logger_deviceconfig2_form_validate\n");
+
+  $jstxt="function updateValues() { ";
 
   validate_network_fields($_REQUEST, 'lan_enabled', 'lan_ip', 'lan_gw', 'lan_mask', 'lan_ns', 'lan_protocol');
   validate_network_fields($_REQUEST, 'wlan_enabled', 'wlan_ip', 'wlan_gw', 'wlan_mask', 'wlan_ns', 'wlan_protocol');
@@ -474,16 +478,15 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   //$wlan_enabled = $form_state['values']['wlan_enabled'];
 
   $net_enabled   = isset($_REQUEST['nw_enabled']) ? $_REQUEST['nw_enabled'] : 0;
-  //$lan_enabled   = isset($_REQUEST['lan_enabled[0]']) ? $_REQUEST['lan_enabled[0]'] : 0;
   $lan_enabled   = ($net_enabled[0] == 1 ) ? 1 : 0;
+  $wlan_enabled   = ($net_enabled[0] == 2) ? 1 : 0 ;
+
   $lan_ip        = isset($_REQUEST['lan_ip']) ? $_REQUEST['lan_ip'] : '';
   $lan_gw        = isset($_REQUEST['lan_gw']) ? $_REQUEST['lan_gw'] : '';
   $lan_mask      = isset($_REQUEST['lan_mask']) ? $_REQUEST['lan_mask'] : '';
   $lan_ns        = isset($_REQUEST['lan_ns']) ? $_REQUEST['lan_ns'] : '';
   $lan_protocol  = isset($_REQUEST['lan_protocol']) ? $_REQUEST['lan_protocol'] : '';
 
-  $wlan_enabled   = ($net_enabled[0] == 2) ? 1 : 0 ;
-  //$wlan_enabled  = isset($_REQUEST['lan_enabled[1]']) ? $_REQUEST['lan_enabled[1]'] : 0;
   $wlan_ip       = isset($_REQUEST['wlan_ip']) ? $_REQUEST['wlan_ip'] : '';
   $wlan_gw       = isset($_REQUEST['wlan_gw']) ? $_REQUEST['wlan_gw'] : '';
   $wlan_mask     = isset($_REQUEST['wlan_mask']) ? $_REQUEST['wlan_mask'] : '';
@@ -493,8 +496,72 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   $nwWlanSSID     = isset($_REQUEST['nwWlanSSID']) ? $_REQUEST['nwWlanSSID'] : '';
   $nw_wlan_crypto = isset($_REQUEST['nw-wlan-crypto']) ? $_REQUEST['nw-wlan-crypto'] : '';
   $nw_wlan_key    = isset($_REQUEST['nw-wlan-key']) ? $_REQUEST['nw-wlan-key'] : '';
+
+  if ($lan_enabled || $wlan_enabled) {
+    $fields = array(
+		    'device' => $device,
+		    'lan_enabled' => $lan_enabled,
+		    'wifi_enabled' => $wlan_enabled
+		    );
+
+    if($lan_enabled) {
+      $fields['lan_protocol'] = $lan_protocol;
+      $jstxt.='$("#nw_lan_checkbox").prop("checked", true).change();';
+      $jstxt.='document.getElementById("lan-dhcp").value="'.$lan_protocol.'";';
+      if($lan_protocol == 'static') {
+	$fields['lan_ip'] = $lan_ip;
+	$fields['lan_netmask'] = $lan_gw;
+	$fields['lan_gateway'] = $lan_mask;
+	$fields['lan_nameserver'] = $lan_ns;
+	$jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);';
+	$jstxt.='$("#lan-ip").attr("value", "'.$lan_ip.'");';
+	$jstxt.='$("#lan-gw").attr("value", "'.$lan_gw.'");';
+	$jstxt.='$("#lan-mask").attr("value", "'.$lan_mask.'");';
+	$jstxt.='$("#lan-ns").attr("value", "'.$lan_ns.'");';
+      }
+    }
+
+    if($wlan_enabled) {
+      $fields['wifi_essid'] = $nwWlanSSID;
+      $fields['wifi_enc'] = $nw_wlan_crypto;
+      $fields['wifi_psk'] = $nw_wlan_key;
+      $fields['wifi_protocol'] = $wlan_protocol;
+      $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();';
+      $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$nwWlanSSID.'");';
+      $jstxt.='document.getElementById("nw-wlan-crypto").value="'.$nw_wlan_crypto.'";';
+      $jstxt.='$("#nw-wlan-key").attr("value", "'.$nw_wlan_key.'");';
+      $jstxt.='document.getElementById("wlan-dhcp").value="'.$wlan_protocol.'";';
+
+      if($wlan_protocol == 'static') {
+	$fields['wifi_ip'] = $wlan_ip;
+	$fields['wifi_netmask'] = $wlan_gw;
+	$fields['wifi_gateway'] = $wlan_mask;
+	$fields['wifi_nameserver'] = $wlan_ns;
+	$jstxt.='toggleHidden($("#nwbox-wlan"), "wlan", 1);';
+	$jstxt.='$("#wlan-ip").attr("value", "'.$wlan_ip.'");';
+	$jstxt.='$("#wlan-gw").attr("value", "'.$wlan_gw.'");';
+	$jstxt.='$("#wlan-mask").attr("value", "'.$wlan_mask.'");';
+	$jstxt.='$("#wlan-ns").attr("value", "'.$wlan_ns.'");';
+      }
+    }
+    db_delete('logger_device_network')
+      ->condition('device', $device)
+      ->execute();
+
+    db_insert('logger_device_network')
+      ->fields($fields)
+      ->execute();
+    db_update('logger_devices')
+      ->fields(array(
+		     //'description' => $form_state['values']['description'],
+		     'pending_config' => 0
+		     ))
+      ->condition('device', $device)
+      ->execute();
+  }  
   
   // Sensoren
+  $sensorUUID     = isset($_REQUEST['sensorenUUID']) ? $_REQUEST['sensorenUUID'] : array();
   $sensorCheckbox = isset($_REQUEST['sensorenCheckbox']) ? $_REQUEST['sensorenCheckbox'] : array();
   $sensorName     = isset($_REQUEST['sensorname']) ? $_REQUEST['sensorname'] : array();
   $sensorXtra     = isset($_REQUEST['sensorXtra']) ? $_REQUEST['sensorXtra'] : array();
@@ -508,40 +575,35 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   $valtxt.="ip: $wlan_ip, gw: $wlan_gw, mask: $wlan_mask, ns: $wlan_ns, protocol: $wlan_protocol<P>\n";
   $valtxt.="ssid: $nwWlanSSID, crypto: $nw_wlan_crypto, key: $nw_wlan_key<P>\n";
 
+  $valtxt.="Sensoren: ".sizeof($sensorUUID) .", ";
   $valtxt.="Sensoren: ".sizeof($sensorCheckbox) .", ";
   $valtxt.="Name:     ".sizeof($sensorName) .",   ";
   $valtxt.="Xtra:     ".sizeof($sensorXtra) ."<BR>\n";
 
-  $jstxt="function updateValues() { ";
-  if($lan_enabled)  {
-    $jstxt.='$("#nw_lan_checkbox").prop("checked", true).change();';
-    $jstxt.='document.getElementById("lan-dhcp").value="'.$lan_protocol.'";';
-    if($lan_protocol == 'static') {
-      $jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);';
-      $jstxt.='$("#lan-ip").attr("value", "'.$lan_ip.'");';
-      $jstxt.='$("#lan-gw").attr("value", "'.$lan_gw.'");';
-      $jstxt.='$("#lan-mask").attr("value", "'.$lan_mask.'");';
-      $jstxt.='$("#lan-ns").attr("value", "'.$lan_ns.'");';
-    }
-  }
-  if($wlan_enabled) {
-    $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();';
-    $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$nwWlanSSID.'");';
-    $jstxt.='document.getElementById("nw-wlan-crypto").value="'.$nw_wlan_crypto.'";';
-    $jstxt.='$("#nw-wlan-key").attr("value", "'.$nw_wlan_key.'");';
-    $jstxt.='document.getElementById("wlan-dhcp").value="'.$wlan_protocol.'";';
-    if($wlan_protocol == 'static') {
-      $jstxt.='toggleHidden($("#nwbox-wlan"), "wlan", 1);';
-      $jstxt.='$("#wlan-ip").attr("value", "'.$wlan_ip.'");';
-      $jstxt.='$("#wlan-gw").attr("value", "'.$wlan_gw.'");';
-      $jstxt.='$("#wlan-mask").attr("value", "'.$wlan_mask.'");';
-      $jstxt.='$("#wlan-ns").attr("value", "'.$wlan_ns.'");';
-    }
-  }
-
   for ($i=0; $i<sizeof($sensorCheckbox); $i++) {
     $k = $sensorCheckbox[$i];
-    $valtxt.="Sensor ".$k.": ".$sensorName[$k]. "  - ". $sensorXtra[$k] . "<BR>\n";
+    $fields = array();
+    $meter = $sensorUUID[$k];
+    if($k < 4) {
+      $fields['voltage'] = 230;
+      $fields['current'] = $sensorXtra[$k];
+    } else {
+      $fields['constant'] = $sensorXtra[$k];
+    }
+    db_update('logger_energy_meter')
+      ->fields($fields)
+      ->condition('meter', $meter)
+      ->execute();
+    db_update('logger_meters')
+      ->fields(array(
+		     'function' => $sensorName[$k],
+		     'pending_config' => 1
+		     ))
+      ->condition('meter', $meter)
+      ->execute();
+
+
+    $valtxt.="Sensor ".$k.": '".$sensorUUID[$k]. "'  - '".$sensorName[$k]. "'  - ". $sensorXtra[$k] . "<BR>\n";
     $jstxt.='$("#sensor'.$k.'_checkbox").prop("checked", true).change();';
     $jstxt.='$("#sensor'.$k.'-name").attr("value", "'.$sensorName[$k].'");';
     if($k<4) {
@@ -556,7 +618,7 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   //form_set_error('code', t('Please specify a valid activation code.'));
 
   $jstxt.=' $("#logger-deviceconfig2-form").validate( );';
-  $jstxt.=' switchtab("messages");';
+  $jstxt.=' switchtab("Synchronisieren");';
   $jstxt.=" console.log('Update'); }";
 
   $valtxt.= $jstxt."<BR>\n";
@@ -569,7 +631,6 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
 function logger_deviceconfig2_form($form, &$form_state, $device_id) {
 
   $device = logger_get_device($device_id);
-  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
   $form_id = "logger-deviceconfig2-form";
 
   $form['device'] = array(
@@ -578,6 +639,7 @@ function logger_deviceconfig2_form($form, &$form_state, $device_id) {
     '#default_value' => $device->device,
     '#attributes' => array('readonly' => 'readonly')
   );
+
   //$form['submit'] = array(
   //  '#type' => 'submit',
     //'#value' => t('Save'),
@@ -601,6 +663,7 @@ function logger_deviceconfig2_form($form, &$form_state, $device_id) {
 function logger_device_config2_page($id, $page) {
 
   $device = logger_get_device($id);
+  $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $id, TRUE);
 
 
   $header = array(
@@ -635,16 +698,28 @@ function logger_device_config2_page($id, $page) {
     $output .= drupal_render($form);
     drupal_add_js("function updateValues() {}", $options);
 
+    $jstxt ="function setSensorID() {\n";
+    foreach($sensors as $sensor) {
+      if($sensor->port>0) {
+	$jstxt.="$('#sensor".$sensor->port."_uuid').attr('value', '".$sensor->meter."');\n";
+      }
+    }
+    $jstxt.='}';
+    drupal_add_js($jstxt, $options);
+
 #    drupal_add_js("jQuery(document).ready( $('.BSswitch').bootstrapSwitch('state', true);); ", $options);
 #    drupal_add_js("var $BSswitch = $('BSswitch').bootstrapSwitch('state', true);", $options);
 
-$output.='
+    //$jstxt.='$("#sensor1_uuid").attr("value", "'.$sensor[].'");';
+
+$output2='
 <script>
   $(document).ready(function() {
     var form = $( "#logger-deviceconfig2-form" );
     fillForm();
     //form.validate();
     updateValues();
+    setSensorID();
     console.log(\'==>Ready called.\');
   });
 </script>
