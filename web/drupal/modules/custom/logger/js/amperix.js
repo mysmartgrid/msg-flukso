@@ -398,6 +398,7 @@ function nextPage(cPage, nPage) {
 					$('#cfg-protocol').html("DHCP");
 					$('#cfg-static').prop("hidden", true).change();
 				} else {
+					$('#cfg-static').prop("hidden", false).change();
 					$('#cfg-protocol').html("Static");
 					$('#cfg-lan-ip').html($('#lan-ip').val());
 					$('#cfg-lan-gw').html($('#lan-gw').val());
@@ -676,7 +677,7 @@ function fillForm() {
   txt = txt + '  </div>';
   txt = txt + '  <div class="row">';
   txt = txt + '    <div class="col-lg-12" align="right">';
-  txt = txt + '      <button type="button" class="btn btn-default" data-tab-destination="save" aria-label="Left Align" id="next-button" onclick="nextPage(\'configuration\',\'submit\');">';
+  txt = txt + '      <button type="button" class="btn btn-default" data-tab-destination="save" aria-label="Left Align" id="next-button" onclick="nextPage(\'configuration\',\'synchronisation\');">';
   txt = txt + '        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>';
   txt = txt + '      </button>';
   txt = txt + '    </div>';

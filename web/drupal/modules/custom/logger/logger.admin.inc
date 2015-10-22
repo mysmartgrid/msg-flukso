@@ -481,21 +481,36 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   $lan_enabled   = ($net_enabled[0] == 1 ) ? 1 : 0;
   $wlan_enabled   = ($net_enabled[0] == 2) ? 1 : 0 ;
 
-  $lan_ip        = isset($_REQUEST['lan_ip']) ? $_REQUEST['lan_ip'] : '';
-  $lan_gw        = isset($_REQUEST['lan_gw']) ? $_REQUEST['lan_gw'] : '';
-  $lan_mask      = isset($_REQUEST['lan_mask']) ? $_REQUEST['lan_mask'] : '';
-  $lan_ns        = isset($_REQUEST['lan_ns']) ? $_REQUEST['lan_ns'] : '';
-  $lan_protocol  = isset($_REQUEST['lan_protocol']) ? $_REQUEST['lan_protocol'] : '';
+  if($lan_enabled) {
+    $lan_ip        = isset($_REQUEST['lan_ip']) ? $_REQUEST['lan_ip'] : '';
+    $lan_gw        = isset($_REQUEST['lan_gw']) ? $_REQUEST['lan_gw'] : '';
+    $lan_mask      = isset($_REQUEST['lan_mask']) ? $_REQUEST['lan_mask'] : '';
+    $lan_ns        = isset($_REQUEST['lan_ns']) ? $_REQUEST['lan_ns'] : '';
+    $lan_protocol  = isset($_REQUEST['lan_protocol']) ? $_REQUEST['lan_protocol'] : '';
+  } else {
+    $lan_ip = '';
+    $lan_gw='';
+    $lan_mask='';
+    $lan_ns = '';
+    $lan_protocol = '';
+  }
+  if($wlan_enabled) {
+    $wlan_ip       = isset($_REQUEST['lan_ip']) ? $_REQUEST['lan_ip'] : '';
+    $wlan_gw       = isset($_REQUEST['lan_gw']) ? $_REQUEST['lan_gw'] : '';
+    $wlan_mask     = isset($_REQUEST['lan_mask']) ? $_REQUEST['lan_mask'] : '';
+    $wlan_ns       = isset($_REQUEST['lan_ns']) ? $_REQUEST['lan_ns'] : '';
+    $wlan_protocol = isset($_REQUEST['lan_protocol']) ? $_REQUEST['lan_protocol'] : '';
 
-  $wlan_ip       = isset($_REQUEST['wlan_ip']) ? $_REQUEST['wlan_ip'] : '';
-  $wlan_gw       = isset($_REQUEST['wlan_gw']) ? $_REQUEST['wlan_gw'] : '';
-  $wlan_mask     = isset($_REQUEST['wlan_mask']) ? $_REQUEST['wlan_mask'] : '';
-  $wlan_ns       = isset($_REQUEST['wlan_ns']) ? $_REQUEST['wlan_ns'] : '';
-  $wlan_protocol = isset($_REQUEST['wlan_protocol']) ? $_REQUEST['wlan_protocol'] : '';
-
-  $nwWlanSSID     = isset($_REQUEST['nwWlanSSID']) ? $_REQUEST['nwWlanSSID'] : '';
-  $nw_wlan_crypto = isset($_REQUEST['nw-wlan-crypto']) ? $_REQUEST['nw-wlan-crypto'] : '';
-  $nw_wlan_key    = isset($_REQUEST['nw-wlan-key']) ? $_REQUEST['nw-wlan-key'] : '';
+    $nwWlanSSID     = isset($_REQUEST['nwWlanSSID']) ? $_REQUEST['nwWlanSSID'] : '';
+    $nw_wlan_crypto = isset($_REQUEST['nw-wlan-crypto']) ? $_REQUEST['nw-wlan-crypto'] : '';
+    $nw_wlan_key    = isset($_REQUEST['nw-wlan-key']) ? $_REQUEST['nw-wlan-key'] : '';
+  } else {
+    $wlan_ip = '';
+    $wlan_gw='';
+    $wlan_mask='';
+    $wlan_ns = '';
+    $wlan_protocol = '';
+  }
 
   if ($lan_enabled || $wlan_enabled) {
     $fields = array(
@@ -509,9 +524,9 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
       $jstxt.='$("#nw_lan_checkbox").prop("checked", true).change();';
       $jstxt.='document.getElementById("lan-dhcp").value="'.$lan_protocol.'";';
       if($lan_protocol == 'static') {
-	$fields['lan_ip'] = $lan_ip;
-	$fields['lan_netmask'] = $lan_gw;
-	$fields['lan_gateway'] = $lan_mask;
+	$fields['lan_ip']         = $lan_ip;
+	$fields['lan_netmask']    = $lan_gw;
+	$fields['lan_gateway']    = $lan_mask;
 	$fields['lan_nameserver'] = $lan_ns;
 	$jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);';
 	$jstxt.='$("#lan-ip").attr("value", "'.$lan_ip.'");';
@@ -522,9 +537,9 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
     }
 
     if($wlan_enabled) {
-      $fields['wifi_essid'] = $nwWlanSSID;
-      $fields['wifi_enc'] = $nw_wlan_crypto;
-      $fields['wifi_psk'] = $nw_wlan_key;
+      $fields['wifi_essid']    = $nwWlanSSID;
+      $fields['wifi_enc']      = $nw_wlan_crypto;
+      $fields['wifi_psk']      = $nw_wlan_key;
       $fields['wifi_protocol'] = $wlan_protocol;
       $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();';
       $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$nwWlanSSID.'");';
@@ -533,15 +548,15 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
       $jstxt.='document.getElementById("wlan-dhcp").value="'.$wlan_protocol.'";';
 
       if($wlan_protocol == 'static') {
-	$fields['wifi_ip'] = $wlan_ip;
-	$fields['wifi_netmask'] = $wlan_gw;
-	$fields['wifi_gateway'] = $wlan_mask;
+	$fields['wifi_ip']         = $wlan_ip;
+	$fields['wifi_netmask']    = $wlan_gw;
+	$fields['wifi_gateway']    = $wlan_mask;
 	$fields['wifi_nameserver'] = $wlan_ns;
-	$jstxt.='toggleHidden($("#nwbox-wlan"), "wlan", 1);';
-	$jstxt.='$("#wlan-ip").attr("value", "'.$wlan_ip.'");';
-	$jstxt.='$("#wlan-gw").attr("value", "'.$wlan_gw.'");';
-	$jstxt.='$("#wlan-mask").attr("value", "'.$wlan_mask.'");';
-	$jstxt.='$("#wlan-ns").attr("value", "'.$wlan_ns.'");';
+	$jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);';
+	$jstxt.='$("#lan-ip").attr("value", "'.$wlan_ip.'");';
+	$jstxt.='$("#lan-gw").attr("value", "'.$wlan_gw.'");';
+	$jstxt.='$("#lan-mask").attr("value", "'.$wlan_mask.'");';
+	$jstxt.='$("#lan-ns").attr("value", "'.$wlan_ns.'");';
       }
     }
     db_delete('logger_device_network')
