@@ -503,8 +503,8 @@ function logger_deviceconfig_form_validate($form, &$form_state) {
     $wlan_protocol = isset($_REQUEST['lan_protocol']) ? $_REQUEST['lan_protocol'] : '';
 
     $nwWlanSSID     = isset($_REQUEST['nwWlanSSID']) ? $_REQUEST['nwWlanSSID'] : '';
-    $nw_wlan_crypto = isset($_REQUEST['nw-wlan-crypto']) ? $_REQUEST['nw-wlan-crypto'] : '';
-    $nw_wlan_key    = isset($_REQUEST['nw-wlan-key']) ? $_REQUEST['nw-wlan-key'] : '';
+    $nw_wlan_enc = isset($_REQUEST['nw-wlan-enc']) ? $_REQUEST['nw-wlan-enc'] : '';
+    $nw_wlan_psk    = isset($_REQUEST['nw-wlan-psk']) ? $_REQUEST['nw-wlan-psk'] : '';
   } else {
     $wlan_ip = '';
     $wlan_gw='';
@@ -539,13 +539,13 @@ function logger_deviceconfig_form_validate($form, &$form_state) {
 
     if($wlan_enabled) {
       $fields['wifi_essid']    = $nwWlanSSID;
-      $fields['wifi_enc']      = $nw_wlan_crypto;
-      $fields['wifi_psk']      = $nw_wlan_key;
+      $fields['wifi_enc']      = $nw_wlan_enc;
+      $fields['wifi_psk']      = $nw_wlan_psk;
       $fields['wifi_protocol'] = $wlan_protocol;
       $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();';
       $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$nwWlanSSID.'");';
-      $jstxt.='document.getElementById("nw-wlan-crypto").value="'.$nw_wlan_crypto.'";';
-      $jstxt.='$("#nw-wlan-key").attr("value", "'.$nw_wlan_key.'");';
+      $jstxt.='document.getElementById("nw-wlan-enc").value="'.$nw_wlan_enc.'";';
+      $jstxt.='$("#nw-wlan-psk").attr("value", "'.$nw_wlan_psk.'");';
       $jstxt.='document.getElementById("wlan-dhcp").value="'.$wlan_protocol.'";';
 
       if($wlan_protocol == 'static') {
@@ -589,7 +589,7 @@ function logger_deviceconfig_form_validate($form, &$form_state) {
 
   //$valtxt.="WLAN: $wlan_enabled<P>\n";
   //$valtxt.="ip: $wlan_ip, gw: $wlan_gw, mask: $wlan_mask, ns: $wlan_ns, protocol: $wlan_protocol<P>\n";
-  //$valtxt.="ssid: $nwWlanSSID, crypto: $nw_wlan_crypto, key: $nw_wlan_key<P>\n";
+  //$valtxt.="ssid: $nwWlanSSID, enc: $nw_wlan_enc, psk: $nw_wlan_psk<P>\n";
 
   $valtxt.="Sensoren: ".sizeof($sensorUUID) .", ";
   $valtxt.="Sensoren: ".sizeof($sensorCheckbox) .", ";
@@ -756,9 +756,9 @@ function logger_device_config_page($id, $page) {
     if($device->wifi_enabled) {
       $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();'."\n";
       $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$device->wifi_essid.'");'."\n";
-      //$jstxt.='$("#nw-wlan-crypto").attr("value","'.$device->wifi_enc.'");'."\n";
-      $jstxt.='document.getElementById("nw-wlan-crypto").value="'.$device->wifi_enc.'";'."\n";
-      $jstxt.='$("#nw-wlan-key").attr("value", "'.$device->wifi_psk.'");'."\n";
+      //$jstxt.='$("#nw-wlan-enc").attr("value","'.$device->wifi_enc.'");'."\n";
+      $jstxt.='document.getElementById("nw-wlan-enc").value="'.$device->wifi_enc.'";'."\n";
+      $jstxt.='$("#nw-wlan-psk").attr("value", "'.$device->wifi_psk.'");'."\n";
       $jstxt.='document.getElementById("lan-dhcp").value="'.$device->wifi_protocol.'";'."\n";
       //$jstxt.='$("#lan-dhcp").attr("value","'.$device->wifi_protocol.'");'."\n";
       if($device->wifi_protocol == 'static') {
@@ -2099,7 +2099,7 @@ function logger_device_form_submit($form, &$form_state) {
         $fields['wifi_nameserver'] = $form_state['values']['wifi_nameserver'];
       }
       $fields['wifi_essid'] = $form_state['values']['wifi_essid'];
-      $fields['wifi_enc'] = $form_state['values']['wifi_enc'];
+      $fields['wifi_enc']   = $form_state['values']['wifi_enc'];
       if ($form_state['values']['wifi_enc'] != 'open') {
         $fields['wifi_psk'] = $form_state['values']['wifi_psk'];
       }

@@ -84,18 +84,18 @@ function toggleNetwork(field1, field2, field3, field4, state) {
     $('#nw-wlan-ssid').rules("add", { required: true , string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#nw-wlan-ssid').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#nw-wlan-ssid1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
-    $('#nw-wlan-key').rules("add", { required: true , string: true, messages: { required: "Bitte WiFi Schl&uuml;ssel eingeben.",} } );
-    $('#nw-wlan-key').closest('.form-group').removeClass('has-success').addClass('has-error');
-    $('#nw-wlan-key1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
+    $('#nw-wlan-psk').rules("add", { required: true , string: true, messages: { required: "Bitte WiFi Schl&uuml;ssel eingeben.",} } );
+    $('#nw-wlan-psk').closest('.form-group').removeClass('has-success').addClass('has-error');
+    $('#nw-wlan-psk1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
     $('#nw-wlan-ssid').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
     $('#nw-wlan-ssid').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
-    $('#nw-wlan-key').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
-    $('#nw-wlan-key').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
+    $('#nw-wlan-psk').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+    $('#nw-wlan-psk').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
 
   } else {
     $('#nw-wlan-ssid').rules("remove", "required" );
-    $('#nw-wlan-key').rules("remove", "required" );
+    $('#nw-wlan-psk').rules("remove", "required" );
   }
   if (thisid == 'nw-lan') {
     console.log("LAN");
@@ -390,8 +390,8 @@ function nextPage(cPage, nPage) {
 					$('#cfg-lan').html("WiFi");
 					$('#cfg-wifi').prop("hidden",false).change();
 					$('#cfg-wlan-ssid').html($('#nw-wlan-ssid').val());
-					$('#cfg-wlan-crypto').html($('#nw-wlan-crypto').val());
-					$('#cfg-wlan-key').html($('#nw-wlan-key').val());
+					$('#cfg-wlan-enc').html($('#nw-wlan-enc').val());
+					$('#cfg-wlan-psk').html($('#nw-wlan-psk').val());
 				} else { $('#cfg-lan').html("unknown"); }
 
 				if($('#lan-dhcp').val() == "dhcp") {
@@ -535,7 +535,7 @@ function fillForm() {
   txt = txt + '                  <div class="col-sm-5">verschluessel:</div>';
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
-  txt = txt + '                      <select class="form-control" id="nw-wlan-crypto" name="nw-wlan-crypto">';
+  txt = txt + '                      <select class="form-control" id="nw-wlan-enc" name="nw-wlan-enc">';
   txt = txt + '                        <option value="open">keine</option>';
   txt = txt + '                        <option value="wep">WEP</option>';
   txt = txt + '                        <option value="wpa">WPA (TKIP)</option>';
@@ -549,9 +549,9 @@ function fillForm() {
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
   txt = txt + '                    <input type="text" class="form-control" placeholder="Passwort oder Schluessel" aria-describedby="basic-addon2"';
-  txt = txt + '                           name="nw-wlan-key" id="nw-wlan-key"';
+  txt = txt + '                           name="nw-wlan-psk" id="nw-wlan-psk"';
   txt = txt + '                           data-bv-notempty-message="The password/PSK is required and cannot be empty" />';
-  txt = txt + '                    <span class="glyphicon form-control-feedback" id="nw-wlan-key1"></span>';
+  txt = txt + '                    <span class="glyphicon form-control-feedback" id="nw-wlan-psk1"></span>';
   txt = txt + '                  </div>';
   txt = txt + '                  </div>';
   txt = txt + '                </div>';
@@ -613,11 +613,11 @@ function fillForm() {
   txt = txt + '      </div>';
   txt = txt + '      <div class="row">';
   txt = txt + '        <div class="col-sm-3">Verschl&uuml;sselung:</div>';
-  txt = txt + '        <div class="col-sm-6" id="cfg-wlan-crypto"></div>';
+  txt = txt + '        <div class="col-sm-6" id="cfg-wlan-enc"></div>';
   txt = txt + '      </div>';
   txt = txt + '      <div class="row">';
   txt = txt + '        <div class="col-sm-3">Passwort/psk:</div>';
-  txt = txt + '        <div class="col-sm-6" id="cfg-wlan-key"></div>';
+  txt = txt + '        <div class="col-sm-6" id="cfg-wlan-psk"></div>';
   txt = txt + '      </div></div>';
   txt = txt + '      <div class="row">';
   txt = txt + '        <div class="col-sm-3">Protocol:</div>';
