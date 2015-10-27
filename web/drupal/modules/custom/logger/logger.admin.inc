@@ -547,7 +547,7 @@ function logger_deviceconfig_form_validate($form, &$form_state) {
       $jstxt.='document.getElementById("nw-wlan-enc").value="'.$nw_wlan_enc.'";';
       $jstxt.='$("#nw-wlan-psk").attr("value", "'.$nw_wlan_psk.'");';
       $jstxt.='document.getElementById("wlan-dhcp").value="'.$wlan_protocol.'";';
-
+      
       if($wlan_protocol == 'static') {
 	$fields['wifi_ip']         = $wlan_ip;
 	$fields['wifi_netmask']    = $wlan_gw;
@@ -758,6 +758,9 @@ function logger_device_config_page($id, $page) {
       $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$device->wifi_essid.'");'."\n";
       //$jstxt.='$("#nw-wlan-enc").attr("value","'.$device->wifi_enc.'");'."\n";
       $jstxt.='document.getElementById("nw-wlan-enc").value="'.$device->wifi_enc.'";'."\n";
+      if($device->wifi_enc == 'open') {
+	$jstxt.="$('#nw-wlan-psk-line').prop('hidden', true).change();\n";
+      }
       $jstxt.='$("#nw-wlan-psk").attr("value", "'.$device->wifi_psk.'");'."\n";
       $jstxt.='document.getElementById("lan-dhcp").value="'.$device->wifi_protocol.'";'."\n";
       //$jstxt.='$("#lan-dhcp").attr("value","'.$device->wifi_protocol.'");'."\n";

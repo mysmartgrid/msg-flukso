@@ -198,13 +198,25 @@ function createNetworkConfig(w) {
         toggleHidden($(inputbox), w, 0);
       }
     });
-    var selected = $(checkbox+' option:selected').val();
-    if(selected == 'static') {
-      toggleHidden($(inputbox), w, 1);
-    } else {
-      toggleHidden($(inputbox), w, 0);
-    }
+	var selected = $(checkbox+' option:selected').val();
+	if(selected == 'static') {
+		toggleHidden($(inputbox), w, 1);
+	} else {
+		toggleHidden($(inputbox), w, 0);
+	}
+
+	$('#nw-wlan-enc').on('change', function() {
+												 var selected = $('#nw-wlan-enc option:selected').val();
+												 console.log("ENC: " + selected);
+												 if(selected == 'open') {
+													 $('#nw-wlan-psk-line').prop('hidden', true).change();
+												 } else {
+													 $('#nw-wlan-psk-line').prop('hidden', false).change();
+												 }
+												});
 }
+
+
 
 
 /*
@@ -544,7 +556,7 @@ function fillForm() {
   txt = txt + '                  </div>';
   txt = txt + '                  </div>';
   txt = txt + '                </div>';
-  txt = txt + '                <div class="row">';
+  txt = txt + '                <div class="row" id="nw-wlan-psk-line">';
   txt = txt + '                  <div class="col-sm-5">Schluessel/Passwort:</div>';
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
@@ -796,7 +808,7 @@ $(document).ready
 			 console.log("T Attr: " + $(this).attr('aria-controls'));
 			 destTab=$(this).attr('aria-controls');
 			 return nextPage(currentTab, destTab);
-		 })
+		 });
 
-		 console.log('==>Ready called.');
+	 console.log('==>Ready called.');
  });
