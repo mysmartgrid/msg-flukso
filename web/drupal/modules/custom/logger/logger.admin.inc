@@ -313,8 +313,9 @@ function logger_firmware_edition_page($id) {
  */
 function logger_device_edition_page($id) {
 
-  $form = drupal_get_form('logger_device_form', logger_get_device($id));
-  return drupal_render($form);
+  return logger_device_config_page($id, 1);
+  //$form = drupal_get_form('logger_device_form', logger_get_device($id));
+  //return drupal_render($form);
 }
 
 /**
@@ -348,7 +349,7 @@ function logger_device_assign_page() {
  * @param $page  The configuration wizard page number.
  * @return the device configuration page.
  */
-function logger_device_config_page($id, $page) {
+function logger_device_configALT_page($id, $page) {
 
   $device = logger_get_device($id);
 
@@ -368,7 +369,7 @@ function logger_device_config_page($id, $page) {
   if ($page == 1) {
     $output .= logger_step(2, 'Please, inform which network interfaces and sensors must be enabled on the device.') . '<br>';
 
-    $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
+    $form = drupal_get_form('logger_deviceconfigALT_form', $id, $page);
     $output .= drupal_render($form);
   }
   else {
@@ -457,15 +458,15 @@ function logger_step($number, $message, $args = array()) {
   return '<p><b>' . t('Step') . " $number - </b> " . t($message, $args) . '</p>';
 }
 
-function logger_deviceconfig2_form_submit($form, &$form_state) {
-  printf("logger_deviceconfig2_form_submit\n");
+function logger_deviceconfig_form_submit($form, &$form_state) {
+  printf("logger_deviceconfig_form_submit\n");
 
   form_set_error('code', t('Please specify a valid activation code.'));
 
 }
 
-function logger_deviceconfig2_form_validate($form, &$form_state) {
-  printf("logger_deviceconfig2_form_validate\n");
+function logger_deviceconfig_form_validate($form, &$form_state) {
+  printf("logger_deviceconfig_form_validate\n");
 
   $jstxt="function updateValues() { ";
 
@@ -569,7 +570,7 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
     db_update('logger_devices')
       ->fields(array(
 		     //'description' => $form_state['values']['description'],
-		     'pending_config' => 0
+		     'pending_config' => 1
 		     ))
       ->condition('device', $device)
       ->execute();
@@ -586,15 +587,27 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   $valtxt.= "LAN: $lan_enabled<P>\n";
   $valtxt.="ip: $lan_ip, gw: $lan_gw, mask: $lan_mask, ns: $lan_ns, protocol: $lan_protocol<P>\n";
 
-  $valtxt.="WLAN: $wlan_enabled<P>\n";
-  $valtxt.="ip: $wlan_ip, gw: $wlan_gw, mask: $wlan_mask, ns: $wlan_ns, protocol: $wlan_protocol<P>\n";
-  $valtxt.="ssid: $nwWlanSSID, crypto: $nw_wlan_crypto, key: $nw_wlan_key<P>\n";
+  //$valtxt.="WLAN: $wlan_enabled<P>\n";
+  //$valtxt.="ip: $wlan_ip, gw: $wlan_gw, mask: $wlan_mask, ns: $wlan_ns, protocol: $wlan_protocol<P>\n";
+  //$valtxt.="ssid: $nwWlanSSID, crypto: $nw_wlan_crypto, key: $nw_wlan_key<P>\n";
 
   $valtxt.="Sensoren: ".sizeof($sensorUUID) .", ";
   $valtxt.="Sensoren: ".sizeof($sensorCheckbox) .", ";
   $valtxt.="Name:     ".sizeof($sensorName) .",   ";
   $valtxt.="Xtra:     ".sizeof($sensorXtra) ."<BR>\n";
 
+  //for ($i=1; $i<=sizeof($sensorUUID); $i++) {
+  foreach ($sensorUUID as $meter) {
+    //$meter = $sensorUUID[$i];
+    $valtxt.='sensor : '.$meter."<br>\n";
+    db_update('logger_meters')
+      ->fields(array(
+		     'function' => NULL,
+		     'pending_config' => 1
+		     ))
+      ->condition('meter', $meter)
+      ->execute();
+  }
   for ($i=0; $i<sizeof($sensorCheckbox); $i++) {
     $k = $sensorCheckbox[$i];
     $fields = array();
@@ -632,7 +645,7 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
 
   //form_set_error('code', t('Please specify a valid activation code.'));
 
-  $jstxt.=' $("#logger-deviceconfig2-form").validate( );';
+  $jstxt.=' $("#logger-deviceconfig-form").validate( );';
   $jstxt.=' switchtab("Synchronisieren");';
   $jstxt.=" console.log('Update'); }";
 
@@ -643,10 +656,10 @@ function logger_deviceconfig2_form_validate($form, &$form_state) {
   drupal_add_js($jstxt, $options);
 }
 
-function logger_deviceconfig2_form($form, &$form_state, $device_id) {
+function logger_deviceconfig_form($form, &$form_state, $device_id) {
 
   $device = logger_get_device($device_id);
-  $form_id = "logger-deviceconfig2-form";
+  $form_id = "logger-deviceconfig-form";
 
   $form['device'] = array(
     '#type' => 'hidden',
@@ -675,7 +688,7 @@ function logger_deviceconfig2_form($form, &$form_state, $device_id) {
  * @param $page  The configuration wizard page number.
  * @return the device configuration page.
  */
-function logger_device_config2_page($id, $page) {
+function logger_device_config_page($id, $page) {
 
   $device = logger_get_device($id);
   $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $id, TRUE);
@@ -709,14 +722,64 @@ function logger_device_config2_page($id, $page) {
 ';
 
   if ($page == 1) {
-    $form = drupal_get_form('logger_deviceconfig2_form', $id, $page);
+    $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
     $output .= drupal_render($form);
     drupal_add_js("function updateValues() {}", $options);
 
     $jstxt ="function setSensorID() {\n";
-    foreach($sensors as $sensor) {
+
+    $query = db_select('logger_meters', 'm')
+      ->fields('m', array('meter', 'external_id', 'function', 'port', 'virtual', 'forecast', 'price', 'latitude', 'longitude', 'created'));
+    $query->condition('m.device', $id);
+    $result = $query->execute();
+
+    //$sensors = array();
+    foreach ($result as $sensor) {
       if($sensor->port>0) {
 	$jstxt.="$('#sensor".$sensor->port."_uuid').attr('value', '".$sensor->meter."');\n";
+      }
+    }
+
+    // fill values
+    if($device->lan_enabled) {
+      $jstxt.='$("#nw_lan_checkbox").prop("checked", true).change();'."\n";
+      //$jstxt.='$("#lan-dhcp").attr("value=","'.$device->lan_protocol.'");'."\n";
+      $jstxt.='document.getElementById("lan-dhcp").value="'.$device->lan_protocol.'";'."\n";
+      if($device->lan_protocol == 'static') {
+	$jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);'."\n";
+	$jstxt.='$("#lan-ip").attr("value", "'.$device->lan_ip.'");'."\n";
+	$jstxt.='$("#lan-gw").attr("value", "'.$device->lan_gateway.'");';
+	$jstxt.='$("#lan-mask").attr("value", "'.$device->lan_netmask.'");'."\n";
+	$jstxt.='$("#lan-ns").attr("value", "'.$device->lan_nameserver.'");'."\n";
+      }
+    }
+    if($device->wifi_enabled) {
+      $jstxt.='$("#nw_wlan_checkbox").prop("checked", true).change();'."\n";
+      $jstxt.='$("#nw-wlan-ssid").attr("value", "'.$device->wifi_essid.'");'."\n";
+      //$jstxt.='$("#nw-wlan-crypto").attr("value","'.$device->wifi_enc.'");'."\n";
+      $jstxt.='document.getElementById("nw-wlan-crypto").value="'.$device->wifi_enc.'";'."\n";
+      $jstxt.='$("#nw-wlan-key").attr("value", "'.$device->wifi_psk.'");'."\n";
+      $jstxt.='document.getElementById("lan-dhcp").value="'.$device->wifi_protocol.'";'."\n";
+      //$jstxt.='$("#lan-dhcp").attr("value","'.$device->wifi_protocol.'");'."\n";
+      if($device->wifi_protocol == 'static') {
+	$jstxt.='toggleHidden($("#nwbox-lan"), "lan", 1);';
+	$jstxt.='$("#lan-ip").attr("value", "'.$device->wifi_ip.'");'."\n";
+	$jstxt.='$("#lan-gw").attr("value", "'.$device->wifi_gateway.'");'."\n";
+	$jstxt.='$("#lan-mask").attr("value", "'.$device->wifi_netmask.'");'."\n";
+	$jstxt.='$("#lan-ns").attr("value", "'.$device->wifi_nameserver.'");'."\n";
+      }
+
+    }
+    foreach ($sensors as $sensor) {
+      $jstxt.='';
+      if($sensor->function) {
+	$jstxt.='$("#sensor'.$sensor->port.'_checkbox").prop("checked", true).change();'."\n";
+	$jstxt.='$("#sensor'.$sensor->port.'-name").attr("value", "'.$sensor->function.'");'."\n";
+	if($sensor->port<4) {
+	  $jstxt.='document.getElementById("sensor'.$sensor->port.'-extras").value="'.$sensor->current.'";'."\n";
+	} else {
+	  $jstxt.='$("#sensor'.$sensor->port.'-extras").attr("value", "'.$sensor->constant.'");'."\n";
+	}
       }
     }
     $jstxt.='}';
@@ -730,7 +793,7 @@ function logger_device_config2_page($id, $page) {
 $output2='
 <script>
   $(document).ready(function() {
-    var form = $( "#logger-deviceconfig2-form" );
+    var form = $( "#logger-deviceconfig-form" );
     fillForm();
     //form.validate();
     updateValues();
@@ -1218,7 +1281,7 @@ function logger_create_energy_sensor_fields(&$form, $sensor, $field_id_suffix = 
   );
 }
 
-function logger_deviceconfig_form($form, &$form_state, $device_id) {
+function logger_deviceconfigALT_form($form, &$form_state, $device_id) {
 
   $device = logger_get_device($device_id);
   $sensors = logger_get_sensors(NULL, NULL, FALSE, FALSE, TRUE, array(), NULL, FALSE, $device_id, TRUE);
@@ -1876,7 +1939,7 @@ function logger_deviceassign_form_validate($form, &$form_state) {
   }
 }
 
-function logger_deviceconfig_form_validate($form, &$form_state) {
+function logger_deviceconfigALT_form_validate($form, &$form_state) {
 
   logger_device_form_validate($form, &$form_state);
   # validate sensor
@@ -2085,7 +2148,7 @@ function logger_deviceassign_form_submit($form, &$form_state) {
   }
 }
 
-function logger_deviceconfig_form_submit($form, &$form_state) {
+function logger_deviceconfigALT_form_submit($form, &$form_state) {
 
   foreach($form_state['values'] as $key => $value) {
 

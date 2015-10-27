@@ -481,7 +481,7 @@ function logger_menu() {
   );
   $items['device/config2'] = array(
     'title' => $device_config_title,
-    'page callback' => 'logger_device_config2_page',
+    'page callback' => 'logger_device_configALT_page',
     'page arguments' => array(2, 3),
     'access callback' => 'logger_device_access',
     'access arguments' => array('edit devices', 2),

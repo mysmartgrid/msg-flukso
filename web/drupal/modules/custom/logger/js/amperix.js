@@ -7,7 +7,7 @@
 
 (function() {
   console.log('Init?');
-  form1 = $( "#logger-deviceconfig2-form" );
+  form1 = $( "#logger-deviceconfig-form" );
 
   $(function() {
       currentTab="network";
@@ -88,10 +88,10 @@ function toggleNetwork(field1, field2, field3, field4, state) {
     $('#nw-wlan-key').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#nw-wlan-key1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
 
-    $('#nw-wlan-ssid').on('click', function() {  $('#logger-deviceconfig2-form').valid(); });
-    $('#nw-wlan-ssid').on('change', function() {  $('#logger-deviceconfig2-form').valid(); });
-    $('#nw-wlan-key').on('click', function() {  $('#logger-deviceconfig2-form').valid(); });
-    $('#nw-wlan-key').on('change', function() {  $('#logger-deviceconfig2-form').valid(); });
+    $('#nw-wlan-ssid').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+    $('#nw-wlan-ssid').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
+    $('#nw-wlan-key').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+    $('#nw-wlan-key').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
 
   } else {
     $('#nw-wlan-ssid').rules("remove", "required" );
@@ -297,8 +297,8 @@ function createHallSensor(no,y,z) {
   $('#sensor'+no+'_checkbox').on('switchChange.bootstrapSwitch', function(event, state) {
     toggleSensor($('#sensor'+no+'-name'), $('#sensor'+no+'-extras'), state);
   });
-  $('#sensor'+no+'-name').on('click', function() {  $('#logger-deviceconfig2-form').valid(); });
-  $('#sensor'+no+'-name').on('change', function() {  $('#logger-deviceconfig2-form').valid(); });
+  $('#sensor'+no+'-name').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+  $('#sensor'+no+'-name').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
 
 	$('#sensor' + no + 'Form').click(function(event){$('#sensor'+no+'_checkbox').bootstrapSwitch('state', true);toggleSensor($('#sensor'+no+'-name'), $('#sensor'+no+'-extras'),true);});
 }
@@ -356,17 +356,17 @@ function createS0Sensor(no,y,z) {
     toggleSensor($('#sensor'+no+'-name'), $('#sensor'+no+'-extras'), state);
   });
 
-  $('#sensor'+no+'-name').on('click', function() {  $('#logger-deviceconfig2-form').valid(); });
-  $('#sensor'+no+'-name').on('change', function() {  $('#logger-deviceconfig2-form').valid(); });
-  $('#sensor'+no+'-extras').on('click', function() {  $('#logger-deviceconfig2-form').valid(); });
-  $('#sensor'+no+'-extras').on('change', function() {  $('#logger-deviceconfig2-form').valid(); });
+  $('#sensor'+no+'-name').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+  $('#sensor'+no+'-name').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
+  $('#sensor'+no+'-extras').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
+  $('#sensor'+no+'-extras').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
 }
 
 
 function nextPage(cPage, nPage) {
 	console.log("Current: "+cPage);
 	console.log("Next   : "+nPage);
-  var form1 = $( "#logger-deviceconfig2-form" );
+  var form1 = $( "#logger-deviceconfig-form" );
   form1.validate({
     debug: true
 	});
@@ -471,8 +471,8 @@ function nextPage(cPage, nPage) {
 }
 
 function fillForm() {
-  var form1 = $( "#logger-deviceconfig2-form" );
-  //var form1 = document.getElementById("logger-deviceconfig2-form2")
+  var form1 = $( "#logger-deviceconfig-form" );
+  //var form1 = document.getElementById("logger-deviceconfig-form2")
   console.log('Fillform ' + form1.attr('id'));
   form1.attr('name', 'devicewizard');
   form1.attr('role', 'form');
@@ -713,7 +713,7 @@ function fillForm() {
   createS0Sensor(4,2,3);
   createS0Sensor(5,2,3);
 
-  $('#logger-deviceconfig2-form').validate({   
+  $('#logger-deviceconfig-form').validate({   
     debug: true,
 
 	  ignore: ":hidden",
@@ -757,7 +757,7 @@ function fillForm() {
 
 	$('.network-group').rules("add", { required: true, string: true, messages: { required: ""}, } );
 	$('.sensor-group').rules("add", { required: true, string: false, messages: { required: false}, } );
-	//$("#logger-deviceconfig2-form").validate().settings.onsubmit = false;
+	//$("#logger-deviceconfig-form").validate().settings.onsubmit = false;
 
     $("#nw_lan_checkbox").bootstrapSwitch('state', true);
 
@@ -777,7 +777,7 @@ function fillForm() {
 $(document).ready
 (
  function() {
-	 var form = $( "#logger-deviceconfig2-form" );
+	 var form = $( "#logger-deviceconfig-form" );
 	 fillForm();
 	 //form.validate();
 	 updateValues();
