@@ -36,6 +36,7 @@
 -define(VZLOGGER_DEVICE_TYPE_ID,     3).
 -define(LIBKLIO_DEVICE_TYPE_ID,      4).
 -define(RASPBERRY_PI_DEVICE_TYPE_ID, 6).
+-define(AMPERIX01_DEVICE_TYPE_ID,    7).
 
 -define(NO_COMMUNICATION_EVENT_ID,       1).
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
@@ -170,6 +171,7 @@ check_device_type(Type) ->
         <<"vzlogger">> -> {?VZLOGGER_DEVICE_TYPE_ID, true};
         <<"libklio">> -> {?LIBKLIO_DEVICE_TYPE_ID, true};
         <<"raspberrypi">> -> {?RASPBERRY_PI_DEVICE_TYPE_ID, true};
+        <<"amperix1">> -> {?AMPERIX01_DEVICE_TYPE_ID, true};
         _ -> {?UNKNOWN_DEVICE_TYPE_ID, false}
     end.
 
