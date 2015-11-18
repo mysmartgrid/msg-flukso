@@ -5,6 +5,14 @@
  * Initialisierung der Seite
  */
 
+function refresh() {
+	setTimeout(function () {
+							 console.log('refresh..');
+							 location.reload();
+						 }, 10000);
+}
+
+
 (function() {
   console.log('Init?');
   form1 = $( "#logger-deviceconfig-form" );
@@ -36,8 +44,8 @@ jQuery.validator.addMethod("integer", function(value, element) {
 			   }, "Must eine Zahl sein");
 
 jQuery.validator.addMethod("string", function(value, element) {
-			       return this.optional(element) || /^([a-zA-Z_0-9])+$/.test(value);
-			   }, "Ungueltiges Zeichen: erlaubt: a-zA-Z0-9_");
+			       return this.optional(element) || /^([a-zA-Z_0-9!])+$/.test(value);
+			   }, "Ungueltiges Zeichen: erlaubt: a-zA-Z0-9_!");
 jQuery.validator.addMethod("ipaddress", function(value, element) {
 			       return this.optional(element) || /^([0-9])+.([0-9])+.([0-9])+.([0-9])+$/.test(value);
 			   }, "Ungueltiges Zeichen: erlaubt: 0-9.");
@@ -59,28 +67,14 @@ function switchtab(tabname) {
 /* 
  *
  */
-function toggleNetwork(field1, field2, field3, field4, state) {
-  var thisid = field1.attr('id');
+//function toggleNetwork(field1, field2, field3, field4, state) {
+function toggleNetwork(field1, field2, state) {
+  var thisid = field2.attr('id');
 
-  if(state) {
+  if(state) { // WiFi activated
     field1.prop('hidden', false).change();
     field1.prop('required', true).change();
 
-    field2.prop('hidden', true).change();
-    field2.prop('required', false).change();
-
-    field3.prop('checked', false).change();
-	} else {
-    field1.prop('hidden', true).change();
-    field1.prop('required', true).change();
-    field2.prop('required', true).change();
-		
-    field3.prop('checked', true).change();
-  }
-  console.log("my id is: "+thisid);
-  if( thisid == 'nw-wlan') {
-    console.log("WLAN");
-    
     $('#nw-wlan-ssid').rules("add", { required: true , string: true, messages: { required: "Bitte SSID eingeben.",} } );
     $('#nw-wlan-ssid').closest('.form-group').removeClass('has-success').addClass('has-error');
     $('#nw-wlan-ssid1').removeClass('glyphicon-ok').addClass('glyphicon-remove');  
@@ -92,14 +86,11 @@ function toggleNetwork(field1, field2, field3, field4, state) {
     $('#nw-wlan-ssid').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
     $('#nw-wlan-psk').on('click', function() {  $('#logger-deviceconfig-form').valid(); });
     $('#nw-wlan-psk').on('change', function() {  $('#logger-deviceconfig-form').valid(); });
-
-  } else {
+	} else {
+    field1.prop('hidden', true).change();
+    field1.prop('required', true).change();
     $('#nw-wlan-ssid').rules("remove", "required" );
     $('#nw-wlan-psk').rules("remove", "required" );
-  }
-  if (thisid == 'nw-lan') {
-    console.log("LAN");
-  //} else {
   }
 }
 
@@ -135,10 +126,12 @@ function createNetworkConfigHTML(w) {
   r = r + '            <div id="' + w + 'Form" class="row">';
   r = r + '              <div class="col-sm-5">Netzadresse:</div>';
   r = r + '              <div class="col-sm-7">';
-  r = r + '                  <select class="form-input" id="' + w + '-dhcp" name="' + w + '_protocol">';
+  r = r + '                  <div class="form-group has-feedback">';
+  r = r + '                  <select class="form-control" id="' + w + '-dhcp" name="' + w + '_protocol">';
   r = r + '                    <option value="dhcp" >Dynamisch (DHCP)</option>';
   r = r + '                    <option value="static">Statisch</option>'; 
   r = r + '                  </select>';
+  r = r + '                  </div>';
   r = r + '              </div>';
   r = r + '            </div>';
 
@@ -164,7 +157,7 @@ function createNetworkConfigHTML(w) {
   r = r + '                </div>';
   r = r + '              </div>';
   r = r + '              <div class="row">';
-  r = r + '                <div class="col-sm-5">Netmask:</div>';
+  r = r + '                <div class="col-sm-5">Netzmaske:</div>';
   r = r + '                <div class="col-sm-7">';
   r = r + '        <div class="form-group has-feedback">';
   r = r + '                  <input type="text" class="form-control" placeholder="255.255.255.0" aria-describedby="basic-addon2"';
@@ -382,7 +375,6 @@ function nextPage(cPage, nPage) {
   form1.validate({
     debug: true
 	});
-  //var id=currentTab;
 
   if( form1.valid() ) {
     //var tab = $(this).attr('data-tab-destination');
@@ -396,22 +388,22 @@ function nextPage(cPage, nPage) {
       console.log(' Next tab');
 			if( nPage == 'configuration' ) {
 				if($('#nw_lan_checkbox').is(":checked")) { 
-					$('#cfg-lan').html("LAN");
-					$('#cfg-wifi').prop("hidden",true).change();
-				} else if($('#nw_wlan_checkbox').is(":checked")) { 
 					$('#cfg-lan').html("WiFi");
 					$('#cfg-wifi').prop("hidden",false).change();
 					$('#cfg-wlan-ssid').html($('#nw-wlan-ssid').val());
 					$('#cfg-wlan-enc').html($('#nw-wlan-enc').val());
 					$('#cfg-wlan-psk').html($('#nw-wlan-psk').val());
-				} else { $('#cfg-lan').html("unknown"); }
+				} else {
+					$('#cfg-lan').html("LAN");
+					$('#cfg-wifi').prop("hidden",true).change();
+				}
 
 				if($('#lan-dhcp').val() == "dhcp") {
 					$('#cfg-protocol').html("DHCP");
 					$('#cfg-static').prop("hidden", true).change();
 				} else {
 					$('#cfg-static').prop("hidden", false).change();
-					$('#cfg-protocol').html("Static");
+					$('#cfg-protocol').html("Statisch");
 					$('#cfg-lan-ip').html($('#lan-ip').val());
 					$('#cfg-lan-gw').html($('#lan-gw').val());
 					$('#cfg-lan-mask').html($('#lan-mask').val());
@@ -500,6 +492,7 @@ function fillForm() {
   txt = txt + '<li role="presentation"><a  href="#sensoren" id="sensoren-tab" role="tab" data-toggle="tab" aria-controls="sensoren">Sensoren</a></li>';
   txt = txt + '<li role="presentation"><a  href="#configuration" id="configuration-tab" role="tab" data-toggle="tab" aria-controls="configuration">Konfiguration</a></li>';
   txt = txt + '<li role="presentation"><a  href="#synchronisation" id="synchronisation-tab" role="tab" data-toggle="tab" aria-controls="synchronisation">Synchronisieren</a></li>';
+  //txt = txt + '<li role="presentation">Synchronisieren</li>';
   txt = txt + '</ul>';
 
   txt = txt + '<div class="tab-content">';
@@ -510,26 +503,12 @@ function fillForm() {
   txt = txt + '<div class="panel-heading"><center>Netzwerkkonfiguration</center></div>';
   txt = txt + '      <div class="panel-body" id="nw" >';
   txt = txt + '        <div class="row">';
-  txt = txt + '          <div class="col-sm-2 form-group">';
+  txt = txt + '          <div class="col-sm-5">Netzwerkanschluss</div>';
+  txt = txt + '          <div class="col-sm-7 form-group">';
   txt = txt + '                <div class="input-group">';
-  txt = txt + '                  <input type="checkbox" id="nw_lan_checkbox" name="nw_enabled[]" value="1" ';
-  txt = txt + '                         data-size="mini"';
-  txt = txt + '                         class="network-group">';
+  txt = txt + '                    <input type="checkbox" id="nw_lan_checkbox" name="nw_enabled" value="1" data-size="normal" data-on-text="WiFi" data-off-text="LAN" data-on-color="success" data-off-color="primary">';
   txt = txt + '                </div>';
   txt = txt + '          </div>';
-  txt = txt + '          <div class="col-sm-1 form-group">LAN';
-  txt = txt + '          </div>';
-  txt = txt + '          <div class="col-sm-2 form-group"></div>';
-  txt = txt + '          <div class="col-sm-2">';
-  txt = txt + '                <div class="input-group">';
-  txt = txt + '                  <input type="checkbox" id="nw_wlan_checkbox" name="nw_enabled[]" value="2" ';
-  txt = txt + '                         data-size="mini"';
-  txt = txt + '                         class="network-group">';
-  txt = txt + '                </div>';
-  txt = txt + '          </div>';
-  txt = txt + '          <div class="col-sm-1 form-group">WiFi';
-  txt = txt + '          </div>';
-  txt = txt + '          <div class="col-sm-2 form-group"></div>';
   txt = txt + '        </div>';
 
   txt = txt + '        <div id="nw-wlan" hidden>'; // WiFi-config
@@ -544,7 +523,7 @@ function fillForm() {
   txt = txt + '                  </div>';
   txt = txt + '                </div>';
   txt = txt + '                <div id="wlanForm" class="row">';
-  txt = txt + '                  <div class="col-sm-5">verschluessel:</div>';
+  txt = txt + '                  <div class="col-sm-5">Verschl&uuml;sselung:</div>';
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
   txt = txt + '                      <select class="form-control" id="nw-wlan-enc" name="nw-wlan-enc">';
@@ -557,10 +536,10 @@ function fillForm() {
   txt = txt + '                  </div>';
   txt = txt + '                </div>';
   txt = txt + '                <div class="row" id="nw-wlan-psk-line">';
-  txt = txt + '                  <div class="col-sm-5">Schluessel/Passwort:</div>';
+  txt = txt + '                  <div class="col-sm-5">PSK / Passwort:</div>';
   txt = txt + '                  <div class="col-sm-7">';
   txt = txt + '                    <div class="form-group has-feedback">';
-  txt = txt + '                    <input type="text" class="form-control" placeholder="Passwort oder Schluessel" aria-describedby="basic-addon2"';
+  txt = txt + '                    <input type="text" class="form-control" placeholder="PSK oder Passwort" aria-describedby="basic-addon2"';
   txt = txt + '                           name="nw-wlan-psk" id="nw-wlan-psk"';
   txt = txt + '                           data-bv-notempty-message="The password/PSK is required and cannot be empty" />';
   txt = txt + '                    <span class="glyphicon form-control-feedback" id="nw-wlan-psk1"></span>';
@@ -620,7 +599,7 @@ function fillForm() {
   txt = txt + '        <div class="col-sm-6" id="cfg-lan"></div>';
   txt = txt + '      </div>';
   txt = txt + '      <div id="cfg-wifi"><div class="row">';
-  txt = txt + '        <div class="col-sm-3">ESSID:</div>';
+  txt = txt + '        <div class="col-sm-3">SSID:</div>';
   txt = txt + '        <div class="col-sm-6" id="cfg-wlan-ssid"></div>';
   txt = txt + '      </div>';
   txt = txt + '      <div class="row">';
@@ -628,16 +607,16 @@ function fillForm() {
   txt = txt + '        <div class="col-sm-6" id="cfg-wlan-enc"></div>';
   txt = txt + '      </div>';
   txt = txt + '      <div class="row">';
-  txt = txt + '        <div class="col-sm-3">Passwort/psk:</div>';
+  txt = txt + '        <div class="col-sm-3">PSK / Passwort:</div>';
   txt = txt + '        <div class="col-sm-6" id="cfg-wlan-psk"></div>';
   txt = txt + '      </div></div>';
   txt = txt + '      <div class="row">';
-  txt = txt + '        <div class="col-sm-3">Protocol:</div>';
+  txt = txt + '        <div class="col-sm-3">Netzadresse:</div>';
   txt = txt + '        <div class="col-sm-6" id="cfg-protocol"></div>';
   txt = txt + '      </div>';
 
   txt = txt + '      <div id="cfg-static"><div class="row">';
-  txt = txt + '        <div class="col-sm-3">IP Adresse:</div>';
+  txt = txt + '        <div class="col-sm-3">IP-Adresse:</div>';
   txt = txt + '        <div class="col-sm-6" id="cfg-lan-ip"></div>';
   txt = txt + '      </div>';
   txt = txt + '      <div class="row">';
@@ -688,9 +667,9 @@ function fillForm() {
   txt = txt + '    </div>';
   txt = txt + '  </div>';
   txt = txt + '  <div class="row">';
-  txt = txt + '    <div class="col-lg-12" align="right">';
-  txt = txt + '      <button type="button" class="btn btn-default" data-tab-destination="save" aria-label="Left Align" id="next-button" onclick="nextPage(\'configuration\',\'synchronisation\');">';
-  txt = txt + '        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>';
+  txt = txt + '    <div class="col-lg-12" align="center">';
+  txt = txt + '      <button value="Speichern" type="button" class="btn btn-default" data-tab-destination="save" aria-label="Center Align" id="next-button" onclick="nextPage(\'configuration\',\'synchronisation\');">';
+	txt = txt + 'Anwenden und Synchronisieren';
   txt = txt + '      </button>';
   txt = txt + '    </div>';
   txt = txt + '  </div>';
@@ -701,7 +680,12 @@ function fillForm() {
   txt = txt + '  <div class="panel panel-default">';
   //txt = txt + '    <div class="panel-heading"><center>Synchronisation</center></div>';
   txt = txt + '    <div class="panel-body">';
-	txt = txt + '       synchronisation progress bar';      
+	txt = txt + '       <div id="progressbar"></div>';      
+	txt = txt + '       <div class="progress">';
+	txt = txt + '         <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">';
+	txt = txt + '           <span class="sr-only">60% Complete</span>';
+	txt = txt + '         </div>';
+	txt = txt + '       </div>';
   txt = txt + '    </div>';
   txt = txt + '  </div>';
   txt = txt + '</div>';
@@ -767,20 +751,14 @@ function fillForm() {
         } 
   });
 
-	$('.network-group').rules("add", { required: true, string: true, messages: { required: ""}, } );
 	$('.sensor-group').rules("add", { required: true, string: false, messages: { required: false}, } );
 	//$("#logger-deviceconfig-form").validate().settings.onsubmit = false;
 
-    $("#nw_lan_checkbox").bootstrapSwitch('state', true);
-
-    $("#nw_wlan_checkbox").bootstrapSwitch('state', false);
+	$("#nw_lan_checkbox").bootstrapSwitch('state', false);
 
     $('#nw_lan_checkbox').on('switchChange.bootstrapSwitch', function(event, state) {
-															 toggleNetwork($('#nw-lan'), $('#nw-wlan'), $('#nw_wlan_checkbox'), $('#nw_lan_checkbox'), state);
+															 toggleNetwork($('#nw-wlan'), $('#nw_lan_checkbox'), state);
 														 });
-    $('#nw_wlan_checkbox').on('switchChange.bootstrapSwitch', function(event, state) {
-																toggleNetwork($('#nw-wlan'), $('#nw-lan'), $('#nw_lan_checkbox'), $('#nw_wlan_checkbox'), state);
-															});
   console.log('Fillform - done');
 
 }
