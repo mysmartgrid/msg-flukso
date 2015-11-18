@@ -48,6 +48,16 @@ function msgweb_preprocess_html(&$vars) {
         'every_page' => TRUE
       )
     );
+    drupal_add_css(
+      path_to_theme() . '/bootstrap/css/bootstrap.css',
+      array(
+        'every_page' => TRUE
+      )
+    );
+    drupal_add_js(
+      path_to_theme() . '/bootstrap/js/bootstrap.min.js',
+      'file'
+    );
 
   // Toggle fixed or fluid width.
   if (theme_get_setting('msgweb_width') == 'fluid') {
