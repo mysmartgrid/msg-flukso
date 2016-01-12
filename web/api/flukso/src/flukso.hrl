@@ -171,7 +171,7 @@ check_device_type(Type) ->
         <<"vzlogger">> -> {?VZLOGGER_DEVICE_TYPE_ID, true};
         <<"libklio">> -> {?LIBKLIO_DEVICE_TYPE_ID, true};
         <<"raspberrypi">> -> {?RASPBERRY_PI_DEVICE_TYPE_ID, true};
-        <<"amperix1">> -> {?AMPERIX01_DEVICE_TYPE_ID, true};
+        <<"amperix1">> -> {?AMPERIXO1_DEVICE_TYPE_ID, true};
         _ -> {?UNKNOWN_DEVICE_TYPE_ID, false}
     end.
 
