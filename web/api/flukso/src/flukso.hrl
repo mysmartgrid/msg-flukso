@@ -36,6 +36,7 @@
 -define(VZLOGGER_DEVICE_TYPE_ID,     3).
 -define(LIBKLIO_DEVICE_TYPE_ID,      4).
 -define(RASPBERRY_PI_DEVICE_TYPE_ID, 6).
+-define(AMPERIX01_DEVICE_TYPE_ID,    7).
 
 -define(NO_COMMUNICATION_EVENT_ID,       1).
 -define(COMMUNICATION_RESTORED_EVENT_ID, 3).
@@ -47,6 +48,8 @@
 -define(BROWNOUT_EVENT_ID,                104).
 -define(FIRMWARE_UPGRADED_EVENT_ID,       105).
 -define(FAILED_FIRMWARE_UPGRADE_EVENT_ID, 106).
+-define(CONFIG_NETWORK_OK_EVENT_ID,       107).
+-define(CONFIG_NETWORK_FAILED_EVENT_ID,   108).
 
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
 -define(INVALID_TIMESTAMP_EVENT_ID,       202).
@@ -132,6 +135,8 @@ check_event(Event) ->
       ?BROWNOUT_EVENT_ID -> true;
       ?FIRMWARE_UPGRADED_EVENT_ID -> true;
       ?FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
+      ?CONFIG_NETWORK_OK_EVENT_ID -> true;
+      ?CONFIG_NETWORK_FAILED_EVENT_ID -> true;
       _ -> false
   end}.
 
@@ -170,6 +175,7 @@ check_device_type(Type) ->
         <<"vzlogger">> -> {?VZLOGGER_DEVICE_TYPE_ID, true};
         <<"libklio">> -> {?LIBKLIO_DEVICE_TYPE_ID, true};
         <<"raspberrypi">> -> {?RASPBERRY_PI_DEVICE_TYPE_ID, true};
+        <<"amperix1">> -> {?AMPERIXO1_DEVICE_TYPE_ID, true};
         _ -> {?UNKNOWN_DEVICE_TYPE_ID, false}
     end.
 

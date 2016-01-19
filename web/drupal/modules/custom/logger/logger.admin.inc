@@ -374,23 +374,28 @@ function logger_device_configALT_page($id, $page) {
   }
   else {
     if ($device->pending_config) {
+      if($device->pending_config == 1) {
 
-      $output .= logger_step(3, 'The configuration below is being sent to the device. ' .
-        'Please make sure that the device is turned on and connected to the network during the next 10 minutes.') .
-        '<br><div id="progressbar"></div><br><br>';
+        $output .= logger_step(3, 'The configuration below is being sent to the device. ' .
+          'Please make sure that the device is turned on and connected to the network during the next 10 minutes.') .
+          '<br><div id="progressbar"></div><br><br>';
 
-      $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (10 * MINUTE)) * 100;
-      $progress = $progress < 95 ? $progress : 95;
+        $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (10 * MINUTE)) * 100;
+        $progress = $progress < 95 ? $progress : 95;
 
-      $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
-      drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
-      drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
-      drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
-      drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
-        array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
+        $options = array('type' => 'file', 'scope' => 'header', 'group' => JS_LIBRARY, 'weight' => 150, 'defer' => FALSE);
+        drupal_add_js(EMOS_REL_PATH . '/js/jquery-min.js', $options);
+        drupal_add_js(EMOS_REL_PATH . '/js/jquery-ui-min.js', $options);
+        drupal_add_css(EMOS_REL_PATH . '/style/jquery-ui.css');
+        drupal_add_js("jQuery(\"#progressbar\").progressbar({value: $progress});",
+          array('type' => 'inline', 'scope' => 'footer', 'group' => JS_DEFAULT));
 
-      drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
-        'http-equiv' => 'refresh', 'content' => "10;URL=/device/config/$id/2")), 'device_config');
+        drupal_add_html_head(array('#type' => 'html_tag', '#tag' => 'meta', '#attributes' => array(
+          'http-equiv' => 'refresh', 'content' => "10;URL=/device/config/$id/2")), 'device_config');
+      } else {
+        $output .= logger_step(4, 'The network configuration failed. ' .
+          'Please review the configuration and try again.');
+      }
     }
     else {
       $output .= logger_step(4, 'Congratulations! The new configuration has been successfully applied to the device. ' .
@@ -713,9 +718,14 @@ function logger_device_config_page($id, $page) {
     <script src="/sites/all/modules/logger/js/amperix.js"></script>
 ';
 
+    $output .= '<div> Page='.$page.' </div>';
   if ($page == 1 || $page == 2) {
     $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
-    $output .= drupal_render($form);
+    $equery = db_select('notification', 'n');
+    $equery->condition('n.device', $device);
+//    $notification = $equery->execute()
+//    ->fetchObject();
+
     $jsupdtxt = "function updateValues() {\n";
     //drupal_add_js(}", $options);
 
@@ -782,20 +792,43 @@ function logger_device_config_page($id, $page) {
 #    drupal_add_js("jQuery(document).ready( $('.BSswitch').bootstrapSwitch('state', true);); ", $options);
 #    drupal_add_js("var $BSswitch = $('BSswitch').bootstrapSwitch('state', true);", $options);
 
-    if ($device->pending_config) {
-      $form_state['redirect'] = 'device/config/' . $id . '/2';
-
+    if($page>1) {
       if($page < 3 ) { $jstxt.="switchtab('synchronisation');"; }
-      $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (20 * MINUTE)) * 100;
-      $progress = $progress < 95 ? $progress : 95;
-      $jstxt.="jQuery('.progress-bar').css('width', '$progress%');\n";
-      $jstxt.=" refresh();";
+      if ($device->pending_config) {
+        if($device->pending_config == 1) {
+          $form_state['redirect'] = 'device/config/' . $id . '/2';
+
+          $progress = ((REQUEST_TIME - max($device->created, $device->access)) / (20 * MINUTE)) * 100;
+          $progress = $progress < 95 ? $progress : 95;
+          $jstxt.="jQuery('.progress-bar').css('width', '$progress%');\n";
+          $jstxt.=" refresh();";
+        } else {
+          $form_state['redirect'] = 'device/config/' . $id . '/3';
+          $output .= '<div class="alert alert-danger" role="alert">';
+          $output .= '  <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>';
+          $output .= '  <span class="sr-only">Error:</span>';
+          $output .= '  The network configuration failed.';
+          $output .= '  Please review the configuration and try again.';
+          $output .= '</div>';
+          # $output .= logger_step(4, 'The network configuration failed. ' .
+          #   'Please review the configuration and try again.');
+        }
+      } else {
+        $form_state['redirect'] = 'device/config/' . $id . '/3';
+        $output .= '<div class="alert alert-success" role="alert">';
+        $output .= '  <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>';
+        $output .= '  <span class="sr-only">Error:</span>';
+        $output .= '  The amperix configuration was successfully synchronised.';
+        $output .= '</div>';
+      }
     }
     $jsupdtxt.='}';
     drupal_add_js($jsupdtxt, $options);
 
     $jstxt.='}';
     drupal_add_js($jstxt, $options);
+
+    $output .= drupal_render($form);
   }
   else {
     if ($device->pending_config) {
