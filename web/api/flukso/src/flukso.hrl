@@ -48,6 +48,8 @@
 -define(BROWNOUT_EVENT_ID,                104).
 -define(FIRMWARE_UPGRADED_EVENT_ID,       105).
 -define(FAILED_FIRMWARE_UPGRADE_EVENT_ID, 106).
+-define(CONFIG_NETWORK_OK_EVENT_ID,       107).
+-define(CONFIG_NETWORK_FAILED_EVENT_ID,   108).
 
 -define(CORRUPTED_MEASUREMENT_EVENT_ID,   201).
 -define(INVALID_TIMESTAMP_EVENT_ID,       202).
@@ -133,6 +135,8 @@ check_event(Event) ->
       ?BROWNOUT_EVENT_ID -> true;
       ?FIRMWARE_UPGRADED_EVENT_ID -> true;
       ?FAILED_FIRMWARE_UPGRADE_EVENT_ID -> true;
+      ?CONFIG_NETWORK_OK_EVENT_ID -> true;
+      ?CONFIG_NETWORK_FAILED_EVENT_ID -> true;
       _ -> false
   end}.
 
