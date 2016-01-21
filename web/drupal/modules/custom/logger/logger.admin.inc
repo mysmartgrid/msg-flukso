@@ -718,7 +718,6 @@ function logger_device_config_page($id, $page) {
     <script src="/sites/all/modules/logger/js/amperix.js"></script>
 ';
 
-    $output .= '<div> Page='.$page.' </div>';
   if ($page == 1 || $page == 2) {
     $form = drupal_get_form('logger_deviceconfig_form', $id, $page);
     $equery = db_select('notification', 'n');
@@ -804,6 +803,8 @@ function logger_device_config_page($id, $page) {
           $jstxt.=" refresh();";
         } else {
           $form_state['redirect'] = 'device/config/' . $id . '/3';
+          $jstxt.="jQuery('.progress-bar').css('width', '100%');\n";
+          $jstxt.=" refresh();";
           $output .= '<div class="alert alert-danger" role="alert">';
           $output .= '  <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>';
           $output .= '  <span class="sr-only">Error:</span>';
@@ -814,6 +815,8 @@ function logger_device_config_page($id, $page) {
           #   'Please review the configuration and try again.');
         }
       } else {
+        $jstxt.="jQuery('.progress-bar').css('width', '100%');\n";
+        $jstxt.=" refresh();";
         $form_state['redirect'] = 'device/config/' . $id . '/3';
         $output .= '<div class="alert alert-success" role="alert">';
         $output .= '  <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>';
