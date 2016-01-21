@@ -773,6 +773,28 @@ function notification_update_7020() {
   return st("The table notification_meter has been created.");
 }
 
+/**
+ * Update the event table.
+ */
+function notification_update_7021() {
+  
+  db_insert('event')
+    ->fields(array(
+      'id' => CONFIG_NETWORK_OK_EVENT_ID,
+      'name' => 'Network configuration successfull',
+    ))
+    ->execute();
+
+  db_insert('event')
+    ->fields(array(
+      'id' => CONFIG_NETWORK_FAILED_EVENT_ID,
+      'name' => 'Network configuration failed',
+    ))
+    ->execute();
+
+  return st("The table event has been updated.");
+}
+
 function notification_meter_create_query_aux($notification) {
 
   $query = db_select('logger_meters', 'm')
