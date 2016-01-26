@@ -44,6 +44,8 @@ define('MEASUREMENT_RECEIVED_EVENT_ID',    102);
 define('BROWNOUT_EVENT_ID',                104);
 define('FIRMWARE_UPGRADED_EVENT_ID',       105);
 define('FAILED_FIRMWARE_UPGRADE_EVENT_ID', 106);
+define('CONFIG_NETWORK_OK_EVENT_ID',       107);
+define('CONFIG_NETWORK_FAILED_EVENT_ID',   108);
 
 //Anomaly and data corruption events
 define('MEASUREMENT_ANOMALY_EVENT_ID',     200);
