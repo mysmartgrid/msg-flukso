@@ -807,8 +807,7 @@ function logger_device_config_page($id, $page) {
           $output .= '<div class="alert alert-danger" role="alert">';
           $output .= '  <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>';
           $output .= '  <span class="sr-only">Error:</span>';
-          $output .= '  The network configuration failed.';
-          $output .= '  Please review the configuration and try again.';
+          $output .= '  '.t('The network configuration failed. Please review the configuration and try again.');
           $output .= '</div>';
           # $output .= logger_step(4, 'The network configuration failed. ' .
           #   'Please review the configuration and try again.');
@@ -819,7 +818,7 @@ function logger_device_config_page($id, $page) {
         $output .= '<div class="alert alert-success" role="alert">';
         $output .= '  <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>';
         $output .= '  <span class="sr-only">Error:</span>';
-        $output .= '  The amperix configuration was successfully synchronised.';
+        $output .= '  '.t('The amperix configuration was successfully synchronised.');
         $output .= '</div>';
       }
     }
@@ -1488,6 +1487,11 @@ function logger_sensor_form($form, &$form_state, $sensor = NULL) {
   logger_create_energy_sensor_fields($form, $sensor);
 
   //If creating or editing a virtual sensor
+  $form['virtual'] = array(
+    '#type' => 'hidden',
+    '#required' => TRUE,
+    '#default_value' => $sensor->virtual
+  );
   if ($sensor->virtual) {
 
     $meters_options = logger_get_meters_options(array(ENERGY_CONSUMPTION_SENSOR_TYPE, ENERGY_PRODUCTION_SENSOR_TYPE));
@@ -2263,12 +2267,16 @@ function logger_sensor_form_submit($form, &$form_state) {
         ->execute();
     }
 
-    db_update('logger_meters')
-      ->fields(array(
-        'pending_config' => 1
-      ))
-      ->condition('meter', $meter)
-      ->execute();
+    // only if not virtual
+    $virtual = isset($form_state['values']['virtual']) ? $form_state['values']['virtual'] : 0;
+    if( $virtual != 1) {
+      db_update('logger_meters')
+        ->fields(array(
+          'pending_config' => 1
+        ))
+        ->condition('meter', $meter)
+        ->execute();
+    }
   }
   //If creation
   else {
