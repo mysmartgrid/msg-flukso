@@ -112,7 +112,9 @@ process_post(ReqData, #state{event = Event, device = Device} = State) ->
     mysql:execute(pool, event_insert, [Device, Event, Timestamp]),
 
     case Event of
-	?CONFIG_NETWORK_FAILED_EVENT_ID -> mysql:execute(pool, device_config_update, [2, Device])
+       ?CONFIG_NETWORK_FAILED_EVENT_ID -> mysql:execute(pool, device_config_update, [2, Device]);
+       ?CONFIG_NETWORK_OK_EVENT_ID -> mysql:execute(pool, device_config_update2, [Device]);
+       _ -> {true}
     end,
     
     digest_response(Key, [{<<"timestamp">>, Timestamp}], ReqData, State).

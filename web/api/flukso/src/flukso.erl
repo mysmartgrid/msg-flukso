@@ -89,6 +89,7 @@ mysql_prepare() ->
 
     mysql:prepare(device_network_insert, <<"INSERT INTO logger_device_network (device, lan_enabled, lan_protocol, lan_ip, lan_netmask, lan_gateway, lan_nameserver, wifi_enabled, wifi_essid, wifi_enc, wifi_psk, wifi_protocol, wifi_ip, wifi_netmask, wifi_gateway, wifi_nameserver) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>),
     mysql:prepare(device_config_update, <<"UPDATE logger_devices set pending_config = ? WHERE device = ?">>),
+    mysql:prepare(device_config_update2, <<"UPDATE logger_device_network set wifi_psk=null WHERE device = ?">>),
     mysql:prepare(device_network_delete, <<"DELETE FROM logger_device_network WHERE device = ?">>),
     mysql:prepare(device_network_props, <<"SELECT d.pending_config, n.lan_enabled, n.lan_protocol, n.lan_ip, n.lan_netmask, n.lan_gateway, n.lan_nameserver, n.wifi_enabled, n.wifi_essid, n.wifi_enc, n.wifi_psk, n.wifi_protocol, n.wifi_ip, n.wifi_netmask, n.wifi_gateway, n.wifi_nameserver FROM logger_devices d, logger_device_network n WHERE d.device = n.device AND d.device = ?">>),
 
