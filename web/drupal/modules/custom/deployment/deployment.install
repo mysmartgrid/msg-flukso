@@ -330,3 +330,28 @@ function deployment_update_7010() {
 
   return st("Deployment state messages have been updated.");
 }
+/**
+ * Update deployment state messages.
+ */
+function deployment_update_7013() {
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 11,
+      'name' => 'Late Measurements',
+      'description' => "The measurements of the device are late but not yet timedout.",
+      'flow_order' => 11,
+    ))
+    ->execute();
+
+  db_insert('deployment_state')
+    ->fields(array(
+      'id' => 12,
+      'name' => 'Late Heartbeat',
+      'description' => "The heartbeat of the device is late but not yet timedout.",
+      'flow_order' => 12,
+    ))
+    ->execute();
+
+  return st("Deployment state messages have been updated.");
+}

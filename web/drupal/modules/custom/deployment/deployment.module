@@ -36,6 +36,8 @@ define('NO_MEASUREMENT_STATE_ID',     7);
 define('NO_HEARTBEAT_STATE_ID',       8);
 define('INVALID_TIMESTAMP_STATE_ID',  9);
 define('MISSING_SENSORS_STATE_ID',   10);
+define('LATE_MEASUREMENT_STATE_ID',  11);
+define('LATE_HEARTBEAT_STATE_ID',    12);
 
 define('DEPLOYMENT_REL_PATH', drupal_get_path('module', 'deployment'));
 define('DEPLOYMENT_PATH', DRUPAL_ROOT . '/' . DEPLOYMENT_REL_PATH);
@@ -175,6 +177,15 @@ function deployment_checkup_page($param_name = NULL, $param_value = NULL) {
         case WORKING_STATE_ID:
           $message = t('This device is working fine. Latest message received at %latest.', $latest);
           break;
+
+        case LATE_MEASUREMENT_STATE_ID:
+          $message = t('No measurement has been received from this device since %latest.', $latest);
+          break;
+
+        case LATE_HEARTBEAT_STATE_ID:
+          $message = t('No heartbeat has been received from this device since %latest.', $latest);
+          break;
+
       }
 
       $operations = l(t('Device History'), 'event/log/list/' . $device['device']);
@@ -637,6 +648,26 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
       $query->isNull('m.access');
       break; 
 
+    case LATE_MEASUREMENT_STATE_ID:
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
+        ->condition('d.access', $communication_timeout, '>=')
+        ->condition('m.access', $offline_timeout, '>=')
+        ->condition('m.access', $communication_timeout, '<');
+      $latest_field = "m.access";
+      break;
+
+    case LATE_HEARTBEAT_STATE_ID:
+      $query->condition('d.uid', 0, '>')
+        ->isNull('m.corrupted')
+        ->isNull('m.unsynchronized')
+        ->condition('d.access', $communication_timeout, '<')
+        ->condition('d.access', $offline_timeout, '>=')
+        ->condition('m.access', $communication_timeout, '>=');
+      $latest_field = "m.access";
+      break;
+
     default:
       return array();
   }
@@ -650,7 +681,6 @@ function deployment_query_devices($filter = array(), $header = NULL, $page_limit
 
   $result = $query->execute();
   while ($device = $result->fetchAssoc()) {
-
     $devices[] = $device;
   }
   return $devices;
