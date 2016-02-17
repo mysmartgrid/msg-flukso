@@ -16,6 +16,10 @@ function refresh() {
 (function() {
   console.log('Init?');
   form1 = $( "#logger-deviceconfig-form" );
+  validation_network=false;
+  validation_sensoren=false;
+  validation_configuration=false;
+  validation_synchronisation=false;
 
   $(function() {
       currentTab="network";
@@ -377,13 +381,29 @@ function nextPage(cPage, nPage) {
 	});
 
   if( form1.valid() ) {
+    var v="validation_"+cPage+"=true";
+    eval(v);
     //var tab = $(this).attr('data-tab-destination');
     if( nPage == 'synchronisation' ) {
-      console.log(' Submit1...: '+cPage);
-      //form1.submit();
-      console.log(' Submit2...: '+cPage);
-      document.devicewizard.submit();
-      console.log(' Submit3...: '+cPage);
+      if(validation_network && validation_sensoren) {
+        console.log(' Submit1...: '+cPage);
+        //form1.submit();
+        console.log(' Submit2...: '+cPage);
+        document.devicewizard.submit();
+        console.log(' Submit3...: '+cPage);
+      } else {
+        console.log(' Validation failed.');
+        if( validation_network==false ) {
+          alert( "Bitte beenden Sie zunaechst die Netzwerkkonfiguration." );
+        } else {
+          if( validation_sensoren==false ) {
+            alert( "Es muss mindestens 1 Sensor aktiviert werden." );
+          } else {
+            alert( "Die Eingabe ist noch fehlerhaft bzw unvollstaedig." );
+          }
+        }
+        return false;
+      }
     } else {
       console.log(' Next tab');
 			if( nPage == 'configuration' ) {
