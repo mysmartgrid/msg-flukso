@@ -969,7 +969,7 @@ function logger_device_form($form, &$form_state, $device, $form_id = "logger-dev
 
   $space = str_repeat('&nbsp;', 53);
 
-  if (version_compare($device->firmware_version, "2.2.9", ">") && 
+  if (version_compare($device->firmware_version, "2.2.9", ">") &&
       ( $device->type_string == 'flukso2') || ($device->type_string == 'amperix1') ) {
     $form['config_header'] = array(
       '#type' => 'item',
@@ -2041,7 +2041,7 @@ function logger_sensor_form_validate($form, &$form_state) {
           form_set_error('voltage', t('Invalid electric current.'));
         }
       }
-      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] <= 0 || $form_state['values']['constant'] > 1000)) {
+      elseif ($class_id == PULSE_SENSOR_CLASS_ID && ($form_state['values']['constant'] <= 0 || $form_state['values']['constant'] > 10000)) {
         form_set_error('voltage', t('Invalid sensor constant.'));
       }
     }
@@ -2488,8 +2488,8 @@ function logger_device_activate($code) {
     $device = logger_get_device($device_id);
 
     drupal_set_message(t("The device is now associated with your account."));
-    if (version_compare($device->firmware_version, "2.2.9", ">") && 
-	( $device->type_string == 'flukso2') || ($device->type_string == 'amperix1') ) {
+    if (version_compare($device->firmware_version, "2.2.9", ">") &&
+        ( $device->type_string == 'flukso2') || ($device->type_string == 'amperix1') ) {
       drupal_goto("device/config/$device_id/1");
     } else {
       drupal_goto('device/mylist');
