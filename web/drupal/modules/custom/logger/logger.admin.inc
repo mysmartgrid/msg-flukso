@@ -313,9 +313,14 @@ function logger_firmware_edition_page($id) {
  */
 function logger_device_edition_page($id) {
 
-  return logger_device_config_page($id, 1);
-  //$form = drupal_get_form('logger_device_form', logger_get_device($id));
-  //return drupal_render($form);
+  $device = logger_get_device($id);
+  if (version_compare($device->firmware_version, "2.2.9", ">") && 
+      ( $device->type_string == 'flukso2') || ($device->type_string == 'amperix1') ) {
+    return logger_device_config_page($id, 1);
+  } else {
+    $form = drupal_get_form('logger_device_form', $device);
+    return drupal_render($form);
+  }
 }
 
 /**
